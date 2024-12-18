@@ -2,7 +2,7 @@ import urllib3
 import json
 import base64
 
-from _constants import (
+from ._constants import (
     DEFAULT_TIMEOUT,
     MAX_RETRY_DELAY,
     DEFAULT_MAX_RETRIES,
@@ -306,33 +306,22 @@ class GoogleAIClient(BaseClient):
 
     def __prepareBody(self, messages):
         
-        systemPrompt = None
-        for idx, message in enumerate(messages):
-            if message['role'] == 'system':
-                systemPrompt = message['content']
-                del messages[idx]
-                break
+        requestBody = {"contents":[]}
 
-        isSystemPromptApplicable = True
         for message in messages:
-            if message['role'] == 'user':
-                message['parts'] = [] if systemPrompt is None and isSystemPromptApplicable else [{"text": systemPrompt}]
-                isSystemPromptApplicable = False
+            if message['role'] == 'system':
+                requestBody['system_instruction'] = {"parts" : { "text" : message['content']}}
+            elif message['role'] == 'user':
                 if message['content'] is not None and type(message['content']) is list:
-                    message['parts'] = message.pop('content')                                                           
+                    requestBody['contents'].append({"role":"user", "parts": message['content']})
                 else:
-                    message['parts'].append({"text": message.pop('content')})
-            
-            if message['role'] == 'assistant':
-                message['role'] = 'model'
-                message['parts'] = [{"text": message.pop('content')}]
+                    requestBody['contents'].append({"role":"user", "parts":[{"text": message['content']}]})
+            elif message['role'] == 'assistant':
+                requestBody['contents'].append({"role":"model", "parts":[{"text": message['content']}]})
 
-        return {            
-            "contents": message
-        }
+        return requestBody
 
-    def completion(self, messages: list):
-        
+    def completion(self, messages: list):        
         responce = self.post(
             f'/models/{self._model}:generateContent?key={self._api_key}',
             data = self.__prepareBody(messages),

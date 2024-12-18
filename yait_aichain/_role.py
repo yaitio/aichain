@@ -1,4 +1,4 @@
-from _client import BaseClient, YandexClient, OpenAIClient, StabilityAIClient, AnthropicClient, GoogleAIClient, MistralAIClient
+from ._client import BaseClient, YandexClient, OpenAIClient, StabilityAIClient, AnthropicClient, GoogleAIClient, MistralAIClient
 from copy import deepcopy
 import base64
 import mimetypes
@@ -20,9 +20,9 @@ class Role:
                 instance = Role_OpenAI
             case "core" | "sd3" | "sd3-turbo":
                 instance = Role_StabilityAI
-            case "claude-3-opus-20240229" | "claude-3-sonnet-20240229" | "claude-3-haiku-20240307" | "claude-3-5-sonnet-20240620" as model:
+            case "claude-3-5-sonnet-latest" | "claude-3-5-haiku-latest" | "claude-3-opus-latest" as model:
                 instance = Role_AnthropicAI
-            case "gemini-pro" | "gemini-pro-vision" as model:
+            case "gemini-2.0-flash-exp" | "gemini-1.5-flash" | "gemini-1.5-flash-8b" | "gemini-1.5-pro" as model:
                 instance = Role_GoogleAI
             case "mistral-large-latest" | "mistral-medium-latest" | "mistral-small-latest" as model:
                 instance = Role_MistralAI                   
