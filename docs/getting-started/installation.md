@@ -2,34 +2,32 @@
 
 ## Library
 
-aichain 2.0 is not yet published to PyPI. Clone the repository and add the root directory to your Python path.
-
 ```bash
-git clone <repo-url> aichain_2.0
-cd aichain_2.0
+pip install yait-aichain
 ```
 
-From your own script, add the library root to `sys.path` before importing:
+Optional extras — install only what you need:
 
-```python
-import sys
-sys.path.insert(0, "/path/to/aichain_2.0")
+```bash
+pip install yait-aichain[convert]   # file/URL → Markdown (markitdown)
+pip install yait-aichain[yaml]      # save & load Skills and Chains (pyyaml)
+pip install yait-aichain[mcp]       # MCP server integration (fastmcp)
+pip install yait-aichain[all]       # everything above
+```
 
-from models import Model
-from skills import Skill
+Or install extras individually:
+
+```bash
+pip install markitdown   # file/URL → Markdown
+pip install pyyaml       # Skill.save() / Chain.save() / load()
+pip install fastmcp      # MCP server integration
 ```
 
 ---
 
 ## Dependencies
 
-### Required
-
-```bash
-pip install pyyaml          # Skill.save() / Skill.load() / Chain.save() / Chain.load()
-```
-
-All HTTP calls use `urllib3`, which is installed by default in most Python environments. If it is missing:
+All HTTP calls use `urllib3`. It ships with most Python environments — if missing:
 
 ```bash
 pip install urllib3
@@ -39,37 +37,28 @@ pip install urllib3
 
 | Feature | Package | Install |
 |---|---|---|
+| URL / file → Markdown | markitdown | `pip install markitdown` |
+| Save & load Skills/Chains | pyyaml | `pip install pyyaml` |
+| MCP server tools | fastmcp | `pip install fastmcp` |
 | HTML export | mistletoe | `pip install mistletoe` |
 | PDF export | weasyprint | `pip install weasyprint` |
-| URL / file → Markdown | markitdown | `pip install markitdown` |
-| DeepL translation | *(none — uses urllib3)* | — |
-| All search tools | *(none — uses urllib3)* | — |
 
 #### WeasyPrint system libraries (macOS)
 
-WeasyPrint needs Pango and GLib, which are not bundled in the Python package. Install them with Homebrew:
+WeasyPrint needs Pango and GLib. Install with Homebrew:
 
 ```bash
 brew install pango glib
-```
-
-Then tell the dynamic linker where to find them. Add this to your `~/.zshrc` (or `~/.bashrc`) to make it permanent:
-
-```bash
 export DYLD_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_LIBRARY_PATH"
 ```
 
-Apply immediately without restarting the shell:
-
-```bash
-source ~/.zshrc
-```
+Add the `export` line to your `~/.zshrc` to make it permanent.
 
 ---
 
 ## API keys
 
-Each provider requires its own key, set as an environment variable. You only need keys for the providers you actually use.
+Set keys only for the providers you use:
 
 | Provider | Environment variable | Get a key |
 |---|---|---|
@@ -78,23 +67,29 @@ Each provider requires its own key, set as an environment variable. You only nee
 | Google AI | `GOOGLE_AI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
 | xAI | `XAI_API_KEY` | [console.x.ai](https://console.x.ai) |
 | Perplexity | `PERPLEXITY_API_KEY` | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+| Kimi | `MOONSHOT_API_KEY` | [platform.moonshot.cn](https://platform.moonshot.cn) |
+| DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
+| Qwen | `DASHSCOPE_API_KEY` | [dashscope.aliyuncs.com](https://dashscope.aliyuncs.com) |
+| Cohere | `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com) |
+| Voyage | `VOYAGE_API_KEY` | [dash.voyageai.com](https://dash.voyageai.com) |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | [brave.com/search/api](https://brave.com/search/api) |
 | SerpAPI | `SERP_API_KEY` | [serpapi.com](https://serpapi.com) |
 | DeepL | `DEEPL_API_KEY` | [deepl.com/pro-api](https://www.deepl.com/pro-api) |
 
-Set them for the current shell session:
+Set for the current session:
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
-export PERPLEXITY_API_KEY="pplx-..."
+export OPENAI_API_KEY="sk-..."
 ```
 
-Or put them in a `.env` file and source it:
+Or put them all in a `.env` file:
 
 ```bash
 # .env
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
+export GOOGLE_AI_API_KEY="AIza..."
 ```
 
 ```bash
@@ -107,19 +102,18 @@ source .env
 
 ## Verify installation
 
-Run the built-in check script. It tests every provider whose key is set and skips the rest:
+```bash
+python -c "from models import Model; from skills import Skill; print('OK')"
+```
+
+Or run a live example (requires `ANTHROPIC_API_KEY`):
 
 ```bash
-python examples/text_to_text.py
+python examples/simple/01_skill.py
 ```
 
-Expected output for a single provider:
-
+Expected output:
 ```
-  ── ANTHROPIC  (5 model(s)) ──────────────────────────────────────────
-
-  ▸ claude-opus-4-6
-    ✓  3.2s
-      1. Readability: code should be easy to read and understand...
-      2. ...
+Machine learning is a branch of artificial intelligence that enables computers
+to learn from data and improve their performance without being explicitly programmed.
 ```
