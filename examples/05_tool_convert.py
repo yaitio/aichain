@@ -5,10 +5,7 @@ Required packages:
     pip install markitdown
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from tools import convertToMD
+from yait_aichain.tools import convertToMD
 
 tool   = convertToMD()
 result = tool.run("https://example.com")

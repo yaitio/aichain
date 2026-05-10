@@ -3,8 +3,7 @@
 **The simplest way to build AI pipelines. 8 providers. 1 interface. Zero lock-in.**
 
 ```python
-from models import Model
-from skills import Skill
+from yait_aichain import Model, Skill
 
 skill = Skill(
     model  = Model("claude-sonnet-4-6"),   # change this one word to switch providers
@@ -72,7 +71,7 @@ export VOYAGE_API_KEY="…"           # embeddings + reranking
 ## 8 providers, one syntax
 
 ```python
-from models import Model
+from yait_aichain.models import Model
 
 Model("claude-sonnet-4-6")   # Anthropic
 Model("gpt-4o")              # OpenAI
@@ -136,9 +135,9 @@ print(f"steps={result.steps_taken}  tokens={result.tokens_used:,}")
 ### Full RAG pipeline
 
 ```python
-from tools.embedding import Embedding
-from tools.vectordb  import VectorDB, vectorChunk, vectorUpsert, vectorQuery
-from tools.reranking import Reranker
+from yait_aichain.tools.embedding import Embedding
+from yait_aichain.tools.vectordb  import VectorDB, vectorChunk, vectorUpsert, vectorQuery
+from yait_aichain.tools.reranking import Reranker
 
 store    = VectorDB("chroma", "docs", embedder=Embedding("cohere/embed-v4.0"))
 reranker = Reranker("cohere/rerank-v3.5")

@@ -7,12 +7,10 @@ Required env vars:
     ANTHROPIC_API_KEY
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from models import Model
-from skills import Skill
-from pool   import Pool, DONE, FAILED
+import os
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.pool import Pool, DONE, FAILED
 
 skill = Skill(
     model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),

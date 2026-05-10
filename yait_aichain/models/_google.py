@@ -53,8 +53,8 @@ import json
 import urllib3
 
 from ._base import Model
-from clients._google import GoogleAIClient
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ..clients._google import GoogleAIClient
+from ..clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
 # ---------------------------------------------------------------------------

@@ -55,7 +55,7 @@ from typing import Any
 
 import urllib3
 
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
 # ---------------------------------------------------------------------------

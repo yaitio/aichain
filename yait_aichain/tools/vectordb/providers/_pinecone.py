@@ -46,7 +46,7 @@ from urllib.parse import urlencode
 
 import urllib3
 
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ....clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 from .._base import VectorBackend, VectorRecord
 
 

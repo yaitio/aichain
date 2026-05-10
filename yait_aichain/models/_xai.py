@@ -71,8 +71,8 @@ from ._openai import (
     _build_image_generations_request,
     _parse_image_generations_response,
 )
-from clients._xai import XAIClient
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ..clients._xai import XAIClient
+from ..clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
 def _is_xai_image_model(name: str) -> bool:

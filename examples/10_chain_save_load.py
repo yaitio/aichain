@@ -11,12 +11,10 @@ Required packages:
     pip install pyyaml
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from models import Model
-from skills import Skill
-from chain  import Chain
+import os
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.chain  import Chain
 
 YAML_PATH = os.path.join(os.path.dirname(__file__), "writer_reviewer.yaml")
 

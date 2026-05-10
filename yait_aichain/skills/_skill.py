@@ -24,7 +24,7 @@ import os
 import time
 from typing import TYPE_CHECKING
 
-from clients._base import APIError
+from ..clients._base import APIError
 from . import _adapters as adapters
 
 if TYPE_CHECKING:

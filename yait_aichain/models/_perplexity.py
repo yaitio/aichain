@@ -47,8 +47,8 @@ import urllib3
 
 from ._base import Model
 from ._openai import _build_openai_compat_request, _parse_openai_compat_response
-from clients._perplexity import PerplexityClient
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ..clients._perplexity import PerplexityClient
+from ..clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
 class PerplexityModel(Model):

@@ -12,10 +12,7 @@ Tools available:
     get_sources        — list all available news sources
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from tools import MCPTools
+from yait_aichain.tools import MCPTools
 
 MCP_URL = "http://127.0.0.1:8009/mcp"
 

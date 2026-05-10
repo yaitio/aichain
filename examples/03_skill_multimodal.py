@@ -12,10 +12,9 @@ Required env vars:
 """
 
 import os, sys, base64, pathlib
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-from models import Model
-from skills import Skill
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
 
 # ── 1. Text → Text (Claude) ───────────────────────────────────────────────────
 text_skill = Skill(

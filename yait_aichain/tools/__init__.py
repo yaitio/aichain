@@ -31,15 +31,6 @@ convert/         Format conversion — all return str (path or content).
   TTS(provider)     factory → ttsOpenAI | ttsGoogle | ttsXAI | ttsQwen
   STT(provider)     factory → sttOpenAI | sttGoogle | sttXAI | sttQwen
 
-services/        External service connectors.
-  serviceTranslate    .run()      — translate with DeepL
-                      .rephrase() — improve style/tone with DeepL Write
-  serviceSocialPost   .run()      — publish post via Late API
-                      .accounts() — list connected Late accounts
-
-image/           Image hosting utilities.
-  ImgbbUploadTool   base64 image → permanent public HTTPS URL (Imgbb)
-
 rest_api         Universal REST endpoint tool.
   RestApiTool       one instance = one configured endpoint; drop any REST
                     call into a Chain, Agent, or script with no boilerplate.
@@ -84,7 +75,6 @@ All previous class names still work:
 """
 
 from ._base           import Tool, ToolResult
-from .section_context import SectionContextTool
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
@@ -143,19 +133,6 @@ from .convert import (
     WeasyprintTool,
 )
 
-# ── Services ──────────────────────────────────────────────────────────────────
-from .services import (
-    serviceTranslate,
-    serviceSocialPost,
-    # aliases
-    DeepLTranslateTool,
-    DeepLRephraseTool,
-    LatePublishTool,
-    LateAccountsTool,
-)
-
-# ── Image hosting ─────────────────────────────────────────────────────────────
-from .imgbb import ImgbbUploadTool
 
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
@@ -249,16 +226,6 @@ __all__ = [
     "MarkItDownTool",
     "MistletoeTool",
     "WeasyprintTool",
-    # ── Services ──────────────────────────────────────────────────────────
-    "serviceTranslate",
-    "serviceSocialPost",
-    # service aliases
-    "DeepLTranslateTool",
-    "DeepLRephraseTool",
-    "LatePublishTool",
-    "LateAccountsTool",
-    # ── Image hosting ─────────────────────────────────────────────────────
-    "ImgbbUploadTool",
     # ── Universal REST API ────────────────────────────────────────────────
     "RestApiTool",
     # ── MCP (Model Context Protocol) ─────────────────────────────────────

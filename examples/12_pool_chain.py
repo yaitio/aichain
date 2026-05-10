@@ -13,14 +13,12 @@ Required packages:
     pip install markitdown
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from models import Model
-from skills import Skill
-from chain  import Chain
-from pool   import Pool, DONE, FAILED
-from tools  import convertToMD
+import os
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.chain  import Chain
+from yait_aichain.pool import Pool, DONE, FAILED
+from yait_aichain.tools import convertToMD
 
 fetch = convertToMD()
 

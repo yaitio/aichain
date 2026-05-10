@@ -15,14 +15,13 @@ Required env vars:
 """
 
 import os, sys, threading, time
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-from models import Model
-from skills import Skill
-from chain  import Chain
-from pool   import Pool, PENDING, RUNNING, DONE, FAILED
-from agent  import Agent
-from tools  import searchPerplexity
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.chain  import Chain
+from yait_aichain.pool import Pool, PENDING, RUNNING, DONE, FAILED
+from yait_aichain.agent  import Agent
+from yait_aichain.tools import searchPerplexity
 
 ANTHROPIC_KEY  = os.getenv("ANTHROPIC_API_KEY")
 PERPLEXITY_KEY = os.getenv("PERPLEXITY_API_KEY")

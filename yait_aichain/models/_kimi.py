@@ -69,8 +69,8 @@ import urllib3
 
 from ._base import Model
 from ._openai import _part_to_openai, _parse_openai_compat_response
-from clients._kimi import KimiClient
-from clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ..clients._kimi import KimiClient
+from ..clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
 # ---------------------------------------------------------------------------

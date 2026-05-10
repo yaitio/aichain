@@ -13,12 +13,10 @@ Required packages:
     pip install markitdown
 """
 
-import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from models import Model
-from agent  import Agent
-from tools  import searchPerplexity, convertToMD
+import os
+from yait_aichain.models import Model
+from yait_aichain.agent  import Agent
+from yait_aichain.tools import searchPerplexity, convertToMD
 
 agent = Agent(
     orchestrator = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),

@@ -60,7 +60,7 @@ from typing import Any
 from ._memory      import AgentMemory
 from ._result      import AgentResult
 from .             import _prompts as prompts
-from tools._base   import Tool
+from ..tools._base   import Tool
 
 
 # ---------------------------------------------------------------------------
