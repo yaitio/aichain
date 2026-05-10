@@ -1,216 +1,110 @@
-# Examples
+# Simple Examples
 
-Ten runnable scripts that demonstrate the core value of aichain — one interface, every provider.
+One concept per file. Read top to bottom — each example builds on the previous one.
 
-Each example is self-contained. Export the API keys for the providers you want to test; any subset works. Models whose key is not set are skipped automatically.
-
----
-
-## The examples
-
-### 1. Universal provider interface
-**`text_to_text.py`**
-
-Sends one prompt to every registered text-to-text model and prints each response. The simplest demonstration of the gateway: change `Model("claude-sonnet-4-6")` to `Model("gpt-4o")` to `Model("gemini-2.5-flash")` — nothing else in the code changes. Provider differences (auth, request shape, response parsing) are absorbed by the `Model` layer.
+Every file is self-contained: copy it, set your API keys, run it.
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-# ... any subset of provider keys
-python examples/text_to_text.py
+source .env   # or export ANTHROPIC_API_KEY="sk-ant-..." etc.
+python examples/simple/01_skill.py
 ```
 
 ---
 
-### 2. Structured JSON output across all providers
-**`json_schema_cross_provider.py`**
+## Skills
 
-Extracts a validated product spec (`name`, `price`, `rating`, `pros`, `cons`, `verdict`) from a review text. Uses `json_schema` output format — one schema definition, every provider. Without aichain, structured output requires different wiring per provider: `response_format` on OpenAI, a `tool_use` trick on Anthropic, `responseSchema` on Google, and so on.
+A **Skill** is the atomic unit — one prompt template, one model, one result.
 
-```bash
-python examples/json_schema_cross_provider.py
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`01_skill.py`](01_skill.py) | Run a prompt against Claude. The minimum viable aichain program. | `ANTHROPIC_API_KEY` |
+| [`02_skill_models.py`](02_skill_models.py) | Same prompt, three providers — Claude, GPT, Gemini. Swap `Model()` to change provider; nothing else changes. | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` |
+| [`03_skill_multimodal.py`](03_skill_multimodal.py) | Three modalities in one file: text → text (Claude) → image (Grok) → vision analysis (Qwen). | `ANTHROPIC_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` |
+| [`04_skill_save_load.py`](04_skill_save_load.py) | Save a skill to YAML, reload it anywhere. API keys never touch disk — resolved from env at load time. | `ANTHROPIC_API_KEY` |
+
+---
+
+## Tools
+
+A **Tool** wraps any callable — a REST API, an MCP server, your own function.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`05_tool_convert.py`](05_tool_convert.py) | Fetch any URL or file and convert it to clean Markdown in one call. | — |
+| [`06_tool_mcp.py`](06_tool_mcp.py) | Connect to an MCP server, discover its tools at runtime, call them. Uses a live NewsAPI MCP server. | MCP server running |
+| [`07_tool_custom.py`](07_tool_custom.py) | Define your own Tool subclass from scratch, use it standalone, then plug it directly into a Chain. | `ANTHROPIC_API_KEY` |
+
+---
+
+## Chains
+
+A **Chain** wires steps in sequence — each step's output automatically flows into the next.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`08_chain.py`](08_chain.py) | Two skills in sequence, two different providers — GPT writes, Claude reviews. Shows variable flow. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
+| [`09_chain_tool_skill.py`](09_chain_tool_skill.py) | Tool + Skill in one pipeline — fetch a webpage, then Claude summarises it in 3 bullets. | `ANTHROPIC_API_KEY` |
+| [`10_chain_save_load.py`](10_chain_save_load.py) | Save an entire chain to YAML and reload it. The full pipeline definition persists; keys do not. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
+
+---
+
+## Pool
+
+A **Pool** runs the same runner across many items in parallel. Total time = slowest item, not the sum.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`11_pool.py`](11_pool.py) | Same skill, 5 topics, all fired simultaneously. Shows `status` polling and per-item `history`. | `ANTHROPIC_API_KEY` |
+| [`12_pool_chain.py`](12_pool_chain.py) | A full Chain (fetch → summarise) used as the Pool runner — 3 URLs processed in parallel, each running its own pipeline. | `ANTHROPIC_API_KEY` |
+
+---
+
+## Agents
+
+An **Agent** plans, picks tools, acts, reflects, and decides when to stop — autonomously.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`13_agent.py`](13_agent.py) | One tool, one task — the agent plans and executes without being told how. Shows steps taken and tokens used. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
+| [`14_agent_tools.py`](14_agent_tools.py) | Two tools available — the agent decides which to use for each step without being told. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
+| [`15_agent_orchestrator.py`](15_agent_orchestrator.py) | Orchestrator spawns sub-agents — one per research topic. Each runs independently; orchestrator compiles final report. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
+
+---
+
+## Debug
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`16_debug.py`](16_debug.py) | How to inspect what's happening inside Chain (`history`), Pool (`status` live + `history`), and Agent (`verbose=1`). Essential for production troubleshooting. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
+
+---
+
+## Quick reference
+
+```python
+from models import Model
+from skills import Skill
+from chain  import Chain
+from pool   import Pool, DONE, FAILED
+from agent  import Agent
+from tools  import convertToMD, MCPTools
+
+# Skill — one prompt, one model
+skill = Skill(model=Model("claude-sonnet-4-6"), input={...})
+result = skill.run(variables={"key": "value"})
+
+# Chain — sequential steps
+chain = Chain(steps=[skill_a, skill_b])
+result = chain.run(variables={...})
+print(chain.history)          # full audit trail
+
+# Pool — parallel execution
+pool = Pool(skill, items=[{"topic": t} for t in topics], max_flows=10)
+results = pool.run()
+print(pool.status)            # {PENDING: 0, RUNNING: 0, DONE: 5, FAILED: 0}
+
+# Agent — autonomous
+agent = Agent(orchestrator=Model("claude-sonnet-4-6"), tools=[...], max_steps=10)
+result = agent.run("Research the top 3 vector databases.")
+print(result.output, result.steps_taken, result.tokens_used)
 ```
-
----
-
-### 3. Skill as a reusable function
-**`template_variables.py`**
-
-Builds one `Skill` object once and calls it across a batch of inputs with different `variables=` dicts. Shows default variables, per-call overrides, and automatic retry (`max_retries=3`). Contrast: with raw APIs you reconstruct the full `messages` list, serialize it, and implement retry logic from scratch on every call and every provider.
-
-```bash
-export OPENAI_API_KEY="sk-..."
-python examples/template_variables.py
-```
-
----
-
-### 4. Reasoning depth as a single dial
-**`text_to_text_reasoning.py`**
-
-Sets `reasoning="high"` on every reasoning-capable model. The library translates this to the correct native mechanism per provider: `budget_tokens` on Anthropic, `thinkingBudget` on Google, `reasoning_effort` on OpenAI/xAI, a model switch to `deepseek-reasoner` on DeepSeek. One parameter, six provider-native implementations.
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-python examples/text_to_text_reasoning.py
-```
-
----
-
-### 5. Chain with automatic variable flow
-**`chain_summarize_translate.py`**
-
-A two-step `Chain`: step 1 summarises an article (output stored as `{result}`), step 2 translates the summary using `{result}` and the original `{language}` variable. Variable accumulation is automatic — no manual wiring, no glue code between steps.
-
-```bash
-export OPENAI_API_KEY="sk-..."
-python examples/chain_summarize_translate.py
-```
-
----
-
-### 6. Text-to-image normalisation across 3 providers
-**`text_to_image.py`**
-
-Sends the same image prompt to every registered text-to-image model (`gpt-image-1`, `grok-imagine-image-pro`, `gemini-3.1-flash-image-preview`) and saves the result to `examples/output/`. Every provider returns the same `{url, base64, mime_type, revised_prompt}` dict. Without aichain: OpenAI uses `/v1/images/generations`, xAI mirrors that endpoint, Google uses `generateContent` with `responseModalities: ["IMAGE"]` — three completely different request and response shapes.
-
-```bash
-export OPENAI_API_KEY="sk-..."
-export XAI_API_KEY="xai-..."
-export GOOGLE_AI_API_KEY="AIza..."
-python examples/text_to_image.py
-```
-
----
-
-### 7. Text + image models in one Chain
-**`logo_creation.py`**
-
-A two-step `Chain` where step 1 (Claude Sonnet) engineers a detailed visual direction from a short brand brief, and step 2 (gpt-image-1) renders it. Two providers, two modalities, zero glue code. The Chain output key `prompt_text` flows between steps automatically. Swap either `Model(...)` to switch providers without touching anything else.
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-python examples/logo_creation.py
-```
-
----
-
-### 8. Autonomous agent with tools and budget control
-**`agent_research.py`**
-
-A two-phase pipeline: phase 1 runs an `Agent` (plan / act / reflect loop) with Brave search and MarkItDown fetch tools, up to 12 steps and 80k tokens. Phase 2 loads the agent's memory and writes a structured report. `AgentResult` reports `steps_taken`, `tokens_used`, and a full `history`. Comparable raw-API orchestration is several hundred lines of custom code.
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export BRAVE_API_KEY="..."
-python examples/agent_research.py
-```
-
----
-
-### 9. YAML persistence — define once, load anywhere
-**`save_and_load.py`**
-
-Builds a JSON-schema keyword extractor Skill, serialises it to YAML with `.save()`, then loads it back with `Skill.load()`. The loaded Skill reconstructs its `Model` from the saved model name — attach any compatible key at load time. The same `.save()` / `.load()` API works for `Chain`.
-
-```bash
-export OPENAI_API_KEY="sk-..."
-python examples/save_and_load.py
-```
-
----
-
-### 10. Sectional document generation — no token-limit ceiling
-**`sectional_document.py`**
-
-Generates a 4-section business brief where each section is an independent model call. A `SectionContextTool` advances a queue and exposes `{current_section_title}`, `{current_section_plan}`, and a `{recent_summaries}` rolling-context window to the write Skill. After each section a cheap summarise Skill compresses it to bullets. `assemble_document()` joins everything in order. The result length is bounded only by API budget — not by any single `max_output_tokens` ceiling.
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-python examples/sectional_document.py
-```
-
----
-
----
-
-### 11. Universal REST API tool — full booking lifecycle
-**`booking_api.py`**
-
-Demonstrates `RestApiTool`: one class, any REST endpoint, zero boilerplate.
-Defines five endpoints for the public [Restful Booker](https://restful-booker.herokuapp.com/)
-test API and runs them in a single Chain: authenticate → create booking →
-read it back → partial update → delete.
-
-**Key patterns:**
-- Each endpoint is declared once in 4–8 lines (method, URL, which fields go into path / query / body, auth strategy).
-- The Chain accumulates response fields automatically — `token` from `POST /auth` and `bookingid` from `POST /booking` flow into later steps by name without any `input_map` wiring.
-- `input_map` is used for one rename: `updated_needs → additionalneeds` in the PATCH step.
-- Dict responses are auto-merged; the plain-text DELETE response (`"Created"`) is stored as a string.
-
-No API keys required — Restful Booker is a free public test API.
-
-```bash
-# Full Chain demo
-python examples/booking_api.py
-
-# Direct tool calls (no Chain)
-python examples/booking_api.py --standalone
-
-# Both
-python examples/booking_api.py --both
-```
-
----
-
----
-
-### 12. Connect any MCP server — tools, agents, chains
-**`mcp_tool.py`**
-
-`MCPTools(server)` discovers all tools on any MCP server and returns a `list[MCPTool]` — ready to drop straight into an Agent or Chain with no async code. `MCPTool` wraps one server operation behind the standard `run()` interface. Five scenarios: (1) HTTP server — connect, list tools, call; (2) STDIO subprocess — launch a local `npx` MCP server; (3) Agent — register all MCP tools in three lines; (4) Chain — MCP fetch step piped into a Skill; (5) direct `MCPTool` without discovery when the tool name is known. Supports Streamable HTTP, SSE, and STDIO transports. Requires `pip install fastmcp`.
-
-```bash
-pip install fastmcp
-
-python examples/mcp_tool.py                   # all scenarios
-python examples/mcp_tool.py --scenario http
-python examples/mcp_tool.py --scenario stdio
-python examples/mcp_tool.py --scenario agent
-python examples/mcp_tool.py --scenario chain
-python examples/mcp_tool.py --scenario direct
-```
-
----
-
-### 13. Qwen / DashScope provider — text, vision, reasoning
-**`qwen_skills.py`**
-
-Three self-contained scenarios using Alibaba DashScope: (1) chat completion with `qwen-max` and `qwen-turbo`; (2) image understanding with `qwen-vl-max` — pass any public image URL; (3) deep reasoning with `QwQ-32B` (always-on chain-of-thought). The library routes `qwen-*`, `QwQ-*`, and `wanx-*` model names to `QwenModel` automatically. The base URL is region-aware — set `DASHSCOPE_REGION` to `ap` (default, international), `us`, `cn`, or `hk`.
-
-```bash
-export DASHSCOPE_API_KEY="sk-..."
-export DASHSCOPE_REGION="ap"          # optional; default is ap (international)
-
-python examples/qwen_skills.py                      # all scenarios
-python examples/qwen_skills.py --scenario text
-python examples/qwen_skills.py --scenario vision
-python examples/qwen_skills.py --scenario reasoning
-```
-
----
-
-## Quick start
-
-```bash
-# Clone and set up
-cd aichain_2.0
-
-# Run any example with at least one key set
-export OPENAI_API_KEY="sk-..."
-python examples/text_to_text.py
-```
-
-Output files (images) are written to `examples/output/`. YAML files from `save_and_load.py` go to `examples/skills/`.

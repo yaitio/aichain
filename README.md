@@ -1,308 +1,238 @@
 # aichain
 
-**One interface. Eight providers. Text, images, agents.**
-
-Route any AI task — chat, reasoning, image generation, vision, web search, speech, embeddings — to OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, or Qwen through a single Python library. Swap models without touching your logic. Build agents and pipelines in minutes.
+**The simplest way to build AI pipelines. 8 providers. 1 interface. Zero lock-in.**
 
 ```python
 from models import Model
 from skills import Skill
 
 skill = Skill(
-    model  = Model("claude-opus-4-6"),       # swap to "gpt-4o" with one change
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "text", "text": "Summarise this in three bullets:\n\n{text}"}
-    ]}]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
+    model  = Model("claude-sonnet-4-6"),   # change this one word to switch providers
+    input  = {"messages": [{"role": "user", "parts": ["Summarise: {text}"]}]},
 )
 
 result = skill.run(variables={"text": "..."})
 ```
 
+Change `"claude-sonnet-4-6"` to `"gpt-4o"`, `"gemini-2.5-pro"`, or `"grok-3"` — nothing else changes.
+
 ---
 
 ## Why aichain?
 
-**One model interface for every provider.** OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, and Qwen all speak different APIs. `Model("gpt-4o")`, `Model("claude-opus-4-6")`, `Model("gemini-2.5-pro")` — same call, same output, same downstream code.
+Every major AI library makes you choose: LangChain is too complex, LlamaIndex is RAG-only, CrewAI is agents-only, AutoGen requires a PhD to configure.
 
-**Universal reasoning.** Set `reasoning="high"` once; the library maps it to `budget_tokens` for Anthropic, `thinkingBudget` for Google, `reasoning_effort` for OpenAI and xAI, `thinking` for Kimi, `enable_thinking` for Qwen, and a model switch for DeepSeek.
+**aichain covers the full stack with the simplest interface:**
 
-**Built for pipelines.** Chain skills, tools, and agents together. Each step's output feeds the next. Mix models freely across steps.
+| Need | aichain primitive |
+|---|---|
+| Call any LLM | `Skill` |
+| Chain steps together | `Chain` |
+| Run tasks in parallel | `Pool` |
+| Autonomous reasoning | `Agent` |
+| Vector search + RAG | `VectorDB` + `vectorQuery` |
+| Rerank results | `Reranker` |
+| Call any tool or MCP server | `Tool` / `MCPTools` |
 
-**Agents that actually reflect.** The built-in Agent loop plans, acts, and reflects on every step — choosing to continue, retry, replan, or stop. `"agile"` mode lets it revise the plan mid-run.
+All of these work identically across **57 models from 8 providers** — with one line to swap any of them.
 
 ---
 
 ## Install
 
 ```bash
-pip install aichain
+pip install yait-aichain
 ```
 
-Install extras for the tools you need:
+Optional extras:
 
 ```bash
-pip install markitdown          # file/URL → Markdown
-pip install weasyprint          # HTML → PDF
-pip install mistletoe           # Markdown → HTML / LaTeX
-pip install pyyaml              # save & load Skills and Chains
-pip install fastmcp             # MCP server integration
+pip install markitdown   # file/URL → Markdown
+pip install pyyaml       # save & load Skills and Chains
+pip install fastmcp      # MCP server integration
 ```
 
-Set the API keys for the providers you use:
+API keys — only for the providers you use:
 
 ```bash
-export OPENAI_API_KEY="sk-…"
 export ANTHROPIC_API_KEY="sk-ant-…"
+export OPENAI_API_KEY="sk-…"
 export GOOGLE_AI_API_KEY="AIza…"
 export XAI_API_KEY="xai-…"
 export PERPLEXITY_API_KEY="pplx-…"
-export MOONSHOT_API_KEY="sk-…"        # Kimi
-export DEEPSEEK_API_KEY="sk-…"        # DeepSeek
-export DASHSCOPE_API_KEY="sk-…"       # Qwen (Alibaba DashScope)
+export MOONSHOT_API_KEY="sk-…"      # Kimi
+export DEEPSEEK_API_KEY="sk-…"
+export DASHSCOPE_API_KEY="sk-…"     # Qwen
+export COHERE_API_KEY="…"           # embeddings + reranking
+export VOYAGE_API_KEY="…"           # embeddings + reranking
 ```
 
 ---
 
-## Eight providers, one syntax
+## 8 providers, one syntax
 
 ```python
 from models import Model
 
-gpt      = Model("gpt-4.1")
-claude   = Model("claude-sonnet-4-6")
-gemini   = Model("gemini-2.5-flash")
-grok     = Model("grok-3")
-sonar    = Model("sonar-pro")
-kimi     = Model("kimi-k2.5")
-deepseek = Model("deepseek-chat")
-qwen     = Model("qwen-max")
+Model("claude-sonnet-4-6")   # Anthropic
+Model("gpt-4o")              # OpenAI
+Model("gemini-2.5-flash")    # Google
+Model("grok-3")              # xAI
+Model("sonar-pro")           # Perplexity
+Model("kimi-k2.5")           # Kimi
+Model("deepseek-chat")       # DeepSeek
+Model("qwen-max")            # Qwen
 ```
 
-Full model list: [model registry →](docs/reference/model-registry.md)
+57 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
 ## Core concepts
 
-### Skill — run a prompt against any model
+### Skill — one prompt, any model
 
 ```python
-from models import Model
-from skills import Skill
-
-translator = Skill(
-    model  = Model("gpt-4.1-mini"),
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "text", "text": "Translate to {language}:\n\n{text}"}
-    ]}]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
-)
-
-result = translator.run(variables={"text": "Hello world", "language": "French"})
-# → "Bonjour le monde"
+skill  = Skill(model=Model("gpt-4o-mini"), input={...})
+result = skill.run(variables={"topic": "neural networks"})
 ```
 
-### Chain — wire steps together
+### Chain — sequential steps, automatic variable flow
 
 ```python
-from chain import Chain
-
 chain = Chain(steps=[
-    (search_skill,    "search_results"),
-    (convert_skill,   "article",   {"source": "target_url"}),
-    (summarise_skill, "summary"),
+    (fetch_tool,    "page"),
+    (summarise,     "summary"),
+    (translate,     "result"),
 ])
-
-result = chain.run(variables={"query": "fusion energy 2025"})
+result = chain.run(variables={"url": "https://…", "language": "French"})
+print(chain.history)   # full audit trail
 ```
 
-### Agent — plan, act, reflect
+### Pool — parallel execution
 
 ```python
-from agent import Agent
-from models import Model
-from tools import PerplexitySearchTool, MarkItDownTool
+pool    = Pool(summarise_skill, items=[{"text": t} for t in documents], max_flows=10)
+results = pool.run()                    # all documents processed simultaneously
 
-agent = Agent(
+print(pool.status)   # {PENDING: 0, RUNNING: 0, DONE: 50, FAILED: 0}
+print(pool.history)  # per-item: status, output, error, duration
+```
+
+### Agent — autonomous reasoning
+
+```python
+agent  = Agent(
     orchestrator = Model("claude-opus-4-6"),
-    tools        = [PerplexitySearchTool(), MarkItDownTool()],
+    tools        = [searchPerplexity(), convertToMD()],
     mode         = "agile",
     max_steps    = 10,
 )
-
-result = agent.run("Compare the top 3 vector databases in 2025.")
-if result:
-    print(result.output)
-    print(f"Used {result.tokens_used:,} tokens in {result.steps_taken} steps.")
+result = agent.run("Compare the top 3 vector databases.")
+print(result.output)
+print(f"steps={result.steps_taken}  tokens={result.tokens_used:,}")
 ```
 
-Two execution modes:
-- **`waterfall`** — fixed plan, executes in order; reflection can retry or stop on fatal failure.
-- **`agile`** — same structure, but reflection can revise the remaining plan mid-run.
-
-### Universal reasoning
+### Full RAG pipeline
 
 ```python
-from models import Model
+from tools.embedding import Embedding
+from tools.vectordb  import VectorDB, vectorChunk, vectorUpsert, vectorQuery
+from tools.reranking import Reranker
 
-# Same option — each provider handles it natively
-model = Model("claude-opus-4-6", options={"reasoning": "high"})
-model = Model("gpt-4o",          options={"reasoning": "medium"})
-model = Model("gemini-2.5-pro",  options={"reasoning": "low"})
+store    = VectorDB("chroma", "docs", embedder=Embedding("cohere/embed-v4.0"))
+reranker = Reranker("cohere/rerank-v3.5")
+
+# Ingest
+chunks = vectorChunk(max_chars=800).run(my_document)
+vectorUpsert(store).run([{"id": f"c{i}", **c} for i, c in enumerate(chunks)])
+
+# Query → rerank → answer
+pipeline = Chain(steps=[
+    (vectorQuery(store),  "candidates", {"input": "{question}", "options": {"n": 20}}),
+    (reranker,            "context",    {"input": "{candidates}",
+                                         "options": {"query": "{question}", "top_n": 5}}),
+    answer_skill,
+])
+answer = pipeline.run(variables={"question": "How does KV caching work?"})
 ```
 
-### Image generation
-
-```python
-from models import Model
-from skills import Skill
-
-skill = Skill(
-    model         = Model("dall-e-3"),          # or "gpt-image-1", "wanx2.1-t2i-turbo"
-    input         = {"messages": [{"role": "user", "parts": [
-        {"type": "text", "text": "A photorealistic red apple on a wooden table"}
-    ]}]},
-    output_format = "image",
-)
-
-result = skill.run()
-# result → {"base64": "…", "mime_type": "image/png", "url": None, "revised_prompt": "…"}
-```
-
-### Vision (image input)
-
-```python
-skill = Skill(
-    model  = Model("gpt-4o"),
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "image", "source": {"kind": "url", "url": "https://…/photo.jpg", "mime": "image/jpeg"}},
-        {"type": "text",  "text": "What is in this image?"},
-    ]}]},
-    output_format = "text",
-)
-```
+Vector DB providers: **Chroma · Qdrant · Pinecone**
+Reranking providers: **Cohere · Voyage · Qwen**
 
 ---
 
 ## Built-in tools
 
 ### Search
-
-| Tool | What it does |
-|---|---|
-| `PerplexitySearchTool` | Web search with rich content snippets |
-| `BraveSearchTool` | Web search — ranked links |
-| `SerpApiTool` | 50+ search engines via SerpAPI |
-| `OpenAIWebSearchTool` | Synthesised answers via OpenAI Responses API |
+`searchPerplexity` · `searchBrave` · `searchSerp` · `searchOpenAI`
 
 ### Convert
-
-| Tool | What it does |
-|---|---|
-| `MarkItDownTool` | PDF, DOCX, PPTX, URLs → Markdown |
-| `MistletoeTool` | Markdown → HTML / LaTeX |
-| `WeasyprintTool` | HTML → PDF |
-| `TTS(provider)` | Text → audio file (OpenAI, Google, xAI, Qwen) |
-| `STT(provider)` | Audio file → transcript (OpenAI, Google, xAI, Qwen) |
+`convertToMD` · `convertToHTML` · `convertToPDF` · `TTS(provider)` · `STT(provider)`
 
 ### Embeddings
-
 ```python
-from tools import Embedding
-
-embedder = Embedding("text-embedding-3-small")   # or "embed-english-v3.0", "voyage-3", …
-result   = embedder.run("The quick brown fox")
-# result.vector → list[float]
+Embedding("openai/text-embedding-3-small")
+Embedding("cohere/embed-v4.0")
+Embedding("voyage/voyage-3-large")
 ```
 
-Providers: OpenAI · Cohere · Voyage · Google · Qwen
+---
 
-### Services
+## Examples
 
-| Tool | What it does |
-|---|---|
-| `DeepLTranslateTool` | Translate text (30+ languages) |
-| `DeepLRephraseTool` | Rephrase for style and tone |
-| `LateAccountsTool` | List connected social accounts (Late API) |
-| `LatePublishTool` | Publish to 14 social platforms |
-| `ImgbbUploadTool` | base64 image → permanent public HTTPS URL |
+→ **[examples/](examples/README.md)** — 16 focused examples, one concept each
 
-### Infrastructure
-
-| Tool | What it does |
-|---|---|
-| `RestApiTool` | Universal REST endpoint — drop any API call into a Chain or Agent |
-| `MCPTool` / `MCPTools` | Model Context Protocol — connect any MCP server's tools |
-| `SectionContextTool` | Rolling-context queue manager for long-document generation |
+| # | File | What it shows |
+|---|---|---|
+| 01 | `01_skill.py` | The minimum viable aichain program |
+| 02 | `02_skill_models.py` | Same prompt, Claude + GPT + Gemini |
+| 03 | `03_skill_multimodal.py` | Text → image → vision, three providers |
+| 04 | `04_skill_save_load.py` | Save to YAML, reload anywhere |
+| 05 | `05_tool_convert.py` | URL → Markdown |
+| 06 | `06_tool_mcp.py` | Connect an MCP server, discover + call tools |
+| 07 | `07_tool_custom.py` | Build your own Tool, plug into a Chain |
+| 08 | `08_chain.py` | GPT writes → Claude reviews |
+| 09 | `09_chain_tool_skill.py` | Fetch page → summarise |
+| 10 | `10_chain_save_load.py` | Save/reload a full pipeline |
+| 11 | `11_pool.py` | 5 topics, all in parallel |
+| 12 | `12_pool_chain.py` | Chain-per-item, all in parallel |
+| 13 | `13_agent.py` | Autonomous agent, one tool |
+| 14 | `14_agent_tools.py` | Agent picks its own tools |
+| 15 | `15_agent_orchestrator.py` | Orchestrator spawns sub-agents |
+| 16 | `16_debug.py` | Inspect Chain history, Pool status, Agent steps |
 
 ---
+
 
 ## Persist and reload
 
 ```python
-# Save a skill
 skill.save("skills/translator.yaml")
+skill = Skill.load("skills/translator.yaml")   # API key from env, not file
 
-# Load anywhere — API keys come from env vars, not the file
-from skills import Skill
-skill = Skill.load("skills/translator.yaml")
-
-# Same for chains
-chain.save("chains/research_pipeline.yaml")
-chain = Chain.load("chains/research_pipeline.yaml")
+chain.save("chains/research.yaml")
+chain = Chain.load("chains/research.yaml")
 ```
 
 ---
 
-## Testing
+## Supported providers
 
-The library ships with a full unit-test suite — no real API keys required for unit tests; live integration tests are skipped unless real keys are present.
+| Provider | Text | Vision | Image gen | Env var |
+|---|---|---|---|---|
+| **Anthropic** | Claude Opus / Sonnet / Haiku 4 | ✓ | — | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-5, GPT-4.1, GPT-4o, o1, o3, o4-mini | ✓ | DALL-E 3, GPT-Image-1 | `OPENAI_API_KEY` |
+| **Google** | Gemini 2.5 Pro / Flash, 3.x | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
+| **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `XAI_API_KEY` |
+| **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |
+| **Kimi** | K2.5, K2, K2 Turbo, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
+| **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | — | — | `DEEPSEEK_API_KEY` |
+| **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wanx image models | `DASHSCOPE_API_KEY` |
 
-```bash
-python3 -m pytest tests/clients/ tests/models/ tests/skills/ tests/chain/ tests/agent/
-```
-
-**Coverage:**
-
-| Area | Tests | What's covered |
-|---|---|---|
-| Clients (8 providers) | auth headers, base URLs, `list_models` parsing, invalid-key rejection | `tests/clients/` |
-| Models — text-to-text | factory routing, `to_request` / `from_response` per provider, JSON output, reasoning | `tests/models/` |
-| Models — text-to-image | DALL-E 3, GPT-Image-1, Grok-Imagine, Gemini image, Wanx | `tests/models/` |
-| Models — image-to-text | Vision messages (URL + base64) for all 6 vision providers | `tests/models/` |
-| Models — features | Reasoning translation, JSON schema, registry helpers, MIME detection | `tests/models/` |
-| Skill | Init, `run()`, variable substitution, multi-provider, no-mutation | `tests/skills/` |
-| Chain | Init, step execution, variable flow, history, precedence, reset | `tests/chain/` |
-| Agent | Memory + FileBackend, AgentResult, init, helpers, `_execute_action`, `run()`, agile replan, spawn | `tests/agent/` |
-
----
-
-## Documentation
-
-| | |
-|---|---|
-| [Getting started](docs/getting-started/index.md) | Install, quickstart, core concepts |
-| [Primitives](docs/primitives/models.md) | Model, Skill, Tool, Chain |
-| [Agents](docs/agents/overview.md) | Agent loop, memory, configuration |
-| [Tools reference](docs/tools-reference/index.md) | All built-in tools |
-| [Reference](docs/reference/model-registry.md) | Model registry, env vars, YAML schema |
-| [Cookbooks](docs/cookbooks/index.md) | Research agent, long-doc, translate & publish, RAG, and more |
-
----
-
-## Supported providers and models
-
-| Provider | Text | Vision | Image gen | Reasoning | Env var |
-|---|---|---|---|---|---|
-| **OpenAI** | GPT-5, GPT-4.1, GPT-4o, o3, o4-mini | ✓ | DALL-E 3, GPT-Image-1 | `reasoning_effort` | `OPENAI_API_KEY` |
-| **Anthropic** | Claude Opus / Sonnet / Haiku 4 | ✓ | — | `budget_tokens` | `ANTHROPIC_API_KEY` |
-| **Google AI** | Gemini 2.5 Pro / Flash, 2.0 Flash | ✓ | Gemini image models | `thinkingBudget` | `GOOGLE_AI_API_KEY` |
-| **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `reasoning_effort` | `XAI_API_KEY` |
-| **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | built-in | `PERPLEXITY_API_KEY` |
-| **Kimi** | K2.5, K2, K2 Turbo, K2 Thinking | ✓ K2.5 | — | `thinking` | `MOONSHOT_API_KEY` |
-| **DeepSeek** | DeepSeek-V3 (chat), DeepSeek-R1 (reasoner) | — | — | model switch | `DEEPSEEK_API_KEY` |
-| **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ QwenVL | Wanx image models | `enable_thinking` | `DASHSCOPE_API_KEY` |
+**Embedding:** OpenAI · Cohere · Voyage · Google · Qwen  
+**Reranking:** Cohere · Voyage · Qwen  
+**Vector DB:** Chroma · Qdrant · Pinecone
 
 ---
 
