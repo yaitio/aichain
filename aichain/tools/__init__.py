@@ -47,6 +47,20 @@ rest_api         Universal REST endpoint tool.
                     Basic / API-key auth, URL templating, JSON auto-parse.
                     See examples/booking_api.py for a full Chain example.
 
+vectordb/        Provider-agnostic vector database interface.
+  VectorDB(provider, collection, *, embedder, ...)
+                    Factory → VectorStore (Chroma, Pinecone, Qdrant).
+  vectorQuery(store)   — semantic RAG retrieval           [main feature]
+  vectorUpsert(store)  — insert / update documents
+  vectorFetch(store)   — retrieve by ID
+  vectorDelete(store)  — delete by ID or filter
+  VectorRecord         — uniform data model (id, text, score, metadata)
+
+reranking/       Provider-agnostic reranking for RAG pipelines.
+  Reranker(model)   factory → RerankCohere | RerankVoyage | RerankQwen
+  .rerank(query, docs, top_n)  → RerankResult
+  .run(docs, options)          → list[dict]  (Tool interface for Chains)
+
 mcp/             Model Context Protocol integration.
   MCPTool           one instance = one tool on an MCP server; works in
                     Chains, Agents, and direct calls with no async code.
@@ -146,6 +160,37 @@ from .imgbb import ImgbbUploadTool
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
 
+# ── Vector DB ────────────────────────────────────────────────────────────────
+from .vectordb import (
+    VectorDB,
+    VectorStore,
+    VectorRecord,
+    VectorBackend,
+    ChromaBackend,
+    PineconeBackend,
+    QdrantBackend,
+    vectorChunk,
+    vectorQuery,
+    vectorUpsert,
+    vectorFetch,
+    vectorDelete,
+    VectorChunkTool,
+    VectorQueryTool,
+    VectorUpsertTool,
+    VectorFetchTool,
+    VectorDeleteTool,
+)
+
+# ── Reranking ────────────────────────────────────────────────────────────────
+from .reranking import (
+    Reranker,
+    RerankBase,
+    RerankResult,
+    RerankCohere,
+    RerankVoyage,
+    RerankQwen,
+)
+
 # ── MCP (Model Context Protocol) ─────────────────────────────────────────────
 from .mcp import MCPTool, MCPTools
 
@@ -217,6 +262,31 @@ __all__ = [
     # ── Universal REST API ────────────────────────────────────────────────
     "RestApiTool",
     # ── MCP (Model Context Protocol) ─────────────────────────────────────
+    # ── Vector DB ───────────────────────────────────────────────────────
+    "VectorDB",
+    "VectorStore",
+    "VectorRecord",
+    "VectorBackend",
+    "ChromaBackend",
+    "PineconeBackend",
+    "QdrantBackend",
+    "vectorChunk",
+    "vectorQuery",
+    "vectorUpsert",
+    "vectorFetch",
+    "vectorDelete",
+    "VectorChunkTool",
+    "VectorQueryTool",
+    "VectorUpsertTool",
+    "VectorFetchTool",
+    "VectorDeleteTool",
+    # ── Reranking ─────────────────────────────────────────────────────────────
+    "Reranker",
+    "RerankBase",
+    "RerankResult",
+    "RerankCohere",
+    "RerankVoyage",
+    "RerankQwen",
     "MCPTool",
     "MCPTools",
 ]
