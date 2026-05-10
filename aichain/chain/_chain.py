@@ -107,9 +107,9 @@ _AGENT_DEFAULT_OPTIONS: dict = {
 
 def _is_tool(runner) -> bool:
     """Return True if *runner* is a Tool instance (lazy, import-free check)."""
-    # Avoid a hard import cycle; check the MRO by class name instead of
-    # isinstance so that neither module needs to import the other at load time.
-    return type(runner).__module__.startswith("tools")
+    # Check the MRO by class name so custom Tool subclasses defined outside
+    # the tools/ package (e.g. in user scripts) are detected correctly.
+    return any(cls.__name__ == "Tool" for cls in type(runner).__mro__)
 
 
 def _is_agent(runner) -> bool:
