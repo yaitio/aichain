@@ -52,6 +52,13 @@ reranking/       Provider-agnostic reranking for RAG pipelines.
   .rerank(query, docs, top_n)  → RerankResult
   .run(docs, options)          → list[dict]  (Tool interface for Chains)
 
+local/           Local filesystem tools — sandboxed to a root directory.
+  LocalTools(root_dir) — returns all 4 tools pre-configured for an Agent
+  localBrowse(root_dir)  — list directory tree
+  localRead(root_dir)    — read file contents (with line range)
+  localWrite(root_dir)   — create or overwrite a file
+  localRun(root_dir)     — execute a shell command or Python file
+
 mcp/             Model Context Protocol integration.
   MCPTool           one instance = one tool on an MCP server; works in
                     Chains, Agents, and direct calls with no async code.
@@ -75,6 +82,7 @@ All previous class names still work:
 """
 
 from ._base           import Tool, ToolResult
+from .section_context import SectionContextTool
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
@@ -133,7 +141,6 @@ from .convert import (
     WeasyprintTool,
 )
 
-
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
 
@@ -166,6 +173,15 @@ from .reranking import (
     RerankCohere,
     RerankVoyage,
     RerankQwen,
+)
+
+# ── Local filesystem ─────────────────────────────────────────────────────────
+from .local import (
+    LocalTools,
+    localBrowse, LocalBrowseTool,
+    localRead,   LocalReadTool,
+    localWrite,  LocalWriteTool,
+    localRun,    LocalRunTool,
 )
 
 # ── MCP (Model Context Protocol) ─────────────────────────────────────────────
@@ -226,6 +242,16 @@ __all__ = [
     "MarkItDownTool",
     "MistletoeTool",
     "WeasyprintTool",
+    # ── Services ──────────────────────────────────────────────────────────
+    "serviceTranslate",
+    "serviceSocialPost",
+    # service aliases
+    "DeepLTranslateTool",
+    "DeepLRephraseTool",
+    "LatePublishTool",
+    "LateAccountsTool",
+    # ── Image hosting ─────────────────────────────────────────────────────
+    "ImgbbUploadTool",
     # ── Universal REST API ────────────────────────────────────────────────
     "RestApiTool",
     # ── MCP (Model Context Protocol) ─────────────────────────────────────
@@ -254,6 +280,12 @@ __all__ = [
     "RerankCohere",
     "RerankVoyage",
     "RerankQwen",
+    # ── Local filesystem ─────────────────────────────────────────────────────
+    "LocalTools",
+    "localBrowse", "LocalBrowseTool",
+    "localRead",   "LocalReadTool",
+    "localWrite",  "LocalWriteTool",
+    "localRun",    "LocalRunTool",
     "MCPTool",
     "MCPTools",
 ]
