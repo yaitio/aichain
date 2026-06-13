@@ -25,6 +25,9 @@ import time
 from typing import TYPE_CHECKING
 
 from ..clients._base import APIError
+from ..clients._errors import RateLimitError, ServerError, NetworkError
+from ..models._usage import Usage, extract_usage
+from ..models._pricing import attach_cost
 from . import _adapters as adapters
 
 if TYPE_CHECKING:
@@ -34,6 +37,10 @@ if TYPE_CHECKING:
 # safe to retry.  Client errors (4xx other than 429) are permanent — they
 # indicate a problem with the request itself and must not be retried.
 _TRANSIENT_STATUSES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+# Error types that trigger fallback to the next model in the chain.  Auth /
+# invalid-request / not-found are NOT here — falling back would hide them.
+_FALLBACK_ERRORS = (RateLimitError, ServerError, NetworkError)
 
 
 class Skill:
@@ -145,7 +152,7 @@ class Skill:
 
     def __init__(
         self,
-        model:        "Model",
+        model:        "Model | list[Model]",
         input:        dict,
         output:       "dict | None" = None,
         variables:    dict  | None  = None,
@@ -160,7 +167,13 @@ class Skill:
         adapters.validate_input(input)
         adapters.validate_output(output)
 
-        self.model       = model
+        # A single model or a fallback chain: on a transient failure
+        # (rate limit / server / network) the next model is tried.  A bare
+        # model behaves exactly as before — self.model stays the primary.
+        self.models = list(model) if isinstance(model, (list, tuple)) else [model]
+        if not self.models:
+            raise ValueError("Skill requires at least one model.")
+        self.model       = self.models[0]
         self._input      = input
         self._output     = output
         self.variables   = variables or {}
@@ -169,6 +182,10 @@ class Skill:
         self.description = description
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+
+        # Token usage of the most recent run() — None until the first call.
+        # Reading it is optional; it never affects run()'s inputs or output.
+        self.last_usage: "Usage | None" = None
 
     # ------------------------------------------------------------------
     # Public
@@ -210,7 +227,8 @@ class Skill:
         clients._base.APIError
             On a non-transient HTTP error, or after all retry attempts are
             exhausted on a transient error (status in
-            ``{429, 500, 502, 503, 504}``).
+            ``{429, 500, 502, 503, 504}``).  With a fallback chain, the last
+            model's transient error is raised only after every model failed.
         ValueError
             If the provider response cannot be parsed (never retried —
             this indicates a prompt or schema error, not a transient fault).
@@ -224,27 +242,49 @@ class Skill:
         # Substitute {placeholders} in a deep copy of the messages list
         messages = adapters.substitute(self._input["messages"], merged)
 
+        # Try each model in the fallback chain.  Transient failures
+        # (rate limit / server / network) advance to the next model; a
+        # non-transient failure (bad request, auth, parse) propagates
+        # immediately — falling back would only hide a real error.
+        for i, model in enumerate(self.models):
+            try:
+                return self._run_on_model(
+                    model, messages, _max_retries, _retry_delay
+                )
+            except _FALLBACK_ERRORS:
+                if i < len(self.models) - 1:
+                    continue   # try the next model in the chain
+                raise          # last model exhausted
+
+    def _run_on_model(
+        self,
+        model:       "Model",
+        messages:    list,
+        max_retries: int,
+        retry_delay: float,
+    ) -> "str | dict":
+        """Run the request against a single model, with transient retries."""
         # Build the native (path, body) pair once — the payload is the same
         # on every attempt; only the server-side condition changes.
-        path, body = self.model.to_request(messages, self._output)
+        path, body = model.to_request(messages, self._output)
 
-        last_error: "APIError | None" = None
-
-        for attempt in range(_max_retries + 1):
+        for attempt in range(max_retries + 1):
             if attempt > 0:
-                time.sleep(_retry_delay * (2 ** (attempt - 1)))
+                time.sleep(retry_delay * (2 ** (attempt - 1)))
 
             try:
-                raw      = self.model.client._post(
-                    path, body, self.model.client._auth_headers()
+                raw      = model.client._post(
+                    path, body, model.client._auth_headers()
                 )
                 response = json.loads(raw)
-                return self.model.from_response(response, self._output)
+                self.last_usage = attach_cost(
+                    extract_usage(response), model.name
+                )
+                return model.from_response(response, self._output)
 
             except APIError as exc:
-                if exc.status in _TRANSIENT_STATUSES and attempt < _max_retries:
-                    last_error = exc
-                    continue   # wait and retry
+                if exc.status in _TRANSIENT_STATUSES and attempt < max_retries:
+                    continue   # wait and retry the same model
                 raise          # non-transient, or retries exhausted
 
         raise last_error  # type: ignore[misc]  # unreachable; satisfies linters

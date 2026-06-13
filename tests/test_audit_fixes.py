@@ -254,11 +254,19 @@ def _mock_orchestrator(*responses: dict):
     return model
 
 
-def _oai(text: str, total_tokens: int = 10) -> dict:
+def _oai(text: str, total_tokens: int = 10, usage: dict | None = None) -> dict:
     return {
         "choices": [{"message": {"content": text}}],
-        "usage":   {"prompt_tokens": total_tokens, "completion_tokens": 0},
+        "usage":   usage or {"prompt_tokens": total_tokens, "completion_tokens": 0},
     }
+
+
+def _mock_client(response: dict):
+    """A MagicMock client whose _post returns *response* JSON-encoded."""
+    c = MagicMock()
+    c._auth_headers.return_value = {"Authorization": "Bearer test"}
+    c._post.return_value = json.dumps(response).encode()
+    return c
 
 
 # ---------------------------------------------------------------------------
@@ -901,6 +909,348 @@ class TestSttGoogleRouting(unittest.TestCase):
         self.assertEqual(tool._MAX_SYNC_SECONDS, 55.0)
         # _probe_duration_seconds returns None gracefully without pydub/file
         self.assertIsNone(tool._probe_duration_seconds("/nonexistent.mp3"))
+
+
+# ---------------------------------------------------------------------------
+# 1.2-A — exception hierarchy
+# ---------------------------------------------------------------------------
+
+class TestExceptionHierarchy(unittest.TestCase):
+
+    def test_factory_maps_status_to_subclass(self):
+        from yait_aichain.clients._errors import (
+            error_from_status, APIError, NetworkError, RateLimitError,
+            AuthenticationError, InvalidRequestError, NotFoundError, ServerError,
+        )
+        self.assertIsInstance(error_from_status(0, "x"),   NetworkError)
+        self.assertIsInstance(error_from_status(429, "x"), RateLimitError)
+        self.assertIsInstance(error_from_status(401, "x"), AuthenticationError)
+        self.assertIsInstance(error_from_status(403, "x"), AuthenticationError)
+        self.assertIsInstance(error_from_status(400, "x"), InvalidRequestError)
+        self.assertIsInstance(error_from_status(422, "x"), InvalidRequestError)
+        self.assertIsInstance(error_from_status(404, "x"), NotFoundError)
+        self.assertIsInstance(error_from_status(500, "x"), ServerError)
+        self.assertIsInstance(error_from_status(503, "x"), ServerError)
+        # unmapped status falls back to the base class exactly
+        self.assertIs(type(error_from_status(418, "x")), APIError)
+
+    def test_all_subclasses_are_apierror(self):
+        """Backward compat: except APIError still catches every failure."""
+        from yait_aichain.clients import (
+            APIError, NetworkError, RateLimitError, AuthenticationError,
+            InvalidRequestError, NotFoundError, ServerError,
+        )
+        for cls in (NetworkError, RateLimitError, AuthenticationError,
+                    InvalidRequestError, NotFoundError, ServerError):
+            self.assertTrue(issubclass(cls, APIError), cls.__name__)
+
+    def test_retry_after_parsed_for_rate_limit(self):
+        from yait_aichain.clients._errors import error_from_status, RateLimitError
+        e = error_from_status(429, "slow down", {"Retry-After": "30"})
+        self.assertIsInstance(e, RateLimitError)
+        self.assertEqual(e.retry_after, 30.0)
+
+    def test_retry_after_absent_or_unparseable_is_none(self):
+        from yait_aichain.clients._errors import error_from_status
+        self.assertIsNone(error_from_status(429, "x").retry_after)
+        self.assertIsNone(
+            error_from_status(429, "x", {"Retry-After": "Wed, 21 Oct"}).retry_after
+        )
+
+    def test_status_and_message_preserved(self):
+        from yait_aichain.clients._errors import error_from_status
+        e = error_from_status(401, "invalid key")
+        self.assertEqual(e.status, 401)
+        self.assertEqual(e.message, "invalid key")
+        self.assertIn("401", str(e))
+
+    def test_base_import_path_still_works(self):
+        """Legacy `from clients._base import APIError` must keep working."""
+        from yait_aichain.clients._base import APIError as FromBase
+        from yait_aichain.clients._errors import APIError as FromErrors
+        self.assertIs(FromBase, FromErrors)
+
+    def test_exported_at_top_level(self):
+        import yait_aichain
+        for name in ("APIError", "RateLimitError", "AuthenticationError",
+                     "NetworkError", "ServerError"):
+            self.assertTrue(hasattr(yait_aichain, name), name)
+
+
+# ---------------------------------------------------------------------------
+# 1.2-B — Usage accounting
+# ---------------------------------------------------------------------------
+
+class TestUsage(unittest.TestCase):
+
+    def test_extract_openai_shape(self):
+        from yait_aichain.models._usage import extract_usage
+        u = extract_usage({"usage": {
+            "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
+        self.assertEqual((u.input_tokens, u.output_tokens, u.total_tokens), (10, 5, 15))
+
+    def test_extract_anthropic_shape(self):
+        from yait_aichain.models._usage import extract_usage
+        u = extract_usage({"usage": {"input_tokens": 7, "output_tokens": 3}})
+        self.assertEqual((u.input_tokens, u.output_tokens), (7, 3))
+        self.assertEqual(u.total_tokens, 10)   # derived when absent
+
+    def test_extract_google_shape(self):
+        from yait_aichain.models._usage import extract_usage
+        u = extract_usage({"usageMetadata": {
+            "promptTokenCount": 20, "candidatesTokenCount": 8, "totalTokenCount": 28}})
+        self.assertEqual((u.input_tokens, u.output_tokens, u.total_tokens), (20, 8, 28))
+
+    def test_extract_missing_is_zero_and_never_raises(self):
+        from yait_aichain.models._usage import extract_usage
+        self.assertFalse(extract_usage({}))
+        self.assertFalse(extract_usage({"choices": []}))
+        self.assertFalse(extract_usage("not a dict"))
+
+    def test_usage_is_additive(self):
+        from yait_aichain.models._usage import Usage
+        a = Usage(10, 5, 15)
+        b = Usage(2, 3, 5)
+        c = a + b
+        self.assertEqual((c.input_tokens, c.output_tokens, c.total_tokens), (12, 8, 20))
+        # sum() starts from 0 (int) → __radd__
+        self.assertEqual(sum([a, b]).total_tokens, 20)
+
+    def test_skill_records_last_usage(self):
+        from yait_aichain.models import OpenAIModel
+        from yait_aichain.skills import Skill
+
+        model = OpenAIModel("gpt-4o", api_key="k")
+        model.client = _mock_client(_oai("hi", usage={
+            "prompt_tokens": 11, "completion_tokens": 4, "total_tokens": 15}))
+        skill = Skill(model=model,
+                      input={"messages": [{"role": "user", "parts": ["x"]}]})
+        self.assertIsNone(skill.last_usage)   # before run
+        skill.run()
+        self.assertEqual(skill.last_usage.input_tokens, 11)
+        self.assertEqual(skill.last_usage.total_tokens, 15)
+
+    def test_chain_sums_step_usage(self):
+        from yait_aichain.models import OpenAIModel
+        from yait_aichain.skills import Skill
+        from yait_aichain.chain import Chain
+
+        def _mk(toks):
+            m = OpenAIModel("gpt-4o", api_key="k")
+            m.client = _mock_client(_oai("ok", usage={
+                "prompt_tokens": toks, "completion_tokens": 1,
+                "total_tokens": toks + 1}))
+            return Skill(model=m,
+                         input={"messages": [{"role": "user", "parts": ["x"]}]})
+
+        chain = Chain(steps=[(_mk(10), "a", {}, {}), (_mk(20), "b", {}, {})])
+        chain.run()
+        self.assertEqual(chain.last_usage.input_tokens, 30)
+        self.assertEqual(chain.last_usage.total_tokens, 32)
+
+    def test_usage_exported_top_level(self):
+        import yait_aichain
+        self.assertTrue(hasattr(yait_aichain, "Usage"))
+
+
+# ---------------------------------------------------------------------------
+# 1.2-C — cost from pricing data
+# ---------------------------------------------------------------------------
+
+class TestPricing(unittest.TestCase):
+
+    def test_estimate_known_model(self):
+        from yait_aichain.models._usage import Usage
+        from yait_aichain.models._pricing import estimate_cost
+        # gpt-4o: 2.5 in / 10 out per Mtok → 1M in + 1M out = 2.5 + 10 = 12.5
+        cost = estimate_cost(Usage(1_000_000, 1_000_000, 2_000_000), "gpt-4o")
+        self.assertAlmostEqual(cost, 12.5)
+
+    def test_unknown_model_is_none(self):
+        from yait_aichain.models._usage import Usage
+        from yait_aichain.models._pricing import estimate_cost
+        self.assertIsNone(estimate_cost(Usage(100, 100), "totally-unknown-xyz"))
+
+    def test_attach_cost_fills_field(self):
+        from yait_aichain.models._usage import Usage
+        from yait_aichain.models._pricing import attach_cost
+        u = attach_cost(Usage(1_000_000, 0, 1_000_000), "gpt-4o")
+        self.assertAlmostEqual(u.cost, 2.5)
+
+    def test_skill_last_usage_has_cost(self):
+        from yait_aichain.models import OpenAIModel
+        from yait_aichain.skills import Skill
+
+        model = OpenAIModel("gpt-4o", api_key="k")
+        model.client = _mock_client(_oai("hi", usage={
+            "prompt_tokens": 1_000_000, "completion_tokens": 0,
+            "total_tokens": 1_000_000}))
+        skill = Skill(model=model,
+                      input={"messages": [{"role": "user", "parts": ["x"]}]})
+        skill.run()
+        self.assertAlmostEqual(skill.last_usage.cost, 2.5)
+
+    def test_chain_sums_cost(self):
+        from yait_aichain.models._usage import Usage
+        a = Usage(0, 0, 0, cost=1.5)
+        b = Usage(0, 0, 0, cost=2.0)
+        self.assertAlmostEqual((a + b).cost, 3.5)
+        # None + value keeps the known part
+        self.assertAlmostEqual((Usage(0, 0, 0) + b).cost, 2.0)
+        # both None stays None
+        self.assertIsNone((Usage(0, 0, 0) + Usage(0, 0, 0)).cost)
+
+
+# ---------------------------------------------------------------------------
+# 1.2-D — provider/model routing
+# ---------------------------------------------------------------------------
+
+class TestProviderRouting(unittest.TestCase):
+
+    def test_explicit_prefix_selects_provider(self):
+        from yait_aichain.models import Model, OpenAIModel, AnthropicModel
+        self.assertIsInstance(Model("openai/gpt-4o", api_key="k"), OpenAIModel)
+        self.assertIsInstance(Model("anthropic/claude-x", api_key="k"),
+                              AnthropicModel)
+
+    def test_prefix_stripped_from_wire_name(self):
+        from yait_aichain.models import Model
+        m = Model("openai/gpt-4o", api_key="k")
+        self.assertEqual(m.name, "gpt-4o")   # prefix never reaches the API
+
+    def test_bare_name_still_works(self):
+        from yait_aichain.models import Model, OpenAIModel
+        m = Model("gpt-4o", api_key="k")
+        self.assertIsInstance(m, OpenAIModel)
+        self.assertEqual(m.name, "gpt-4o")
+
+    def test_explicit_prefix_allows_custom_model_name(self):
+        """A name the regex can't recognise works via an explicit prefix."""
+        from yait_aichain.models import Model, OpenAIModel
+        m = Model("openai/ft:gpt-4o:org:abc", api_key="k")
+        self.assertIsInstance(m, OpenAIModel)
+        self.assertEqual(m.name, "ft:gpt-4o:org:abc")
+
+    def test_unknown_prefix_falls_through_to_regex(self):
+        from yait_aichain.models._base import _split_provider_prefix
+        self.assertEqual(_split_provider_prefix("foo/bar"), (None, "foo/bar"))
+
+    def test_split_helper(self):
+        from yait_aichain.models._base import _split_provider_prefix
+        self.assertEqual(_split_provider_prefix("openai/gpt-4o"), ("openai", "gpt-4o"))
+        self.assertEqual(_split_provider_prefix("gpt-4o"), (None, "gpt-4o"))
+
+
+# ---------------------------------------------------------------------------
+# 1.2-E — registry model refresh
+# ---------------------------------------------------------------------------
+
+class TestRegistryRefresh(unittest.TestCase):
+
+    class _FakeClient:
+        def __init__(self, models): self._models = models
+        def list_models(self): return self._models
+
+    def test_diff_new_and_removed(self):
+        from yait_aichain.models import registry
+        # live has one new model and is missing one previously-registered one
+        registered = registry.models(provider="openai")
+        live = [m for m in registered if m != registered[0]] + ["gpt-6-new"]
+        d = registry.refresh("openai", client=self._FakeClient(live))
+        self.assertIn("gpt-6-new", d["new"])
+        self.assertIn(registered[0], d["removed"])
+        self.assertNotIn("gpt-6-new", d["registered"])
+
+    def test_does_not_mutate_registry(self):
+        from yait_aichain.models import registry
+        before = registry.models(provider="openai")
+        registry.refresh("openai", client=self._FakeClient(["only-this"]))
+        after = registry.models(provider="openai")
+        self.assertEqual(before, after)   # registry stays a reference
+
+    def test_unknown_provider_raises(self):
+        from yait_aichain.models import registry
+        with self.assertRaises(ValueError):
+            registry.refresh("nope", client=self._FakeClient([]))
+
+    def test_missing_key_raises_when_no_client(self):
+        from yait_aichain.models import registry
+        import os
+        saved = os.environ.pop("OPENAI_API_KEY", None)
+        try:
+            with self.assertRaises(ValueError):
+                registry.refresh("openai")   # no client, no key
+        finally:
+            if saved is not None:
+                os.environ["OPENAI_API_KEY"] = saved
+
+
+# ---------------------------------------------------------------------------
+# 1.2-F — model fallback chain
+# ---------------------------------------------------------------------------
+
+class TestFallbackChain(unittest.TestCase):
+
+    def _ok(self, text):
+        from yait_aichain.models import OpenAIModel
+        m = OpenAIModel("gpt-4o", api_key="k")
+        m.client = _mock_client(_oai(text))
+        return m
+
+    def _failing(self, exc):
+        from yait_aichain.models import OpenAIModel
+        m = OpenAIModel("gpt-4o", api_key="k")
+        m.client = MagicMock()
+        m.client._auth_headers.return_value = {}
+        m.client._post.side_effect = exc
+        return m
+
+    def test_single_model_unchanged(self):
+        from yait_aichain.skills import Skill
+        s = Skill(model=self._ok("solo"),
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        self.assertEqual(s.run(), "solo")
+        self.assertEqual(len(s.models), 1)
+
+    def test_transient_failure_falls_through(self):
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import RateLimitError
+        s = Skill(model=[self._failing(RateLimitError(429, "slow")),
+                         self._ok("second")],
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        self.assertEqual(s.run(), "second")
+
+    def test_server_and_network_errors_fall_through(self):
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import ServerError, NetworkError
+        for exc in (ServerError(503, "down"), NetworkError(0, "no route")):
+            s = Skill(model=[self._failing(exc), self._ok("recovered")],
+                      input={"messages": [{"role": "user", "parts": ["x"]}]})
+            self.assertEqual(s.run(), "recovered")
+
+    def test_non_transient_does_not_fall_through(self):
+        """Auth error must propagate immediately, not hide behind fallback."""
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import AuthenticationError
+        s = Skill(model=[self._failing(AuthenticationError(401, "bad key")),
+                         self._ok("unreached")],
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        with self.assertRaises(AuthenticationError):
+            s.run()
+
+    def test_all_models_exhausted_raises_last(self):
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import RateLimitError
+        s = Skill(model=[self._failing(RateLimitError(429, "a")),
+                         self._failing(RateLimitError(429, "b"))],
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        with self.assertRaises(RateLimitError):
+            s.run()
+
+    def test_empty_model_list_rejected(self):
+        from yait_aichain.skills import Skill
+        with self.assertRaises(ValueError):
+            Skill(model=[], input={"messages": [{"role": "user", "parts": ["x"]}]})
 
 
 # ---------------------------------------------------------------------------

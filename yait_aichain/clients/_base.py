@@ -8,22 +8,18 @@ from ._constants import (
     DEFAULT_IDEMPOTENT_RETRIES,
 )
 
-
-class APIError(Exception):
-    """
-    Raised when an AI provider API returns a non-2xx HTTP status,
-    or when a network-level error occurs.
-
-    Attributes
-    ----------
-    status  : HTTP status code (0 for network/connection errors).
-    message : Error detail from the response body or exception message.
-    """
-
-    def __init__(self, status: int, message: str) -> None:
-        self.status = status
-        self.message = message
-        super().__init__(f"[HTTP {status}] {message}")
+# APIError and its subclasses live in ._errors; re-exported here so the
+# long-standing ``from ._base import APIError`` imports keep working.
+from ._errors import (  # noqa: F401
+    APIError,
+    NetworkError,
+    RateLimitError,
+    AuthenticationError,
+    InvalidRequestError,
+    NotFoundError,
+    ServerError,
+    error_from_status,
+)
 
 
 class BaseClient:
@@ -192,14 +188,15 @@ class BaseClient:
                 retries=DEFAULT_IDEMPOTENT_RETRIES,
             )
         except Exception as exc:
-            raise APIError(0, str(exc)) from exc
+            raise NetworkError(0, str(exc)) from exc
 
         if 200 <= response.status < 300:
             return response.data
 
-        raise APIError(
+        raise error_from_status(
             response.status,
             response.data.decode("utf-8", errors="replace"),
+            response.headers,
         )
 
     def _post(self, path: str, data: dict, headers: dict) -> bytes:
@@ -230,14 +227,15 @@ class BaseClient:
                 headers=headers,
             )
         except Exception as exc:
-            raise APIError(0, str(exc)) from exc
+            raise NetworkError(0, str(exc)) from exc
 
         if 200 <= response.status < 300:
             return response.data
 
-        raise APIError(
+        raise error_from_status(
             response.status,
             response.data.decode("utf-8", errors="replace"),
+            response.headers,
         )
 
     def _post_form(self, path: str, fields: dict, headers: dict) -> bytes:
@@ -271,14 +269,15 @@ class BaseClient:
                 headers=headers,
             )
         except Exception as exc:
-            raise APIError(0, str(exc)) from exc
+            raise NetworkError(0, str(exc)) from exc
 
         if 200 <= response.status < 300:
             return response.data
 
-        raise APIError(
+        raise error_from_status(
             response.status,
             response.data.decode("utf-8", errors="replace"),
+            response.headers,
         )
 
     def _download(self, url: str, headers: dict | None = None) -> dict:
@@ -303,7 +302,7 @@ class BaseClient:
         try:
             response = self._http.request("GET", url, headers=headers)
         except Exception as exc:
-            raise APIError(0, str(exc)) from exc
+            raise NetworkError(0, str(exc)) from exc
 
         if 200 <= response.status < 300:
             return {
@@ -313,7 +312,8 @@ class BaseClient:
                 ),
             }
 
-        raise APIError(
+        raise error_from_status(
             response.status,
             response.data.decode("utf-8", errors="replace"),
+            response.headers,
         )
