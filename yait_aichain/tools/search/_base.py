@@ -25,7 +25,26 @@ Standard ``options`` keys (all optional)
 """
 
 from __future__ import annotations
+
+import urllib3
+
 from .._base import Tool
+
+# ---------------------------------------------------------------------------
+# Shared network policy for all search providers
+# ---------------------------------------------------------------------------
+# Search endpoints answer in seconds; without a timeout a hung server blocks
+# the calling pipeline (or agent) forever.  Retries cover transient 429/5xx;
+# search POSTs are read-only queries, so retrying them cannot double-bill a
+# generation the way a retried completion call could.
+SEARCH_TIMEOUT = urllib3.Timeout(connect=10.0, read=120.0)
+SEARCH_RETRIES = urllib3.Retry(
+    total=3,
+    backoff_factor=1.0,
+    status_forcelist={429, 500, 502, 503, 504},
+    allowed_methods=None,   # include POST — see note above
+    raise_on_status=False,
+)
 
 
 class Search(Tool):

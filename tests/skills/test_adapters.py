@@ -582,11 +582,12 @@ class TestGoogleToRequest(unittest.TestCase):
             api_key="test-google-key",
         )
 
-    def test_path_contains_model_and_key(self):
+    def test_path_contains_model_without_key(self):
+        # The key travels in the x-goog-api-key header, never the URL.
         path, _ = self._model().to_request([], _text_output())
         self.assertIn("gemini-2.0-flash", path)
         self.assertIn("generateContent",  path)
-        self.assertIn("key=test-google-key", path)
+        self.assertNotIn("key=", path)
 
     def test_generation_config_temperature(self):
         _, body = self._model(temperature=0.7).to_request([], _text_output())

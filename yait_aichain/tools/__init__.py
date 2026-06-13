@@ -76,8 +76,6 @@ Backward-compatible aliases
 All previous class names still work:
   PerplexitySearchTool, BraveSearchTool, OpenAIWebSearchTool, SerpApiTool
   MarkItDownTool, MistletoeTool, WeasyprintTool
-  DeepLTranslateTool, DeepLRephraseTool
-  LatePublishTool, LateAccountsTool
   OpenAIEmbedder, CohereEmbedder, VoyageEmbedder, GoogleEmbedder
 """
 
@@ -242,16 +240,6 @@ __all__ = [
     "MarkItDownTool",
     "MistletoeTool",
     "WeasyprintTool",
-    # ── Services ──────────────────────────────────────────────────────────
-    "serviceTranslate",
-    "serviceSocialPost",
-    # service aliases
-    "DeepLTranslateTool",
-    "DeepLRephraseTool",
-    "LatePublishTool",
-    "LateAccountsTool",
-    # ── Image hosting ─────────────────────────────────────────────────────
-    "ImgbbUploadTool",
     # ── Universal REST API ────────────────────────────────────────────────
     "RestApiTool",
     # ── MCP (Model Context Protocol) ─────────────────────────────────────

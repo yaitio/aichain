@@ -426,7 +426,8 @@ class sttGoogle(convertToText):
     _DEFAULT_MODEL    = "latest_long"
     _CHUNK_SECONDS    = 55      # Google sync limit is 60 s; stay safely under
     _OVERLAP_SECONDS  = 2
-    _MAX_SYNC_MB      = 10.0    # files above this threshold are chunked
+    _MAX_SYNC_SECONDS = 55.0    # sync API hard limit is ~60 s of audio
+    _MAX_SYNC_MB      = 10.0    # size fallback when duration can't be probed
 
     # Maps audio extensions to Google RecognitionConfig encoding names
     _ENCODING_MAP: dict = {
@@ -501,7 +502,19 @@ class sttGoogle(convertToText):
             enable_automatic_punctuation = True,
         )
 
-        if file_mb <= self._MAX_SYNC_MB:
+        # The sync recognize API is limited by audio *duration* (~60 s), not
+        # file size: a 5 MB low-bitrate MP3 can hold half an hour of speech.
+        # Route by real duration whenever pydub can probe it.
+        duration_s = self._probe_duration_seconds(input)
+        if duration_s is not None:
+            use_sync = duration_s <= self._MAX_SYNC_SECONDS
+        else:
+            # pydub unavailable — fall back to the size heuristic.  This can
+            # mis-route long low-bitrate files into the sync API; install
+            # pydub for an exact duration check.
+            use_sync = file_mb <= self._MAX_SYNC_MB
+
+        if use_sync:
             with open(input, "rb") as fh:
                 content = fh.read()
             audio    = speech.RecognitionAudio(content=content)
@@ -509,6 +522,18 @@ class sttGoogle(convertToText):
             return self._format_results(response.results, timestamps, fmt)
 
         return self._transcribe_chunked(client, config, input, timestamps, fmt)
+
+    @staticmethod
+    def _probe_duration_seconds(path: str) -> "float | None":
+        """Return the audio duration in seconds, or None if unprobeable."""
+        try:
+            from pydub import AudioSegment
+        except ImportError:
+            return None
+        try:
+            return len(AudioSegment.from_file(path)) / 1000.0
+        except Exception:
+            return None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -556,7 +581,8 @@ class sttGoogle(convertToText):
         audio      = AudioSegment.from_file(path)
         chunk_ms   = self._CHUNK_SECONDS   * 1000
         overlap_ms = self._OVERLAP_SECONDS * 1000
-        parts: list[str] = []
+        parts: list[str]  = []
+        words: list[dict] = []
         start_ms = 0
 
         while start_ms < len(audio):
@@ -573,6 +599,7 @@ class sttGoogle(convertToText):
                     encoding      = _speech.RecognitionConfig.AudioEncoding.LINEAR16,
                     language_code = config.language_code,
                     model         = config.model,
+                    enable_word_time_offsets     = timestamps,
                     enable_automatic_punctuation = True,
                 )
                 resp = client.recognize(
@@ -585,6 +612,24 @@ class sttGoogle(convertToText):
                     if r.alternatives
                 )
                 parts.append(part.strip())
+
+                if timestamps:
+                    offset_s = start_ms / 1000.0
+                    for r in resp.results:
+                        if not r.alternatives:
+                            continue
+                        for w in r.alternatives[0].words:
+                            local_start = w.start_time.total_seconds()
+                            # Words inside the leading overlap of a non-first
+                            # chunk were already captured by the previous
+                            # chunk — drop them to avoid duplicates.
+                            if start_ms > 0 and local_start < self._OVERLAP_SECONDS:
+                                continue
+                            words.append({
+                                "word":  w.word,
+                                "start": local_start + offset_s,
+                                "end":   w.end_time.total_seconds() + offset_s,
+                            })
             finally:
                 os.unlink(tmp_path)
 
@@ -593,9 +638,15 @@ class sttGoogle(convertToText):
                 break
             start_ms = next_start
 
+        # NB: the plain-text join may duplicate a word or two at chunk
+        # boundaries (the 2 s overlap is transcribed twice); the word list
+        # above is deduplicated by timestamp and is the precise record.
         combined = " ".join(p for p in parts if p)
         if fmt == "json" or timestamps:
-            return json.dumps({"text": combined}, ensure_ascii=False)
+            payload: dict = {"text": combined}
+            if timestamps:
+                payload["words"] = words
+            return json.dumps(payload, ensure_ascii=False)
         return combined
 
 

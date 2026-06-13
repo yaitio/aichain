@@ -43,8 +43,26 @@ Auth
 from __future__ import annotations
 
 import os
+import uuid
 
 from .._base import VectorBackend, VectorRecord
+
+# Payload key that preserves the caller's original record ID.  Qdrant only
+# accepts unsigned integers or UUIDs as point IDs, so arbitrary string IDs
+# ("doc_1") are deterministically mapped to UUIDv5 — the original is kept in
+# the payload and restored on every read.
+_ORIGINAL_ID_KEY = "_aichain_id"
+
+
+def _point_id(rec_id: "str | int") -> "int | str":
+    """Map an arbitrary record ID onto a Qdrant-acceptable point ID."""
+    s = str(rec_id)
+    if s.isdigit():
+        return int(s)
+    try:
+        return str(uuid.UUID(s))
+    except ValueError:
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"aichain:{s}"))
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -161,9 +179,15 @@ class QdrantBackend(VectorBackend):
         records: list[VectorRecord] = []
         for point in data.get("result", []):
             payload = dict(point.get("payload") or {})
-            text    = payload.pop("text", payload.pop("document", ""))
+            # NB: not payload.pop("text", payload.pop("document", "")) —
+            # Python evaluates the default eagerly, which would silently
+            # strip a user's own "document" key even when "text" exists.
+            text = payload.pop("text", None)
+            if text is None:
+                text = payload.pop("document", "")
+            original_id = payload.pop(_ORIGINAL_ID_KEY, None)
             records.append(VectorRecord(
-                id       = str(point["id"]),
+                id       = original_id or str(point["id"]),
                 text     = text,
                 score    = point.get("score"),
                 metadata = payload,
@@ -178,9 +202,13 @@ class QdrantBackend(VectorBackend):
     ) -> None:
         points = []
         for rec, vec in zip(records, vectors):
-            payload = {**rec.metadata, "text": rec.text}
+            payload = {
+                **rec.metadata,
+                "text":           rec.text,
+                _ORIGINAL_ID_KEY: str(rec.id),
+            }
             points.append({
-                "id":      rec.id,
+                "id":      _point_id(rec.id),
                 "vector":  vec,
                 "payload": payload,
             })
@@ -192,15 +220,16 @@ class QdrantBackend(VectorBackend):
         ids:        list[str],
     ) -> list[VectorRecord]:
         # Qdrant: POST /collections/{name}/points with body {"ids": [...]}
-        body = {"ids": ids, "with_payload": True}
+        body = {"ids": [_point_id(i) for i in ids], "with_payload": True}
         data = self._post(f"/collections/{collection}/points", body)
 
         records: list[VectorRecord] = []
         for point in data.get("result", []):
-            payload = dict(point.get("payload") or {})
-            text    = payload.pop("text", "")
+            payload     = dict(point.get("payload") or {})
+            text        = payload.pop("text", "")
+            original_id = payload.pop(_ORIGINAL_ID_KEY, None)
             records.append(VectorRecord(
-                id       = str(point["id"]),
+                id       = original_id or str(point["id"]),
                 text     = text,
                 metadata = payload,
             ))
@@ -212,14 +241,17 @@ class QdrantBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
+        # The VectorStore layer guarantees at least one non-empty argument
+        # (an empty list/dict would otherwise mean "delete everything").
         body: dict = {}
         if ids:
-            body["points"] = ids
+            body["points"] = [_point_id(i) for i in ids]
         elif filter:
             body["filter"] = filter
         else:
-            # delete all: empty filter matches every point
-            body["filter"] = {}
+            raise ValueError(
+                "QdrantBackend.delete: provide non-empty ids or filter."
+            )
         self._post(f"/collections/{collection}/points/delete", body)
 
     def count(self, collection: str) -> int:

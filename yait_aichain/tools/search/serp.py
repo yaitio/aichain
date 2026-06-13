@@ -41,7 +41,7 @@ import urllib.parse
 
 import urllib3
 
-from ._base import Search
+from ._base import Search, SEARCH_RETRIES, SEARCH_TIMEOUT
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -208,7 +208,9 @@ class searchSerp(Search):
                 f"{_ENV_KEY} environment variable."
             )
         self._api_key = key
-        self._http    = urllib3.PoolManager()
+        self._http    = urllib3.PoolManager(
+            timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES
+        )
 
     # ------------------------------------------------------------------
     # Core logic

@@ -100,7 +100,7 @@ class RerankQwen(RerankBase):
         documents: list[str],
         top_n:     int | None,
     ) -> tuple[list[dict], int | None, dict]:
-        from clients._qwen import resolve_qwen_base_url
+        from ...clients._qwen import resolve_qwen_base_url
 
         base_url = resolve_qwen_base_url(self._region)
         url      = base_url + _RERANK_PATH

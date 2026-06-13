@@ -40,7 +40,7 @@ gemini-2.5-flash               temperature=1.0, top_p=0.95, top_k=40, max_tokens
 
 Note
 ----
-Google authenticates via query-string ``?key=<api_key>`` rather than an
+Google authenticates via the ``x-goog-api-key`` header rather than an
 Authorization header.  The client handles this transparently.
 
 Environment variable
@@ -207,9 +207,9 @@ class GoogleAIModel(Model):
         Translate universal messages → Google AI ``generateContent``
         ``(path, body)`` pair.
 
-        The API key is embedded in the path (``?key=…``) because Google
-        authenticates via query string rather than a header.  System
-        messages are lifted into ``system_instruction``.
+        Authentication is carried by the client's ``x-goog-api-key``
+        header, so the path stays free of the API key (URLs leak into
+        logs).  System messages are lifted into ``system_instruction``.
         """
         system_parts:    list[dict] = []
         google_contents: list[dict] = []
@@ -263,7 +263,7 @@ class GoogleAIModel(Model):
         if system_parts:
             body["system_instruction"] = {"parts": system_parts}
 
-        path = f"/models/{self.name}:generateContent?key={self._api_key}"
+        path = f"/models/{self.name}:generateContent"
         return path, body
 
     def from_response(self, response: dict, output: dict) -> "str | dict":

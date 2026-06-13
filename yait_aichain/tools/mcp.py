@@ -93,6 +93,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
 from ._base import Tool
@@ -135,10 +136,25 @@ class _AsyncBridge:
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
-    def run(self, coro: Any) -> Any:
-        """Submit *coro* to the background loop and block until it completes."""
+    def run(self, coro: Any, timeout: "float | None" = None) -> Any:
+        """
+        Submit *coro* to the background loop and block until it completes.
+
+        ``timeout`` caps the total wall-clock wait.  Without it, a hung MCP
+        server (e.g. a STDIO subprocess that spawned but never answers the
+        protocol handshake) would block the calling thread forever — the
+        daemon loop thread is not interruptible from the caller's side.
+        """
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result()   # re-raises exceptions from the coroutine
+        try:
+            return future.result(timeout)  # re-raises coroutine exceptions
+        except FuturesTimeoutError:
+            future.cancel()
+            raise TimeoutError(
+                f"MCP operation did not complete within {timeout:.0f}s "
+                "(server hung during connection or call). Pass a larger "
+                "options={'timeout': ...} if the operation is legitimately slow."
+            ) from None
 
     @classmethod
     def get(cls) -> "_AsyncBridge":
@@ -149,9 +165,15 @@ class _AsyncBridge:
             return cls._instance
 
 
-def _run_sync(coro: Any) -> Any:
+# Wall-clock cap for the connection/handshake phase (and tool discovery).
+# Generous — covers slow STDIO subprocess startup — but finite, so a dead
+# server fails with TimeoutError instead of hanging the pipeline forever.
+DEFAULT_MCP_SETUP_TIMEOUT = 60.0
+
+
+def _run_sync(coro: Any, timeout: "float | None" = None) -> Any:
     """Run *coro* synchronously from any context (sync or async)."""
-    return _AsyncBridge.get().run(coro)
+    return _AsyncBridge.get().run(coro, timeout=timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -501,11 +523,26 @@ class MCPTool(Tool):
             cwd       = self._cwd,
             transport = self._transport,
         )
-        async with client:
+        # The connection/handshake phase gets its own finite cap: the
+        # per-call ``timeout`` option only covers ``call_tool``, so a STDIO
+        # subprocess that spawns but never speaks the protocol would
+        # otherwise hang here forever.
+        try:
+            await asyncio.wait_for(
+                client.__aenter__(), DEFAULT_MCP_SETUP_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"MCP server did not complete the connection handshake "
+                f"within {DEFAULT_MCP_SETUP_TIMEOUT:.0f}s: {self._server!r}"
+            ) from None
+        try:
             call_kwargs: dict = {"raise_on_error": True}
             if timeout is not None:
                 call_kwargs["timeout"] = timeout
             result = await client.call_tool(self.name, arguments, **call_kwargs)
+        finally:
+            await client.__aexit__(None, None, None)
         return _extract_result(result)
 
     # ------------------------------------------------------------------
@@ -533,6 +570,7 @@ def MCPTools(
     env:       "dict | None"      = None,
     cwd:       "str | None"       = None,
     transport: "str | None"       = None,
+    timeout:   "float | None"     = DEFAULT_MCP_SETUP_TIMEOUT,
 ) -> "list[MCPTool]":
     """
     Connect to an MCP server, discover all exposed tools, and return one
@@ -541,6 +579,10 @@ def MCPTools(
     The discovery connection is opened and closed within this call.  Each
     returned ``MCPTool`` opens its own connection independently when
     ``run()`` is called later.
+
+    ``timeout`` caps the whole discovery (connect + handshake + list_tools);
+    a hung server raises ``TimeoutError`` instead of blocking forever.
+    Pass ``timeout=None`` to wait indefinitely.
 
     Parameters
     ----------
@@ -644,7 +686,8 @@ def MCPTools(
             env       = env,
             cwd       = cwd,
             transport = transport,
-        )
+        ),
+        timeout = timeout,
     )
 
 

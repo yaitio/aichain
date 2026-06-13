@@ -98,6 +98,8 @@ Partial forms (each missing key is filled in with its default)::
 
 import copy
 
+from .._template import substitute_placeholders
+
 
 # ---------------------------------------------------------------------------
 # Normalisation
@@ -310,36 +312,30 @@ def validate_output(output: dict) -> None:
 # Variable substitution
 # ---------------------------------------------------------------------------
 
-class _SafeFormatMap(dict):
-    """
-    A dict subclass that returns ``"{key}"`` for missing keys so that
-    :py:meth:`str.format_map` leaves unknown placeholders intact instead
-    of raising ``KeyError``.
-    """
-    def __missing__(self, key: str) -> str:
-        return f"{{{key}}}"
-
-
 def substitute(messages: list, variables: dict) -> list:
     """
     Return a deep copy of *messages* with ``{placeholders}`` in text parts
     replaced by the matching value from *variables*.
 
-    Unknown placeholders that have no corresponding key in *variables* are
-    left intact (they are not removed or replaced with an empty string).
+    Substitution is performed by
+    :func:`yait_aichain._template.substitute_placeholders`: only bare
+    ``{identifier}`` placeholders with a matching key are replaced.  Unknown
+    placeholders, format specs and literal braces (e.g. JSON examples like
+    ``{"a": 1}``) are left intact — they never raise.
 
     Non-text parts are deep-copied unchanged.
     """
     if not variables:
         return copy.deepcopy(messages)
-    mapping = _SafeFormatMap(variables)
     result = []
     for msg in messages:
         new_parts = []
         for part in msg.get("parts", []):
             if part.get("type") == "text":
                 new_part = dict(part)
-                new_part["text"] = part["text"].format_map(mapping)
+                new_part["text"] = substitute_placeholders(
+                    part["text"], variables
+                )
                 new_parts.append(new_part)
             else:
                 new_parts.append(copy.deepcopy(part))

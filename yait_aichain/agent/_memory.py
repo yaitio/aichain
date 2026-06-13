@@ -14,9 +14,9 @@ snapshot, giving callers a full audit trail of what the agent retained.
 
 Pluggable backends
 ------------------
-By default ``AgentMemory`` uses an in-process ``InMemoryBackend`` that
-behaves exactly like the original plain-dict store — state is wiped at the
-start of each ``run()`` call.
+By default ``AgentMemory`` uses an in-process ``InMemoryBackend``: each
+``run()`` starts from the construction-time baseline (any ``initial`` seed),
+discarding scratch values from previous runs.
 
 For durable state across separate ``run()`` calls, supply a ``FileBackend``::
 
@@ -24,14 +24,14 @@ For durable state across separate ``run()`` calls, supply a ``FileBackend``::
 
     memory = AgentMemory(backend=FileBackend("~/.agent_state.json"))
     agent  = Agent(..., memory=memory)
-    result = agent.run(task="...")
+    result = agent.run(task="...")   # sees the state loaded from the file
 
     # Persist the final state so the next run can load it
     memory.flush()
 
-On the *next* invocation, create a *new* ``AgentMemory`` with the same
-``FileBackend`` path — its ``__init__`` will load the saved state before the
-agent's ``run()`` resets it.
+``run()`` calls :meth:`AgentMemory.reset` (not :meth:`~AgentMemory.clear`),
+which restores the loaded-plus-initial baseline without touching the backend
+— so persisted state survives and is visible to every run.
 """
 
 from __future__ import annotations
@@ -76,11 +76,9 @@ class InMemoryBackend(MemoryBackend):
     Volatile in-process backend.
 
     State lives only in ``self._data``; nothing is written to disk.
-    ``clear()`` wipes the in-process dict, so state does **not** survive
-    an ``agent.run()`` call (which always begins with ``memory.clear()``).
 
-    This is the default backend and reproduces the original behaviour of
-    ``AgentMemory`` exactly.
+    This is the default backend: with no ``initial`` seed the baseline is
+    empty, so each ``agent.run()`` starts with a clean store.
     """
 
     def __init__(self) -> None:
@@ -126,8 +124,9 @@ class FileBackend(MemoryBackend):
         # After a run, persist the final state:
         memory.flush()
 
-        # On the next invocation, create a new AgentMemory with the same
-        # backend to restore the saved state:
+        # The same instance can be reused for the next run() — it starts
+        # from the flushed checkpoint.  A new process restores the state
+        # the same way:
         memory2 = AgentMemory(backend=FileBackend("~/.agent_memory.json"))
     """
 
@@ -220,10 +219,15 @@ class AgentMemory:
         initial: dict | None        = None,
         backend: MemoryBackend | None = None,
     ) -> None:
-        self._backend: MemoryBackend         = backend or InMemoryBackend()
-        self._store:   dict[str, Any]        = dict(self._backend.load())
+        self._backend: MemoryBackend  = backend or InMemoryBackend()
+        loaded: dict[str, Any]        = dict(self._backend.load())
         if initial:
-            self._store.update(initial)
+            loaded.update(initial)
+        # Construction-time baseline: backend state + initial seed.
+        # ``reset()`` (called by agent.run()) restores this snapshot, so
+        # persistent state survives across runs while per-run scratch does not.
+        self._baseline: dict[str, Any] = dict(loaded)
+        self._store:    dict[str, Any] = dict(loaded)
 
     # ------------------------------------------------------------------
     # Read / Write
@@ -245,23 +249,39 @@ class AgentMemory:
         """Remove *key* from the store.  Silent no-op if absent."""
         self._store.pop(key, None)
 
+    def reset(self) -> None:
+        """
+        Restore the in-process store to its construction-time baseline.
+
+        The baseline is the state loaded from the backend plus any ``initial``
+        seed.  Called by ``agent.run()`` at the start of every run so that
+        scratch values from a previous run are discarded while persistent
+        state (FileBackend contents, ``initial``) is preserved.  The backend
+        itself is never touched.
+        """
+        self._store = dict(self._baseline)
+
     def clear(self) -> None:
-        """Remove all entries from the in-process store and the backend."""
+        """
+        Remove all entries from the in-process store, the baseline, and the
+        backend.  This is a destructive, explicit operation — ``agent.run()``
+        does **not** call it (it calls :meth:`reset`).
+        """
         self._store.clear()
+        self._baseline = {}
         self._backend.clear()
 
     def flush(self) -> None:
         """
         Persist the current in-process state to the backend without clearing.
 
-        Call this explicitly after ``agent.run()`` completes to checkpoint the
-        final memory state.  On a subsequent ``run()``, create a *new*
-        ``AgentMemory`` with the same backend to restore the saved state —
-        do not reuse the same instance, because ``run()`` calls ``clear()``
-        at the start which would wipe both the in-process store and the
-        persisted file.
+        Call this explicitly after ``agent.run()`` completes to checkpoint
+        the final memory state.  The flushed state also becomes the new
+        baseline, so a subsequent ``run()`` on the same instance starts from
+        the checkpoint instead of the construction-time snapshot.
         """
         self._backend.save(self._store)
+        self._baseline = dict(self._store)
 
     # ------------------------------------------------------------------
     # Inspection

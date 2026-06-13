@@ -217,12 +217,46 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
     response.
 
     Shared by :class:`OpenAIModel`, :class:`~models._xai.XAIModel`, and
-    :class:`~models._perplexity.PerplexityModel`.
+    :class:`~models._perplexity.PerplexityModel` (and, via their own
+    request builders, the Kimi/DeepSeek/Qwen models).
+
+    Raises
+    ------
+    ValueError
+        With a descriptive message when the response carries no usable
+        content: empty ``choices`` (blocked/failed upstream), an explicit
+        model ``refusal``, or invalid/truncated JSON in a JSON mode.
     """
-    text  = response["choices"][0]["message"]["content"] or ""
+    choices = response.get("choices") or []
+    if not choices:
+        detail = (response.get("error") or {}).get("message")
+        raise ValueError(
+            "Provider response contains no choices — the request was "
+            "blocked or failed upstream"
+            + (f": {detail}" if detail else ".")
+        )
+
+    choice  = choices[0] or {}
+    message = choice.get("message") or {}
+
+    refusal = message.get("refusal")
+    if refusal:
+        raise ValueError(f"Model refused to answer: {refusal}")
+
+    text  = message.get("content") or ""
     ftype = output.get("format", {}).get("type", "text")
     if ftype in ("json", "json_schema"):
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            if choice.get("finish_reason") == "length":
+                raise ValueError(
+                    "Response was truncated (finish_reason='length') before "
+                    "the JSON completed — increase max_tokens."
+                ) from exc
+            raise ValueError(
+                f"Model returned invalid JSON: {exc}"
+            ) from exc
     return text
 
 
@@ -236,6 +270,18 @@ _OPENAI_IMAGE_MODEL_PREFIXES = ("dall-e-", "gpt-image-")
 def _is_openai_image_model(name: str) -> bool:
     """Return True when *name* identifies an OpenAI image-generation model."""
     return name.startswith(_OPENAI_IMAGE_MODEL_PREFIXES)
+
+
+# o-series reasoning models reject the sampling parameters that ordinary
+# GPT models accept.
+_OSERIES_FAMILIES = ("o1", "o3", "o4")
+
+
+def _is_o_series_model(name: str) -> bool:
+    """True for o-series reasoning models (o1, o1-mini, o3, o4-mini, …)."""
+    return any(
+        name == fam or name.startswith(f"{fam}-") for fam in _OSERIES_FAMILIES
+    )
 
 
 def _build_image_generations_request(
@@ -333,9 +379,22 @@ def _parse_image_generations_response(response: dict) -> dict:
 
     ``mime_type`` is detected from the image's magic bytes so it is always
     accurate, regardless of which provider generated the image.
+
+    Raises
+    ------
+    ValueError
+        When ``data`` is empty (e.g. the prompt was rejected by moderation).
     """
-    item  = response.get("data", [{}])[0]
-    b64   = item.get("b64_json")
+    data = response.get("data") or []
+    if not data:
+        detail = (response.get("error") or {}).get("message")
+        raise ValueError(
+            "Provider returned no image data — the prompt may have been "
+            "rejected by moderation"
+            + (f": {detail}" if detail else ".")
+        )
+    item = data[0]
+    b64  = item.get("b64_json")
     return {
         "url":            item.get("url"),
         "base64":         b64,
@@ -391,18 +450,22 @@ def _build_responses_api_request(
             else:
                 input_messages.append({"role": role, "content": items})
 
+    # gpt-5-family models are reasoning models: the Responses API rejects
+    # ``temperature``/``top_p`` for them ("Unsupported parameter"), so the
+    # sampling knobs are deliberately omitted here.
     body: dict = {
         "model":             model.name,
         "input":             input_messages,
         "max_output_tokens": model.max_tokens,
-        "temperature":       model.temperature,
     }
 
     if instructions:
         body["instructions"] = instructions
 
-    if model.top_p is not None:
-        body["top_p"] = model.top_p
+    if model.reasoning:
+        effort = model._REASONING_MAP.get(model.reasoning)
+        if effort:
+            body["reasoning"] = {"effort": effort}
 
     # Structured output — lives under ``text.format`` in the Responses API
     fmt   = output.get("format", {})
@@ -515,6 +578,11 @@ class OpenAIModel(Model):
         path, body = _build_openai_compat_request(
             self, messages, output, "/v1/chat/completions"
         )
+        if _is_o_series_model(self.name):
+            # o-series models reject temperature/top_p with an API error
+            # rather than ignoring them.
+            body.pop("temperature", None)
+            body.pop("top_p", None)
         if self.reasoning:
             effort = self._REASONING_MAP.get(self.reasoning)
             if effort:
