@@ -408,6 +408,7 @@ class TestSkillUnsupportedModel(unittest.TestCase):
         # Bypass __init__ validation by constructing Skill manually
         skill = object.__new__(Skill)
         skill.model       = fake
+        skill.models      = [fake]
         skill._input      = _simple_input()
         skill._output     = _text_output()
         skill.variables   = {}

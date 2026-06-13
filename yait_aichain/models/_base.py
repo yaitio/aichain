@@ -59,9 +59,37 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 
+# Provider keys accepted as an explicit ``"provider/model"`` prefix.
+_PROVIDER_KEYS = frozenset({
+    "openai", "anthropic", "google", "xai",
+    "perplexity", "kimi", "deepseek", "qwen",
+})
+
+
+def _split_provider_prefix(name: str) -> "tuple[str | None, str]":
+    """
+    Split an explicit ``"provider/model"`` identifier.
+
+    Returns ``(provider_key, model_name)`` when *name* starts with a known
+    provider prefix (e.g. ``"openai/gpt-4o"`` → ``("openai", "gpt-4o")``),
+    otherwise ``(None, name)`` — leaving auto-detection to ``_resolve_provider``.
+
+    An explicit prefix also lets you use a custom model name the regex can't
+    recognise, e.g. ``Model("openai/ft:gpt-4o:org:abc")``.
+    """
+    if "/" in name:
+        head, _, tail = name.partition("/")
+        if head.lower() in _PROVIDER_KEYS and tail:
+            return head.lower(), tail
+    return None, name
+
+
 def _resolve_provider(name: str) -> str:
     """Return the provider key for *name*, or raise ``ValueError``."""
-    lower = name.lower()
+    explicit, model_name = _split_provider_prefix(name)
+    if explicit:
+        return explicit
+    lower = model_name.lower()
     for pattern, provider in _PROVIDER_PATTERNS:
         if pattern.match(lower):
             return provider
@@ -69,7 +97,8 @@ def _resolve_provider(name: str) -> str:
         f"Cannot detect provider for model {name!r}.\n"
         "Supported prefixes: claude-, gemini-, grok-, sonar, r1-1776, "
         "kimi-, deepseek-, gpt-, dall-e-, text-embedding-, whisper-, tts-, o<digit>.\n"
-        "Use a provider subclass directly if you need a custom model name."
+        "Use an explicit \"provider/model\" prefix (e.g. \"openai/my-custom\") "
+        "or a provider subclass directly if you need a custom model name."
     )
 
 
@@ -252,7 +281,9 @@ class Model:
         client_options: dict | None = None,
         api_key:        str  | None = None,
     ) -> None:
-        self.name = name
+        # Strip an explicit "provider/model" prefix so the wire name is clean
+        # (the prefix only steers provider selection, never reaches the API).
+        self.name = _split_provider_prefix(name)[1]
 
         # ── resolve API key ──────────────────────────────────────────
         resolved_key = api_key or os.getenv(self._ENV_KEY)

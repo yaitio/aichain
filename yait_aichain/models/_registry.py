@@ -450,3 +450,97 @@ def is_supported(model_name: str, task: "str | None" = None) -> bool:
                 if task is None or t == task:
                     return True
     return False
+
+
+def refresh(
+    provider: str,
+    api_key:  "str | None" = None,
+    client=None,
+) -> dict:
+    """
+    Compare the registry against the provider's *live* model list.
+
+    Calls the provider's ``list_models()`` and diffs it against what the
+    static registry knows, so a roster that drifted since release is visible
+    instead of silently stale.  The registry is **not** mutated — it stays a
+    reference; the caller decides what to do with the diff.
+
+    Parameters
+    ----------
+    provider : str
+        One of :data:`PROVIDERS`.
+    api_key : str | None
+        Key for the provider client; falls back to the provider's standard
+        environment variable when omitted.  Ignored if *client* is given.
+    client : object, optional
+        A pre-built client exposing ``list_models()`` (mainly for testing).
+
+    Returns
+    -------
+    dict
+        ``{"provider", "live", "registered", "new", "removed"}`` where
+        ``new`` = available from the provider but absent from the registry,
+        ``removed`` = in the registry but no longer offered.
+
+    Raises
+    ------
+    ValueError
+        If *provider* is unknown.
+    APIError
+        On a transport/auth failure from ``list_models()``.
+    """
+    if provider not in PROVIDERS:
+        raise ValueError(
+            f"Unknown provider {provider!r}. Valid providers: {list(PROVIDERS)}"
+        )
+
+    if client is None:
+        client = _build_client(provider, api_key)
+
+    live       = set(client.list_models())
+    registered = set(models(provider=provider))
+    return {
+        "provider":   provider,
+        "live":       sorted(live),
+        "registered": sorted(registered),
+        "new":        sorted(live - registered),
+        "removed":    sorted(registered - live),
+    }
+
+
+def _build_client(provider: str, api_key: "str | None"):
+    """Construct the HTTP client for *provider* (lazy import)."""
+    from ..clients import (
+        OpenAIClient, AnthropicClient, GoogleAIClient, XAIClient,
+        PerplexityClient, KimiClient, DeepSeekClient,
+    )
+    from ..clients._qwen import QwenClient
+
+    classes = {
+        "openai":     OpenAIClient,
+        "anthropic":  AnthropicClient,
+        "google":     GoogleAIClient,
+        "xai":        XAIClient,
+        "perplexity": PerplexityClient,
+        "kimi":       KimiClient,
+        "deepseek":   DeepSeekClient,
+        "qwen":       QwenClient,
+    }
+    env_vars = {
+        "openai":     "OPENAI_API_KEY",
+        "anthropic":  "ANTHROPIC_API_KEY",
+        "google":     "GOOGLE_AI_API_KEY",
+        "xai":        "XAI_API_KEY",
+        "perplexity": "PERPLEXITY_API_KEY",
+        "kimi":       "MOONSHOT_API_KEY",
+        "deepseek":   "DEEPSEEK_API_KEY",
+        "qwen":       "DASHSCOPE_API_KEY",
+    }
+    import os
+    key = api_key or os.getenv(env_vars[provider])
+    if not key:
+        raise ValueError(
+            f"No API key for {provider!r}. Pass api_key= or set "
+            f"{env_vars[provider]!r}."
+        )
+    return classes[provider](api_key=key)

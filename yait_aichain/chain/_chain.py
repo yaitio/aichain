@@ -96,6 +96,8 @@ import importlib
 import os
 import warnings
 
+from ..models._usage import Usage
+
 _VALID_ON_STEP_ERROR: frozenset[str] = frozenset({"raise", "stop", "skip"})
 
 # Default options applied to every Agent step unless overridden.
@@ -249,6 +251,9 @@ class Chain:
         self.on_step_error  = on_step_error
         self._history: list[dict] = []
         self._accumulated: dict   = {}     # snapshot of accumulated vars after last run()
+        # Summed token usage of the last run() across Skill steps; None until
+        # the first run or when no step reported usage. Reading is optional.
+        self.last_usage: "Usage | None" = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -301,6 +306,7 @@ class Chain:
         history:     list[dict] = []
         accumulated = {**self.variables, **(variables or {})}
         last_output: "str | dict | None" = None
+        usage_total: "Usage | None" = None   # sum of step usages, when available
 
         for idx, (runner, output_key, input_map, kind, options) in enumerate(self._steps):
             step_input = dict(accumulated)          # snapshot before the step
@@ -364,11 +370,13 @@ class Chain:
                 if _on_error == "raise":
                     self._history     = history
                     self._accumulated = dict(accumulated)
+                    self.last_usage   = usage_total
                     raise
 
                 if _on_error == "stop":
                     self._history     = history
                     self._accumulated = dict(accumulated)
+                    self.last_usage   = usage_total
                     return last_output
 
                 # "skip" — warn and continue; downstream steps may lack a
@@ -392,6 +400,11 @@ class Chain:
                 "options":    options,
             })
 
+            # Accumulate token usage from steps that report it (Skill steps).
+            step_usage = getattr(runner, "last_usage", None)
+            if step_usage:
+                usage_total = step_usage if usage_total is None else usage_total + step_usage
+
             # Merge output into accumulated vars for downstream steps
             if isinstance(output, dict):
                 accumulated.update(output)
@@ -402,6 +415,7 @@ class Chain:
 
         self._history     = history
         self._accumulated = dict(accumulated)
+        self.last_usage   = usage_total
         return last_output
 
     @property

@@ -161,6 +161,65 @@ Reranking providers: **Cohere · Voyage · Qwen**
 
 ---
 
+## Cost, routing & resilience
+
+These are all **opt-in** — the minimal program above is unchanged.
+
+**Token usage & cost** — every result carries normalised usage:
+
+```python
+skill.run()
+skill.last_usage.input_tokens   # 1240
+skill.last_usage.total_tokens   # 1310
+skill.last_usage.cost           # 0.0032  (USD, None if the model has no price)
+
+chain.run()
+chain.last_usage.cost           # summed across all Skill steps
+```
+
+**Explicit provider routing** — pick the provider with a `provider/model`
+prefix; it also unlocks custom / fine-tuned names the auto-detector can't
+recognise:
+
+```python
+Model("openai/gpt-4o")                 # same as Model("gpt-4o")
+Model("openai/ft:gpt-4o:acme:42")      # custom name, explicit provider
+```
+
+**Fallback chain** — pass a list; a transient failure (rate limit / server /
+network) advances to the next model. A real error (bad key, bad request)
+still raises immediately:
+
+```python
+skill = Skill(
+    model = [Model("claude-sonnet-4-6"), Model("gpt-4o")],  # primary, then backup
+    input = {"messages": [{"role": "user", "parts": ["..."]}]},
+)
+```
+
+**Typed errors** — catch a specific failure mode, or `APIError` for all:
+
+```python
+from yait_aichain import RateLimitError, AuthenticationError, APIError
+
+try:
+    skill.run()
+except RateLimitError as e:
+    wait(e.retry_after)        # honours the Retry-After header
+except AuthenticationError:
+    ...
+```
+
+**Keep the model list fresh** — diff the registry against a provider's live
+roster:
+
+```python
+from yait_aichain.models import registry
+registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
+```
+
+---
+
 ## Built-in tools
 
 ### Search
