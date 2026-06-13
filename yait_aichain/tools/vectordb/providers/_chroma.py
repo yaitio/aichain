@@ -2,24 +2,29 @@
 tools.vectordb.providers._chroma
 =================================
 
-ChromaBackend — VectorBackend adapter for ChromaDB via its REST API v1.
+ChromaBackend — VectorBackend adapter for ChromaDB via its REST API v2.
 
 Uses pure urllib3, no ``chromadb`` SDK required.
+
+API v1 was removed in Chroma >= 0.6 (and is absent from Chroma Cloud), so
+all endpoints below use the v2 tenant/database-scoped layout.
 
 Environment variables
 ---------------------
 ``CHROMA_URL``      — base URL of the Chroma server  (default: http://localhost:8000)
 ``CHROMA_API_KEY``  — API key for Chroma Cloud        (optional for self-hosted)
+``CHROMA_TENANT``   — tenant name      (default: default_tenant)
+``CHROMA_DATABASE`` — database name    (default: default_database)
 
-Chroma REST API v1 reference
------------------------------
-POST   /api/v1/collections                     — create collection
-GET    /api/v1/collections/{name}              — describe (returns id, name, metadata)
-POST   /api/v1/collections/{id}/upsert         — upsert documents
-POST   /api/v1/collections/{id}/query          — similarity query
-POST   /api/v1/collections/{id}/get            — fetch by IDs or filter
-POST   /api/v1/collections/{id}/delete         — delete by IDs or filter
-GET    /api/v1/collections/{id}/count          — record count
+Chroma REST API v2 reference (prefix = /api/v2/tenants/{t}/databases/{db})
+---------------------------------------------------------------------------
+POST   {prefix}/collections                    — create collection (get_or_create)
+GET    {prefix}/collections/{name}             — describe (returns id, name, metadata)
+POST   {prefix}/collections/{id}/upsert        — upsert documents
+POST   {prefix}/collections/{id}/query         — similarity query
+POST   {prefix}/collections/{id}/get           — fetch by IDs or filter
+POST   {prefix}/collections/{id}/delete        — delete by IDs or filter
+GET    {prefix}/collections/{id}/count         — record count
 
 Distance normalisation
 -----------------------
@@ -66,7 +71,7 @@ def _normalise_score(distance: float, space: str) -> float:
 
 class ChromaBackend(VectorBackend):
     """
-    VectorBackend for ChromaDB (REST API v1).
+    VectorBackend for ChromaDB (REST API v2).
 
     Parameters
     ----------
@@ -76,6 +81,12 @@ class ChromaBackend(VectorBackend):
     api_key : str | None
         API key for Chroma Cloud.  Omit for local/self-hosted deployments.
         Defaults to ``CHROMA_API_KEY`` env var.
+    tenant : str | None
+        Tenant name.  Defaults to ``CHROMA_TENANT`` env var or
+        ``default_tenant``.
+    database : str | None
+        Database name.  Defaults to ``CHROMA_DATABASE`` env var or
+        ``default_database``.
 
     Examples
     --------
@@ -108,14 +119,19 @@ class ChromaBackend(VectorBackend):
     def __init__(
         self,
         *,
-        url:     str | None = None,
-        api_key: str | None = None,
+        url:      str | None = None,
+        api_key:  str | None = None,
+        tenant:   str | None = None,
+        database: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(
             url     = url     or os.environ.get("CHROMA_URL", self._DEFAULT_URL),
             api_key = api_key or os.environ.get("CHROMA_API_KEY"),
         )
+        tenant   = tenant   or os.environ.get("CHROMA_TENANT",   "default_tenant")
+        database = database or os.environ.get("CHROMA_DATABASE", "default_database")
+        self._prefix = f"/api/v2/tenants/{tenant}/databases/{database}"
         # name → (id, hnsw_space) cache — avoids repeated GET per operation
         self._collection_cache: dict[str, tuple[str, str]] = {}
 
@@ -125,7 +141,7 @@ class ChromaBackend(VectorBackend):
         """Return (collection_id, hnsw_space) for *name*, cached after first call."""
         if name in self._collection_cache:
             return self._collection_cache[name]
-        data  = self._get(f"/api/v1/collections/{name}")
+        data  = self._get(f"{self._prefix}/collections/{name}")
         cid   = data["id"]
         space = (data.get("metadata") or {}).get("hnsw:space", "cosine")
         self._collection_cache[name] = (cid, space)
@@ -141,10 +157,13 @@ class ChromaBackend(VectorBackend):
     ) -> None:
         space = _METRIC_MAP.get(metric, "cosine")
         body  = {
-            "name":     collection,
-            "metadata": {"hnsw:space": space},
+            "name":          collection,
+            "metadata":      {"hnsw:space": space},
+            # Idempotent create: an existing collection is returned instead
+            # of an error (matches Pinecone-backend semantics).
+            "get_or_create": True,
         }
-        data = self._post("/api/v1/collections", body)
+        data = self._post(f"{self._prefix}/collections", body)
         cid  = data["id"]
         self._collection_cache[collection] = (cid, space)
 
@@ -163,7 +182,7 @@ class ChromaBackend(VectorBackend):
         }
         if filter:
             body["where"] = filter
-        data = self._post(f"/api/v1/collections/{cid}/query", body)
+        data = self._post(f"{self._prefix}/collections/{cid}/query", body)
 
         ids       = (data.get("ids")       or [[]])[0]
         docs      = (data.get("documents") or [[]])[0]
@@ -195,7 +214,7 @@ class ChromaBackend(VectorBackend):
             "documents":  [r.text     for r in records],
             "metadatas":  [r.metadata for r in records],
         }
-        self._post(f"/api/v1/collections/{cid}/upsert", body)
+        self._post(f"{self._prefix}/collections/{cid}/upsert", body)
 
     def fetch(
         self,
@@ -204,7 +223,7 @@ class ChromaBackend(VectorBackend):
     ) -> list[VectorRecord]:
         cid, _ = self._resolve(collection)
         body   = {"ids": ids, "include": ["documents", "metadatas"]}
-        data   = self._post(f"/api/v1/collections/{cid}/get", body)
+        data   = self._post(f"{self._prefix}/collections/{cid}/get", body)
 
         ret_ids = data.get("ids")       or []
         docs    = data.get("documents") or []
@@ -231,11 +250,11 @@ class ChromaBackend(VectorBackend):
             body["ids"] = ids
         if filter:
             body["where"] = filter
-        self._post(f"/api/v1/collections/{cid}/delete", body)
+        self._post(f"{self._prefix}/collections/{cid}/delete", body)
 
     def count(self, collection: str) -> int:
         cid, _ = self._resolve(collection)
-        data   = self._get(f"/api/v1/collections/{cid}/count")
+        data   = self._get(f"{self._prefix}/collections/{cid}/count")
         # Chroma returns a bare integer (not wrapped in an object)
         if isinstance(data, (int, float)):
             return int(data)

@@ -114,7 +114,9 @@ def _is_tool(runner) -> bool:
 
 def _is_agent(runner) -> bool:
     """Return True if *runner* is an Agent instance (lazy, import-free check)."""
-    return type(runner).__module__.startswith("agent")
+    # Check the MRO by class name (same approach as _is_tool) so the check
+    # works regardless of the package the Agent class was imported from.
+    return any(cls.__name__ == "Agent" for cls in type(runner).__mro__)
 
 
 def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
@@ -291,8 +293,13 @@ class Chain:
                 f"got {_on_error!r}"
             )
 
-        self._history = []
-        accumulated   = {**self.variables, **(variables or {})}
+        # Run state is local: concurrent run() calls on a shared Chain (e.g.
+        # a Pool of threads driving one instance) never interleave their
+        # histories.  Instance attributes are assigned once per exit point
+        # and reflect the most recently finished run; the return value is
+        # the per-call source of truth.
+        history:     list[dict] = []
+        accumulated = {**self.variables, **(variables or {})}
         last_output: "str | dict | None" = None
 
         for idx, (runner, output_key, input_map, kind, options) in enumerate(self._steps):
@@ -319,7 +326,7 @@ class Chain:
                     if not agent_result:
                         raise RuntimeError(
                             f"Agent step {idx} ({name!r}) failed: "
-                            f"{agent_result.error}"
+                            f"{getattr(agent_result, 'error', 'no result returned')}"
                         )
 
                     # Extract the requested field from AgentResult
@@ -343,7 +350,7 @@ class Chain:
                         output = runner.run(variables=accumulated)
 
             except Exception as exc:
-                self._history.append({
+                history.append({
                     "step":       idx,
                     "kind":       kind,
                     "name":       name,
@@ -355,9 +362,13 @@ class Chain:
                 })
 
                 if _on_error == "raise":
+                    self._history     = history
+                    self._accumulated = dict(accumulated)
                     raise
 
                 if _on_error == "stop":
+                    self._history     = history
+                    self._accumulated = dict(accumulated)
                     return last_output
 
                 # "skip" — warn and continue; downstream steps may lack a
@@ -371,7 +382,7 @@ class Chain:
                 )
                 continue
 
-            self._history.append({
+            history.append({
                 "step":       idx,
                 "kind":       kind,
                 "name":       name,
@@ -389,6 +400,7 @@ class Chain:
 
             last_output = output
 
+        self._history     = history
         self._accumulated = dict(accumulated)
         return last_output
 
@@ -628,8 +640,8 @@ class Chain:
             data = yaml.safe_load(fh)
 
         # Local imports to avoid circular references at module load time
-        from models._base import Model as _Model
-        from skills._skill import Skill as _Skill
+        from ..models._base import Model as _Model
+        from ..skills._skill import Skill as _Skill
 
         steps = []
         for step_data in data.get("steps", []):
@@ -653,8 +665,7 @@ class Chain:
                 entry: "tuple | object" = (skill, output_key, input_map, options)
 
             elif kind == "agent":
-                from models._base  import Model as _Model2
-                from agent._agent  import Agent as _Agent
+                from ..agent._agent import Agent as _Agent
 
                 ad = step_data["agent"]
 
@@ -671,7 +682,7 @@ class Chain:
                     tool_instances.append(getattr(t_module, t_cls)())
 
                 agent = _Agent(
-                    orchestrator = _Model2(ad["orchestrator"],
+                    orchestrator = _Model(ad["orchestrator"],
                                           api_key=api_key),
                     tools        = tool_instances or None,
                     mode         = ad.get("mode",         "agile"),

@@ -15,8 +15,8 @@ class GoogleAIClient(BaseClient):
     layer above this class.
 
     Base URL: ``https://generativelanguage.googleapis.com/v1beta``
-    Auth:     API key passed as ``?key=<api_key>`` query parameter.
-              Google does not use the ``Authorization`` header for this API.
+    Auth:     API key passed in the ``x-goog-api-key`` header (keeps the
+              key out of URLs, which leak into proxy/server logs).
 
     Parameters
     ----------
@@ -49,8 +49,12 @@ class GoogleAIClient(BaseClient):
     # ------------------------------------------------------------------
 
     def _auth_headers(self) -> dict:
-        # Google authenticates via query-string key, not a header.
-        return {"Content-Type": "application/json"}
+        # The x-goog-api-key header keeps the key out of URLs, which end up
+        # in proxy/server logs and tracebacks (query-string auth does not).
+        return {
+            "Content-Type":   "application/json",
+            "x-goog-api-key": self._api_key,
+        }
 
     # ------------------------------------------------------------------
     # Public interface
@@ -60,7 +64,7 @@ class GoogleAIClient(BaseClient):
         """
         Return all model IDs available for the configured API key.
 
-        Calls ``GET /models?key=<api_key>``.
+        Calls ``GET /models`` (key sent via the ``x-goog-api-key`` header).
 
         The raw Google response returns names in the form
         ``"models/gemini-2.0-flash"``; this method strips the
@@ -76,7 +80,7 @@ class GoogleAIClient(BaseClient):
         APIError
             On HTTP error or network failure (400/403 for invalid key).
         """
-        path = f"/models?key={self._api_key}"
+        path = "/models"
         data = self._get(path, self._auth_headers())
         return [
             m["name"].removeprefix("models/")

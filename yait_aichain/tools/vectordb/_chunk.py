@@ -204,16 +204,21 @@ def _split_by_priority(
         return [text] if text.strip() else []
 
     for idx, sep in enumerate(seps):
-        parts = text.split(sep)
-        if len(parts) == 1:
+        raw_parts = text.split(sep)
+        if len(raw_parts) == 1:
             continue  # separator absent — try next
+
+        # Keep each separator attached to the part that precedes it, so no
+        # text is lost at chunk boundaries (e.g. the trailing "." of a
+        # sentence when splitting on ". ").  Concatenating the parts back
+        # reproduces the input exactly.
+        parts = [p + sep for p in raw_parts[:-1]] + [raw_parts[-1]]
 
         chunks: list[str] = []
         buf = ""
 
         for part in parts:
-            glue      = sep if buf else ""
-            candidate = buf + glue + part
+            candidate = buf + part
             if len(candidate) <= max_chars:
                 buf = candidate
             else:
@@ -271,6 +276,10 @@ def _chunk_code(
     chunks:    list[_Chunk] = []
     buf_lines: list[str]   = []
 
+    # Budget for code content inside one chunk (header + body + fence and
+    # the two joining newlines must all fit into max_chars).
+    line_budget = max(1, max_chars - len(header) - len(fence) - 2)
+
     def _flush(lines_: list[str]) -> None:
         if lines_:
             chunks.append(_Chunk(
@@ -279,6 +288,15 @@ def _chunk_code(
             ))
 
     for line in lines:
+        if len(line) > line_budget:
+            # A single line longer than the whole budget: hard-wrap it,
+            # otherwise the chunk would break the `chars <= max_chars`
+            # contract (and downstream metadata/token limits with it).
+            _flush(buf_lines)
+            buf_lines = []
+            for i in range(0, len(line), line_budget):
+                _flush([line[i : i + line_budget]])
+            continue
         candidate = f"{header}\n" + "\n".join(buf_lines + [line]) + f"\n{fence}"
         if len(candidate) <= max_chars:
             buf_lines.append(line)
@@ -313,7 +331,7 @@ def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
     if sep_idx is None:
         # Not a proper table — fall back to text splitting
         pieces = _split_by_priority(table, max_chars, _MD_TEXT_SEPS)
-        return [_Chunk(text=p) for p in pieces]
+        return [_Chunk(text=p.rstrip()) for p in pieces]
 
     header_rows  = rows[:sep_idx]
     sep_row      = rows[sep_idx]
@@ -327,8 +345,21 @@ def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
         if rows_:
             chunks.append(_Chunk(text=header_block + "\n" + "\n".join(rows_)))
 
+    # Budget for data rows inside one chunk (header block + newline + rows).
+    row_budget = max(1, max_chars - len(header_block) - 1)
+
     for row in data_rows:
         if not row.strip():
+            continue
+        if len(row) > row_budget:
+            # A single row longer than the whole budget: hard-wrap it so the
+            # `chars <= max_chars` contract holds.  The wrapped pieces are
+            # no longer well-formed table rows, but staying within the size
+            # contract matters more (metadata/token limits downstream).
+            _flush_table(buf_rows)
+            buf_rows = []
+            for i in range(0, len(row), row_budget):
+                _flush_table([row[i : i + row_budget]])
             continue
         candidate = header_block + "\n" + "\n".join(buf_rows + [row])
         if len(candidate) <= max_chars:
@@ -566,10 +597,15 @@ class VectorChunkTool(Tool):
             )
 
         # ── Chunk ────────────────────────────────────────────────────────
+        # Reserve room for the overlap tail up front.  Splitting to the full
+        # max_chars would leave no headroom, and _apply_overlap would then
+        # silently skip every chunk — overlap must shrink the split budget,
+        # not compete with it.
+        effective_max = max_chars - overlap_chars
         chunks = (
-            self._chunk_markdown(input, max_chars)
+            self._chunk_markdown(input, effective_max)
             if _is_markdown(input)
-            else self._chunk_plain(input, max_chars)
+            else self._chunk_plain(input, effective_max)
         )
 
         if not chunks:
@@ -577,7 +613,7 @@ class VectorChunkTool(Tool):
 
         # ── Merge peers ──────────────────────────────────────────────────
         if merge_peers:
-            chunks = self._merge_peers(chunks, max_chars)
+            chunks = self._merge_peers(chunks, effective_max)
 
         # ── Apply overlap ────────────────────────────────────────────────
         chunks = self._apply_overlap(chunks, overlap_chars, max_chars)
@@ -621,7 +657,9 @@ class VectorChunkTool(Tool):
 
             else:  # text
                 for p in _split_by_priority(seg.content, max_chars, _MD_TEXT_SEPS):
-                    chunks.append(_Chunk(text=p, headings=list(headings)))
+                    # Separators stay attached during splitting (lossless);
+                    # trailing whitespace is cosmetic at this point.
+                    chunks.append(_Chunk(text=p.rstrip(), headings=list(headings)))
 
         return chunks
 
@@ -629,7 +667,7 @@ class VectorChunkTool(Tool):
 
     def _chunk_plain(self, text: str, max_chars: int) -> list[_Chunk]:
         return [
-            _Chunk(text=p, headings=[])
+            _Chunk(text=p.rstrip(), headings=[])
             for p in _split_by_priority(text, max_chars, _PLAIN_TEXT_SEPS)
         ]
 

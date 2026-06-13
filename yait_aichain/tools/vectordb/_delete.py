@@ -103,10 +103,11 @@ class VectorDeleteTool(Tool):
         filter = opts.get("filter")
         store  = self._with_collection(opts)
 
-        if input is None and filter is None:
+        if not input and not filter:
             raise ValueError(
-                "VectorDeleteTool: provide at least one of 'input' (IDs) "
-                "or options['filter'] for bulk deletion."
+                "VectorDeleteTool: provide at least one non-empty 'input' "
+                "(IDs) or options['filter'] for bulk deletion.  An empty "
+                "list is rejected to avoid wiping the collection."
             )
         store.delete(ids=input, filter=filter)
         return {"deleted": True}

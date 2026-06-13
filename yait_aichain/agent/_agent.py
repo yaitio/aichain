@@ -60,6 +60,7 @@ from typing import Any
 from ._memory      import AgentMemory
 from ._result      import AgentResult
 from .             import _prompts as prompts
+from .._template     import substitute_placeholders
 from ..tools._base   import Tool
 
 
@@ -134,16 +135,6 @@ class _SpawnTool(Tool):
             resolved_model = self._agent._executor_map.get(model)
 
         return self._agent.spawn(task, tools=resolved_tools, model=resolved_model)
-
-
-# ---------------------------------------------------------------------------
-# Safe string formatter (missing keys → left as {key})
-# ---------------------------------------------------------------------------
-
-class _SafeFormatMap(dict):
-    """Return the literal ``{key}`` for any key not present in the dict."""
-    def __missing__(self, key: str) -> str:
-        return "{" + key + "}"
 
 
 # ---------------------------------------------------------------------------
@@ -361,7 +352,10 @@ class Agent:
             ``bool(result)`` to determine outcome.
         """
         # ── Initialise state ─────────────────────────────────────────────
-        self.memory.clear()
+        # reset() restores the construction-time baseline (backend state +
+        # initial seed) — it must NOT clear() the backend, or persistent
+        # memory would be wiped before the first step ever sees it.
+        self.memory.reset()
         if variables:
             self.memory.update(variables)
 
@@ -399,10 +393,11 @@ class Agent:
                 max_steps      = self.max_steps,
                 persona        = self.persona,
             )
-            plan_raw, plan_tokens = self._llm_call(self.orchestrator, plan_msgs)
+            plan_data, plan_tokens = self._llm_call_json(
+                self.orchestrator, plan_msgs
+            )
             tokens_used += plan_tokens
 
-            plan_data    = self._parse_json(plan_raw)
             current_plan = plan_data.get("steps", [])[:self.max_steps]
 
             if not current_plan:
@@ -424,7 +419,7 @@ class Agent:
                 icon   = "⚙" if s.get("type") == "tool" else "◆"
                 target = s.get("tool_name") or s.get("model") or "default"
                 goal   = textwrap.shorten(s.get("goal", ""), 60, placeholder="…")
-                self._log(1, f"       {s['id']:>2}.  {icon}  {target:<22}  {goal}")
+                self._log(1, f"       {str(s.get('id', '?')):>2}.  {icon}  {target:<22}  {goal}")
 
             # ── Phase 2: Step execution loop ──────────────────────────────
             step_idx = 0
@@ -447,6 +442,10 @@ class Agent:
                 for attempt in range(1, self.max_attempts + 1):
 
                     if tokens_used >= self.max_tokens:
+                        # Budget ran out mid-step: the step is incomplete, so
+                        # it must not count as advanced — otherwise a budget
+                        # stop on the final step would report success.
+                        advance = False
                         break
 
                     if attempt > 1:
@@ -480,12 +479,10 @@ class Agent:
                         available_tool_names = [t.name for t in self.tools],
                         persona              = self.persona,
                     )
-                    action_raw, action_tokens = self._llm_call(
+                    action, action_tokens = self._llm_call_json(
                         self.orchestrator, action_msgs
                     )
                     tokens_used += action_tokens
-
-                    action = self._parse_json(action_raw)
 
                     # Log action
                     self._log_action(action, action_tokens)
@@ -531,11 +528,10 @@ class Agent:
                         remaining_tokens = max(0, self.max_tokens - tokens_used),
                         persona          = self.persona,
                     )
-                    reflect_raw, reflect_tokens = self._llm_call(
+                    reflection, reflect_tokens = self._llm_call_json(
                         self.orchestrator, reflect_msgs
                     )
                     tokens_used  += reflect_tokens
-                    reflection    = self._parse_json(reflect_raw)
                     decision      = reflection.get("decision", "continue")
 
                     # Store result in memory using the orchestrator's suggested key
@@ -592,7 +588,12 @@ class Agent:
                         if revised:
                             old_len      = len(current_plan)
                             current_plan = revised[:self.max_steps]
-                            goto         = int(reflection.get("goto_step", step_idx))
+                            try:
+                                goto = int(reflection.get("goto_step", step_idx))
+                            except (TypeError, ValueError):
+                                # Model returned "two" / null / garbage —
+                                # resume at the current step rather than abort.
+                                goto = step_idx
                             step_idx     = max(0, min(goto, len(current_plan) - 1))
                             advance      = False
                             self._log(1,
@@ -604,7 +605,7 @@ class Agent:
                                     icon   = "⚙" if s.get("type") == "tool" else "◆"
                                     target = s.get("tool_name") or s.get("model") or "default"
                                     goal   = textwrap.shorten(s.get("goal", ""), 55, placeholder="…")
-                                    self._log(2, f"       {s['id']:>2}.  {icon}  {target:<20}  {goal}")
+                                    self._log(2, f"       {str(s.get('id', '?')):>2}.  {icon}  {target:<20}  {goal}")
                         break
 
                     if decision == "continue":
@@ -615,10 +616,48 @@ class Agent:
 
                     break  # unknown decision → treat as continue
 
+                else:
+                    # The attempt loop ran out without a break: every attempt
+                    # ended in a "retry" decision.  The step has failed — do
+                    # not silently advance to steps that depend on its output.
+                    goal = textwrap.shorten(
+                        step.get("goal", ""), 60, placeholder="…"
+                    )
+                    error = (
+                        f"Step {step_idx + 1} ({goal!r}) failed after "
+                        f"{self.max_attempts} attempt(s)."
+                    )
+                    self._log(1, f"\n[Fail] ✗ {error}")
+                    return AgentResult(
+                        success=False, output=None, mode=self.mode,
+                        steps_taken=step_idx, tokens_used=tokens_used,
+                        plan=current_plan, history=history,
+                        memory=self.memory.all(),
+                        error=error,
+                    )
+
                 if advance:
                     step_idx += 1
 
             # ── Phase 3: Compile result ───────────────────────────────────
+            if step_idx < len(current_plan):
+                # The while loop was exited early — the token budget ran out
+                # before the plan completed.  Partial work is available in
+                # history/memory, but the run must not report success.
+                error = (
+                    f"Token budget exhausted after {step_idx} of "
+                    f"{len(current_plan)} step(s) "
+                    f"({tokens_used:,}/{self.max_tokens:,} tokens)."
+                )
+                self._log(1, f"\n[Fail] ✗ {error}")
+                return AgentResult(
+                    success=False, output=None, mode=self.mode,
+                    steps_taken=step_idx, tokens_used=tokens_used,
+                    plan=current_plan, history=history,
+                    memory=self.memory.all(),
+                    error=error,
+                )
+
             final_output = self._extract_final_output(history)
             self._log(1,
                 f"\n[Done] ✓ All steps complete · "
@@ -860,7 +899,7 @@ class Agent:
             kwargs = {}
             for k, v in raw_kwargs.items():
                 if isinstance(v, str):
-                    kwargs[k] = v.format_map(_SafeFormatMap(context))
+                    kwargs[k] = substitute_placeholders(v, context)
                 else:
                     kwargs[k] = v
 
@@ -874,8 +913,8 @@ class Agent:
             user_prompt   = action.get("user_prompt", "")
             out_format    = action.get("output_format", "text")
 
-            system_prompt = system_prompt.format_map(_SafeFormatMap(context))
-            user_prompt   = user_prompt.format_map(_SafeFormatMap(context))
+            system_prompt = substitute_placeholders(system_prompt, context)
+            user_prompt   = substitute_placeholders(user_prompt, context)
 
             messages: list[dict] = []
             if system_prompt:
@@ -905,38 +944,77 @@ class Agent:
             return self._executor_map[hint]
         return self.executors[0]
 
+    def _llm_call_json(self, model, messages: list[dict]) -> tuple[dict, int]:
+        """
+        Make one LLM call and parse the reply as a JSON object, retrying
+        once when the reply is not parseable.
+
+        A single transient formatting slip from the orchestrator (prose
+        around the JSON, a bare list, a half-finished object) used to abort
+        the whole run; one corrective retry recovers the vast majority of
+        these cases.  Returns ``(parsed_dict, total_tokens_spent)``.
+        """
+        raw, tokens = self._llm_call(model, messages)
+        try:
+            return self._parse_json(raw), tokens
+        except ValueError:
+            self._log(2, "  ⚠  Orchestrator reply was not a JSON object — retrying once")
+
+        retry_msgs = list(messages) + [
+            {"role": "assistant",
+             "parts": [{"type": "text", "text": raw}]},
+            {"role": "user",
+             "parts": [{"type": "text", "text":
+                "Your previous reply was not a valid JSON object. "
+                "Respond again with ONLY the JSON object — no prose, "
+                "no code fences, no surrounding text."}]},
+        ]
+        raw2, tokens2 = self._llm_call(model, retry_msgs)
+        return self._parse_json(raw2), tokens + tokens2
+
     def _parse_json(self, text: str) -> dict:
         """
-        Robustly parse JSON from an LLM response.
+        Robustly parse a JSON **object** from an LLM response.
 
         Tries three strategies in order:
         1. Direct ``json.loads`` of the full text.
         2. Extraction from a ```json ... ``` code fence.
         3. Extraction of the first ``{...}`` block in the text.
+
+        A parse that yields anything other than a dict (a bare list, string,
+        number, or ``null``) is treated as a failed strategy: every caller
+        immediately calls ``.get()`` on the result, so returning a non-dict
+        would crash later with a far less useful error.
         """
         text = text.strip()
 
         try:
-            return json.loads(text)
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
         except json.JSONDecodeError:
             pass
 
         m = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
         if m:
             try:
-                return json.loads(m.group(1))
+                data = json.loads(m.group(1))
+                if isinstance(data, dict):
+                    return data
             except json.JSONDecodeError:
                 pass
 
         m = re.search(r"\{[\s\S]+\}", text)
         if m:
             try:
-                return json.loads(m.group(0))
+                data = json.loads(m.group(0))
+                if isinstance(data, dict):
+                    return data
             except json.JSONDecodeError:
                 pass
 
         raise ValueError(
-            f"Could not parse JSON from orchestrator response.\n"
+            f"Could not parse a JSON object from orchestrator response.\n"
             f"Raw text (first 400 chars): {text[:400]!r}"
         )
 

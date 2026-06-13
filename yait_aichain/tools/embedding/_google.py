@@ -14,7 +14,7 @@ Supported models
 
 Model notes
 -----------
-* Authentication is via query-string ``?key=<GOOGLE_AI_API_KEY>`` (no header).
+* Authentication is via the ``x-goog-api-key`` header.
 * The ``batchEmbedContents`` endpoint accepts a list of
   ``EmbedContentRequest`` objects in one POST, making it naturally batched.
 * ``task_type`` (RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, etc.) is supported only
@@ -123,11 +123,14 @@ class EmbeddingGoogle(Embedder):
             requests.append(req)
 
         body = {"requests": requests}
-        path = (
-            f"/v1beta/models/{self.model}:batchEmbedContents"
-            f"?key={self._api_key}"
+        path = f"/v1beta/models/{self.model}:batchEmbedContents"
+        # Key travels in the x-goog-api-key header — keeping it out of the
+        # URL keeps it out of proxy/server logs and tracebacks.
+        data = self._request(
+            f"{_BASE_URL}{path}",
+            body,
+            extra_headers={"x-goog-api-key": self._api_key},
         )
-        data = self._request(f"{_BASE_URL}{path}", body)
 
         # Response: {"embeddings": [{"values": [...]}]}
         embeddings = [item["values"] for item in data.get("embeddings", [])]

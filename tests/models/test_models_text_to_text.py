@@ -219,9 +219,12 @@ class TestGoogleToRequest(unittest.TestCase):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertIn("generateContent", path)
 
-    def test_path_contains_api_key_param(self):
+    def test_path_has_no_api_key(self):
+        # The key must travel in the x-goog-api-key header, never the URL
+        # (URLs leak into proxy/server logs).
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
-        self.assertIn("?key=", path)
+        self.assertNotIn("key=", path)
+        self.assertIn("x-goog-api-key", self.model.client._auth_headers())
 
     def test_body_has_contents_not_messages(self):
         _, body = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)

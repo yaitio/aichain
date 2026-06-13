@@ -47,7 +47,7 @@ import os
 
 import urllib3
 
-from ._base import Search
+from ._base import Search, SEARCH_RETRIES, SEARCH_TIMEOUT
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -194,7 +194,9 @@ class searchOpenAI(Search):
             )
         self._api_key = key
         self._model   = model
-        self._http    = urllib3.PoolManager()
+        self._http    = urllib3.PoolManager(
+            timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES
+        )
 
     # ------------------------------------------------------------------
     # Core logic

@@ -237,7 +237,12 @@ class PineconeBackend(VectorBackend):
         records: list[VectorRecord] = []
         for match in data.get("matches", []):
             meta = dict(match.get("metadata") or {})
-            text = meta.pop("text", meta.pop("document", ""))
+            # NB: not meta.pop("text", meta.pop("document", "")) — Python
+            # evaluates the default eagerly, which would silently strip a
+            # user's own "document" metadata key even when "text" exists.
+            text = meta.pop("text", None)
+            if text is None:
+                text = meta.pop("document", "")
             records.append(VectorRecord(
                 id       = match["id"],
                 text     = text,

@@ -193,6 +193,12 @@ class AnthropicModel(Model):
             if budget is not None:
                 body["thinking"]     = {"type": "enabled", "budget_tokens": budget}
                 body["temperature"]  = 1.0   # required by Anthropic when thinking is active
+                # The API requires budget_tokens < max_tokens.  With the
+                # default max_tokens (8192) any "medium"/"high" budget would
+                # be rejected with HTTP 400 — raise the ceiling so the model
+                # keeps headroom for the visible answer after thinking.
+                if body["max_tokens"] <= budget:
+                    body["max_tokens"] = budget + self._DEFAULT_MAX_TOKENS
 
         # ── Structured output via tool_use ────────────────────────────────
         # Anthropic has no native response_format / json_schema parameter.

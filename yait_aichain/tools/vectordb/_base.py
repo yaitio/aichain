@@ -325,7 +325,12 @@ class VectorStore:
         vector = self._embed_query(text)
         return self._backend.query(self._collection, vector, n=n, filter=filter)
 
-    def upsert(self, records: list[dict]) -> int:
+    # Records per backend write.  Sized for the strictest provider limit:
+    # Pinecone caps upsert requests at 2 MB / 1000 vectors — 50 records of
+    # 1536-dim JSON-encoded floats stay safely under both.
+    _UPSERT_BATCH_SIZE: int = 50
+
+    def upsert(self, records: list[dict], batch_size: "int | None" = None) -> int:
         """
         Insert or update records.
 
@@ -337,6 +342,8 @@ class VectorStore:
                                           (required when no embedder is set)
 
         Missing vectors are auto-computed in a single batched embedding call.
+        Writes are sent to the backend in batches of *batch_size* records
+        (default 50) so large ingests don't exceed provider request limits.
 
         Returns
         -------
@@ -344,7 +351,13 @@ class VectorStore:
             Number of records upserted.
         """
         recs, vectors = self._prepare_records(records)
-        self._backend.upsert(self._collection, recs, vectors)
+        step = batch_size or self._UPSERT_BATCH_SIZE
+        if step <= 0:
+            raise ValueError(f"batch_size must be positive; got {step}")
+        for i in range(0, len(recs), step):
+            self._backend.upsert(
+                self._collection, recs[i : i + step], vectors[i : i + step]
+            )
         return len(recs)
 
     def fetch(self, ids: list[str]) -> list[VectorRecord]:
@@ -360,11 +373,23 @@ class VectorStore:
         Remove records.
 
         Pass *ids* to delete specific records, *filter* to delete by
-        metadata condition, or both.  At least one must be provided.
+        metadata condition, or both.  At least one must be provided and
+        non-empty: an empty list/dict is rejected rather than treated as
+        "match everything", because some backends (Pinecone, Qdrant) would
+        otherwise interpret it as a full-collection wipe.
         """
-        if ids is None and filter is None:
-            raise ValueError("Provide at least one of: ids, filter")
-        self._backend.delete(self._collection, ids=ids, filter=filter)
+        if not ids and not filter:
+            raise ValueError(
+                "Provide at least one non-empty argument: ids, filter. "
+                "An empty list/dict is rejected to avoid accidentally "
+                "deleting the whole collection."
+            )
+        # Normalise empties so backends never see ids=[] / filter={}.
+        self._backend.delete(
+            self._collection,
+            ids=ids or None,
+            filter=filter or None,
+        )
 
     def count(self) -> int:
         """Return the total number of records in the collection."""

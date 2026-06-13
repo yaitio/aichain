@@ -2,7 +2,11 @@ import urllib3
 import json
 import base64
 
-from ._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ._constants import (
+    DEFAULT_TIMEOUT,
+    DEFAULT_RETRIES,
+    DEFAULT_IDEMPOTENT_RETRIES,
+)
 
 
 class APIError(Exception):
@@ -182,7 +186,10 @@ class BaseClient:
         """
         try:
             response = self._http.request(
-                "GET", self._base_url + path, headers=headers
+                "GET",
+                self._base_url + path,
+                headers=headers,
+                retries=DEFAULT_IDEMPOTENT_RETRIES,
             )
         except Exception as exc:
             raise APIError(0, str(exc)) from exc
