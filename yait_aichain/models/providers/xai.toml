@@ -22,6 +22,22 @@ low = "low"
 medium = "high"
 high = "high"
 
+[models."grok-4-0709"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 3.0, output = 15.0 }
+
+[models."grok-4-fast-reasoning"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.2, output = 0.5 }
+
+[models."grok-4-fast-non-reasoning"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.2, output = 0.5 }
+
+[models."grok-4-1-fast-reasoning"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.2, output = 0.5 }
+
 [models."grok-3"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 3.0, output = 15.0 }
@@ -32,18 +48,6 @@ caps  = ["image-to-text", "text-to-text"]
 [models."grok-3-mini"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.3, output = 0.5 }
-
-[models."grok-3-mini-fast"]
-caps  = ["image-to-text", "text-to-text"]
-
-[models."grok-4-0709"]
-caps  = ["image-to-text", "text-to-text"]
-
-[models."grok-4-1-fast-reasoning"]
-caps  = ["image-to-text", "text-to-text"]
-
-[models."grok-4-fast-reasoning"]
-caps  = ["image-to-text", "text-to-text"]
 
 [models."grok-imagine-image"]
 caps  = ["text-to-image"]

@@ -162,8 +162,8 @@ All providers expose the same interface. The table below is for discovery only; 
 
 | Provider | Env var | Representative models |
 |---|---|---|
-| OpenAI | `OPENAI_API_KEY` | `gpt-5`, `gpt-4.1`, `gpt-4o`, `o3`, `o4-mini`, `gpt-image-1` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-5.5`, `gpt-5.4`, `gpt-4o`, `gpt-image-1` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
 | Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash` |
 | xAI | `XAI_API_KEY` | `grok-4-0709`, `grok-4-fast-reasoning`, `grok-3`, `grok-imagine-image` |
 | Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
