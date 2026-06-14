@@ -63,7 +63,10 @@ class SandboxedTool:
         else:
             resolved = os.path.realpath(os.path.join(self.root, path))
 
-        if not resolved.startswith(self.root):
+        # Compare on path boundaries, not raw string prefix: a plain
+        # ``startswith`` would treat ``/tmp/sandbox-evil`` as inside
+        # ``/tmp/sandbox`` and let a sibling directory escape the sandbox.
+        if resolved != self.root and not resolved.startswith(self.root + os.sep):
             raise PermissionError(
                 f"Path {path!r} resolves to {resolved!r} which is outside "
                 f"the sandbox root {self.root!r}."

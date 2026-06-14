@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "1.2.5"
+__version__ = "1.2.6"
 __author__  = "YAIT"
 
 # ── Convenience re-exports ─────────────────────────────────────────────────────

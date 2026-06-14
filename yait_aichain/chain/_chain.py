@@ -107,6 +107,26 @@ _AGENT_DEFAULT_OPTIONS: dict = {
 }
 
 
+def _require_safe_tool_class(class_path: str, trusted: bool) -> None:
+    """
+    Guard against arbitrary-code-execution when loading a chain file.
+
+    A serialised chain names tool classes by import path; importing one runs
+    its module/constructor. Unless *trusted*, only classes under the
+    ``yait_aichain`` package are allowed, so a tampered or untrusted file
+    cannot name (e.g.) ``subprocess.Popen`` and have it instantiated.
+    """
+    if trusted:
+        return
+    module_path = class_path.rsplit(".", 1)[0]
+    if module_path != "yait_aichain" and not module_path.startswith("yait_aichain."):
+        raise ValueError(
+            f"Refusing to import tool class {class_path!r} from outside "
+            f"'yait_aichain' while loading an untrusted chain file. Pass "
+            f"trusted=True to Chain.load() only for files you fully control."
+        )
+
+
 def _is_tool(runner) -> bool:
     """Return True if *runner* is a Tool instance (lazy, import-free check)."""
     # Check the MRO by class name so custom Tool subclasses defined outside
@@ -594,9 +614,21 @@ class Chain:
                       default_flow_style=False)
 
     @classmethod
-    def load(cls, path: str, api_key: "str | None" = None) -> "Chain":
+    def load(
+        cls,
+        path: str,
+        api_key: "str | None" = None,
+        *,
+        trusted: bool = False,
+    ) -> "Chain":
         """
         Load a chain from a YAML file previously created by :meth:`save`.
+
+        .. warning::
+            A chain file names tool classes by import path and instantiates
+            them — loading one therefore imports and runs code. By default
+            only classes under ``yait_aichain`` are allowed; pass
+            ``trusted=True`` ONLY for files you created or fully control.
 
         Each step is reconstructed from the serialised data:
 
@@ -686,6 +718,7 @@ class Chain:
                 # Reconstruct tools from class paths
                 tool_instances = []
                 for tool_path in ad.get("tools", []):
+                    _require_safe_tool_class(tool_path, trusted)
                     t_mod, t_cls = tool_path.rsplit(".", 1)
                     try:
                         t_module = importlib.import_module(t_mod)
@@ -713,7 +746,8 @@ class Chain:
                 class_path = td["class"]
                 init_args  = td.get("init_args") or {}
 
-                # Import the tool class dynamically
+                # Import the tool class dynamically (allowlisted unless trusted)
+                _require_safe_tool_class(class_path, trusted)
                 module_path, class_name = class_path.rsplit(".", 1)
                 try:
                     module = importlib.import_module(module_path)

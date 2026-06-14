@@ -23,6 +23,26 @@ from __future__ import annotations
 import os
 
 from .._base import Tool
+from .._security import assert_safe_url, confine_output_path
+
+
+def _safe_url_fetcher(url, *args, **kwargs):
+    """
+    WeasyPrint URL fetcher that blocks ``file://`` and private/internal hosts.
+
+    External references in the rendered HTML (``<img src>``, CSS ``url(...)``,
+    ``@import``) are dereferenced during layout; without this an attacker-
+    supplied document could read local files or reach internal services
+    (SSRF/LFI).  ``data:`` URIs are allowed; everything else must be a public
+    http(s) target.
+    """
+    from urllib.parse import urlparse
+    from weasyprint import default_url_fetcher
+
+    if urlparse(url).scheme == "data":
+        return default_url_fetcher(url, *args, **kwargs)
+    assert_safe_url(url)
+    return default_url_fetcher(url, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -189,10 +209,11 @@ class convertToPDF(Tool):
             html_obj = self._build_html(HTML, input, base_url)
 
             if output_path:
-                parent = os.path.dirname(os.path.abspath(output_path))
+                output_path = confine_output_path(output_path)
+                parent = os.path.dirname(output_path)
                 os.makedirs(parent, exist_ok=True)
                 html_obj.write_pdf(output_path)
-                return os.path.abspath(output_path)
+                return output_path
 
             return html_obj.write_pdf()
         finally:
@@ -210,7 +231,7 @@ class convertToPDF(Tool):
         If *source* is an existing file path, use ``filename=``.
         Otherwise treat it as an HTML string and use ``string=``.
         """
-        kwargs = {}
+        kwargs = {"url_fetcher": _safe_url_fetcher}
         if base_url is not None:
             kwargs["base_url"] = base_url
 
