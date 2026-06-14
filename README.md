@@ -297,3 +297,76 @@ chain = Chain.load("chains/research.yaml")
 ## License
 
 MIT
+
+---
+
+## Changelog
+
+### 1.2.3
+
+Two-tier model layer: **format is code (by API family), provider is data.**
+Changing provider — one word in `Model("…")` — changes only data, never the
+request format or any model code. Behaviour is byte-for-byte unchanged
+(guarded by characterisation tests).
+
+- `Model` is a single, thin, data-driven class: it resolves the provider from
+  the name and delegates the wire format to the matching family client. The
+  provider is exposed as `model._provider`.
+- Provider settings, model capabilities and prices live in data — one file per
+  provider under `models/providers/*.toml`.
+- The protocol layer (`clients/`) owns the wire format. Five family clients
+  cover all eight providers: `OpenAIClient` (openai, xai, kimi, deepseek),
+  `PerplexityClient`, `QwenClient`, `AnthropicClient`, `GoogleClient`.
+- Removed the per-provider `Model` subclasses and client classes; use
+  `Model("name")` (or an explicit `provider/` prefix for custom names).
+- Fixed Qwen region endpoints (`us`, `hk`) and base URL.
+
+### 1.2.1
+
+- Removed leaked application code from the library (`skills/summarise.py`,
+  `tools/section_context.py`) — an app-specific pipeline that did not belong in
+  the general-purpose library.
+
+### 1.2.0
+
+Mechanism 1 — "LLM layer as data". All additive; the minimal program is
+unchanged.
+
+- `Usage` on every result — normalised `input_tokens` / `output_tokens` /
+  `total_tokens` across providers; additive; `skill.last_usage` and
+  `chain.last_usage` sum across steps.
+- Cost estimation from a per-model price table (`usage.cost`; `None` when a
+  model is unpriced).
+- Exception hierarchy under `APIError` (`RateLimitError`,
+  `AuthenticationError`, `InvalidRequestError`, `NotFoundError`,
+  `ServerError`, `NetworkError`).
+- `provider/model` routing — `Model("openai/gpt-4o")`; unlocks custom /
+  fine-tuned names.
+- Model fallback chain — `Skill(model=[primary, backup, …])` advances on a
+  transient failure; a non-transient failure propagates immediately.
+- `registry.refresh(provider)` — diffs the registry against the provider's
+  live `list_models()`.
+
+### 1.1.0
+
+Foundation repaired: five features that never worked in the installed package
+are revived, plus fragility closed across the library. 69 regression tests.
+
+- Fixed `Chain.load()`, Agent inside `Chain`, the Qwen embedder/reranker, and
+  Agent persistent memory — each previously crashed or was dead code.
+- Honest `success=False` on token-budget exhaustion and exhausted step retries.
+- Hardened LLM-response and agent-JSON parsing; timeouts on all search tools
+  and the MCP bridge; `delete(ids=[])` no longer wipes a collection.
+- Chunker contract fixes; thread-safe `Chain.run()`; fixed
+  `from yait_aichain.tools import *`.
+- POST retry policy (429/503); Anthropic auto-raises `max_tokens` above the
+  thinking budget; gpt-5 / o-series parameter correctness; Chroma v2; Qdrant
+  string IDs; batched VectorDB `upsert`; safe prompt templating.
+- Security: the Google API key moved from the query string to the
+  `x-goog-api-key` header.
+
+### 1.0.0
+
+Initial release — `Skill`, `Chain`, `Pool`, `Agent`, `Tool` / `MCPTools`,
+`VectorDB`, `Reranker`, and 8 providers (Anthropic, OpenAI, Google, xAI,
+Perplexity, Kimi, DeepSeek, Qwen).

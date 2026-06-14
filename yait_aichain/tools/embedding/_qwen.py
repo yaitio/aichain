@@ -125,7 +125,7 @@ class EmbeddingQwen(Embedder):
         -------
         (embeddings, total_tokens, metadata)
         """
-        from ...clients._qwen import resolve_qwen_base_url
+        from ...clients._families.qwen import resolve_qwen_base_url
 
         base_url = resolve_qwen_base_url(self._region)
         url      = base_url + "/compatible-mode/v1/embeddings"

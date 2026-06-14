@@ -35,17 +35,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import (
-    Model,
-    OpenAIModel,
-    AnthropicModel,
-    GoogleAIModel,
-    XAIModel,
-    PerplexityModel,
-    DeepSeekModel,
-    KimiModel,
-    QwenModel,
-)
+from models import Model
 
 # ---------------------------------------------------------------------------
 # Shared test fixtures
@@ -71,45 +61,45 @@ class TestModelFactory(unittest.TestCase):
     """Model("name") must instantiate the exact provider subclass."""
 
     def test_gpt_routes_to_openai(self):
-        self.assertIsInstance(Model("gpt-4o"), OpenAIModel)
+        self.assertEqual(Model("gpt-4o")._provider, "openai")
 
     def test_o_series_routes_to_openai(self):
-        self.assertIsInstance(Model("o3"), OpenAIModel)
+        self.assertEqual(Model("o3")._provider, "openai")
 
     def test_claude_routes_to_anthropic(self):
-        self.assertIsInstance(Model("claude-opus-4-6"), AnthropicModel)
+        self.assertEqual(Model("claude-opus-4-6")._provider, "anthropic")
 
     def test_gemini_routes_to_google(self):
-        self.assertIsInstance(Model("gemini-2.5-flash"), GoogleAIModel)
+        self.assertEqual(Model("gemini-2.5-flash")._provider, "google")
 
     def test_grok_routes_to_xai(self):
-        self.assertIsInstance(Model("grok-3"), XAIModel)
+        self.assertEqual(Model("grok-3")._provider, "xai")
 
     def test_sonar_routes_to_perplexity(self):
-        self.assertIsInstance(Model("sonar-pro"), PerplexityModel)
+        self.assertEqual(Model("sonar-pro")._provider, "perplexity")
 
     def test_r1_routes_to_perplexity(self):
-        self.assertIsInstance(Model("r1-1776"), PerplexityModel)
+        self.assertEqual(Model("r1-1776")._provider, "perplexity")
 
     def test_deepseek_routes_to_deepseek(self):
-        self.assertIsInstance(Model("deepseek-chat"), DeepSeekModel)
+        self.assertEqual(Model("deepseek-chat")._provider, "deepseek")
 
     def test_kimi_routes_to_kimi(self):
-        self.assertIsInstance(Model("kimi-k2-0905-preview"), KimiModel)
+        self.assertEqual(Model("kimi-k2-0905-preview")._provider, "kimi")
 
     def test_qwen_routes_to_qwen(self):
-        self.assertIsInstance(Model("qwen-max"), QwenModel)
+        self.assertEqual(Model("qwen-max")._provider, "qwen")
 
     def test_qwq_routes_to_qwen(self):
-        self.assertIsInstance(Model("QwQ-32B"), QwenModel)
+        self.assertEqual(Model("QwQ-32B")._provider, "qwen")
 
     def test_unknown_model_raises_value_error(self):
         with self.assertRaises(ValueError):
             Model("totally-unknown-model-xyz")
 
     def test_direct_subclass_construction_bypasses_factory(self):
-        m = OpenAIModel("gpt-4o")
-        self.assertIsInstance(m, OpenAIModel)
+        m = Model("gpt-4o")
+        self.assertEqual(m._provider, "openai")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +109,7 @@ class TestModelFactory(unittest.TestCase):
 class TestOpenAIToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = OpenAIModel("gpt-4o")
+        self.model = Model("gpt-4o")
 
     def test_path_is_chat_completions(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -151,14 +141,14 @@ class TestOpenAIToRequest(unittest.TestCase):
         self.assertNotIn("system", body)  # NOT a top-level key
 
     def test_gpt5_routes_to_responses_api(self):
-        model = OpenAIModel("gpt-5")
+        model = Model("gpt-5")
         path, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(path, "/v1/responses")
         self.assertIn("input", body)
         self.assertNotIn("messages", body)
 
     def test_gpt5_uses_max_output_tokens_not_max_completion_tokens(self):
-        model = OpenAIModel("gpt-5")
+        model = Model("gpt-5")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertIn("max_output_tokens", body)
         self.assertNotIn("max_completion_tokens", body)
@@ -171,7 +161,7 @@ class TestOpenAIToRequest(unittest.TestCase):
 class TestAnthropicToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = AnthropicModel("claude-opus-4-6")
+        self.model = Model("claude-opus-4-6")
 
     def test_path_is_messages(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -209,7 +199,7 @@ class TestAnthropicToRequest(unittest.TestCase):
 class TestGoogleToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = GoogleAIModel("gemini-2.5-flash")
+        self.model = Model("gemini-2.5-flash")
 
     def test_path_contains_model_name(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -265,7 +255,7 @@ class TestGoogleToRequest(unittest.TestCase):
 class TestXAIToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = XAIModel("grok-3")
+        self.model = Model("grok-3")
 
     def test_path_is_chat_completions(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -287,7 +277,7 @@ class TestXAIToRequest(unittest.TestCase):
 class TestPerplexityToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = PerplexityModel("sonar")
+        self.model = Model("sonar")
 
     def test_path_is_chat_completions_without_v1_prefix(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -309,7 +299,7 @@ class TestPerplexityToRequest(unittest.TestCase):
 class TestDeepSeekToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = DeepSeekModel("deepseek-chat")
+        self.model = Model("deepseek-chat")
 
     def test_path_is_chat_completions(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -324,7 +314,7 @@ class TestDeepSeekToRequest(unittest.TestCase):
         self.assertIn("temperature", body)
 
     def test_reasoner_omits_temperature(self):
-        model = DeepSeekModel("deepseek-chat", options={"reasoning": "high"})
+        model = Model("deepseek-chat", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["model"], "deepseek-reasoner")
         self.assertNotIn("temperature", body)
@@ -337,7 +327,7 @@ class TestDeepSeekToRequest(unittest.TestCase):
 class TestKimiToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = KimiModel("kimi-k2-0905-preview")
+        self.model = Model("kimi-k2-0905-preview")
 
     def test_path_is_chat_completions(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -359,7 +349,7 @@ class TestKimiToRequest(unittest.TestCase):
 class TestQwenToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = QwenModel("qwen-max")
+        self.model = Model("qwen-max")
 
     def test_path_uses_compatible_mode(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -374,17 +364,17 @@ class TestQwenToRequest(unittest.TestCase):
         self.assertIn("messages", body)
 
     def test_qwq_always_gets_enable_thinking(self):
-        model = QwenModel("QwQ-32B")
+        model = Model("QwQ-32B")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_gets_enable_thinking_when_reasoning_set(self):
-        model = QwenModel("qwen3-72b", options={"reasoning": "high"})
+        model = Model("qwen3-72b", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_no_enable_thinking_when_reasoning_none(self):
-        model = QwenModel("qwen3-72b")
+        model = Model("qwen3-72b")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("enable_thinking", body)
 
@@ -407,25 +397,25 @@ class TestOpenAICompatFromResponse(unittest.TestCase):
         self.assertEqual(result, "Hello from the model")
 
     def test_openai(self):
-        self._assert_text(OpenAIModel("gpt-4o"))
+        self._assert_text(Model("gpt-4o"))
 
     def test_xai(self):
-        self._assert_text(XAIModel("grok-3"))
+        self._assert_text(Model("grok-3"))
 
     def test_perplexity(self):
-        self._assert_text(PerplexityModel("sonar"))
+        self._assert_text(Model("sonar"))
 
     def test_deepseek(self):
-        self._assert_text(DeepSeekModel("deepseek-chat"))
+        self._assert_text(Model("deepseek-chat"))
 
     def test_kimi(self):
-        self._assert_text(KimiModel("kimi-k2-0905-preview"))
+        self._assert_text(Model("kimi-k2-0905-preview"))
 
     def test_qwen(self):
-        self._assert_text(QwenModel("qwen-max"))
+        self._assert_text(Model("qwen-max"))
 
     def test_returns_string_type(self):
-        result = OpenAIModel("gpt-4o").from_response(_OPENAI_COMPAT_RESPONSE, _TEXT_OUTPUT)
+        result = Model("gpt-4o").from_response(_OPENAI_COMPAT_RESPONSE, _TEXT_OUTPUT)
         self.assertIsInstance(result, str)
 
 
@@ -436,7 +426,7 @@ class TestOpenAICompatFromResponse(unittest.TestCase):
 class TestAnthropicFromResponse(unittest.TestCase):
 
     def setUp(self):
-        self.model = AnthropicModel("claude-opus-4-6")
+        self.model = Model("claude-opus-4-6")
 
     def test_extracts_first_text_block(self):
         response = {"content": [{"type": "text", "text": "Hi there"}]}
@@ -465,7 +455,7 @@ class TestAnthropicFromResponse(unittest.TestCase):
 class TestGoogleFromResponse(unittest.TestCase):
 
     def setUp(self):
-        self.model = GoogleAIModel("gemini-2.5-flash")
+        self.model = Model("gemini-2.5-flash")
 
     def test_extracts_text_from_candidates(self):
         response = {
@@ -501,7 +491,7 @@ class TestModelApiKey(unittest.TestCase):
         saved = os.environ.pop("OPENAI_API_KEY", None)
         try:
             with self.assertRaises(ValueError):
-                OpenAIModel("gpt-4o")
+                Model("gpt-4o")
         finally:
             if saved:
                 os.environ["OPENAI_API_KEY"] = saved
@@ -509,12 +499,12 @@ class TestModelApiKey(unittest.TestCase):
                 os.environ["OPENAI_API_KEY"] = "test-openai-key"
 
     def test_explicit_api_key_bypasses_env(self):
-        m = OpenAIModel("gpt-4o", api_key="explicit-key")
+        m = Model("gpt-4o", api_key="explicit-key")
         self.assertEqual(m._api_key, "explicit-key")
 
     def test_invalid_reasoning_level_raises(self):
         with self.assertRaises(ValueError):
-            OpenAIModel("gpt-4o", options={"reasoning": "extreme"})
+            Model("gpt-4o", options={"reasoning": "extreme"})
 
 
 # ---------------------------------------------------------------------------
@@ -524,24 +514,28 @@ class TestModelApiKey(unittest.TestCase):
 class TestModelOptions(unittest.TestCase):
 
     def test_temperature_override_stored(self):
-        m = OpenAIModel("gpt-4o", options={"temperature": 0.3})
+        m = Model("gpt-4o", options={"temperature": 0.3})
         self.assertAlmostEqual(m.temperature, 0.3)
 
     def test_max_tokens_override_stored(self):
-        m = OpenAIModel("gpt-4o", options={"max_tokens": 512})
+        m = Model("gpt-4o", options={"max_tokens": 512})
         self.assertEqual(m.max_tokens, 512)
 
     def test_reasoning_stored(self):
-        m = OpenAIModel("gpt-4o", options={"reasoning": "high"})
+        m = Model("gpt-4o", options={"reasoning": "high"})
         self.assertEqual(m.reasoning, "high")
 
     def test_default_temperature_applied(self):
-        m = OpenAIModel("gpt-4o")
-        self.assertEqual(m.temperature, OpenAIModel._DEFAULT_TEMPERATURE)
+        from models._data import PROVIDERS
+        m = Model("gpt-4o")
+        self.assertEqual(
+            m.temperature, PROVIDERS["openai"]["provider"]["defaults"]["temperature"])
 
     def test_default_max_tokens_applied(self):
-        m = AnthropicModel("claude-opus-4-6")
-        self.assertEqual(m.max_tokens, AnthropicModel._DEFAULT_MAX_TOKENS)
+        from models._data import PROVIDERS
+        m = Model("claude-opus-4-6")
+        self.assertEqual(
+            m.max_tokens, PROVIDERS["anthropic"]["provider"]["defaults"]["max_tokens"])
 
 
 # ---------------------------------------------------------------------------

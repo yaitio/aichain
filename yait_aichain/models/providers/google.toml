@@ -1,0 +1,43 @@
+# google — provider settings + its models (data tier)
+
+[provider]
+key      = "google"
+client   = "google"
+base_url = "https://generativelanguage.googleapis.com/v1beta"
+env_key  = "GOOGLE_AI_API_KEY"
+auth     = "x-goog-api-key"
+max_tokens_field = "maxOutputTokens"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 8192
+top_p = 0.95
+top_k = 40
+
+[provider.reasoning_map]
+low = 2048
+medium = 8192
+high = 24576
+
+[models."gemini-2.5-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.3, output = 2.5 }
+
+[models."gemini-2.5-pro"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 10.0 }
+
+[models."gemini-3-flash-preview"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."gemini-3-pro-image-preview"]
+caps  = ["text-to-image"]
+
+[models."gemini-3.1-flash-image-preview"]
+caps  = ["text-to-image"]
+
+[models."gemini-3.1-flash-lite-preview"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."gemini-3.1-pro-preview"]
+caps  = ["image-to-text", "text-to-text"]

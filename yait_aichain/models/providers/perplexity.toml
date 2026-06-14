@@ -1,0 +1,30 @@
+# perplexity — provider settings + its models (data tier)
+
+[provider]
+key      = "perplexity"
+client   = "perplexity"
+base_url = "https://api.perplexity.ai"
+env_key  = "PERPLEXITY_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+
+chat_path        = "/chat/completions"
+
+[provider.defaults]
+temperature = 0.2
+max_tokens  = 8192
+top_p = 0.9
+
+[models."sonar"]
+caps  = ["text-to-text"]
+price = { input = 1.0, output = 1.0 }
+
+[models."sonar-deep-research"]
+caps  = ["text-to-text"]
+
+[models."sonar-pro"]
+caps  = ["text-to-text"]
+price = { input = 3.0, output = 15.0 }
+
+[models."sonar-reasoning-pro"]
+caps  = ["text-to-text"]

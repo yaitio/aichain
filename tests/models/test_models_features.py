@@ -31,11 +31,8 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import (
-    OpenAIModel, AnthropicModel, GoogleAIModel, XAIModel,
-    PerplexityModel, DeepSeekModel, KimiModel, QwenModel,
-)
-import models._registry as registry
+from models import Model
+from models import registry
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -61,17 +58,17 @@ _JSON_SCHEMA = {
 class TestOpenAIReasoning(unittest.TestCase):
 
     def test_reasoning_high_adds_reasoning_effort(self):
-        model = OpenAIModel("gpt-4o", options={"reasoning": "high"})
+        model = Model("gpt-4o", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "high")
 
     def test_reasoning_low_adds_reasoning_effort_low(self):
-        model = OpenAIModel("gpt-4o", options={"reasoning": "low"})
+        model = Model("gpt-4o", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "low")
 
     def test_reasoning_none_omits_reasoning_effort(self):
-        model = OpenAIModel("gpt-4o")
+        model = Model("gpt-4o")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("reasoning_effort", body)
 
@@ -79,29 +76,29 @@ class TestOpenAIReasoning(unittest.TestCase):
 class TestAnthropicReasoning(unittest.TestCase):
 
     def test_reasoning_high_adds_thinking_block(self):
-        model = AnthropicModel("claude-opus-4-6", options={"reasoning": "high"})
+        model = Model("claude-opus-4-6", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertIn("thinking", body)
         self.assertEqual(body["thinking"]["type"], "enabled")
         self.assertEqual(body["thinking"]["budget_tokens"], 20000)
 
     def test_reasoning_medium_budget(self):
-        model = AnthropicModel("claude-opus-4-6", options={"reasoning": "medium"})
+        model = Model("claude-opus-4-6", options={"reasoning": "medium"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["thinking"]["budget_tokens"], 10000)
 
     def test_reasoning_low_budget(self):
-        model = AnthropicModel("claude-opus-4-6", options={"reasoning": "low"})
+        model = Model("claude-opus-4-6", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["thinking"]["budget_tokens"], 4000)
 
     def test_reasoning_forces_temperature_to_1(self):
-        model = AnthropicModel("claude-opus-4-6", options={"reasoning": "high", "temperature": 0.3})
+        model = Model("claude-opus-4-6", options={"reasoning": "high", "temperature": 0.3})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["temperature"], 1.0)
 
     def test_no_reasoning_omits_thinking(self):
-        model = AnthropicModel("claude-opus-4-6")
+        model = Model("claude-opus-4-6")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("thinking", body)
 
@@ -109,25 +106,25 @@ class TestAnthropicReasoning(unittest.TestCase):
 class TestGoogleReasoning(unittest.TestCase):
 
     def test_reasoning_high_adds_thinking_config(self):
-        model = GoogleAIModel("gemini-2.5-pro", options={"reasoning": "high"})
+        model = Model("gemini-2.5-pro", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 24576)
 
     def test_reasoning_medium_budget(self):
-        model = GoogleAIModel("gemini-2.5-pro", options={"reasoning": "medium"})
+        model = Model("gemini-2.5-pro", options={"reasoning": "medium"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 8192)
 
     def test_reasoning_low_budget(self):
-        model = GoogleAIModel("gemini-2.5-pro", options={"reasoning": "low"})
+        model = Model("gemini-2.5-pro", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 2048)
 
     def test_no_reasoning_omits_thinking_config(self):
-        model = GoogleAIModel("gemini-2.5-flash")
+        model = Model("gemini-2.5-flash")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("thinkingConfig", body.get("generationConfig", {}))
 
@@ -135,18 +132,18 @@ class TestGoogleReasoning(unittest.TestCase):
 class TestXAIReasoning(unittest.TestCase):
 
     def test_reasoning_high_maps_to_high(self):
-        model = XAIModel("grok-3-mini", options={"reasoning": "high"})
+        model = Model("grok-3-mini", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "high")
 
     def test_reasoning_medium_maps_to_high(self):
         # xAI has no "medium"; it maps to "high"
-        model = XAIModel("grok-3-mini", options={"reasoning": "medium"})
+        model = Model("grok-3-mini", options={"reasoning": "medium"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "high")
 
     def test_reasoning_low_maps_to_low(self):
-        model = XAIModel("grok-3-mini", options={"reasoning": "low"})
+        model = Model("grok-3-mini", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "low")
 
@@ -154,17 +151,17 @@ class TestXAIReasoning(unittest.TestCase):
 class TestDeepSeekReasoning(unittest.TestCase):
 
     def test_reasoning_high_switches_model_to_reasoner(self):
-        model = DeepSeekModel("deepseek-chat", options={"reasoning": "high"})
+        model = Model("deepseek-chat", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["model"], "deepseek-reasoner")
 
     def test_reasoning_low_keeps_chat_model(self):
-        model = DeepSeekModel("deepseek-chat", options={"reasoning": "low"})
+        model = Model("deepseek-chat", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["model"], "deepseek-chat")
 
     def test_reasoning_medium_keeps_chat_model(self):
-        model = DeepSeekModel("deepseek-chat", options={"reasoning": "medium"})
+        model = Model("deepseek-chat", options={"reasoning": "medium"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["model"], "deepseek-chat")
 
@@ -174,17 +171,17 @@ class TestKimiReasoning(unittest.TestCase):
     def test_any_reasoning_level_enables_thinking(self):
         for level in ("low", "medium", "high"):
             with self.subTest(level=level):
-                model = KimiModel("kimi-k2-0905-preview", options={"reasoning": level})
+                model = Model("kimi-k2-0905-preview", options={"reasoning": level})
                 _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
                 self.assertEqual(body.get("thinking"), {"type": "enabled"})
 
     def test_reasoning_forces_temperature_to_1(self):
-        model = KimiModel("kimi-k2-0905-preview", options={"reasoning": "high", "temperature": 0.6})
+        model = Model("kimi-k2-0905-preview", options={"reasoning": "high", "temperature": 0.6})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body["temperature"], 1.0)
 
     def test_no_reasoning_omits_thinking(self):
-        model = KimiModel("kimi-k2-0905-preview")
+        model = Model("kimi-k2-0905-preview")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("thinking", body)
 
@@ -192,22 +189,22 @@ class TestKimiReasoning(unittest.TestCase):
 class TestQwenReasoning(unittest.TestCase):
 
     def test_qwq_always_has_enable_thinking(self):
-        model = QwenModel("QwQ-32B")
+        model = Model("QwQ-32B")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_with_reasoning_has_enable_thinking(self):
-        model = QwenModel("qwen3-72b", options={"reasoning": "high"})
+        model = Model("qwen3-72b", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_without_reasoning_no_enable_thinking(self):
-        model = QwenModel("qwen3-72b")
+        model = Model("qwen3-72b")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("enable_thinking", body)
 
     def test_qwen_max_never_has_enable_thinking(self):
-        model = QwenModel("qwen-max")
+        model = Model("qwen-max")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("enable_thinking", body)
 
@@ -216,7 +213,7 @@ class TestPerplexityReasoning(unittest.TestCase):
 
     def test_reasoning_silently_ignored(self):
         # Perplexity has no reasoning parameter; setting it must not crash.
-        model = PerplexityModel("sonar", options={"reasoning": "high"})
+        model = Model("sonar", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("reasoning_effort", body)
         self.assertNotIn("thinking", body)
@@ -229,25 +226,25 @@ class TestPerplexityReasoning(unittest.TestCase):
 class TestOpenAIJsonOutput(unittest.TestCase):
 
     def test_json_format_sets_response_format(self):
-        model  = OpenAIModel("gpt-4o")
+        model  = Model("gpt-4o")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(body["response_format"]["type"], "json_object")
 
     def test_json_schema_format_sets_schema(self):
-        model  = OpenAIModel("gpt-4o")
+        model  = Model("gpt-4o")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(body["response_format"]["type"], "json_schema")
         self.assertIn("json_schema", body["response_format"])
 
     def test_text_format_omits_response_format(self):
-        model = OpenAIModel("gpt-4o")
+        model = Model("gpt-4o")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("response_format", body)
 
     def test_json_from_response_parses_to_dict(self):
-        model  = OpenAIModel("gpt-4o")
+        model  = Model("gpt-4o")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         resp   = {"choices": [{"message": {"content": '{"name": "Alice", "score": 9}'}}]}
         result = model.from_response(resp, output)
@@ -259,7 +256,7 @@ class TestOpenAIJsonOutput(unittest.TestCase):
 class TestAnthropicJsonOutput(unittest.TestCase):
 
     def test_json_schema_adds_tool_and_tool_choice(self):
-        model  = AnthropicModel("claude-opus-4-6")
+        model  = Model("claude-opus-4-6")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertIn("tools", body)
@@ -267,7 +264,7 @@ class TestAnthropicJsonOutput(unittest.TestCase):
         self.assertEqual(body["tool_choice"]["type"], "tool")
 
     def test_json_schema_from_response_returns_input_dict(self):
-        model  = AnthropicModel("claude-opus-4-6")
+        model  = Model("claude-opus-4-6")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         resp   = {
             "content": [
@@ -279,7 +276,7 @@ class TestAnthropicJsonOutput(unittest.TestCase):
         self.assertEqual(result["name"], "Bob")
 
     def test_text_format_no_tools_in_body(self):
-        model = AnthropicModel("claude-opus-4-6")
+        model = Model("claude-opus-4-6")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("tools", body)
 
@@ -287,7 +284,7 @@ class TestAnthropicJsonOutput(unittest.TestCase):
 class TestGoogleJsonOutput(unittest.TestCase):
 
     def test_json_sets_response_mime_type(self):
-        model  = GoogleAIModel("gemini-2.5-flash")
+        model  = Model("gemini-2.5-flash")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(
@@ -296,7 +293,7 @@ class TestGoogleJsonOutput(unittest.TestCase):
         )
 
     def test_json_schema_sets_response_schema(self):
-        model  = GoogleAIModel("gemini-2.5-flash")
+        model  = Model("gemini-2.5-flash")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         gc = body["generationConfig"]
@@ -304,13 +301,13 @@ class TestGoogleJsonOutput(unittest.TestCase):
         self.assertIn("responseSchema", gc)
 
     def test_google_schema_sanitisation_strips_additional_properties(self):
-        from models._google import _sanitize_google_schema
+        from clients._families.google import _sanitize_google_schema
         schema = {"type": "object", "additionalProperties": False, "properties": {}}
         result = _sanitize_google_schema(schema)
         self.assertNotIn("additionalProperties", result)
 
     def test_google_schema_sanitisation_handles_nullable_types(self):
-        from models._google import _sanitize_google_schema
+        from clients._families.google import _sanitize_google_schema
         schema = {"type": ["string", "null"]}
         result = _sanitize_google_schema(schema)
         self.assertEqual(result["type"], "string")
@@ -320,14 +317,14 @@ class TestGoogleJsonOutput(unittest.TestCase):
 class TestKimiJsonOutput(unittest.TestCase):
 
     def test_json_schema_adds_response_format(self):
-        model  = KimiModel("kimi-k2-0905-preview")
+        model  = Model("kimi-k2-0905-preview")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertIn("response_format", body)
         self.assertEqual(body["response_format"]["type"], "json_schema")
 
     def test_json_format_sets_json_object(self):
-        model  = KimiModel("kimi-k2-0905-preview")
+        model  = Model("kimi-k2-0905-preview")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(body["response_format"]["type"], "json_object")
@@ -336,14 +333,14 @@ class TestKimiJsonOutput(unittest.TestCase):
 class TestDeepSeekJsonOutput(unittest.TestCase):
 
     def test_json_sets_response_format_json_object(self):
-        model  = DeepSeekModel("deepseek-chat")
+        model  = Model("deepseek-chat")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(body["response_format"]["type"], "json_object")
 
     def test_json_schema_falls_back_to_json_object(self):
         # DeepSeek does not support json_schema natively; falls back to json_object.
-        model  = DeepSeekModel("deepseek-chat")
+        model  = Model("deepseek-chat")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(body["response_format"]["type"], "json_object")
@@ -427,7 +424,7 @@ class TestRegistry(unittest.TestCase):
 class TestDetectImageMime(unittest.TestCase):
 
     def setUp(self):
-        from models._openai import _detect_image_mime
+        from clients._families._openai_compat import _detect_image_mime
         self._detect = _detect_image_mime
 
     def _b64(self, raw: bytes) -> str:

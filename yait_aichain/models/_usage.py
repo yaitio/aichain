@@ -20,7 +20,7 @@ steps into one total.  Cost is attached separately in block 1.2-C.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True)
@@ -96,3 +96,39 @@ def extract_usage(response: dict) -> Usage:
         return Usage(input_tokens=inp, output_tokens=out, total_tokens=total)
 
     return Usage()
+
+
+# ---------------------------------------------------------------------------
+# Cost — prices live in the provider data (providers/*.toml)
+# ---------------------------------------------------------------------------
+#
+# The price lookup is imported lazily so that merely importing ``Usage`` (which
+# every primitive does for ``.last_usage``) stays light and never triggers the
+# provider-data load.
+
+def _price_of(model_name: str) -> "dict | None":
+    from ._data import PROVIDERS
+    for data in PROVIDERS.values():
+        mdl = data.get("models", {}).get(model_name)
+        if mdl is not None and "price" in mdl:
+            return mdl["price"]
+    return None
+
+
+def estimate_cost(usage: Usage, model_name: str) -> "float | None":
+    """
+    Estimate USD cost of *usage* for *model_name*, or ``None`` if the model
+    has no price entry in the provider data.
+    """
+    price = _price_of(model_name)
+    if price is None:
+        return None
+    return (
+        usage.input_tokens  / 1_000_000 * price["input"]
+        + usage.output_tokens / 1_000_000 * price["output"]
+    )
+
+
+def attach_cost(usage: Usage, model_name: str) -> Usage:
+    """Return *usage* with its ``cost`` field filled in (``None`` if unknown)."""
+    return replace(usage, cost=estimate_cost(usage, model_name))

@@ -25,7 +25,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import OpenAIModel, AnthropicModel
+from models import Model
 from skills import Skill
 from chain  import Chain
 
@@ -34,11 +34,21 @@ from chain  import Chain
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_client(response_body: dict) -> MagicMock:
-    client = MagicMock()
-    client._post.return_value     = json.dumps(response_body).encode()
-    client._auth_headers.return_value = {"Authorization": "Bearer test"}
-    return client
+def _stub_transport(model, *responses: dict):
+    """Stub only the TRANSPORT on *model*'s real family client, keeping
+    build_request / parse_response real (format moved into the client)."""
+    encoded = [json.dumps(r).encode() for r in responses] or [b"{}"]
+    c = model.client
+    c._auth_headers = MagicMock(return_value={"Authorization": "Bearer test"})
+    c._get = MagicMock(return_value=b'{"data": []}')
+    if len(encoded) == 1:
+        c._post = MagicMock(return_value=encoded[0])
+    else:
+        call = [0]
+        def _se(*_a, **_k):
+            i = min(call[0], len(encoded) - 1); call[0] += 1; return encoded[i]
+        c._post = MagicMock(side_effect=_se)
+    return c
 
 
 def _openai_response(text: str) -> dict:
@@ -51,8 +61,8 @@ def _openai_json_response(data: dict) -> dict:
 
 def _make_skill(name: str, response_text: str, placeholder: str = "input") -> Skill:
     """Build a minimal Skill with a mocked client returning *response_text*."""
-    model = OpenAIModel("gpt-4o")
-    model.client = _mock_client(_openai_response(response_text))
+    model = Model("gpt-4o")
+    model.client = _stub_transport(model, _openai_response(response_text))
     return Skill(
         model=model,
         input={"messages": [
@@ -67,8 +77,8 @@ def _make_skill(name: str, response_text: str, placeholder: str = "input") -> Sk
 
 def _make_json_skill(name: str, response_data: dict) -> Skill:
     """Build a Skill whose output is a JSON dict."""
-    model = OpenAIModel("gpt-4o")
-    model.client = _mock_client(_openai_json_response(response_data))
+    model = Model("gpt-4o")
+    model.client = _stub_transport(model, _openai_json_response(response_data))
     return Skill(
         model=model,
         input={"messages": [
@@ -209,8 +219,8 @@ class TestChainVariableFlow(unittest.TestCase):
         s1 = _make_skill("summariser", step1_output, placeholder="article")
 
         # Step 2: translator — needs {result} and {language}
-        s2_model = OpenAIModel("gpt-4o")
-        s2_model.client = _mock_client(_openai_response("translated text"))
+        s2_model = Model("gpt-4o")
+        s2_model.client = _stub_transport(s2_model, _openai_response("translated text"))
         s2 = Skill(
             model=s2_model,
             input={"messages": [
@@ -255,8 +265,8 @@ class TestChainVariableFlow(unittest.TestCase):
         # Step 1 uses output_key="analysis"
         s1 = _make_skill("analyst", "the analysis", placeholder="topic")
 
-        s2_model = OpenAIModel("gpt-4o")
-        s2_model.client = _mock_client(_openai_response("formatted"))
+        s2_model = Model("gpt-4o")
+        s2_model.client = _stub_transport(s2_model, _openai_response("formatted"))
         s2 = Skill(
             model=s2_model,
             input={"messages": [
@@ -280,8 +290,8 @@ class TestChainVariableFlow(unittest.TestCase):
         # Step 1 returns a dict; its keys become variables for step 2
         s1 = _make_json_skill("extractor", {"title": "AI News", "lang": "de"})
 
-        s2_model = OpenAIModel("gpt-4o")
-        s2_model.client = _mock_client(_openai_response("done"))
+        s2_model = Model("gpt-4o")
+        s2_model.client = _stub_transport(s2_model, _openai_response("done"))
         s2 = Skill(
             model=s2_model,
             input={"messages": [
@@ -331,8 +341,8 @@ class TestChainThreeSteps(unittest.TestCase):
     def test_each_step_sees_all_prior_outputs(self):
         s1 = _make_skill("s1", "alpha", placeholder="start")
 
-        s2_model = OpenAIModel("gpt-4o")
-        s2_model.client = _mock_client(_openai_response("beta"))
+        s2_model = Model("gpt-4o")
+        s2_model.client = _stub_transport(s2_model, _openai_response("beta"))
         s2 = Skill(
             model=s2_model,
             input={"messages": [
@@ -414,8 +424,8 @@ class TestChainHistoryReset(unittest.TestCase):
 class TestChainUnnamedSkills(unittest.TestCase):
 
     def test_unnamed_skill_gets_step_label(self):
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response("out"))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("out"))
         s = Skill(
             model=model,
             input={"messages": [

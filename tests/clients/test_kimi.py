@@ -24,7 +24,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._kimi import KimiClient
+from clients._families.openai import OpenAIClient as _Family
+from models._data import PROVIDERS as _PROVIDERS
+def KimiClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['kimi'], **kw)
+
 
 _KEY  = os.getenv("MOONSHOT_API_KEY")
 _FAKE = "sk-invalid-kimi-key-for-testing-000000000000000000000000"

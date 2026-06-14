@@ -28,13 +28,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import (
-    OpenAIModel,
-    AnthropicModel,
-    GoogleAIModel,
-    XAIModel,
-    PerplexityModel,
-)
+from models import Model
 from skills import Skill
 
 
@@ -42,12 +36,27 @@ from skills import Skill
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_client(response_body: dict) -> MagicMock:
-    """Return a mock client whose _post() returns *response_body* as bytes."""
-    client = MagicMock()
-    client._post.return_value    = json.dumps(response_body).encode()
-    client._auth_headers.return_value = {"Authorization": "Bearer test"}
-    return client
+def _stub_transport(model, *responses: dict):
+    """
+    Stub only the TRANSPORT on *model*'s real family client, leaving
+    ``build_request`` / ``parse_response`` real.  Format now lives in the
+    client, so replacing the whole client would also stub the format — we want
+    to exercise the real wire format and only fake the HTTP round-trip.
+
+    Each response is returned by ``_post`` in order (last repeats forever).
+    """
+    encoded = [json.dumps(r).encode() for r in responses] or [b"{}"]
+    c = model.client
+    c._auth_headers = MagicMock(return_value={"Authorization": "Bearer test"})
+    c._get = MagicMock(return_value=b'{"data": []}')
+    if len(encoded) == 1:
+        c._post = MagicMock(return_value=encoded[0])
+    else:
+        call = [0]
+        def _se(*_a, **_k):
+            i = min(call[0], len(encoded) - 1); call[0] += 1; return encoded[i]
+        c._post = MagicMock(side_effect=_se)
+    return c
 
 
 def _openai_response(text: str) -> dict:
@@ -85,8 +94,8 @@ def _json_output() -> dict:
 class TestSkillInit(unittest.TestCase):
 
     def _make_skill(self, **kw):
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response("ok"))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("ok"))
         defaults = dict(
             model=model,
             input=_simple_input(),
@@ -117,12 +126,12 @@ class TestSkillInit(unittest.TestCase):
         self.assertEqual(skill.options["key"], "val")
 
     def test_invalid_input_raises(self):
-        model = OpenAIModel("gpt-4o")
+        model = Model("gpt-4o")
         with self.assertRaises(ValueError):
             Skill(model=model, input={}, output=_text_output())
 
     def test_invalid_output_raises(self):
-        model = OpenAIModel("gpt-4o")
+        model = Model("gpt-4o")
         with self.assertRaises(ValueError):
             Skill(
                 model=model,
@@ -138,8 +147,8 @@ class TestSkillInit(unittest.TestCase):
 class TestSkillRepr(unittest.TestCase):
 
     def _make(self, **kw):
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response("ok"))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("ok"))
         return Skill(model=model, input=_simple_input(), output=_text_output(), **kw)
 
     def test_repr_contains_model_name(self):
@@ -165,8 +174,8 @@ class TestSkillRepr(unittest.TestCase):
 class TestSkillRunOpenAI(unittest.TestCase):
 
     def _make_skill(self, input_=None, output=None, variables=None):
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response("The answer is 42."))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("The answer is 42."))
         return Skill(
             model=model,
             input=input_    or _simple_input(),
@@ -222,8 +231,8 @@ class TestSkillRunOpenAI(unittest.TestCase):
         self.assertNotIn("Bob",    user_content)
 
     def test_run_json_output_returns_dict(self):
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response('{"result": "ok"}'))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response('{"result": "ok"}'))
         skill = Skill(
             model=model,
             input=_simple_input("Respond with JSON."),
@@ -235,8 +244,8 @@ class TestSkillRunOpenAI(unittest.TestCase):
 
     def test_run_does_not_mutate_original_input(self):
         inp = _simple_input("Tell me about {topic}.")
-        model = OpenAIModel("gpt-4o")
-        model.client = _mock_client(_openai_response("ok"))
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("ok"))
         skill = Skill(model=model, input=inp, output=_text_output())
         skill.run(variables={"topic": "gravity"})
         # Original template must be intact
@@ -250,8 +259,8 @@ class TestSkillRunOpenAI(unittest.TestCase):
 class TestSkillRunAnthropic(unittest.TestCase):
 
     def _make_skill(self, **kw):
-        model = AnthropicModel("claude-sonnet-4-5", api_key="test-anthropic-key")
-        model.client = _mock_client(_anthropic_response("Claude says hi."))
+        model = Model("claude-sonnet-4-5", api_key="test-anthropic-key")
+        model.client = _stub_transport(model, _anthropic_response("Claude says hi."))
         return Skill(
             model=model,
             input=kw.get("input", _simple_input()),
@@ -298,8 +307,8 @@ class TestSkillRunAnthropic(unittest.TestCase):
 class TestSkillRunGoogle(unittest.TestCase):
 
     def _make_skill(self, **kw):
-        model = GoogleAIModel("gemini-2.0-flash", api_key="test-google-key")
-        model.client = _mock_client(_google_response("Gemini says hello."))
+        model = Model("gemini-2.0-flash", api_key="test-google-key")
+        model.client = _stub_transport(model, _google_response("Gemini says hello."))
         return Skill(
             model=model,
             input=kw.get("input", _simple_input()),
@@ -339,8 +348,8 @@ class TestSkillRunGoogle(unittest.TestCase):
 class TestSkillRunXAI(unittest.TestCase):
 
     def test_run_returns_string(self):
-        model = XAIModel("grok-3", api_key="test-xai-key")
-        model.client = _mock_client(_openai_response("Grok here."))
+        model = Model("grok-3", api_key="test-xai-key")
+        model.client = _stub_transport(model, _openai_response("Grok here."))
         skill = Skill(
             model=model,
             input=_simple_input("Hi {name}"),
@@ -350,8 +359,8 @@ class TestSkillRunXAI(unittest.TestCase):
         self.assertEqual(result, "Grok here.")
 
     def test_path_is_v1_chat_completions(self):
-        model = XAIModel("grok-3", api_key="test-xai-key")
-        model.client = _mock_client(_openai_response("ok"))
+        model = Model("grok-3", api_key="test-xai-key")
+        model.client = _stub_transport(model, _openai_response("ok"))
         skill = Skill(model=model, input=_simple_input(), output=_text_output())
         skill.run(variables={"name": "T"})
         path = skill.model.client._post.call_args[0][0]
@@ -365,8 +374,8 @@ class TestSkillRunXAI(unittest.TestCase):
 class TestSkillRunPerplexity(unittest.TestCase):
 
     def test_run_returns_string(self):
-        model = PerplexityModel("sonar", api_key="test-perplexity-key")
-        model.client = _mock_client(_openai_response("Sonar answer."))
+        model = Model("sonar", api_key="test-perplexity-key")
+        model.client = _stub_transport(model, _openai_response("Sonar answer."))
         skill = Skill(
             model=model,
             input=_simple_input("What is {topic}?"),
@@ -376,8 +385,8 @@ class TestSkillRunPerplexity(unittest.TestCase):
         self.assertEqual(result, "Sonar answer.")
 
     def test_path_is_chat_completions(self):
-        model = PerplexityModel("sonar-pro", api_key="test-perplexity-key")
-        model.client = _mock_client(_openai_response("ok"))
+        model = Model("sonar-pro", api_key="test-perplexity-key")
+        model.client = _stub_transport(model, _openai_response("ok"))
         skill = Skill(model=model, input=_simple_input(), output=_text_output())
         skill.run(variables={"name": "T"})
         path = skill.model.client._post.call_args[0][0]
@@ -385,25 +394,29 @@ class TestSkillRunPerplexity(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Skill._build_request — unsupported model type raises TypeError
+# Unimplemented family client → NotImplementedError propagates through run()
 # ---------------------------------------------------------------------------
 
 class TestSkillUnsupportedModel(unittest.TestCase):
 
     def test_unsupported_model_raises_not_implemented(self):
-        from models._base import Model
+        from models._base   import Model
+        from clients._base  import BaseClient
 
-        # Create a bare Model instance (no subclass) — to_request is abstract
+        # A model whose client is a bare BaseClient (no wire format implemented).
+        # Format now lives in the client, so build_request() is what's abstract:
+        # an unimplemented family raises NotImplementedError rather than POSTing
+        # our universal format and getting a 400.
         fake = object.__new__(Model)
         fake.name          = "unknown-model"
         fake.temperature   = 1.0
         fake.max_tokens    = 4096
         fake.top_p         = None
         fake.top_k         = None
+        fake.reasoning     = None
         fake.cache_control = False
-        fake.thinking      = None
         fake._api_key      = "key"
-        fake.client        = _mock_client({})
+        fake.client        = BaseClient("key", url="http://example.invalid")
 
         # Bypass __init__ validation by constructing Skill manually
         skill = object.__new__(Skill)

@@ -23,7 +23,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._qwen import QwenClient, resolve_qwen_base_url, REGION_URLS
+from clients._families.qwen import QwenClient as _Family, resolve_qwen_base_url, REGION_URLS
+from models._data import PROVIDERS as _PROVIDERS
+def QwenClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['qwen'], **kw)
 
 _KEY  = os.getenv("DASHSCOPE_API_KEY")
 _FAKE = "sk-invalid-qwen-key-for-testing-000000000000000000000000"

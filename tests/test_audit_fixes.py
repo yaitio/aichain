@@ -47,12 +47,12 @@ class TestBrokenImports(unittest.TestCase):
             self.skipTest("PyYAML not installed")
 
         import tempfile
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
         from yait_aichain.skills import Skill
         from yait_aichain.chain import Chain
 
         skill = Skill(
-            model = OpenAIModel("gpt-4o", api_key="test-key"),
+            model = Model("gpt-4o", api_key="test-key"),
             input = {"messages": [{"role": "user", "parts": ["Say {word}"]}]},
         )
         chain = Chain(steps=[(skill, "result", {}, {})])
@@ -235,22 +235,35 @@ class TestDeleteEmptyIds(unittest.TestCase):
 # Helpers for Agent-level tests (fixes 5 and 6)
 # ---------------------------------------------------------------------------
 
+def _stub_transport(model, *responses: dict):
+    """
+    Stub only the TRANSPORT on *model*'s real family client, keeping
+    ``build_request`` / ``parse_response`` real.  The wire format moved into
+    the client, so replacing the whole client would also stub the format.
+    ``_post`` returns each response in order (last repeats forever).
+    """
+    encoded = [json.dumps(r).encode() for r in responses] or [b"{}"]
+    c = model.client
+    c._auth_headers = MagicMock(return_value={"Authorization": "Bearer test"})
+    c._get = MagicMock(return_value=b'{"data": []}')
+    if len(encoded) == 1:
+        c._post = MagicMock(return_value=encoded[0])
+    else:
+        call_count = [0]
+        def _side_effect(*_args, **_kwargs):
+            idx = min(call_count[0], len(encoded) - 1)
+            call_count[0] += 1
+            return encoded[idx]
+        c._post = MagicMock(side_effect=_side_effect)
+    return c
+
+
 def _mock_orchestrator(*responses: dict):
     """OpenAI-style model whose client returns *responses* in order."""
-    from yait_aichain.models import OpenAIModel
+    from yait_aichain.models import Model
 
-    encoded = [json.dumps(r).encode() for r in responses]
-    call_count = [0]
-
-    def _side_effect(*_args, **_kwargs):
-        idx = min(call_count[0], len(encoded) - 1)
-        call_count[0] += 1
-        return encoded[idx]
-
-    model = OpenAIModel("gpt-4o", api_key="test-key")
-    model.client = MagicMock()
-    model.client._auth_headers.return_value = {"Authorization": "Bearer test"}
-    model.client._post.side_effect = _side_effect
+    model = Model("gpt-4o", api_key="test-key")
+    _stub_transport(model, *responses)
     return model
 
 
@@ -259,14 +272,6 @@ def _oai(text: str, total_tokens: int = 10, usage: dict | None = None) -> dict:
         "choices": [{"message": {"content": text}}],
         "usage":   usage or {"prompt_tokens": total_tokens, "completion_tokens": 0},
     }
-
-
-def _mock_client(response: dict):
-    """A MagicMock client whose _post returns *response* JSON-encoded."""
-    c = MagicMock()
-    c._auth_headers.return_value = {"Authorization": "Bearer test"}
-    c._post.return_value = json.dumps(response).encode()
-    return c
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +405,7 @@ class TestHonestSuccess(unittest.TestCase):
 class TestOpenAICompatParser(unittest.TestCase):
 
     def _parse(self, response, output=None):
-        from yait_aichain.models._openai import _parse_openai_compat_response
+        from yait_aichain.clients._families._openai_compat import _parse_openai_compat_response
         return _parse_openai_compat_response(
             response, output or {"format": {"type": "text"}}
         )
@@ -447,7 +452,7 @@ class TestOpenAICompatParser(unittest.TestCase):
         self.assertEqual(self._parse(ok, {"format": {"type": "json"}}), {"x": 1})
 
     def test_empty_image_data_raises(self):
-        from yait_aichain.models._openai import _parse_image_generations_response
+        from yait_aichain.clients._families._openai_compat import _parse_image_generations_response
         with self.assertRaises(ValueError):
             _parse_image_generations_response({"data": []})
 
@@ -600,9 +605,9 @@ _OUT = {"modalities": ["text"], "format": {"type": "text"}}
 class TestAnthropicReasoningBudget(unittest.TestCase):
 
     def test_high_reasoning_raises_max_tokens(self):
-        from yait_aichain.models import AnthropicModel
+        from yait_aichain.models import Model
 
-        m = AnthropicModel(
+        m = Model(
             "claude-sonnet-4-6", api_key="k", options={"reasoning": "high"}
         )
         _path, body = m.to_request(_MSG, _OUT)
@@ -611,9 +616,9 @@ class TestAnthropicReasoningBudget(unittest.TestCase):
         self.assertGreater(body["max_tokens"], budget)
 
     def test_explicit_max_tokens_respected_when_sufficient(self):
-        from yait_aichain.models import AnthropicModel
+        from yait_aichain.models import Model
 
-        m = AnthropicModel(
+        m = Model(
             "claude-sonnet-4-6", api_key="k",
             options={"reasoning": "low", "max_tokens": 30000},
         )
@@ -624,9 +629,9 @@ class TestAnthropicReasoningBudget(unittest.TestCase):
 class TestOpenAIReasoningModels(unittest.TestCase):
 
     def test_gpt5_omits_sampling_params_and_sends_reasoning(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
 
-        m = OpenAIModel("gpt-5", api_key="k", options={"reasoning": "high"})
+        m = Model("gpt-5", api_key="k", options={"reasoning": "high"})
         path, body = m.to_request(_MSG, _OUT)
         self.assertEqual(path, "/v1/responses")
         self.assertNotIn("temperature", body)
@@ -634,9 +639,9 @@ class TestOpenAIReasoningModels(unittest.TestCase):
         self.assertEqual(body["reasoning"], {"effort": "high"})
 
     def test_o_series_omits_sampling_params(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
 
-        m = OpenAIModel("o3-mini", api_key="k", options={"reasoning": "medium"})
+        m = Model("o3-mini", api_key="k", options={"reasoning": "medium"})
         path, body = m.to_request(_MSG, _OUT)
         self.assertEqual(path, "/v1/chat/completions")
         self.assertNotIn("temperature", body)
@@ -644,14 +649,14 @@ class TestOpenAIReasoningModels(unittest.TestCase):
         self.assertEqual(body["reasoning_effort"], "medium")
 
     def test_regular_gpt_keeps_sampling_params(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
 
-        m = OpenAIModel("gpt-4o", api_key="k")
+        m = Model("gpt-4o", api_key="k")
         _path, body = m.to_request(_MSG, _OUT)
         self.assertIn("temperature", body)
 
     def test_o_series_detection(self):
-        from yait_aichain.models._openai import _is_o_series_model
+        from yait_aichain.clients._families._openai_compat import _is_o_series_model
 
         for name in ("o1", "o1-mini", "o3", "o3-mini", "o4-mini"):
             self.assertTrue(_is_o_series_model(name), name)
@@ -662,9 +667,9 @@ class TestOpenAIReasoningModels(unittest.TestCase):
 class TestGoogleKeyInHeader(unittest.TestCase):
 
     def test_model_path_has_no_key(self):
-        from yait_aichain.models import GoogleAIModel
+        from yait_aichain.models import Model
 
-        m = GoogleAIModel("gemini-2.5-pro", api_key="SECRET")
+        m = Model("gemini-2.5-pro", api_key="SECRET")
         path, _body = m.to_request(_MSG, _OUT)
         self.assertNotIn("SECRET", path)
         self.assertIn("x-goog-api-key",
@@ -1017,11 +1022,11 @@ class TestUsage(unittest.TestCase):
         self.assertEqual(sum([a, b]).total_tokens, 20)
 
     def test_skill_records_last_usage(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
         from yait_aichain.skills import Skill
 
-        model = OpenAIModel("gpt-4o", api_key="k")
-        model.client = _mock_client(_oai("hi", usage={
+        model = Model("gpt-4o", api_key="k")
+        model.client = _stub_transport(model, _oai("hi", usage={
             "prompt_tokens": 11, "completion_tokens": 4, "total_tokens": 15}))
         skill = Skill(model=model,
                       input={"messages": [{"role": "user", "parts": ["x"]}]})
@@ -1031,13 +1036,13 @@ class TestUsage(unittest.TestCase):
         self.assertEqual(skill.last_usage.total_tokens, 15)
 
     def test_chain_sums_step_usage(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
         from yait_aichain.skills import Skill
         from yait_aichain.chain import Chain
 
         def _mk(toks):
-            m = OpenAIModel("gpt-4o", api_key="k")
-            m.client = _mock_client(_oai("ok", usage={
+            m = Model("gpt-4o", api_key="k")
+            m.client = _stub_transport(m, _oai("ok", usage={
                 "prompt_tokens": toks, "completion_tokens": 1,
                 "total_tokens": toks + 1}))
             return Skill(model=m,
@@ -1061,28 +1066,28 @@ class TestPricing(unittest.TestCase):
 
     def test_estimate_known_model(self):
         from yait_aichain.models._usage import Usage
-        from yait_aichain.models._pricing import estimate_cost
+        from yait_aichain.models._usage import estimate_cost
         # gpt-4o: 2.5 in / 10 out per Mtok → 1M in + 1M out = 2.5 + 10 = 12.5
         cost = estimate_cost(Usage(1_000_000, 1_000_000, 2_000_000), "gpt-4o")
         self.assertAlmostEqual(cost, 12.5)
 
     def test_unknown_model_is_none(self):
         from yait_aichain.models._usage import Usage
-        from yait_aichain.models._pricing import estimate_cost
+        from yait_aichain.models._usage import estimate_cost
         self.assertIsNone(estimate_cost(Usage(100, 100), "totally-unknown-xyz"))
 
     def test_attach_cost_fills_field(self):
         from yait_aichain.models._usage import Usage
-        from yait_aichain.models._pricing import attach_cost
+        from yait_aichain.models._usage import attach_cost
         u = attach_cost(Usage(1_000_000, 0, 1_000_000), "gpt-4o")
         self.assertAlmostEqual(u.cost, 2.5)
 
     def test_skill_last_usage_has_cost(self):
-        from yait_aichain.models import OpenAIModel
+        from yait_aichain.models import Model
         from yait_aichain.skills import Skill
 
-        model = OpenAIModel("gpt-4o", api_key="k")
-        model.client = _mock_client(_oai("hi", usage={
+        model = Model("gpt-4o", api_key="k")
+        model.client = _stub_transport(model, _oai("hi", usage={
             "prompt_tokens": 1_000_000, "completion_tokens": 0,
             "total_tokens": 1_000_000}))
         skill = Skill(model=model,
@@ -1108,10 +1113,9 @@ class TestPricing(unittest.TestCase):
 class TestProviderRouting(unittest.TestCase):
 
     def test_explicit_prefix_selects_provider(self):
-        from yait_aichain.models import Model, OpenAIModel, AnthropicModel
-        self.assertIsInstance(Model("openai/gpt-4o", api_key="k"), OpenAIModel)
-        self.assertIsInstance(Model("anthropic/claude-x", api_key="k"),
-                              AnthropicModel)
+        from yait_aichain.models import Model
+        self.assertEqual(Model("openai/gpt-4o", api_key="k")._provider, "openai")
+        self.assertEqual(Model("anthropic/claude-x", api_key="k")._provider, "anthropic")
 
     def test_prefix_stripped_from_wire_name(self):
         from yait_aichain.models import Model
@@ -1119,16 +1123,16 @@ class TestProviderRouting(unittest.TestCase):
         self.assertEqual(m.name, "gpt-4o")   # prefix never reaches the API
 
     def test_bare_name_still_works(self):
-        from yait_aichain.models import Model, OpenAIModel
+        from yait_aichain.models import Model
         m = Model("gpt-4o", api_key="k")
-        self.assertIsInstance(m, OpenAIModel)
+        self.assertEqual(m._provider, "openai")
         self.assertEqual(m.name, "gpt-4o")
 
     def test_explicit_prefix_allows_custom_model_name(self):
         """A name the regex can't recognise works via an explicit prefix."""
-        from yait_aichain.models import Model, OpenAIModel
+        from yait_aichain.models import Model
         m = Model("openai/ft:gpt-4o:org:abc", api_key="k")
-        self.assertIsInstance(m, OpenAIModel)
+        self.assertEqual(m._provider, "openai")
         self.assertEqual(m.name, "ft:gpt-4o:org:abc")
 
     def test_unknown_prefix_falls_through_to_regex(self):
@@ -1192,17 +1196,16 @@ class TestRegistryRefresh(unittest.TestCase):
 class TestFallbackChain(unittest.TestCase):
 
     def _ok(self, text):
-        from yait_aichain.models import OpenAIModel
-        m = OpenAIModel("gpt-4o", api_key="k")
-        m.client = _mock_client(_oai(text))
+        from yait_aichain.models import Model
+        m = Model("gpt-4o", api_key="k")
+        m.client = _stub_transport(m, _oai(text))
         return m
 
     def _failing(self, exc):
-        from yait_aichain.models import OpenAIModel
-        m = OpenAIModel("gpt-4o", api_key="k")
-        m.client = MagicMock()
-        m.client._auth_headers.return_value = {}
-        m.client._post.side_effect = exc
+        from yait_aichain.models import Model
+        m = Model("gpt-4o", api_key="k")
+        m.client._auth_headers = MagicMock(return_value={})
+        m.client._post = MagicMock(side_effect=exc)
         return m
 
     def test_single_model_unchanged(self):

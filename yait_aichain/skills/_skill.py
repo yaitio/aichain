@@ -26,8 +26,7 @@ from typing import TYPE_CHECKING
 
 from ..clients._base import APIError
 from ..clients._errors import RateLimitError, ServerError, NetworkError
-from ..models._usage import Usage, extract_usage
-from ..models._pricing import attach_cost
+from ..models._usage import Usage, extract_usage, attach_cost
 from . import _adapters as adapters
 
 if TYPE_CHECKING:

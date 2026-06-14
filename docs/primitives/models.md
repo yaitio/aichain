@@ -11,13 +11,13 @@ Everything above a `Model` — Skills, Tools, Chains, Agents — is provider-agn
 ```python
 from models import Model
 
-Model("gpt-4o")                  # → OpenAIModel
-Model("claude-sonnet-4-6")       # → AnthropicModel
-Model("gemini-2.5-pro")          # → GoogleAIModel
-Model("grok-3")                  # → XAIModel
-Model("sonar-pro")               # → PerplexityModel
-Model("kimi-k2.5")               # → KimiModel
-Model("deepseek-chat")           # → DeepSeekModel
+Model("gpt-4o")                  # → provider "openai"
+Model("claude-sonnet-4-6")       # → provider "anthropic"
+Model("gemini-2.5-pro")          # → provider "google"
+Model("grok-3")                  # → provider "xai"
+Model("sonar-pro")               # → provider "perplexity"
+Model("kimi-k2.5")               # → provider "kimi"
+Model("deepseek-chat")           # → provider "deepseek"
 ```
 
 Provider is resolved from a well-known prefix:
@@ -32,12 +32,14 @@ Provider is resolved from a well-known prefix:
 | `deepseek-` | DeepSeek |
 | `gpt-`, `dall-e-`, `text-embedding-`, `whisper-`, `tts-`, `o<digit>` | OpenAI |
 
-Unknown names raise `ValueError`. If you need a model name that doesn't match any prefix (e.g. a custom fine-tune), instantiate the provider subclass directly:
+Unknown names raise `ValueError`. If you need a model name that doesn't match any prefix (e.g. a custom fine-tune), give an explicit `provider/` prefix:
 
 ```python
-from models import OpenAIModel
-model = OpenAIModel("my-custom-ft-name")
+from models import Model
+model = Model("openai/my-custom-ft-name")   # forces the openai provider
 ```
+
+The prefix only steers provider selection; it is stripped from the wire name.
 
 ---
 
@@ -156,7 +158,7 @@ Registered tasks: `text-to-text`, `text-to-image`, `image-to-text`.
 
 ## Provider reference
 
-All providers expose the same interface. The table below is for discovery only; full model lists live in `models/_registry.py` and change as providers release new models.
+All providers expose the same interface. The table below is for discovery only; full model lists live in the `models/providers/*.toml` data and change as providers release new models.
 
 | Provider | Env var | Representative models |
 |---|---|---|
@@ -170,21 +172,23 @@ All providers expose the same interface. The table below is for discovery only; 
 
 ---
 
-## Direct subclass construction
+## One Model class
 
-The factory is the recommended entry point, but every subclass is also a public import:
+There are no per-provider Model subclasses. `Model` is a single class: the
+provider is resolved from the name (available as `model._provider`), its
+settings come from the `models/providers/*.toml` data, and the matching family
+client handles the wire format.
 
 ```python
-from models import (
-    OpenAIModel, AnthropicModel, GoogleAIModel, XAIModel, PerplexityModel, KimiModel, DeepSeekModel,
-)
+from models import Model
 
-model = AnthropicModel("claude-sonnet-4-6", options={"max_tokens": 8192})
-model = KimiModel("kimi-k2.5", options={"reasoning": "high"})
-model = DeepSeekModel("deepseek-chat", options={"reasoning": "high"})  # routes to deepseek-reasoner
+model = Model("claude-sonnet-4-6", options={"max_tokens": 8192})
+model = Model("kimi-k2.5", options={"reasoning": "high"})
+model = Model("deepseek-chat", options={"reasoning": "high"})  # routes to deepseek-reasoner
 ```
 
-Use the subclass form when a model name doesn't match any built-in prefix.
+For a name that doesn't match any built-in prefix, use an explicit
+`provider/` prefix (see *Provider detection* above).
 
 ---
 

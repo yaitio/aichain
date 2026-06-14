@@ -1,0 +1,72 @@
+# qwen — provider settings + its models (data tier)
+
+[provider]
+key      = "qwen"
+client   = "qwen"
+env_key  = "DASHSCOPE_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/compatible-mode/v1/models"
+
+chat_path        = "/compatible-mode/v1/chat/completions"
+images_path      = "/compatible-mode/v1/images/generations"
+
+[provider.defaults]
+temperature = 0.7
+max_tokens  = 2048
+top_p = 0.8
+
+[provider.reasoning_map]
+low = true
+medium = true
+high = true
+
+[models."QwQ-32B"]
+caps  = ["text-to-text"]
+
+[models."qwen-max"]
+caps  = ["text-to-text"]
+price = { input = 1.6, output = 6.4 }
+
+[models."qwen-plus"]
+caps  = ["text-to-text"]
+price = { input = 0.4, output = 1.2 }
+
+[models."qwen-turbo"]
+caps  = ["text-to-text"]
+
+[models."qwen-vl-max"]
+caps  = ["image-to-text"]
+
+[models."qwen-vl-plus"]
+caps  = ["image-to-text"]
+
+[models."qwen2.5-vl-max"]
+caps  = ["image-to-text"]
+
+[models."qwen2.5-vl-plus"]
+caps  = ["image-to-text"]
+
+[models."qwen3-14b"]
+caps  = ["text-to-text"]
+
+[models."qwen3-235b-a22b"]
+caps  = ["text-to-text"]
+
+[models."qwen3-32b"]
+caps  = ["text-to-text"]
+
+[models."qwen3-72b"]
+caps  = ["text-to-text"]
+
+[models."qwen3-8b"]
+caps  = ["text-to-text"]
+
+[models."wanx-v1"]
+caps  = ["text-to-image"]
+
+[models."wanx2.1-t2i-plus"]
+caps  = ["text-to-image"]
+
+[models."wanx2.1-t2i-turbo"]
+caps  = ["text-to-image"]

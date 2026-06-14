@@ -741,6 +741,6 @@ class sttQwen(_OpenAICompatSTT):
     def __init__(self, api_key: "str | None" = None) -> None:
         # Resolve the region-aware base URL before calling the parent __init__
         # (which reads self._BASE_URL to build the OpenAI client).
-        from clients._qwen import resolve_qwen_base_url
+        from clients._families.qwen import resolve_qwen_base_url
         self._BASE_URL = resolve_qwen_base_url() + "/compatible-mode/v1"
         super().__init__(api_key=api_key)

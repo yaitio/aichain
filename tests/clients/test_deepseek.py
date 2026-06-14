@@ -24,7 +24,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._deepseek import DeepSeekClient
+from clients._families.openai import OpenAIClient as _Family
+from models._data import PROVIDERS as _PROVIDERS
+def DeepSeekClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['deepseek'], **kw)
+
 
 _KEY  = os.getenv("DEEPSEEK_API_KEY")
 _FAKE = "sk-invalid-deepseek-key-for-testing-0000000000000000"

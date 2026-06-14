@@ -26,38 +26,43 @@ Typical usage
     # Explicit API key (falls back to env var when omitted)
     model = Model("claude-sonnet-4-5", api_key="sk-ant-...")
 
-    # Use a provider subclass directly
-    from models import OpenAIModel
-    m = OpenAIModel("gpt-4.1", options={"max_tokens": 32768})
-
     # Query the model registry
     from models import registry
     registry.models(task="text-to-image")           # all text-to-image models
     registry.providers(task="text-to-image")        # ["google", "openai", "xai"]
     registry.tasks("gpt-4o")                        # ["image-to-text", "text-to-text"]
     registry.is_supported("gpt-image-1", "text-to-image")  # True
+
+There is one ``Model`` class: the provider is resolved from the model name
+(against the ``providers/`` data) and the matching family client handles the
+wire format.  There are no per-provider Model subclasses.
 """
 
-from ._base       import Model
-from ._openai     import OpenAIModel
-from ._anthropic  import AnthropicModel
-from ._google     import GoogleAIModel
-from ._xai        import XAIModel
-from ._perplexity import PerplexityModel
-from ._kimi       import KimiModel
-from ._deepseek   import DeepSeekModel
-from ._qwen       import QwenModel
-from .            import _registry as registry
+from types import SimpleNamespace
+
+from ._base import (
+    Model,
+    models       as _q_models,
+    providers    as _q_providers,
+    tasks        as _q_tasks,
+    is_supported as _q_is_supported,
+    refresh      as _q_refresh,
+    TASKS        as _TASKS,
+)
+
+#: Data-driven registry query surface.  Capabilities/prices live in the
+#: ``providers/`` data; these functions read it (there is no registry module).
+registry = SimpleNamespace(
+    models       = _q_models,
+    providers    = _q_providers,
+    tasks        = _q_tasks,
+    is_supported = _q_is_supported,
+    refresh      = _q_refresh,
+    TASKS        = _TASKS,
+    PROVIDERS    = tuple(_q_providers()),
+)
 
 __all__ = [
     "Model",
-    "OpenAIModel",
-    "AnthropicModel",
-    "GoogleAIModel",
-    "XAIModel",
-    "PerplexityModel",
-    "KimiModel",
-    "DeepSeekModel",
-    "QwenModel",
     "registry",
 ]

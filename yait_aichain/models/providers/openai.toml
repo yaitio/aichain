@@ -1,0 +1,72 @@
+# openai — provider settings + its models (data tier)
+
+[provider]
+key      = "openai"
+client   = "openai"
+base_url = "https://api.openai.com"
+env_key  = "OPENAI_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/v1/models"
+
+chat_path        = "/v1/chat/completions"
+images_path      = "/v1/images/generations"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p = 1.0
+
+[provider.reasoning_map]
+low = "low"
+medium = "medium"
+high = "high"
+
+[models."gpt-4.1"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 8.0 }
+
+[models."gpt-4.1-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.4, output = 1.6 }
+
+[models."gpt-4.1-nano"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.1, output = 0.4 }
+
+[models."gpt-4o"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.5, output = 10.0 }
+
+[models."gpt-4o-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.15, output = 0.6 }
+
+[models."gpt-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 10.0 }
+
+[models."gpt-5-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.25, output = 2.0 }
+
+[models."gpt-image-1"]
+caps  = ["text-to-image"]
+
+[models."gpt-image-1-mini"]
+caps  = ["text-to-image"]
+
+[models."gpt-image-1.5"]
+caps  = ["text-to-image"]
+
+[models."o1"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 15.0, output = 60.0 }
+
+[models."o3"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 8.0 }
+
+[models."o4-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.1, output = 4.4 }
