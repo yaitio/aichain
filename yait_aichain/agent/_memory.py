@@ -12,6 +12,13 @@ complete context.
 The memory is also exposed in :class:`~agent.AgentResult` as a plain dict
 snapshot, giving callers a full audit trail of what the agent retained.
 
+.. warning::
+    Memory is **not** encrypted or redacted: its full contents are embedded
+    verbatim into every orchestrator prompt (sent to the model provider) and,
+    with ``FileBackend``, written to disk as plain JSON. Do not store secrets
+    (API keys, tokens, PII) in agent memory or seed them as ``initial``
+    values — they would leak to the provider and to the state file.
+
 Pluggable backends
 ------------------
 By default ``AgentMemory`` uses an in-process ``InMemoryBackend``: each

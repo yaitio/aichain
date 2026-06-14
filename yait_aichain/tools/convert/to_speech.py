@@ -43,6 +43,7 @@ import os
 import urllib3
 
 from .._base import Tool
+from .._security import confine_output_path
 
 
 # ── Module-level defaults ─────────────────────────────────────────────────────
@@ -238,7 +239,7 @@ class ttsOpenAI(convertToSpeech):
             speed           = speed,
         )
 
-        output_path = os.path.abspath(output_path)
+        output_path = confine_output_path(output_path)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         response.stream_to_file(output_path)
 
@@ -368,7 +369,7 @@ class ttsGoogle(convertToSpeech):
             audio_config = audio_config,
         )
 
-        output_path = os.path.abspath(output_path)
+        output_path = confine_output_path(output_path)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as fh:
             fh.write(response.audio_content)
@@ -461,7 +462,7 @@ class ttsXAI(convertToSpeech):
             speed           = speed,
         )
 
-        output_path = os.path.abspath(output_path)
+        output_path = confine_output_path(output_path)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         response.stream_to_file(output_path)
 
@@ -638,7 +639,7 @@ class ttsQwen(convertToSpeech):
                 f"(HTTP {dl.status})"
             )
 
-        output_path = os.path.abspath(output_path)
+        output_path = confine_output_path(output_path)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as fh:
             fh.write(dl.data)

@@ -26,6 +26,7 @@ from __future__ import annotations
 import os
 
 from .._base import Tool
+from .._security import confine_output_path
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +163,7 @@ class convertToHTML(Tool):
         result = self._convert(input, fmt)
 
         if output_path:
-            parent = os.path.dirname(os.path.abspath(output_path))
+            parent = os.path.dirname(confine_output_path(output_path))
             os.makedirs(parent, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as fh:
                 fh.write(result)

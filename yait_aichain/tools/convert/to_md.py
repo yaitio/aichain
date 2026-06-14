@@ -49,6 +49,7 @@ import os
 from typing import Any
 
 from .._base import Tool
+from .._security import assert_safe_url, confine_output_path, has_url_scheme
 
 
 class convertToMD(Tool):
@@ -186,12 +187,18 @@ class convertToMD(Tool):
         opts        = options or {}
         output_path = opts.get("output_path")
 
+        # If the input is a URL, only allow public http(s) targets — this blocks
+        # SSRF to internal/metadata hosts and file:// local-file disclosure.
+        if has_url_scheme(input):
+            assert_safe_url(input)
+
         md     = self._get_converter()
         result = md.convert(input)
         text   = result.text_content
 
         if output_path:
-            parent = os.path.dirname(os.path.abspath(output_path))
+            output_path = confine_output_path(output_path)
+            parent = os.path.dirname(output_path)
             os.makedirs(parent, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as fh:
                 fh.write(text)

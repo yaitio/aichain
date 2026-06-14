@@ -2,11 +2,18 @@
 tools.local._run — LocalRunTool
 =================================
 
-Execute a shell command or Python file within the sandbox.
-The working directory is always set to the sandbox root (or a
-sub-directory of it) — the process cannot be started outside the root.
+Execute a shell command or Python file. The working directory is set to the
+sandbox root (or a sub-directory of it).
 
-All paths in the command are validated against the sandbox root.
+.. danger::
+    This tool runs **arbitrary commands** through the shell (``shell=True``)
+    with the full privileges of the host process. ``root_dir`` only sets the
+    *starting directory* — it does NOT confine what the command can read,
+    write, execute, or reach over the network (a command can use absolute
+    paths, ``..``, ``curl | sh``, etc.). Treat ``LocalRunTool`` as
+    arbitrary-code-execution: only expose it to trusted input, and never wire
+    it to an agent acting on untrusted instructions without an OS-level
+    sandbox (container, seccomp, separate user).
 """
 
 from __future__ import annotations
