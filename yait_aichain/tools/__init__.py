@@ -68,7 +68,6 @@ mcp/             Model Context Protocol integration.
 
 Infrastructure
 --------------
-  SectionContextTool   rolling-context queue manager for sectional reports
   Tool, ToolResult     base class and return type
 
 Backward-compatible aliases
@@ -80,7 +79,6 @@ All previous class names still work:
 """
 
 from ._base           import Tool, ToolResult
-from .section_context import SectionContextTool
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
@@ -191,7 +189,6 @@ __all__ = [
     "Tool",
     "ToolResult",
     # ── Infrastructure ────────────────────────────────────────────────────
-    "SectionContextTool",
     # ── Search ────────────────────────────────────────────────────────────
     "Search",
     "searchPerplexity",
