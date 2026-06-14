@@ -58,17 +58,25 @@ _JSON_SCHEMA = {
 class TestOpenAIReasoning(unittest.TestCase):
 
     def test_reasoning_high_adds_reasoning_effort(self):
-        model = Model("gpt-4o", options={"reasoning": "high"})
+        # reasoning_effort is only valid on the o-series reasoning models.
+        model = Model("o3", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "high")
 
     def test_reasoning_low_adds_reasoning_effort_low(self):
-        model = Model("gpt-4o", options={"reasoning": "low"})
+        model = Model("o3", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertEqual(body.get("reasoning_effort"), "low")
 
     def test_reasoning_none_omits_reasoning_effort(self):
-        model = Model("gpt-4o")
+        model = Model("o3")
+        _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
+        self.assertNotIn("reasoning_effort", body)
+
+    def test_gpt_model_never_gets_reasoning_effort(self):
+        # Plain GPT chat models reject reasoning_effort (HTTP 400); it must not
+        # be sent even when reasoning is requested.
+        model = Model("gpt-4o", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("reasoning_effort", body)
 

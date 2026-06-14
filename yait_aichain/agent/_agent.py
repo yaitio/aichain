@@ -398,7 +398,14 @@ class Agent:
             )
             tokens_used += plan_tokens
 
-            current_plan = plan_data.get("steps", [])[:self.max_steps]
+            steps = plan_data.get("steps", [])
+            # The model can return malformed steps (a string, a dict, or a list
+            # of strings). Keep only dict steps so later `step.get(...)` calls
+            # never crash on a non-dict.
+            current_plan = (
+                [s for s in steps if isinstance(s, dict)][:self.max_steps]
+                if isinstance(steps, list) else []
+            )
 
             if not current_plan:
                 self._log(1, "       ✗ Orchestrator produced an empty plan.")
@@ -585,6 +592,13 @@ class Agent:
 
                     if decision == "replan" and self.mode == "agile":
                         revised = reflection.get("revised_plan")
+                        # Keep only well-formed dict steps; ignore a malformed
+                        # revised_plan (e.g. a list of strings) and keep going
+                        # with the existing plan rather than crashing.
+                        revised = (
+                            [s for s in revised if isinstance(s, dict)]
+                            if isinstance(revised, list) else []
+                        )
                         if revised:
                             old_len      = len(current_plan)
                             current_plan = revised[:self.max_steps]
@@ -656,6 +670,22 @@ class Agent:
                     plan=current_plan, history=history,
                     memory=self.memory.all(),
                     error=error,
+                )
+
+            # Honest success: if the final executed step ended in an execution
+            # error (the orchestrator chose "continue" past a failed tool),
+            # the run did not truly complete — report failure, not success.
+            if history and history[-1].get("exec_error") is not None:
+                error = (
+                    f"Final step ended with an execution error: "
+                    f"{history[-1]['exec_error']}"
+                )
+                self._log(1, f"\n[Fail] ✗ {error}")
+                return AgentResult(
+                    success=False, output=None, mode=self.mode,
+                    steps_taken=step_idx, tokens_used=tokens_used,
+                    plan=current_plan, history=history,
+                    memory=self.memory.all(), error=error,
                 )
 
             final_output = self._extract_final_output(history)

@@ -430,12 +430,14 @@ class VectorStore:
                 )
             texts  = [r["text"] for r in needs_embed]
             result = self._embedder.embed(texts, input_type="document")
-            embed_map = {
-                r["id"]: result.embeddings[i]
-                for i, r in enumerate(needs_embed)
-            }
+            # Pair embeddings to records POSITIONALLY (in input order), not by id.
+            # `needs_embed` follows the order of `raw`, so the same iterator
+            # consumed below assigns each freshly-embedded vector to its own
+            # record — correct even when two records share an id (an id-keyed
+            # map would collapse duplicates and mis-assign vectors).
+            embeds = iter(result.embeddings)
         else:
-            embed_map = {}
+            embeds = iter(())
 
         for r in raw:
             rec = VectorRecord(
@@ -443,7 +445,7 @@ class VectorStore:
                 text     = r["text"],
                 metadata = r.get("metadata", {}),
             )
-            vec = r["vector"] if "vector" in r else embed_map[r["id"]]
+            vec = r["vector"] if "vector" in r else next(embeds)
             recs.append(rec)
             vectors.append(vec)
 

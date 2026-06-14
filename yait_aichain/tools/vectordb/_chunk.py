@@ -338,6 +338,13 @@ def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
     data_rows    = rows[sep_idx + 1 :]
     header_block = "\n".join(header_rows) + "\n" + sep_row
 
+    # If the header block alone leaves no room for even one data row, repeating
+    # it in every sub-chunk would break the `chars <= max_chars` contract.
+    # Fall back to plain size-based splitting of the whole table instead.
+    if len(header_block) + 2 >= max_chars:
+        pieces = _split_by_priority(table, max_chars, _MD_TEXT_SEPS)
+        return [_Chunk(text=p.rstrip()) for p in pieces]
+
     chunks:   list[_Chunk] = []
     buf_rows: list[str]    = []
 
