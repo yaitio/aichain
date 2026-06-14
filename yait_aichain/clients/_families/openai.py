@@ -93,11 +93,14 @@ class OpenAIClient(BaseClient):
             if _is_openai_image_model(m.name):
                 return _build_image_generations_request(m, messages, output, self._images_path)
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            # reasoning_effort is only valid on the o-series reasoning models;
+            # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
+            # routes through the Responses API branch above).
             if _is_o_series_model(m.name):
                 body.pop("temperature", None); body.pop("top_p", None)
-            if m.reasoning:
-                eff = m._REASONING_MAP.get(m.reasoning)
-                if eff: body["reasoning_effort"] = eff
+                if m.reasoning:
+                    eff = m._REASONING_MAP.get(m.reasoning)
+                    if eff: body["reasoning_effort"] = eff
             return path, body
 
         if p == "xai":
@@ -106,7 +109,9 @@ class OpenAIClient(BaseClient):
                 return self._images_path, {"model": m.name, "prompt": prompt,
                                            "n": 1, "response_format": "b64_json"}
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
-            if m.reasoning:
+            # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
+            # grok models reject it (grok-4 reasoners think natively).
+            if m.reasoning and m.name.startswith("grok-3-mini"):
                 eff = m._REASONING_MAP.get(m.reasoning)
                 if eff: body["reasoning_effort"] = eff
             return path, body
@@ -130,7 +135,10 @@ class OpenAIClient(BaseClient):
             fmt = output.get("format", {}); ft = fmt.get("type", "text")
             if ft in ("json", "json_schema"):
                 body["response_format"] = {"type": "json_object"}
-                has = any("json" in (x.get("content") or "").lower()
+                # A system message's content may be a list (multi-part) rather
+                # than a string — guard before calling .lower() on it.
+                has = any(isinstance(x.get("content"), str)
+                          and "json" in x["content"].lower()
                           for x in body["messages"] if x.get("role") == "system")
                 if not has:
                     hint = ("Respond with a JSON object that strictly follows this "

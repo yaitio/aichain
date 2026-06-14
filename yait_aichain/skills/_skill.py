@@ -267,7 +267,7 @@ class Skill:
         # on every attempt; only the server-side condition changes.
         path, body = model.to_request(messages, self._output)
 
-        for attempt in range(max_retries + 1):
+        for attempt in range(max(0, max_retries) + 1):
             if attempt > 0:
                 time.sleep(retry_delay * (2 ** (attempt - 1)))
 
@@ -286,7 +286,9 @@ class Skill:
                     continue   # wait and retry the same model
                 raise          # non-transient, or retries exhausted
 
-        raise last_error  # type: ignore[misc]  # unreachable; satisfies linters
+        # Unreachable: the loop runs at least once (max(0, max_retries)+1 >= 1)
+        # and every iteration returns or raises.
+        raise RuntimeError("retry loop exited without returning or raising")
 
     # ------------------------------------------------------------------
     # Persistence

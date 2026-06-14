@@ -1299,6 +1299,16 @@ class TestSafeTemplating(unittest.TestCase):
             "hello {name}",
         )
 
+    def test_doubled_braces_stay_literal(self):
+        # A doubled-brace ``{{name}}`` must NOT be substituted even when a
+        # variable of that name exists — doubled braces stay literal.
+        from yait_aichain._template import substitute_placeholders
+
+        self.assertEqual(
+            substitute_placeholders("emit {{name}} and {name}", {"name": "X"}),
+            "emit {{name}} and X",
+        )
+
     def test_known_placeholder_substituted(self):
         from yait_aichain._template import substitute_placeholders
 

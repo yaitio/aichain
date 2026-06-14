@@ -300,11 +300,15 @@ class _OpenAICompatSTT(convertToText):
             )
 
         audio      = AudioSegment.from_file(path)
-        chunk_ms   = self._CHUNK_SECONDS   * 1000
-        overlap_ms = self._OVERLAP_SECONDS * 1000
+        chunk_ms   = self._CHUNK_SECONDS * 1000
         parts: list[str] = []
         start_ms = 0
 
+        # Chunks are CONTIGUOUS (no overlap): this path joins plain transcript
+        # text and has no word-timing data to de-duplicate an overlap region,
+        # so overlapping audio would repeat a few seconds of speech at every
+        # boundary. A clean cut at a 10-minute boundary risks splitting at most
+        # one word — far less harmful than duplicated phrases.
         while start_ms < len(audio):
             end_ms = min(start_ms + chunk_ms, len(audio))
             chunk  = audio[start_ms:end_ms]
@@ -321,10 +325,9 @@ class _OpenAICompatSTT(convertToText):
             finally:
                 os.unlink(tmp_path)
 
-            next_start = end_ms - overlap_ms
-            if next_start <= start_ms:
-                break   # final chunk — guard against infinite loop
-            start_ms = next_start
+            if end_ms >= len(audio):
+                break
+            start_ms = end_ms
 
         combined = " ".join(p for p in parts if p)
         if fmt == "json" or timestamps:

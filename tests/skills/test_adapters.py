@@ -311,11 +311,17 @@ class TestOpenAIToRequest(unittest.TestCase):
         self.assertNotIn("top_p", body)
 
     def test_reasoning_effort_included(self):
-        _, body = self._model(reasoning="high").to_request([], _text_output())
+        # reasoning_effort is valid only on o-series reasoning models, not gpt-4o.
+        m = Model("o3", options={"reasoning": "high"})
+        _, body = m.to_request([], _text_output())
         self.assertEqual(body["reasoning_effort"], "high")
 
     def test_reasoning_effort_omitted_when_none(self):
         _, body = self._model().to_request([], _text_output())
+        self.assertNotIn("reasoning_effort", body)
+
+    def test_reasoning_effort_not_sent_to_gpt(self):
+        _, body = self._model(reasoning="high").to_request([], _text_output())
         self.assertNotIn("reasoning_effort", body)
 
     def test_text_part_converted(self):

@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import re
 
-_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+# Match a single ``{name}`` placeholder, but NOT one wrapped in doubled
+# braces: the lookbehind/lookahead skip ``{{name}}`` so a doubled brace stays
+# literal (``{{`` stays ``{{``), as documented.
+_PLACEHOLDER_RE = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)\}(?!\})")
 
 
 def substitute_placeholders(text: str, variables: dict) -> str:
