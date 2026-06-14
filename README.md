@@ -280,7 +280,7 @@ chain = Chain.load("chains/research.yaml")
 | Provider | Text | Vision | Image gen | Env var |
 |---|---|---|---|---|
 | **Anthropic** | Claude Opus / Sonnet / Haiku 4 | ✓ | — | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-5, GPT-4.1, GPT-4o, o1, o3, o4-mini | ✓ | DALL-E 3, GPT-Image-1 | `OPENAI_API_KEY` |
+| **OpenAI** | GPT-5.5, GPT-5.4, GPT-4o | ✓ | GPT-Image-1 | `OPENAI_API_KEY` |
 | **Google** | Gemini 2.5 Pro / Flash, 3.x | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
 | **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `XAI_API_KEY` |
 | **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |

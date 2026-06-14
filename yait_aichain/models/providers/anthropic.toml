@@ -18,14 +18,26 @@ low = 4000
 medium = 10000
 high = 20000
 
-[models."claude-haiku-4-5-20251001"]
+[models."claude-fable-5"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 1.0, output = 5.0 }
+price = { input = 10.0, output = 50.0 }
+
+[models."claude-opus-4-8"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 5.0, output = 25.0 }
+
+[models."claude-opus-4-7"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 5.0, output = 25.0 }
 
 [models."claude-opus-4-6"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 15.0, output = 75.0 }
+price = { input = 5.0, output = 25.0 }
 
 [models."claude-sonnet-4-6"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 3.0, output = 15.0 }
+
+[models."claude-haiku-4-5-20251001"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.0, output = 5.0 }

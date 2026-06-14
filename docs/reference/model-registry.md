@@ -37,26 +37,23 @@ A provider is absent for a task it does not support (Anthropic has no text-to-im
 
 ### `text-to-text`
 ```
-gpt-5                    # GPT-5 series — Responses API
-gpt-5-mini
-
-gpt-4.1                  # GPT-4.1 series
-gpt-4.1-mini
-gpt-4.1-nano
+gpt-5.5                  # GPT-5.5 series — Responses API
+gpt-5.5-pro
+gpt-5.4                  # GPT-5.4 series
+gpt-5.4-mini
+gpt-5.4-nano
+gpt-5.4-pro
 
 gpt-4o                   # GPT-4o series
 gpt-4o-mini
-
-o3                       # o-series reasoning
-o4-mini
-o1
 ```
 
 ### `text-to-image`
 ```
-gpt-image-1
-gpt-image-1.5            # latest, highest quality
+gpt-image-2             # latest
+gpt-image-1.5
 gpt-image-1-mini
+gpt-image-1
 ```
 `dall-e-2` / `dall-e-3` are deprecated (scheduled removal 2026-05-12) and excluded from the registry.
 

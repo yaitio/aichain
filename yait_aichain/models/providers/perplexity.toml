@@ -19,12 +19,18 @@ top_p = 0.9
 caps  = ["text-to-text"]
 price = { input = 1.0, output = 1.0 }
 
-[models."sonar-deep-research"]
-caps  = ["text-to-text"]
-
 [models."sonar-pro"]
 caps  = ["text-to-text"]
 price = { input = 3.0, output = 15.0 }
 
+[models."sonar-reasoning"]
+caps  = ["text-to-text"]
+price = { input = 1.0, output = 5.0 }
+
 [models."sonar-reasoning-pro"]
 caps  = ["text-to-text"]
+price = { input = 2.0, output = 8.0 }
+
+[models."sonar-deep-research"]
+caps  = ["text-to-text"]
+price = { input = 2.0, output = 8.0 }
