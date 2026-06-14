@@ -1,107 +1,16 @@
 """
-models._openai — OpenAIModel
-=============================
+clients._families._openai_compat
+================================
 
-Covers the full OpenAI model family:
-
-  Chat / reasoning  (Chat Completions API — /v1/chat/completions)
-  ────────────────
-  GPT-4.1 series  gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
-  GPT-4o series   gpt-4o, gpt-4o-mini, gpt-4o-audio-preview, …
-  o-series        o1, o1-mini, o3, o3-mini, o4-mini, …
-
-  Chat / reasoning  (Responses API — /v1/responses)
-  ────────────────────────────────────────────────
-  GPT-5 series    gpt-5, gpt-5-mini, gpt-5.4, gpt-5.4-…
-                  These models are ONLY available via /v1/responses.
-                  The library auto-detects any model whose name starts
-                  with "gpt-5" and routes it to the Responses API.
-
-  Image
-  ─────
-  DALL-E          dall-e-3, dall-e-2
-  GPT Image       gpt-image-1, gpt-image-1.5, gpt-image-1-mini
-
-  Embeddings
-  ──────────
-  text-embedding-3-small, text-embedding-3-large, text-embedding-ada-002
-
-  Audio
-  ─────
-  whisper-1, tts-1, tts-1-hd
-
-Responses API vs Chat Completions API
---------------------------------------
-The two endpoints differ in request and response shape:
-
-  Feature              Chat Completions          Responses API
-  ─────────────────────────────────────────────────────────────
-  endpoint             /v1/chat/completions      /v1/responses
-  messages key         messages                  input
-  system message       inside messages[]         top-level instructions
-  token limit param    max_completion_tokens     max_output_tokens
-  structured output    response_format           text.format
-  response content     choices[0].message        output[0].content[0].text
-
-The library detects the correct path automatically; callers do not need
-to change anything.
-
-Default generation parameters
-------------------------------
-temperature   1.0    OpenAI API default; valid range 0–2.
-                     Note: o-series (o1, o3, o4-mini) ignore this
-                     parameter — only GPT models use it.
-max_tokens    16384  ⚠ ``max_tokens`` is **deprecated** in the OpenAI API
-                     in favour of ``max_completion_tokens``.  The task
-                     layer must send ``max_completion_tokens`` for all
-                     current models (GPT-4o, GPT-4.1, o-series).
-                     ``max_tokens`` is incompatible with the o-series.
-                     16 384 is a safe default for GPT-4o / GPT-4.1.
-top_p         1.0    Nucleus sampling; range 0–1, default 1.
-                     OpenAI recommends altering either temperature or
-                     top_p, not both.
-top_k         None   Not part of the OpenAI API — unsupported.
-cache_control False  Automatic prompt caching is available for GPT-4.1
-                     and GPT-4o.  When True, the task layer adds
-                     ``{"cache_control": {"type": "ephemeral"}}`` to
-                     eligible content blocks.
-reasoning     None   Universal reasoning depth for o-series models only.
-                     Accepts None | "low" | "medium" | "high"; mapped to
-                     the ``reasoning_effort`` API parameter:
-                       "low"    — faster, fewer reasoning tokens
-                       "medium" — API default for o-series
-                       "high"   — deepest reasoning, most tokens
-                     GPT models ignore this field entirely.
-
-Recommended overrides by model
---------------------------------
-gpt-4o / gpt-4.1    temperature=1.0, max_tokens=16384
-gpt-4o-mini         temperature=1.0, max_tokens=16384
-gpt-4.1-nano        temperature=1.0, max_tokens=8192
-gpt-5 / gpt-5-mini  temperature=1.0, max_tokens=16384  (Responses API)
-o1                  reasoning="medium", max_tokens=32768
-o3 / o4-mini        reasoning="high",   max_tokens=32768
-dall-e-3            temperature / max_tokens not applicable
-gpt-image-1(.5)     temperature / max_tokens not applicable
-
-Environment variable
----------------------
-OPENAI_API_KEY
+Wire-format helpers for the OpenAI Chat Completions / Responses / Images
+APIs — shared by every OpenAI-compatible provider (openai, xai, perplexity,
+kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
 """
 
-import copy
+from __future__ import annotations
+
 import json
 
-import urllib3
-
-from ._base import Model
-from ..clients._openai import OpenAIClient
-from ..clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
-
-
-# ---------------------------------------------------------------------------
-# Part-level conversion helper (also imported by XAIModel and PerplexityModel)
-# ---------------------------------------------------------------------------
 
 def _part_to_openai(part: dict) -> "dict | None":
     """
@@ -156,19 +65,20 @@ def _build_openai_compat_request(
     messages: list,
     output:   dict,
     path:     str,
+    max_tokens_field: str = "max_completion_tokens",
 ) -> "tuple[str, dict]":
     """
     Build an OpenAI-compatible ``(path, body)`` pair.
 
-    Shared by :class:`OpenAIModel`, :class:`~models._xai.XAIModel`, and
-    :class:`~models._perplexity.PerplexityModel`.
-
     Parameters
     ----------
-    model    : Provider model instance (OpenAI / xAI / Perplexity).
+    model    : Provider model instance (OpenAI / xAI / Perplexity / …).
     messages : Substituted universal messages list.
     output   : Universal output spec.
     path     : Provider-specific endpoint path.
+    max_tokens_field : Request key for the output-token limit
+                       (``"max_completion_tokens"`` default, ``"max_tokens"``
+                       for Kimi/DeepSeek).
     """
     openai_messages: list[dict] = []
     for msg in messages:
@@ -184,10 +94,10 @@ def _build_openai_compat_request(
             openai_messages.append({"role": role, "content": items})
 
     body: dict = {
-        "model":                 model.name,
-        "messages":              openai_messages,
-        "max_completion_tokens": model.max_tokens,
-        "temperature":           model.temperature,
+        "model":          model.name,
+        "messages":       openai_messages,
+        max_tokens_field: model.max_tokens,
+        "temperature":    model.temperature,
     }
 
     if model.top_p is not None:
@@ -216,9 +126,8 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
     Extract the clean result from an OpenAI-compatible chat completion
     response.
 
-    Shared by :class:`OpenAIModel`, :class:`~models._xai.XAIModel`, and
-    :class:`~models._perplexity.PerplexityModel` (and, via their own
-    request builders, the Kimi/DeepSeek/Qwen models).
+    Shared by the openai, xai and perplexity providers (and, via their own
+    request builders, the kimi/deepseek/qwen providers).
 
     Raises
     ------
@@ -293,7 +202,7 @@ def _build_image_generations_request(
     """
     Build an OpenAI ``/v1/images/generations`` ``(path, body)`` pair.
 
-    Shared by :class:`OpenAIModel` and :class:`~models._xai.XAIModel`.
+    Shared by the openai and xai providers.
 
     The text prompt is extracted from the last user message.  Optional
     ``size`` and ``quality`` values are read from ``output["format"]``.
@@ -372,7 +281,7 @@ def _parse_image_generations_response(response: dict) -> dict:
     Extract the image result from an OpenAI ``/v1/images/generations``
     response.
 
-    Shared by :class:`OpenAIModel` and :class:`~models._xai.XAIModel`.
+    Shared by the openai and xai providers.
 
     Returns a dict with keys ``url``, ``base64``, ``mime_type``, and
     ``revised_prompt`` — consistent with the Google image response format.
@@ -514,92 +423,6 @@ def _parse_responses_api_response(response: dict, output: dict) -> "str | dict":
 
 
 # ---------------------------------------------------------------------------
-# OpenAIModel
+# openai provider
 # ---------------------------------------------------------------------------
 
-class OpenAIModel(Model):
-    """Provider-specific model for the OpenAI API."""
-
-    _ENV_KEY = "OPENAI_API_KEY"
-
-    # ── generation defaults ──────────────────────────────────────────
-    _DEFAULT_TEMPERATURE:   float        = 1.0
-    _DEFAULT_MAX_TOKENS:    int          = 16384
-    _DEFAULT_TOP_P:         float | None = 1.0
-    _DEFAULT_TOP_K:         int   | None = None   # unsupported
-    _DEFAULT_CACHE_CONTROL: bool         = False
-    _DEFAULT_REASONING:     str   | None = None
-
-    # Maps universal reasoning level → OpenAI reasoning_effort value
-    _REASONING_MAP: dict = {"low": "low", "medium": "medium", "high": "high"}
-
-    # ------------------------------------------------------------------
-
-    def _build_client(self, api_key: str, client_options: dict) -> OpenAIClient:
-        """
-        Construct an :class:`~clients.OpenAIClient`.
-
-        Supported *client_options* keys: ``url``, ``timeout``,
-        ``retries``, ``proxy``.
-        """
-        return OpenAIClient(
-            api_key = api_key,
-            url     = client_options.get("url"),
-            timeout = client_options.get("timeout", DEFAULT_TIMEOUT),
-            retries = client_options.get("retries", DEFAULT_RETRIES),
-            proxy   = client_options.get("proxy"),
-        )
-
-    def to_request(self, messages: list, output: dict) -> "tuple[str, dict]":
-        """
-        Translate universal messages into the correct OpenAI request format.
-
-        Routing
-        -------
-        * Models whose name starts with ``"gpt-5"`` are routed to the
-          **Responses API** (``POST /v1/responses``).  These models are not
-          available on Chat Completions and return HTTP 403 if called there.
-        * Image models (``dall-e-*``, ``gpt-image-*``) are routed to the
-          **Images Generations API** (``POST /v1/images/generations``).
-        * All other models use the **Chat Completions API**
-          (``POST /v1/chat/completions``).
-
-        When ``reasoning`` is set the corresponding ``reasoning_effort``
-        value from ``_REASONING_MAP`` is added to Chat Completions requests.
-        o-series models use this to control reasoning depth; GPT models
-        ignore the parameter.
-        """
-        if _should_use_responses_api(self.name):
-            return _build_responses_api_request(self, messages, output)
-
-        if _is_openai_image_model(self.name):
-            return _build_image_generations_request(self, messages, output)
-
-        path, body = _build_openai_compat_request(
-            self, messages, output, "/v1/chat/completions"
-        )
-        if _is_o_series_model(self.name):
-            # o-series models reject temperature/top_p with an API error
-            # rather than ignoring them.
-            body.pop("temperature", None)
-            body.pop("top_p", None)
-        if self.reasoning:
-            effort = self._REASONING_MAP.get(self.reasoning)
-            if effort:
-                body["reasoning_effort"] = effort
-        return path, body
-
-    def from_response(self, response: dict, output: dict) -> "str | dict":
-        """
-        Extract the clean result from an OpenAI response.
-
-        Detects the API automatically:
-        * ``"data"``    present → Images Generations response
-        * ``"choices"`` present → Chat Completions response
-        * ``"output"``  present → Responses API response
-        """
-        if "data" in response:
-            return _parse_image_generations_response(response)
-        if "choices" in response:
-            return _parse_openai_compat_response(response, output)
-        return _parse_responses_api_response(response, output)

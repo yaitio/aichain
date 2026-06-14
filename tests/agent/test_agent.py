@@ -29,7 +29,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import OpenAIModel
+from models import Model
 from agent  import Agent, AgentMemory, AgentResult, FileBackend, InMemoryBackend
 from tools._base import Tool, ToolResult
 
@@ -52,17 +52,20 @@ class EchoTool(Tool):
         return f"echo: {text}"
 
 
-def _mock_client(*responses: dict) -> MagicMock:
+def _stub_transport(model, *responses: dict):
     """
-    Return a mock client whose ``_post`` returns each *response* dict in order,
-    JSON-encoded as bytes.  Extra calls return the last response forever.
+    Stub only the TRANSPORT on *model*'s real family client; ``_post`` returns
+    each *response* dict in order (last repeats forever).  ``build_request`` /
+    ``parse_response`` stay real — the format now lives in the client, so
+    replacing the whole client would also stub out the format under test.
     """
-    encoded = [json.dumps(r).encode() for r in responses]
-    client  = MagicMock()
-    client._auth_headers.return_value = {"Authorization": "Bearer test"}
+    encoded = [json.dumps(r).encode() for r in responses] or [b"{}"]
+    c = model.client
+    c._auth_headers = MagicMock(return_value={"Authorization": "Bearer test"})
+    c._get = MagicMock(return_value=b'{"data": []}')
 
     if len(encoded) == 1:
-        client._post.return_value = encoded[0]
+        c._post = MagicMock(return_value=encoded[0])
     else:
         # Cycle through responses; repeat last if exhausted
         call_count = [0]
@@ -70,9 +73,9 @@ def _mock_client(*responses: dict) -> MagicMock:
             idx = min(call_count[0], len(encoded) - 1)
             call_count[0] += 1
             return encoded[idx]
-        client._post.side_effect = _side_effect
+        c._post = MagicMock(side_effect=_side_effect)
 
-    return client
+    return c
 
 
 def _oai(text: str) -> dict:
@@ -108,10 +111,10 @@ def _reflect_resp(
     return _oai(json.dumps(payload))
 
 
-def _make_model(*responses: dict) -> OpenAIModel:
-    """Create an OpenAIModel with a mocked client returning *responses* in order."""
-    model = OpenAIModel("gpt-4o")
-    model.client = _mock_client(*responses)
+def _make_model(*responses: dict) -> Model:
+    """Create an Model with a mocked client returning *responses* in order."""
+    model = Model("gpt-4o")
+    model.client = _stub_transport(model, *responses)
     return model
 
 
@@ -309,9 +312,9 @@ class TestAgentResult(unittest.TestCase):
 
 class TestAgentInit(unittest.TestCase):
 
-    def _model(self) -> OpenAIModel:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+    def _model(self) -> Model:
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return m
 
     def test_basic_construction(self):
@@ -385,32 +388,32 @@ class TestAgentInit(unittest.TestCase):
 class TestAgentRepr(unittest.TestCase):
 
     def test_repr_contains_mode(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         r = repr(Agent(orchestrator=m, mode="agile"))
         self.assertIn("agile", r)
 
     def test_repr_contains_orchestrator_name(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         r = repr(Agent(orchestrator=m))
         self.assertIn("gpt-4o", r)
 
     def test_repr_contains_max_steps(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         r = repr(Agent(orchestrator=m, max_steps=5))
         self.assertIn("5", r)
 
     def test_repr_includes_allow_spawn(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         r = repr(Agent(orchestrator=m, allow_spawn=True))
         self.assertIn("allow_spawn=True", r)
 
     def test_repr_includes_truncated_persona(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         r = repr(Agent(orchestrator=m, persona="A" * 80))
         self.assertIn("persona=", r)
 
@@ -422,8 +425,8 @@ class TestAgentRepr(unittest.TestCase):
 class TestAgentParseJson(unittest.TestCase):
 
     def _agent(self) -> Agent:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m)
 
     def test_parses_direct_json(self):
@@ -494,8 +497,8 @@ class TestAgentSanitiseKey(unittest.TestCase):
 class TestAgentExtractTokens(unittest.TestCase):
 
     def _agent(self) -> Agent:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m)
 
     def test_openai_style_usage(self):
@@ -571,8 +574,8 @@ class TestAgentIsImportant(unittest.TestCase):
 class TestAgentHistorySummary(unittest.TestCase):
 
     def _agent(self) -> Agent:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m)
 
     def _rec(self, step_idx: int, decision: str = "continue") -> dict:
@@ -622,8 +625,8 @@ class TestAgentHistorySummary(unittest.TestCase):
 class TestAgentExtractFinalOutput(unittest.TestCase):
 
     def _agent(self) -> Agent:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m)
 
     def _rec(self, output, exec_error=None) -> dict:
@@ -657,8 +660,8 @@ class TestAgentExtractFinalOutput(unittest.TestCase):
 class TestAgentExecuteActionTool(unittest.TestCase):
 
     def _agent(self, tool: Tool) -> Agent:
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m, tools=[tool])
 
     def test_tool_called_with_kwargs(self):
@@ -704,8 +707,8 @@ class TestAgentExecuteActionTool(unittest.TestCase):
 class TestAgentExecuteActionSkill(unittest.TestCase):
 
     def test_skill_returns_model_output(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("skill output"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("skill output"))
 
         agent  = Agent(orchestrator=m)
         action = {
@@ -721,8 +724,8 @@ class TestAgentExecuteActionSkill(unittest.TestCase):
         self.assertEqual(tokens, 0)  # mock returns no usage field
 
     def test_skill_unknown_model_falls_back_to_first_executor(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("fallback"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("fallback"))
 
         agent  = Agent(orchestrator=m)
         action = {
@@ -733,8 +736,8 @@ class TestAgentExecuteActionSkill(unittest.TestCase):
         self.assertEqual(result, "fallback")
 
     def test_unknown_action_type_raises(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         agent  = Agent(orchestrator=m)
         with self.assertRaises(ValueError):
             agent._execute_action({"type": "magic"}, {})
@@ -846,10 +849,9 @@ class TestAgentRun(unittest.TestCase):
 
     def test_run_always_returns_agent_result(self):
         """Even when the orchestrator raises an exception, run() returns AgentResult."""
-        m = OpenAIModel("gpt-4o")
-        m.client = MagicMock()
-        m.client._auth_headers.return_value = {}
-        m.client._post.side_effect = RuntimeError("network down")
+        m = Model("gpt-4o")
+        m.client._auth_headers = MagicMock(return_value={})
+        m.client._post = MagicMock(side_effect=RuntimeError("network down"))
 
         agent  = Agent(orchestrator=m)
         result = agent.run("task")
@@ -939,8 +941,8 @@ class TestAgentSpawn(unittest.TestCase):
 
     def test_spawn_depth_limit_blocks_nesting(self):
         """An agent at max depth returns a blocked message, does not recurse."""
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         agent = Agent(
             orchestrator=m,
             _depth=5,
@@ -957,8 +959,8 @@ class TestAgentSpawn(unittest.TestCase):
         reflect = _reflect_resp(decision="final_answer", final_answer="child done")
 
         # Parent orchestrator serves parent run() — won't be used here directly
-        parent_m = OpenAIModel("gpt-4o")
-        parent_m.client = _mock_client(
+        parent_m = Model("gpt-4o")
+        parent_m.client = _stub_transport(parent_m, 
             _plan_resp(plan), _action_resp(action), reflect
         )
 
@@ -975,8 +977,8 @@ class TestAgentSpawn(unittest.TestCase):
 
     def test_spawn_failure_returns_subagent_failed_prefix(self):
         """A failing child agent returns '[subagent failed] …'."""
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_plan_resp([]))  # empty plan → failure
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _plan_resp([]))  # empty plan → failure
 
         parent = Agent(orchestrator=m)
         result = parent.spawn("fail task")
@@ -991,8 +993,8 @@ class TestSpawnTool(unittest.TestCase):
 
     def test_spawn_tool_delegates_to_agent_spawn(self):
         """_SpawnTool.run() calls Agent.spawn() with the right arguments."""
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         agent = Agent(orchestrator=m, allow_spawn=True)
 
         spawn_tool = agent._tool_map["spawn_agent"]
@@ -1005,8 +1007,8 @@ class TestSpawnTool(unittest.TestCase):
         self.assertEqual(result, "mocked spawn result")
 
     def test_spawn_tool_name_and_description(self):
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         agent = Agent(orchestrator=m, allow_spawn=True)
         st = agent._tool_map["spawn_agent"]
         self.assertEqual(st.name, "spawn_agent")
@@ -1022,8 +1024,8 @@ class TestSafeFormatMap(unittest.TestCase):
 
     def test_missing_key_left_as_literal(self):
         """Unknown {keys} in prompts are left as-is rather than raising."""
-        m = OpenAIModel("gpt-4o")
-        m.client = _mock_client(_oai("ok"))
+        m = Model("gpt-4o")
+        m.client = _stub_transport(m, _oai("ok"))
         agent  = Agent(orchestrator=m)
         action = {
             "type":          "skill",

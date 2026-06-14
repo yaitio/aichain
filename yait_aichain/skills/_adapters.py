@@ -4,10 +4,12 @@ skills._adapters
 
 Provider-agnostic format utilities used by the Skill layer.
 
-The actual provider-specific serialisation / deserialisation logic lives
-inside each model class as ``to_request()`` and ``from_response()``
-methods.  This module only contains the pieces that are not tied to any
-single provider:
+The actual provider-specific serialisation / deserialisation lives in the
+family clients (``clients/_families/*``), reached via the model's
+``to_request()`` / ``from_response()``.  This module only contains the
+pieces that are not tied to any single provider — validation and
+normalisation of *our* universal format, which only the Skill layer needs
+(the Agent builds the format by hand):
 
 * :func:`normalize_input`  — fill in implicit defaults in an input dict
 * :func:`normalize_output` — fill in implicit defaults in an output dict

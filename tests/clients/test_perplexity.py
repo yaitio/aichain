@@ -22,7 +22,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._perplexity import PerplexityClient, _KNOWN_MODELS
+from clients._families.perplexity import PerplexityClient as _Family, _KNOWN_MODELS
+from models._data import PROVIDERS as _PROVIDERS
+def PerplexityClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['perplexity'], **kw)
 
 _KEY  = os.getenv("PERPLEXITY_API_KEY")
 _FAKE = "pplx-invalid-key-for-testing-0000000000000000000000000000000000000000"

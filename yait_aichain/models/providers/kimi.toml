@@ -1,0 +1,38 @@
+# kimi — provider settings + its models (data tier)
+
+[provider]
+key      = "kimi"
+client   = "openai"
+base_url = "https://api.moonshot.ai"
+env_key  = "MOONSHOT_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+
+chat_path        = "/v1/chat/completions"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 32768
+top_p = 0.95
+
+[provider.reasoning_map]
+low = "enabled"
+medium = "enabled"
+high = "enabled"
+
+[models."kimi-k2-0905-preview"]
+caps  = ["text-to-text"]
+price = { input = 0.6, output = 2.5 }
+
+[models."kimi-k2-thinking"]
+caps  = ["text-to-text"]
+
+[models."kimi-k2-thinking-turbo"]
+caps  = ["text-to-text"]
+
+[models."kimi-k2-turbo-preview"]
+caps  = ["text-to-text"]
+
+[models."kimi-k2.5"]
+caps  = ["image-to-text", "text-to-text"]

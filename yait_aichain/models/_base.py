@@ -39,8 +39,44 @@ import os
 import re
 from typing import TYPE_CHECKING
 
+from ._data import PROVIDERS
+
 if TYPE_CHECKING:
-    from clients._base import BaseClient
+    from ..clients._base import BaseClient
+
+
+# ---------------------------------------------------------------------------
+# Internal: build the API-family client for a provider (data-driven)
+# ---------------------------------------------------------------------------
+
+def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseClient":
+    """
+    Construct the family client that owns *provider*'s wire format + transport.
+
+    The provider's data file names its client family (``[provider].client``):
+    one of ``openai`` / ``anthropic`` / ``google`` / ``perplexity`` / ``qwen``.
+    The client receives the whole provider data dict, so it knows its
+    endpoints, base URL and quirk branches; per-call model settings arrive in
+    ``params`` later.
+    """
+    data  = PROVIDERS[provider]
+    ctype = data["provider"]["client"]
+
+    # Lazy imports keep module load cheap and avoid import cycles.
+    from ..clients._families.openai     import OpenAIClient
+    from ..clients._families.anthropic  import AnthropicClient
+    from ..clients._families.google     import GoogleClient
+    from ..clients._families.perplexity import PerplexityClient
+    from ..clients._families.qwen       import QwenClient
+
+    family = {
+        "openai":     OpenAIClient,
+        "anthropic":  AnthropicClient,
+        "google":     GoogleClient,
+        "perplexity": PerplexityClient,
+        "qwen":       QwenClient,
+    }[ctype]
+    return family(api_key, data=data, **client_options)
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +144,14 @@ def _resolve_provider(name: str) -> str:
 
 class Model:
     """
-    Factory and base class for all provider-specific model instances.
+    A configured model: provider resolved from the name, settings from data,
+    format + transport delegated to the matching family client.
 
-    ``Model(name, options, client_options, api_key)`` inspects *name*,
-    constructs the correct provider subclass, and returns a fully-
-    configured instance — including an attached, ready-to-use client.
+    ``Model(name, options, client_options, api_key)`` resolves *name* to a
+    provider (via the ``providers/`` data), merges that provider's default
+    generation parameters, and attaches a ready-to-use family client.  There
+    is a single ``Model`` class — no per-provider subclasses; the provider is
+    available as ``model._provider``.
 
     Parameters
     ----------
@@ -136,8 +175,9 @@ class Model:
         ================  ========  =======================================
 
         **reasoning** accepts ``None``, ``"low"``, ``"medium"``, or
-        ``"high"``.  Each provider class translates the universal level to
-        its own native format via ``_REASONING_MAP``:
+        ``"high"``.  Each provider's family client translates the universal
+        level to its own native format via the provider's ``reasoning_map``
+        data:
 
         * **Anthropic**  — maps to ``{"type": "enabled", "budget_tokens": N}``
           (``low`` → 4 000, ``medium`` → 10 000, ``high`` → 20 000 tokens).
@@ -181,9 +221,9 @@ class Model:
         ===========  ========================  ==========================
 
     api_key : str | None, optional
-        Provider API key.  When omitted the class reads from the
-        environment variable named in ``_ENV_KEY`` (e.g.
-        ``OPENAI_API_KEY``).  Raises ``ValueError`` if neither is found.
+        Provider API key.  When omitted it is read from the provider's
+        environment variable (e.g. ``OPENAI_API_KEY``), named in the provider
+        data.  Raises ``ValueError`` if neither is found.
 
     Attributes
     ----------
@@ -194,13 +234,13 @@ class Model:
     top_k         : int | None
     cache_control : bool
     reasoning     : str | None  (None | "low" | "medium" | "high")
-    client        : BaseClient subclass (ready to use)
+    client        : family client (ready to use)
 
     Examples
     --------
     >>> m = Model("gpt-4o")
-    >>> type(m)
-    <class 'models._openai.OpenAIModel'>
+    >>> m._provider
+    'openai'
 
     >>> m = Model("claude-sonnet-4-5", options={"temperature": 0.5, "reasoning": "high"})
     >>> m.temperature
@@ -212,66 +252,7 @@ class Model:
     """
 
     # ------------------------------------------------------------------
-    # Class-level defaults — overridden in every provider subclass.
-    # These serve as the last-resort fallback; they should never be used
-    # directly because BaseModel is never instantiated on its own.
-    # ------------------------------------------------------------------
-
-    #: Environment variable name for the provider API key.
-    _ENV_KEY: str = ""
-
-    _DEFAULT_TEMPERATURE:  float        = 1.0
-    _DEFAULT_MAX_TOKENS:   int          = 4096
-    _DEFAULT_TOP_P:        float | None = None
-    _DEFAULT_TOP_K:        int   | None = None
-    _DEFAULT_CACHE_CONTROL: bool        = False
-    _DEFAULT_REASONING:    str   | None = None
-
-    #: Maps universal reasoning levels to provider-native values.
-    #: Overridden in each provider subclass; empty dict = no reasoning support.
-    _REASONING_MAP: dict = {}
-
-    # ------------------------------------------------------------------
-    # Factory — __new__
-    # ------------------------------------------------------------------
-
-    def __new__(
-        cls,
-        name: str,
-        options:        dict | None = None,
-        client_options: dict | None = None,
-        api_key:        str  | None = None,
-    ):
-        if cls is not Model:
-            # Called as a subclass constructor (e.g. OpenAIModel("gpt-4o")).
-            return object.__new__(cls)
-
-        # Lazy imports avoid circular-reference issues at module load time.
-        from ._openai     import OpenAIModel
-        from ._anthropic  import AnthropicModel
-        from ._google     import GoogleAIModel
-        from ._xai        import XAIModel
-        from ._perplexity import PerplexityModel
-        from ._kimi       import KimiModel
-        from ._deepseek   import DeepSeekModel
-        from ._qwen       import QwenModel
-
-        _MAP = {
-            "openai":     OpenAIModel,
-            "anthropic":  AnthropicModel,
-            "google":     GoogleAIModel,
-            "xai":        XAIModel,
-            "perplexity": PerplexityModel,
-            "kimi":       KimiModel,
-            "deepseek":   DeepSeekModel,
-            "qwen":       QwenModel,
-        }
-
-        provider = _resolve_provider(name)
-        return object.__new__(_MAP[provider])
-
-    # ------------------------------------------------------------------
-    # Shared initialiser — inherited by all provider subclasses
+    # Data-driven initialiser
     # ------------------------------------------------------------------
 
     def __init__(
@@ -281,29 +262,33 @@ class Model:
         client_options: dict | None = None,
         api_key:        str  | None = None,
     ) -> None:
-        # Strip an explicit "provider/model" prefix so the wire name is clean
-        # (the prefix only steers provider selection, never reaches the API).
-        self.name = _split_provider_prefix(name)[1]
+        # The provider is resolved from the (possibly prefixed) name; the wire
+        # name has any "provider/" prefix stripped (it only steers selection).
+        self._provider = _resolve_provider(name)
+        self.name      = _split_provider_prefix(name)[1]
 
-        # ── resolve API key ──────────────────────────────────────────
-        resolved_key = api_key or os.getenv(self._ENV_KEY)
+        prov     = PROVIDERS[self._provider]["provider"]
+        defaults = prov["defaults"]
+
+        # ── resolve API key (env var named in the provider data) ──────
+        resolved_key = api_key or os.getenv(prov["env_key"])
         if not resolved_key:
             raise ValueError(
-                f"No API key found for {type(self).__name__}. "
-                f"Pass api_key= or set the {self._ENV_KEY!r} environment variable."
+                f"No API key found for the {self._provider!r} provider. "
+                f"Pass api_key= or set the {prov['env_key']!r} environment variable."
             )
         # Do not store the raw key as a public attribute; keep it private.
         self._api_key = resolved_key
 
-        # ── merge options with provider defaults ──────────────────────
+        # ── merge options with provider defaults (from data) ──────────
         opts = options or {}
-        self.temperature   = opts.get("temperature",   self._DEFAULT_TEMPERATURE)
-        self.max_tokens    = opts.get("max_tokens",    self._DEFAULT_MAX_TOKENS)
-        self.top_p         = opts.get("top_p",         self._DEFAULT_TOP_P)
-        self.top_k         = opts.get("top_k",         self._DEFAULT_TOP_K)
-        self.cache_control = opts.get("cache_control", self._DEFAULT_CACHE_CONTROL)
+        self.temperature   = opts.get("temperature",   defaults.get("temperature"))
+        self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
+        self.top_p         = opts.get("top_p",         defaults.get("top_p"))
+        self.top_k         = opts.get("top_k",         defaults.get("top_k"))
+        self.cache_control = opts.get("cache_control", False)
 
-        reasoning = opts.get("reasoning", self._DEFAULT_REASONING)
+        reasoning = opts.get("reasoning", None)
         if reasoning not in (None, "low", "medium", "high"):
             raise ValueError(
                 f"reasoning must be None, 'low', 'medium', or 'high'; "
@@ -311,77 +296,38 @@ class Model:
             )
         self.reasoning = reasoning
 
-        # ── build the provider HTTP client ────────────────────────────
-        self.client = self._build_client(resolved_key, client_options or {})
+        # ── build the family client (format + transport) ──────────────
+        self.client = _build_client(self._provider, resolved_key, client_options or {})
 
     # ------------------------------------------------------------------
-    # Abstract — each provider subclass must implement these
+    # Format — thin delegation to the family client
     # ------------------------------------------------------------------
 
-    def _build_client(self, api_key: str, client_options: dict) -> "BaseClient":
-        """
-        Construct and return the provider-specific HTTP client.
-
-        Parameters
-        ----------
-        api_key        : Resolved provider API key.
-        client_options : Caller-supplied overrides (url, timeout, retries,
-                         proxy).
-
-        Must be implemented by every subclass.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement _build_client()"
-        )
+    def _params(self) -> dict:
+        """Per-call model settings handed to the client's ``build_request``."""
+        return {
+            "name":        self.name,
+            "temperature": self.temperature,
+            "max_tokens":  self.max_tokens,
+            "top_p":       self.top_p,
+            "top_k":       self.top_k,
+            "reasoning":   self.reasoning,
+        }
 
     def to_request(self, messages: list, output: dict) -> "tuple[str, dict]":
         """
-        Translate substituted universal *messages* and *output* spec into the
-        provider's native ``(path, body)`` pair.
-
-        Parameters
-        ----------
-        messages : list
-            Substituted universal message list (variables already filled in).
-        output : dict
-            Universal output spec, e.g.
-            ``{"modalities": ["text"], "format": {"type": "text"}}``.
-
-        Returns
-        -------
-        tuple[str, dict]
-            ``(path, body)`` ready to pass to ``client._post()``.
-
-        Must be implemented by every subclass.
+        Translate substituted universal *messages* + *output* spec into the
+        provider's native ``(path, body)`` pair, by delegating to the family
+        client that owns this provider's wire format.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement to_request()"
-        )
+        return self.client.build_request(messages, output, self._params())
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
         """
-        Extract the clean result from a raw provider API response.
-
-        Parameters
-        ----------
-        response : dict
-            Parsed JSON response body from the provider.
-        output : dict
-            Universal output spec used when building the request.
-
-        Returns
-        -------
-        str
-            When ``output["format"]["type"] == "text"``.
-        dict
-            When ``output["format"]["type"]`` is ``"json"`` or
-            ``"json_schema"``.
-
-        Must be implemented by every subclass.
+        Extract the clean result (str for text, dict for json / image) from a
+        raw provider response, by delegating to the family client.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement from_response()"
-        )
+        return self.client.parse_response(response, output)
 
     # ------------------------------------------------------------------
     # Dunder helpers
@@ -402,3 +348,104 @@ class Model:
         if self.reasoning is not None:
             parts.append(f"reasoning={self.reasoning!r}")
         return f"{type(self).__name__}({', '.join(parts)})"
+
+
+# ---------------------------------------------------------------------------
+# Registry query — data-driven (capabilities live in providers/*.toml)
+# ---------------------------------------------------------------------------
+#
+# Each model entry in the provider data carries a ``caps`` list (the tasks it
+# supports).  These functions read that data; there is no separate registry.
+
+#: Canonical task vocabulary.
+TASKS: tuple[str, ...] = ("text-to-text", "text-to-image", "image-to-text")
+
+
+def _check_task(task: "str | None") -> None:
+    if task is not None and task not in TASKS:
+        raise ValueError(f"Unknown task {task!r}. Valid tasks: {list(TASKS)}")
+
+
+def _check_provider(provider: "str | None") -> None:
+    if provider is not None and provider not in PROVIDERS:
+        raise ValueError(
+            f"Unknown provider {provider!r}. Valid providers: {list(PROVIDERS)}"
+        )
+
+
+def models(provider: "str | None" = None, task: "str | None" = None) -> list[str]:
+    """Return model names, optionally filtered by *provider* and/or *task*."""
+    _check_provider(provider)
+    _check_task(task)
+    result: set[str] = set()
+    for prov, data in PROVIDERS.items():
+        if provider is not None and prov != provider:
+            continue
+        for name, mdl in data.get("models", {}).items():
+            if task is None or task in mdl.get("caps", []):
+                result.add(name)
+    return sorted(result)
+
+
+def providers(task: "str | None" = None) -> list[str]:
+    """Return providers with at least one model (optionally supporting *task*)."""
+    _check_task(task)
+    out: list[str] = []
+    for prov, data in PROVIDERS.items():
+        ms = data.get("models", {})
+        if not ms:
+            continue
+        if task is None or any(task in m.get("caps", []) for m in ms.values()):
+            out.append(prov)
+    return out
+
+
+def tasks(model_name: str) -> list[str]:
+    """Return the tasks supported by *model_name* (empty list if unknown)."""
+    found: set[str] = set()
+    for data in PROVIDERS.values():
+        mdl = data.get("models", {}).get(model_name)
+        if mdl is not None:
+            found.update(mdl.get("caps", []))
+    return sorted(found)
+
+
+def is_supported(model_name: str, task: "str | None" = None) -> bool:
+    """Return True when *model_name* is known (and supports *task* if given)."""
+    _check_task(task)
+    for data in PROVIDERS.values():
+        mdl = data.get("models", {}).get(model_name)
+        if mdl is not None and (task is None or task in mdl.get("caps", [])):
+            return True
+    return False
+
+
+def refresh(provider: str, api_key: "str | None" = None, client=None) -> dict:
+    """
+    Diff the data registry against the provider's *live* model list.
+
+    Calls the provider's ``list_models()`` and compares it to what the data
+    knows, surfacing drift.  The data is **not** mutated.
+    """
+    _check_provider(provider)
+    if provider is None:
+        raise ValueError("provider is required")
+    if client is None:
+        env_key = PROVIDERS[provider]["provider"]["env_key"]
+        key = api_key or os.getenv(env_key)
+        if not key:
+            raise ValueError(
+                f"No API key for provider {provider!r}. "
+                f"Set {env_key} or pass api_key=/client=."
+            )
+        client = _build_client(provider, key, {})
+
+    live       = set(client.list_models())
+    registered = set(models(provider=provider))
+    return {
+        "provider":   provider,
+        "live":       sorted(live),
+        "registered": sorted(registered),
+        "new":        sorted(live - registered),
+        "removed":    sorted(registered - live),
+    }

@@ -1,0 +1,30 @@
+# deepseek — provider settings + its models (data tier)
+
+[provider]
+key      = "deepseek"
+client   = "openai"
+base_url = "https://api.deepseek.com"
+env_key  = "DEEPSEEK_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/models"
+
+chat_path        = "/v1/chat/completions"
+
+[provider.defaults]
+temperature = 0.0
+max_tokens  = 4096
+top_p = 1.0
+
+[provider.reasoning_map]
+low = "deepseek-chat"
+medium = "deepseek-chat"
+high = "deepseek-reasoner"
+
+[models."deepseek-chat"]
+caps  = ["text-to-text"]
+price = { input = 0.27, output = 1.1 }
+
+[models."deepseek-reasoner"]
+caps  = ["text-to-text"]
+price = { input = 0.55, output = 2.19 }

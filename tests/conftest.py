@@ -5,7 +5,7 @@ The test suite was written when the library's sub-packages lived at the
 repository top level (``models/``, ``skills/``, ``chain/`` ...).  After the
 code moved into the ``yait_aichain`` package those imports broke.  Until the
 tests are migrated to ``yait_aichain.*`` imports, alias the sub-packages —
-and their submodules — so ``from models import OpenAIModel`` and
+and their submodules — so ``from models import Model
 ``from skills._adapters import substitute`` keep working.
 
 Submodules must be aliased under their canonical ``yait_aichain.*`` names:

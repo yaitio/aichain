@@ -44,11 +44,11 @@ aichain is a gateway: one interface in, any AI provider out. The five building b
 A **Model** wraps one provider's API. You create one by name — the library detects the provider automatically:
 
 ```python
-Model("gpt-4o")            # → OpenAIModel
-Model("claude-sonnet-4-6") # → AnthropicModel
-Model("gemini-2.0-flash")  # → GoogleAIModel
-Model("grok-3")            # → XAIModel
-Model("sonar-pro")         # → PerplexityModel
+Model("gpt-4o")            # → provider "openai"
+Model("claude-sonnet-4-6") # → provider "anthropic"
+Model("gemini-2.0-flash")  # → provider "google"
+Model("grok-3")            # → provider "xai"
+Model("sonar-pro")         # → provider "perplexity"
 ```
 
 A Model does exactly two things: format a request and parse a response. It knows nothing about prompts, pipelines, or tools. That separation is intentional — you can swap the model in any Skill or Chain without touching the logic around it.

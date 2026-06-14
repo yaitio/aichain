@@ -112,6 +112,38 @@ class BaseClient:
         )
 
     # ------------------------------------------------------------------
+    # Format — must be overridden by each API-family client
+    # ------------------------------------------------------------------
+
+    def build_request(
+        self, messages: list, output: dict, params: dict
+    ) -> "tuple[str, dict]":
+        """
+        Translate our universal *messages* + *output* spec + model *params*
+        into the provider's native ``(path, body)`` pair.
+
+        ``params`` carries the model-level settings the family needs:
+        ``{name, temperature, max_tokens, top_p, top_k, reasoning}``.  The
+        client is stateless about the model — everything comes in here.
+
+        Abstract: each family client (openai / anthropic / google / …)
+        implements its own wire format.  Not a passthrough — an unimplemented
+        family raises here rather than sending our format and getting a 400.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement build_request()"
+        )
+
+    def parse_response(self, response: dict, output: dict) -> "str | dict":
+        """
+        Translate the provider's raw response into our clean result
+        (str for text, dict for json / image).  Abstract — see build_request.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement parse_response()"
+        )
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 

@@ -1,0 +1,52 @@
+# xai — provider settings + its models (data tier)
+
+[provider]
+key      = "xai"
+client   = "openai"
+base_url = "https://api.x.ai"
+env_key  = "XAI_API_KEY"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/v1/models"
+
+chat_path        = "/v1/chat/completions"
+images_path      = "/v1/images/generations"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p = 1.0
+
+[provider.reasoning_map]
+low = "low"
+medium = "high"
+high = "high"
+
+[models."grok-3"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 3.0, output = 15.0 }
+
+[models."grok-3-fast"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."grok-3-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.3, output = 0.5 }
+
+[models."grok-3-mini-fast"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."grok-4-0709"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."grok-4-1-fast-reasoning"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."grok-4-fast-reasoning"]
+caps  = ["image-to-text", "text-to-text"]
+
+[models."grok-imagine-image"]
+caps  = ["text-to-image"]
+
+[models."grok-imagine-image-pro"]
+caps  = ["text-to-image"]

@@ -30,7 +30,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model, OpenAIModel, XAIModel, GoogleAIModel, QwenModel
+from models import Model
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -79,19 +79,19 @@ def _google_image_response(b64: str = _TINY_PNG_B64) -> dict:
 class TestImageModelFactory(unittest.TestCase):
 
     def test_dalle3_routes_to_openai(self):
-        self.assertIsInstance(Model("dall-e-3"), OpenAIModel)
+        self.assertEqual(Model("dall-e-3")._provider, "openai")
 
     def test_gpt_image_routes_to_openai(self):
-        self.assertIsInstance(Model("gpt-image-1"), OpenAIModel)
+        self.assertEqual(Model("gpt-image-1")._provider, "openai")
 
     def test_grok_imagine_routes_to_xai(self):
-        self.assertIsInstance(Model("grok-imagine-image-pro"), XAIModel)
+        self.assertEqual(Model("grok-imagine-image-pro")._provider, "xai")
 
     def test_gemini_image_routes_to_google(self):
-        self.assertIsInstance(Model("gemini-3.1-flash-image-preview"), GoogleAIModel)
+        self.assertEqual(Model("gemini-3.1-flash-image-preview")._provider, "google")
 
     def test_wanx_routes_to_qwen(self):
-        self.assertIsInstance(Model("wanx2.1-t2i-turbo"), QwenModel)
+        self.assertEqual(Model("wanx2.1-t2i-turbo")._provider, "qwen")
 
 
 # ---------------------------------------------------------------------------
@@ -101,50 +101,50 @@ class TestImageModelFactory(unittest.TestCase):
 class TestOpenAIImageToRequest(unittest.TestCase):
 
     def test_dalle3_path(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(path, "/v1/images/generations")
 
     def test_gpt_image_path(self):
-        model = OpenAIModel("gpt-image-1")
+        model = Model("gpt-image-1")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(path, "/v1/images/generations")
 
     def test_body_has_model_name(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body["model"], "dall-e-3")
 
     def test_body_has_prompt(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertIn("prompt", body)
         self.assertIn("apple", body["prompt"].lower())
 
     def test_body_has_n_equals_1(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body["n"], 1)
 
     def test_dalle3_requests_b64_json(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body.get("response_format"), "b64_json")
 
     def test_gpt_image_omits_response_format(self):
         # gpt-image-* always returns b64_json natively and rejects the param.
-        model = OpenAIModel("gpt-image-1")
+        model = Model("gpt-image-1")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertNotIn("response_format", body)
 
     def test_size_forwarded_when_set(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         output = {"modalities": ["image"], "format": {"type": "image", "size": "1024x1024"}}
         _, body = model.to_request(_PROMPT_MSG, output)
         self.assertEqual(body["size"], "1024x1024")
 
     def test_size_absent_when_not_set(self):
-        model = OpenAIModel("dall-e-3")
+        model = Model("dall-e-3")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertNotIn("size", body)
 
@@ -156,28 +156,28 @@ class TestOpenAIImageToRequest(unittest.TestCase):
 class TestXAIImageToRequest(unittest.TestCase):
 
     def test_path(self):
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(path, "/v1/images/generations")
 
     def test_body_has_model_name(self):
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body["model"], "grok-imagine-image")
 
     def test_body_has_prompt(self):
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertIn("prompt", body)
 
     def test_body_requests_b64_json(self):
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body.get("response_format"), "b64_json")
 
     def test_xai_image_does_not_include_size(self):
         # xAI grok-imagine models do not accept size; should be absent.
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertNotIn("size", body)
 
@@ -189,19 +189,19 @@ class TestXAIImageToRequest(unittest.TestCase):
 class TestGoogleImageToRequest(unittest.TestCase):
 
     def test_path_contains_model_and_generate_content(self):
-        model = GoogleAIModel("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image-preview")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertIn("gemini-3.1-flash-image-preview", path)
         self.assertIn("generateContent", path)
 
     def test_body_has_response_modalities_image(self):
-        model = GoogleAIModel("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image-preview")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         mods = body["generationConfig"].get("responseModalities", [])
         self.assertIn("IMAGE", mods)
 
     def test_text_plus_image_modality_includes_text(self):
-        model = GoogleAIModel("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image-preview")
         output = {"modalities": ["text", "image"], "format": {"type": "image"}}
         _, body = model.to_request(_PROMPT_MSG, output)
         mods = body["generationConfig"].get("responseModalities", [])
@@ -216,17 +216,17 @@ class TestGoogleImageToRequest(unittest.TestCase):
 class TestQwenImageToRequest(unittest.TestCase):
 
     def test_wanx_path(self):
-        model = QwenModel("wanx2.1-t2i-turbo")
+        model = Model("wanx2.1-t2i-turbo")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(path, "/compatible-mode/v1/images/generations")
 
     def test_body_has_model_name(self):
-        model = QwenModel("wanx2.1-t2i-turbo")
+        model = Model("wanx2.1-t2i-turbo")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertEqual(body["model"], "wanx2.1-t2i-turbo")
 
     def test_body_has_prompt(self):
-        model = QwenModel("wanx2.1-t2i-turbo")
+        model = Model("wanx2.1-t2i-turbo")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         self.assertIn("prompt", body)
 
@@ -238,7 +238,7 @@ class TestQwenImageToRequest(unittest.TestCase):
 class TestOpenAIImageFromResponse(unittest.TestCase):
 
     def _model(self):
-        return OpenAIModel("dall-e-3")
+        return Model("dall-e-3")
 
     def test_returns_dict(self):
         result = self._model().from_response(_openai_image_response(), _IMAGE_OUTPUT)
@@ -262,7 +262,7 @@ class TestOpenAIImageFromResponse(unittest.TestCase):
         self.assertEqual(result["mime_type"], "image/png")
 
     def test_xai_image_from_response(self):
-        model = XAIModel("grok-imagine-image")
+        model = Model("grok-imagine-image")
         result = model.from_response(_openai_image_response(), _IMAGE_OUTPUT)
         self.assertIsInstance(result, dict)
         self.assertIn("base64", result)
@@ -275,7 +275,7 @@ class TestOpenAIImageFromResponse(unittest.TestCase):
 class TestGoogleImageFromResponse(unittest.TestCase):
 
     def setUp(self):
-        self.model = GoogleAIModel("gemini-3.1-flash-image-preview")
+        self.model = Model("gemini-3.1-flash-image-preview")
         self._output = {"modalities": ["image"], "format": {"type": "image"}}
 
     def test_returns_dict(self):
@@ -311,7 +311,7 @@ class TestGoogleImageFromResponse(unittest.TestCase):
 class TestQwenImageFromResponse(unittest.TestCase):
 
     def test_returns_dict_with_required_keys(self):
-        model = QwenModel("wanx2.1-t2i-turbo")
+        model = Model("wanx2.1-t2i-turbo")
         resp  = _openai_image_response(_TINY_PNG_B64)
         result = model.from_response(resp, _IMAGE_OUTPUT)
         self.assertIsInstance(result, dict)

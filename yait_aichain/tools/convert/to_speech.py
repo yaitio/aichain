@@ -551,7 +551,7 @@ class ttsQwen(convertToSpeech):
         )
 
     def _base_url(self) -> str:
-        from clients._qwen import resolve_qwen_base_url
+        from clients._families.qwen import resolve_qwen_base_url
         return resolve_qwen_base_url(self._region)
 
     def run(self, input: str, options: dict | None = None) -> str:
@@ -584,7 +584,7 @@ class ttsQwen(convertToSpeech):
 
         # Override region from options if provided
         if region and region != self._region:
-            from clients._qwen import resolve_qwen_base_url
+            from clients._families.qwen import resolve_qwen_base_url
             base_url = resolve_qwen_base_url(region)
         else:
             base_url = self._base_url()

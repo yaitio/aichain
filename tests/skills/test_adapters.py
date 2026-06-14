@@ -31,7 +31,7 @@ for _k, _v in _TEST_KEYS.items():
         os.environ[_k] = _v
 
 from skills._adapters import validate_input, validate_output, substitute
-from models import OpenAIModel, AnthropicModel, GoogleAIModel, XAIModel, PerplexityModel
+from models import Model
 
 
 # ---------------------------------------------------------------------------
@@ -274,13 +274,13 @@ class TestSubstitute(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# OpenAIModel.to_request / from_response
+# Model.to_request / from_response
 # ---------------------------------------------------------------------------
 
 class TestOpenAIToRequest(unittest.TestCase):
 
     def _model(self, **kw):
-        m = OpenAIModel("gpt-4o", options=kw if kw else None)
+        m = Model("gpt-4o", options=kw if kw else None)
         return m
 
     def test_path(self):
@@ -305,7 +305,7 @@ class TestOpenAIToRequest(unittest.TestCase):
         self.assertEqual(body["top_p"], 0.9)
 
     def test_top_p_omitted_when_none(self):
-        m = OpenAIModel("gpt-4o")
+        m = Model("gpt-4o")
         m.top_p = None
         _, body = m.to_request([], _text_output())
         self.assertNotIn("top_p", body)
@@ -385,72 +385,72 @@ class TestOpenAIFromResponse(unittest.TestCase):
         return {"choices": [{"message": {"content": content}}]}
 
     def test_returns_string_for_text_output(self):
-        result = OpenAIModel("gpt-4o").from_response(self._resp("Hello!"), _text_output())
+        result = Model("gpt-4o").from_response(self._resp("Hello!"), _text_output())
         self.assertEqual(result, "Hello!")
 
     def test_returns_dict_for_json_output(self):
-        result = OpenAIModel("gpt-4o").from_response(self._resp('{"key": "value"}'), _json_output())
+        result = Model("gpt-4o").from_response(self._resp('{"key": "value"}'), _json_output())
         self.assertIsInstance(result, dict)
         self.assertEqual(result["key"], "value")
 
     def test_returns_dict_for_json_schema_output(self):
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": {}}}
-        result = OpenAIModel("gpt-4o").from_response(self._resp('{"answer": 42}'), output)
+        result = Model("gpt-4o").from_response(self._resp('{"answer": 42}'), output)
         self.assertEqual(result["answer"], 42)
 
 
 # ---------------------------------------------------------------------------
-# XAIModel.to_request / from_response
+# Model.to_request / from_response
 # ---------------------------------------------------------------------------
 
 class TestXAIToRequest(unittest.TestCase):
 
     def test_path_is_v1_chat_completions(self):
-        model = XAIModel("grok-3")
+        model = Model("grok-3")
         path, _ = model.to_request([], _text_output())
         self.assertEqual(path, "/v1/chat/completions")
 
     def test_model_name_in_body(self):
-        model = XAIModel("grok-3")
+        model = Model("grok-3")
         _, body = model.to_request([], _text_output())
         self.assertEqual(body["model"], "grok-3")
 
     def test_from_response_returns_string(self):
-        model = XAIModel("grok-3")
+        model = Model("grok-3")
         resp  = {"choices": [{"message": {"content": "Grok answer"}}]}
         self.assertEqual(model.from_response(resp, _text_output()), "Grok answer")
 
 
 # ---------------------------------------------------------------------------
-# PerplexityModel.to_request / from_response
+# Model.to_request / from_response
 # ---------------------------------------------------------------------------
 
 class TestPerplexityToRequest(unittest.TestCase):
 
     def test_path_is_chat_completions(self):
-        model = PerplexityModel("sonar")
+        model = Model("sonar")
         path, _ = model.to_request([], _text_output())
         self.assertEqual(path, "/chat/completions")
 
     def test_model_name_in_body(self):
-        model = PerplexityModel("sonar-pro")
+        model = Model("sonar-pro")
         _, body = model.to_request([], _text_output())
         self.assertEqual(body["model"], "sonar-pro")
 
     def test_from_response_returns_string(self):
-        model = PerplexityModel("sonar")
+        model = Model("sonar")
         resp  = {"choices": [{"message": {"content": "Sonar answer"}}]}
         self.assertEqual(model.from_response(resp, _text_output()), "Sonar answer")
 
 
 # ---------------------------------------------------------------------------
-# AnthropicModel.to_request / from_response
+# Model.to_request / from_response
 # ---------------------------------------------------------------------------
 
 class TestAnthropicToRequest(unittest.TestCase):
 
     def _model(self, **kw):
-        return AnthropicModel(
+        return Model(
             "claude-sonnet-4-5",
             options={"max_tokens": 8192, **kw},
             api_key="test-anthropic-key",
@@ -547,7 +547,7 @@ class TestAnthropicFromResponse(unittest.TestCase):
         return {"content": [{"type": "text", "text": text}]}
 
     def _model(self):
-        return AnthropicModel("claude-sonnet-4-5", api_key="test-anthropic-key")
+        return Model("claude-sonnet-4-5", api_key="test-anthropic-key")
 
     def test_returns_string_for_text_output(self):
         self.assertEqual(self._model().from_response(self._resp("world"), _text_output()), "world")
@@ -570,13 +570,13 @@ class TestAnthropicFromResponse(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# GoogleAIModel.to_request / from_response
+# Model.to_request / from_response
 # ---------------------------------------------------------------------------
 
 class TestGoogleToRequest(unittest.TestCase):
 
     def _model(self, **kw):
-        return GoogleAIModel(
+        return Model(
             "gemini-2.0-flash",
             options=kw if kw else None,
             api_key="test-google-key",
@@ -694,7 +694,7 @@ class TestGoogleFromResponse(unittest.TestCase):
         return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
 
     def _model(self):
-        return GoogleAIModel("gemini-2.0-flash", api_key="test-google-key")
+        return Model("gemini-2.0-flash", api_key="test-google-key")
 
     def test_returns_string_for_text_output(self):
         self.assertEqual(self._model().from_response(self._resp("hi there"), _text_output()), "hi there")

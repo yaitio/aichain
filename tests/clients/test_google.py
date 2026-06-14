@@ -25,7 +25,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._google import GoogleAIClient
+from clients._families.google import GoogleClient as _Family
+from models._data import PROVIDERS as _PROVIDERS
+def GoogleAIClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['google'], **kw)
+
 
 _KEY  = os.getenv("GOOGLE_AI_API_KEY")
 _FAKE = "AIzaInvalidKeyForTesting000000000000000"

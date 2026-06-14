@@ -35,7 +35,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import OpenAIModel, AnthropicModel, GoogleAIModel, XAIModel, KimiModel, QwenModel
+from models import Model
 
 # ---------------------------------------------------------------------------
 # Shared universal message fixtures
@@ -81,7 +81,7 @@ def _b64_vision_msgs(data: str = _IMAGE_B64) -> list:
 class TestOpenAIVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = OpenAIModel("gpt-4o")
+        self.model = Model("gpt-4o")
 
     def test_url_produces_image_url_block(self):
         _, body = self.model.to_request(_url_vision_msgs(), _TEXT_OUTPUT)
@@ -117,7 +117,7 @@ class TestOpenAIVisionToRequest(unittest.TestCase):
 class TestAnthropicVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = AnthropicModel("claude-opus-4-6")
+        self.model = Model("claude-opus-4-6")
 
     def _get_user_content(self, messages):
         _, body = self.model.to_request(messages, _TEXT_OUTPUT)
@@ -154,7 +154,7 @@ class TestAnthropicVisionToRequest(unittest.TestCase):
 class TestGoogleVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = GoogleAIModel("gemini-2.5-flash")
+        self.model = Model("gemini-2.5-flash")
 
     def _get_user_parts(self, messages):
         _, body = self.model.to_request(messages, _TEXT_OUTPUT)
@@ -190,7 +190,7 @@ class TestGoogleVisionToRequest(unittest.TestCase):
 class TestXAIVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = XAIModel("grok-3")
+        self.model = Model("grok-3")
 
     def test_url_produces_image_url_block(self):
         _, body = self.model.to_request(_url_vision_msgs(), _TEXT_OUTPUT)
@@ -212,7 +212,7 @@ class TestXAIVisionToRequest(unittest.TestCase):
 class TestKimiVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = KimiModel("kimi-k2.5")
+        self.model = Model("kimi-k2.5")
 
     def test_url_produces_image_url_block(self):
         _, body = self.model.to_request(_url_vision_msgs(), _TEXT_OUTPUT)
@@ -228,7 +228,7 @@ class TestKimiVisionToRequest(unittest.TestCase):
 class TestQwenVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = QwenModel("qwen-vl-max")
+        self.model = Model("qwen-vl-max")
 
     def test_path_is_compatible_mode_chat(self):
         path, _ = self.model.to_request(_url_vision_msgs(), _TEXT_OUTPUT)
@@ -257,31 +257,31 @@ class TestVisionFromResponse(unittest.TestCase):
         return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
 
     def test_openai_extracts_description(self):
-        result = OpenAIModel("gpt-4o").from_response(
+        result = Model("gpt-4o").from_response(
             self._openai_resp("A cat sitting on a mat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "A cat sitting on a mat.")
 
     def test_anthropic_extracts_description(self):
-        result = AnthropicModel("claude-opus-4-6").from_response(
+        result = Model("claude-opus-4-6").from_response(
             self._anthropic_resp("A tabby cat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "A tabby cat.")
 
     def test_google_extracts_description(self):
-        result = GoogleAIModel("gemini-2.5-flash").from_response(
+        result = Model("gemini-2.5-flash").from_response(
             self._google_resp("An orange cat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "An orange cat.")
 
     def test_xai_extracts_description(self):
-        result = XAIModel("grok-3").from_response(
+        result = Model("grok-3").from_response(
             self._openai_resp("A ginger cat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "A ginger cat.")
 
     def test_qwen_extracts_description(self):
-        result = QwenModel("qwen-vl-max").from_response(
+        result = Model("qwen-vl-max").from_response(
             self._openai_resp("A white cat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "A white cat.")

@@ -21,7 +21,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._anthropic import AnthropicClient
+from clients._families.anthropic import AnthropicClient as _Family
+from models._data import PROVIDERS as _PROVIDERS
+def AnthropicClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['anthropic'], **kw)
+
 
 _KEY  = os.getenv("ANTHROPIC_API_KEY")
 _FAKE = "sk-ant-invalid-key-for-testing-000000000000000000000000000000000000"

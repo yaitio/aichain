@@ -21,7 +21,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from clients._base import APIError
-from clients._xai import XAIClient
+from clients._families.openai import OpenAIClient as _Family
+from models._data import PROVIDERS as _PROVIDERS
+def XAIClient(api_key, **kw):
+    return _Family(api_key, data=_PROVIDERS['xai'], **kw)
+
 
 _KEY  = os.getenv("XAI_API_KEY")
 _FAKE = "xai-invalid-key-for-testing-000000000000000000000000000000000000"
