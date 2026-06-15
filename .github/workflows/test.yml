@@ -17,6 +17,5 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[all]" pytest pytest-asyncio
-      # *Live* tests hit real provider APIs (keys + network); test_tool.py has a
-      # stale import path — both excluded from CI.
-      - run: pytest -k "not Live" --ignore=tests/tools/test_tool.py
+      # *Live* tests hit real provider APIs (keys + network) — skipped in CI.
+      - run: pytest -k "not Live"

@@ -76,6 +76,8 @@ class FileStore(StateStore):
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 json.dump(document, fh, ensure_ascii=False)
+                fh.flush()
+                os.fsync(fh.fileno())     # durable on disk before the rename
             os.replace(tmp, path)
         except BaseException:
             try:
@@ -90,6 +92,14 @@ class FileStore(StateStore):
                 return json.load(fh)
         except FileNotFoundError:
             return None
+        except json.JSONDecodeError as exc:
+            # A present-but-corrupt file (e.g. a crash mid-write before fsync
+            # landed) is not "no such run" — surface it clearly rather than
+            # leaking a raw JSONDecodeError or silently losing the run.
+            raise ValueError(
+                f"Corrupt run document for {run_id!r} at "
+                f"{self._path(run_id)!r}: {exc}"
+            ) from exc
 
     def delete(self, run_id: str) -> None:
         try:

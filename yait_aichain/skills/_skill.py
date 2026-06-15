@@ -25,7 +25,7 @@ import time
 from typing import TYPE_CHECKING
 
 from ..clients._base import APIError
-from ..clients._errors import RateLimitError, ServerError, NetworkError
+from ..clients._errors import RateLimitError, ServerError, NetworkError, TaskFailedError
 from ..models._usage import Usage, extract_usage, attach_cost
 from . import _adapters as adapters
 
@@ -282,7 +282,11 @@ class Skill:
                 return model.from_response(response, self._output)
 
             except APIError as exc:
-                if exc.status in _TRANSIENT_STATUSES and attempt < max_retries:
+                # TaskFailedError is terminal — retrying would submit a new
+                # (billable) async job, so never retry it regardless of status.
+                if (exc.status in _TRANSIENT_STATUSES
+                        and not isinstance(exc, TaskFailedError)
+                        and attempt < max_retries):
                     continue   # wait and retry the same model
                 raise          # non-transient, or retries exhausted
 

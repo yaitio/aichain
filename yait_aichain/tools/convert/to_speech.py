@@ -43,7 +43,7 @@ import os
 import urllib3
 
 from .._base import Tool
-from .._security import confine_output_path
+from .._security import assert_safe_url, confine_output_path
 
 
 # ── Module-level defaults ─────────────────────────────────────────────────────
@@ -632,7 +632,10 @@ class ttsQwen(convertToSpeech):
             ) from exc
 
         # ── Download audio bytes ──────────────────────────────────────
-        dl = self._http.request("GET", audio_url)
+        # The URL comes from the provider response — guard it (SSRF) and do not
+        # follow redirects to an unvalidated host.
+        assert_safe_url(audio_url)
+        dl = self._http.request("GET", audio_url, redirect=False)
         if not (200 <= dl.status < 300):
             raise RuntimeError(
                 f"ttsQwen: failed to download audio from presigned URL "
