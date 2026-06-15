@@ -5,7 +5,7 @@ tests.models.test_models_text_to_image
 Tests for text-to-image models:
   - OpenAI   : dall-e-3, gpt-image-1
   - xAI      : grok-imagine-image
-  - Google   : gemini-3.1-flash-image-preview  (responseModalities)
+  - Google   : gemini-3.1-flash-image  (responseModalities)
   - Qwen     : wan2.2-t2i-flash
 
 Covers:
@@ -88,7 +88,7 @@ class TestImageModelFactory(unittest.TestCase):
         self.assertEqual(Model("grok-imagine-image-pro")._provider, "xai")
 
     def test_gemini_image_routes_to_google(self):
-        self.assertEqual(Model("gemini-3.1-flash-image-preview")._provider, "google")
+        self.assertEqual(Model("gemini-3.1-flash-image")._provider, "google")
 
     def test_wanx_routes_to_qwen(self):
         self.assertEqual(Model("wan2.2-t2i-flash")._provider, "qwen")
@@ -189,19 +189,19 @@ class TestXAIImageToRequest(unittest.TestCase):
 class TestGoogleImageToRequest(unittest.TestCase):
 
     def test_path_contains_model_and_generate_content(self):
-        model = Model("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
-        self.assertIn("gemini-3.1-flash-image-preview", path)
+        self.assertIn("gemini-3.1-flash-image", path)
         self.assertIn("generateContent", path)
 
     def test_body_has_response_modalities_image(self):
-        model = Model("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
         mods = body["generationConfig"].get("responseModalities", [])
         self.assertIn("IMAGE", mods)
 
     def test_text_plus_image_modality_includes_text(self):
-        model = Model("gemini-3.1-flash-image-preview")
+        model = Model("gemini-3.1-flash-image")
         output = {"modalities": ["text", "image"], "format": {"type": "image"}}
         _, body = model.to_request(_PROMPT_MSG, output)
         mods = body["generationConfig"].get("responseModalities", [])
@@ -277,7 +277,7 @@ class TestOpenAIImageFromResponse(unittest.TestCase):
 class TestGoogleImageFromResponse(unittest.TestCase):
 
     def setUp(self):
-        self.model = Model("gemini-3.1-flash-image-preview")
+        self.model = Model("gemini-3.1-flash-image")
         self._output = {"modalities": ["image"], "format": {"type": "image"}}
 
     def test_returns_dict(self):
@@ -351,7 +351,7 @@ class TestGoogleImageLive(unittest.TestCase):
     def test_gemini_image_returns_base64(self):
         from skills import Skill
         skill = Skill(
-            model      = Model("gemini-3.1-flash-image-preview"),
+            model      = Model("gemini-3.1-flash-image"),
             input      = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "A tiny red dot"}]}]},
             output     = {"modalities": ["image"], "format": {"type": "image"}},
         )

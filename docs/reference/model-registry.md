@@ -93,9 +93,11 @@ gemini-2.5-flash
 
 ### `text-to-image`
 ```
-gemini-3.1-flash-image-preview
-gemini-3-pro-image-preview
+gemini-3.1-flash-image   # GA — recommended (migration target for Imagen 4)
+gemini-3-pro-image       # GA — professional asset production
+gemini-2.5-flash-image
 ```
+(The `imagen-4.0-*` endpoints are discontinued; Gemini image models replace them.)
 
 ### `image-to-text`
 Every Gemini chat model accepts image (and video/audio) input — the list mirrors `text-to-text`.

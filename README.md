@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **62 models from 8 providers** — with one line to swap any of them.
+All of these work identically across **63 models from 8 providers** — with one line to swap any of them.
 
 ---
 
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-62 models total. Full list: [model registry →](docs/reference/model-registry.md)
+63 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -303,6 +303,16 @@ MIT
 ---
 
 ## Changelog
+
+### 1.3.5
+
+Model registry refresh — Google image models.
+
+- Gemini image generation is now GA: `gemini-3.1-flash-image` and
+  `gemini-3-pro-image` (the `-preview` suffixes are gone), plus the new
+  `gemini-2.5-flash-image`. These are the migration target for Google's
+  discontinued Imagen 4 endpoints (`imagen-4.0-*`), which this library never
+  referenced.
 
 ### 1.3.4
 

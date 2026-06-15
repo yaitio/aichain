@@ -142,13 +142,13 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (8 providers, 62 models):
+and is tested with (8 providers, 63 models):
 
 ```python
 from yait_aichain.models import registry
 
 registry.models(task="text-to-image")
-# ['chatgpt-image-latest', 'gemini-3.1-flash-image-preview', 'gpt-image-2',
+# ['chatgpt-image-latest', 'gemini-3.1-flash-image', 'gpt-image-2',
 #  'gpt-image-1.5', 'grok-imagine-image-pro', 'wan2.2-t2i-flash', ...]
 
 registry.providers(task="text-to-image")   # ['openai', 'google', 'xai', 'qwen']
