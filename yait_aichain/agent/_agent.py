@@ -286,6 +286,7 @@ class Agent:
         description:  str | None         = None,
         persona:      str | None         = None,
         allow_spawn:  bool               = False,
+        store=None,
         _depth:       int                = 0,
         _max_depth:   int                = 5,
     ) -> None:
@@ -312,6 +313,10 @@ class Agent:
         self.allow_spawn  = allow_spawn
         self._depth       = _depth
         self._max_depth   = _max_depth
+        # Always present (default in-memory) so suspend/resume has one uniform
+        # path; pass store= for persistence across processes.
+        from ..state import InMemoryStore
+        self._store = store or InMemoryStore()
 
         # ── Build tool list ───────────────────────────────────────────────
         tool_list: list = list(tools or [])
@@ -428,9 +433,69 @@ class Agent:
                 goal   = textwrap.shorten(s.get("goal", ""), 60, placeholder="…")
                 self._log(1, f"       {str(s.get('id', '?')):>2}.  {icon}  {target:<22}  {goal}")
 
-            # ── Phase 2: Step execution loop ──────────────────────────────
-            step_idx = 0
-            advance  = True
+        except Exception as exc:
+            self._log(1, f"\n[Error] ✗ Unexpected exception: {exc}")
+            return AgentResult(
+                success=False, output=None, mode=self.mode,
+                steps_taken=0, tokens_used=tokens_used,
+                plan=current_plan, history=history, memory=self.memory.all(),
+                error=str(exc),
+            )
+
+        return self._execute_loop(
+            task, current_plan, step_idx=0, history=history,
+            tokens_used=tokens_used, resume_action=None, resume_signal=None,
+        )
+
+    def resume(self, run_id: str, signal=None) -> "AgentResult":
+        """
+        Resume a previously suspended agent run.
+
+        Loads the parked document, restores memory and the plan/cursor, and
+        re-runs the suspended action with *signal* — then continues the normal
+        plan/act/reflect loop. Idempotent: a ``run_id`` no longer in the store
+        raises ``KeyError`` (already resumed or unknown).
+        """
+        from ..state import RunDocument
+
+        raw = self._store.load(run_id)
+        if raw is None:
+            raise KeyError(
+                f"No suspended run {run_id!r} in the store "
+                f"(already resumed/completed, or unknown id)."
+            )
+        doc = RunDocument.from_dict(raw)
+        if doc.suspended_step() is None:
+            return None                      # not suspended → idempotent no-op
+
+        defn = doc.definition or {}
+        self.memory.reset()
+        self.memory.update(doc.variables)    # restore memory at suspend time
+        result = self._execute_loop(
+            defn.get("task", ""),
+            defn.get("plan", []),
+            step_idx      = defn.get("step_idx", 0),
+            history       = defn.get("history", []),
+            tokens_used   = defn.get("tokens_used", 0),
+            resume_action = defn.get("pending_action"),
+            resume_signal = signal,
+        )
+        # This parked run is consumed: it either finished or re-suspended under
+        # a NEW run_id. Drop the old one so a duplicate resume is a no-op.
+        self._store.delete(run_id)
+        return result
+
+    def _execute_loop(self, task, current_plan, *, step_idx, history,
+                      tokens_used, resume_action, resume_signal) -> "AgentResult":
+        """
+        Plan/act/reflect step loop, shared by ``run()`` (from step 0) and
+        ``resume()`` (from the suspended step). On resume, *resume_action* is
+        executed at *step_idx* with *resume_signal* instead of asking the
+        orchestrator for a fresh action; afterwards the loop proceeds normally.
+        """
+        from ..state import Suspend, SuspendedResult
+        try:
+            advance = True
 
             while step_idx < len(current_plan):
 
@@ -461,34 +526,45 @@ class Agent:
                     context = self.memory.all()
 
                     # ── Determine action ─────────────────────────────────
-                    # For a named tool step, pass only that tool's schema so
-                    # the prompt stays focused.  All schemas are passed when
-                    # the step has no named tool (e.g. after a replan).
-                    step_tool_name = step.get("tool_name")
-                    if step_tool_name and step.get("type") == "tool":
-                        primary = [
-                            t.schema() for t in self.tools
-                            if t.name == step_tool_name
-                        ]
-                        tool_schemas_for_action = (
-                            primary if primary else [t.schema() for t in self.tools]
-                        )
+                    if resume_action is not None:
+                        # Resuming the suspended step: the action is already
+                        # known; run it with the resume signal instead of
+                        # asking the orchestrator for a fresh action.
+                        action        = resume_action
+                        action_tokens = 0
+                        _step_signal  = resume_signal
+                        resume_action = resume_signal = None      # one-shot
+                        self._log(1, "  ▶  Resuming suspended action with the signal")
                     else:
-                        tool_schemas_for_action = [t.schema() for t in self.tools]
+                        _step_signal = None
+                        # For a named tool step, pass only that tool's schema so
+                        # the prompt stays focused.  All schemas are passed when
+                        # the step has no named tool (e.g. after a replan).
+                        step_tool_name = step.get("tool_name")
+                        if step_tool_name and step.get("type") == "tool":
+                            primary = [
+                                t.schema() for t in self.tools
+                                if t.name == step_tool_name
+                            ]
+                            tool_schemas_for_action = (
+                                primary if primary else [t.schema() for t in self.tools]
+                            )
+                        else:
+                            tool_schemas_for_action = [t.schema() for t in self.tools]
 
-                    action_msgs = prompts.action_messages(
-                        task                 = task,
-                        step                 = step,
-                        step_num             = step_idx + 1,
-                        total_steps          = len(current_plan),
-                        context              = context,
-                        tool_schemas         = tool_schemas_for_action,
-                        available_tool_names = [t.name for t in self.tools],
-                        persona              = self.persona,
-                    )
-                    action, action_tokens = self._llm_call_json(
-                        self.orchestrator, action_msgs
-                    )
+                        action_msgs = prompts.action_messages(
+                            task                 = task,
+                            step                 = step,
+                            step_num             = step_idx + 1,
+                            total_steps          = len(current_plan),
+                            context              = context,
+                            tool_schemas         = tool_schemas_for_action,
+                            available_tool_names = [t.name for t in self.tools],
+                            persona              = self.persona,
+                        )
+                        action, action_tokens = self._llm_call_json(
+                            self.orchestrator, action_msgs
+                        )
                     tokens_used += action_tokens
 
                     # Log action
@@ -511,7 +587,24 @@ class Agent:
                     exec_error:  str | None = None
                     exec_tokens: int        = 0
                     try:
-                        result, exec_tokens = self._execute_action(action, context)
+                        result, exec_tokens = self._execute_action(
+                            action, context, signal=_step_signal)
+                    except Suspend as susp:
+                        # A Wait/Gate tool paused the agent: park the run and
+                        # return a SuspendedResult; resume re-runs this action.
+                        self._log(1, f"\n[Wait] ⏸  {susp.reason}")
+                        doc = self._park_document(
+                            task, current_plan, step_idx, history,
+                            tokens_used, action, susp,
+                        )
+                        self._store.save(doc.run_id, doc.to_dict())
+                        return SuspendedResult(
+                            run_id   = doc.run_id,
+                            awaiting = {"reason":      susp.reason,
+                                        "resume_with": susp.resume_with,
+                                        "hint":        susp.hint},
+                            document = doc.to_dict(),
+                        )
                     except Exception as exc:
                         result     = f"ERROR: {exc}"
                         exec_error = str(exc)
@@ -904,16 +997,52 @@ class Agent:
     # Action execution
     # ------------------------------------------------------------------
 
+    def _park_document(self, task, current_plan, step_idx, history,
+                       tokens_used, action, susp):
+        """
+        Build the run document for a suspended agent run. Memory is the
+        key-value data (variables); the plan steps carry status; the agent
+        runtime needed to resume lives in ``definition``.
+        """
+        from ..state import RunDocument, StepStatus
+        names = [str(s.get("goal") or f"step_{i}")
+                 for i, s in enumerate(current_plan)]
+        doc = RunDocument.new("agent", names, variables=self.memory.all())
+        for i, st in enumerate(doc.steps):
+            if i < step_idx:
+                st["status"] = StepStatus.DONE
+            elif i == step_idx:
+                st["status"]  = StepStatus.SUSPENDED
+                st["suspend"] = {"reason":      susp.reason,
+                                 "resume_with": susp.resume_with,
+                                 "hint":        susp.hint}
+        doc.usage      = {"tokens_used": tokens_used}
+        # Agent resume state — the engine rehydrates the loop from here.
+        doc.definition = {
+            "task":           task,
+            "plan":           current_plan,
+            "step_idx":       step_idx,
+            "tokens_used":    tokens_used,
+            "history":        history,
+            "pending_action": action,
+            "mode":           self.mode,
+        }
+        return doc
+
     def _execute_action(
         self,
         action:  dict,
         context: dict,
+        signal=None,
     ) -> tuple[Any, int]:
         """
         Execute a tool or skill action.
 
         Returns ``(result, tokens_used)``.  Tool calls return 0 tokens.
         Raises on error — the caller catches and records the exception.
+
+        *signal* (resume only) is forwarded to the tool as ``_signal`` so a
+        suspended Wait/Gate tool can proceed with the external decision.
         """
         atype = action.get("type")
 
@@ -933,7 +1062,7 @@ class Agent:
                 else:
                     kwargs[k] = v
 
-            result = tool.run(**kwargs)
+            result = tool.run(**kwargs) if signal is None else tool.run(_signal=signal, **kwargs)
             return result, 0
 
         # ── Skill call (dynamic LLM call) ─────────────────────────────

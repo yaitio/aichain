@@ -127,6 +127,18 @@ def _require_safe_tool_class(class_path: str, trusted: bool) -> None:
         )
 
 
+def _usage_to_dict(usage) -> dict:
+    """Serialise a ``Usage`` (or None) for the run document."""
+    if not usage:
+        return {}
+    return {
+        "input_tokens":  usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens":  usage.total_tokens,
+        "cost":          usage.cost,
+    }
+
+
 def _is_tool(runner) -> bool:
     """Return True if *runner* is a Tool instance (lazy, import-free check)."""
     # Check the MRO by class name so custom Tool subclasses defined outside
@@ -256,6 +268,7 @@ class Chain:
         name:           str  | None = None,
         description:    str  | None = None,
         on_step_error:  str         = "raise",
+        store=None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
@@ -269,6 +282,11 @@ class Chain:
         self.name           = name
         self.description    = description
         self.on_step_error  = on_step_error
+        # A store is always present (default: process-local in-memory) so the
+        # engine has one uniform path; pass store= for persistence (FileStore,
+        # S3, …). It holds suspended runs for resume.
+        from ..state import InMemoryStore
+        self._store = store or InMemoryStore()
         self._history: list[dict] = []
         self._accumulated: dict   = {}     # snapshot of accumulated vars after last run()
         # Summed token usage of the last run() across Skill steps; None until
@@ -283,6 +301,8 @@ class Chain:
         self,
         variables:     dict | None = None,
         on_step_error: str  | None = None,
+        *,
+        context=None,
     ) -> "str | dict | None":
         """
         Execute all steps in order and return the final step's output.
@@ -318,27 +338,94 @@ class Chain:
                 f"got {_on_error!r}"
             )
 
-        # Run state is local: concurrent run() calls on a shared Chain (e.g.
-        # a Pool of threads driving one instance) never interleave their
-        # histories.  Instance attributes are assigned once per exit point
-        # and reflect the most recently finished run; the return value is
-        # the per-call source of truth.
-        history:     list[dict] = []
+        from ..state import RunDocument
         accumulated = {**self.variables, **(variables or {})}
-        last_output: "str | dict | None" = None
-        usage_total: "Usage | None" = None   # sum of step usages, when available
+        step_names  = [getattr(r, "name", None) or f"step_{i}"
+                       for i, (r, *_rest) in enumerate(self._steps)]
+        doc = RunDocument.new("chain", step_names, variables=accumulated)
+        return self._run_from(doc, accumulated, start_idx=0, signal=None,
+                              usage_in=None, on_error=_on_error, context=context)
 
-        for idx, (runner, output_key, input_map, kind, options) in enumerate(self._steps):
-            step_input = dict(accumulated)          # snapshot before the step
-            name       = getattr(runner, "name", None) or f"step_{idx}"
+    def resume(
+        self,
+        run_id:        str,
+        signal=None,
+        *,
+        on_step_error: str | None = None,
+        context=None,
+    ) -> "str | dict | None":
+        """
+        Resume a previously suspended run.
+
+        Loads the run document from the store, re-invokes the suspended step
+        with *signal*, and continues from the first step that is not yet
+        ``done`` — already-completed steps are never re-run (their outputs are
+        in the document's variables).
+
+        Idempotent: a ``run_id`` no longer in the store (already resumed to
+        completion, or unknown) raises ``KeyError`` so an at-least-once trigger
+        can treat that as "already handled".
+        """
+        _on_error = self.on_step_error if on_step_error is None else on_step_error
+        if _on_error not in _VALID_ON_STEP_ERROR:
+            raise ValueError(
+                f"on_step_error must be one of {sorted(_VALID_ON_STEP_ERROR)}; "
+                f"got {_on_error!r}"
+            )
+
+        from ..state import RunDocument
+        from ..models._usage import Usage
+
+        raw = self._store.load(run_id)
+        if raw is None:
+            raise KeyError(
+                f"No suspended run {run_id!r} in the store "
+                f"(already resumed/completed, or unknown id)."
+            )
+        doc   = RunDocument.from_dict(raw)
+        start = doc.first_pending()
+        if start is None or doc.suspended_step() is None:
+            return None   # not actually suspended → idempotent no-op
+
+        accumulated = dict(doc.variables)
+        u = doc.usage or {}
+        usage_in = Usage(
+            input_tokens  = u.get("input_tokens", 0),
+            output_tokens = u.get("output_tokens", 0),
+            total_tokens  = u.get("total_tokens", 0),
+            cost          = u.get("cost"),
+        ) if u else None
+        return self._run_from(doc, accumulated, start_idx=start, signal=signal,
+                              usage_in=usage_in, on_error=_on_error, context=context)
+
+    def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
+                  on_error, context) -> "str | dict | None":
+        """
+        Shared step loop for ``run()`` (from step 0) and ``resume()`` (from the
+        suspended step). On ``resume``, *signal* is delivered to the step at
+        *start_idx* (the suspended tool) via ``_signal=``.
+        """
+        from ..state import StepStatus, Suspend, SuspendedResult
+
+        history:     list[dict] = []
+        last_output: "str | dict | None" = None
+        usage_total: "Usage | None" = usage_in
+
+        for idx in range(start_idx, len(self._steps)):
+            runner, output_key, input_map, kind, options = self._steps[idx]
+            step_input  = dict(accumulated)          # snapshot before the step
+            name        = getattr(runner, "name", None) or f"step_{idx}"
+            step_signal = signal if idx == start_idx else None
 
             try:
                 if kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
-                    output = runner.run(**kwargs)       # Tool: direct kwargs call
+                    if step_signal is not None:
+                        output = runner.run(_signal=step_signal, **kwargs)
+                    else:
+                        output = runner.run(**kwargs)
 
                 elif kind == "agent":
-                    # Resolve task string from accumulated dict
                     task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
                     task     = accumulated.get(task_key, "")
                     if not task:
@@ -355,17 +442,13 @@ class Chain:
                             f"{getattr(agent_result, 'error', 'no result returned')}"
                         )
 
-                    # Extract the requested field from AgentResult
                     output_field = options.get(
                         "output_field", _AGENT_DEFAULT_OPTIONS["output_field"]
                     )
                     output = getattr(agent_result, output_field, None)
 
                 else:
-                    # Skill: pass full accumulated dict, honouring any input_map renames.
-                    # input_map for skills works as an *alias* layer: the mapped key is
-                    # added/overwritten in the variables copy passed to the skill, without
-                    # touching the real accumulated dict.
+                    # Skill: pass full accumulated dict, honouring input_map renames.
                     if input_map:
                         skill_vars = dict(accumulated)
                         for dst, src in input_map.items():
@@ -374,6 +457,26 @@ class Chain:
                         output = runner.run(variables=skill_vars)
                     else:
                         output = runner.run(variables=accumulated)
+
+            except Suspend as susp:
+                # A suspend tool paused the run: park the document and return a
+                # SuspendedResult; on resume the engine re-invokes this step.
+                awaiting = {"reason":      susp.reason,
+                            "resume_with": susp.resume_with,
+                            "hint":        susp.hint}
+                doc.steps[idx]["status"]  = StepStatus.SUSPENDED
+                doc.steps[idx]["suspend"] = awaiting
+                doc.variables = dict(accumulated)
+                doc.usage     = _usage_to_dict(usage_total)
+                self._history     = history
+                self._accumulated = dict(accumulated)
+                self.last_usage   = usage_total
+                self._store.save(doc.run_id, doc.to_dict())
+                return SuspendedResult(
+                    run_id   = doc.run_id,
+                    awaiting = awaiting,
+                    document = doc.to_dict(),
+                )
 
             except Exception as exc:
                 history.append({
@@ -387,20 +490,18 @@ class Chain:
                     "error":      str(exc),
                 })
 
-                if _on_error == "raise":
+                if on_error == "raise":
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total
                     raise
 
-                if _on_error == "stop":
+                if on_error == "stop":
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total
                     return last_output
 
-                # "skip" — warn and continue; downstream steps may lack a
-                # variable they depend on, but the caller owns that trade-off.
                 warnings.warn(
                     f"Chain step {idx} ({name!r}) failed and was skipped: {exc}. "
                     f"Downstream steps that read {output_key!r} will receive a "
@@ -420,12 +521,10 @@ class Chain:
                 "options":    options,
             })
 
-            # Accumulate token usage from steps that report it (Skill steps).
             step_usage = getattr(runner, "last_usage", None)
             if step_usage:
                 usage_total = step_usage if usage_total is None else usage_total + step_usage
 
-            # Merge output into accumulated vars for downstream steps
             if isinstance(output, dict):
                 accumulated.update(output)
             else:
@@ -433,6 +532,14 @@ class Chain:
 
             last_output = output
 
+            # Checkpoint: the step is done; variables reflect its output.
+            doc.steps[idx]["status"] = StepStatus.DONE
+            doc.steps[idx].pop("suspend", None)
+            doc.variables = dict(accumulated)
+
+        # Completed run: a finished run leaves no parked document (no-op when
+        # the run never suspended and was therefore never stored).
+        self._store.delete(doc.run_id)
         self._history     = history
         self._accumulated = dict(accumulated)
         self.last_usage   = usage_total

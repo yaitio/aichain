@@ -79,6 +79,7 @@ All previous class names still work:
 """
 
 from ._base           import Tool, ToolResult
+from ._wait           import Wait, Gate
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
@@ -188,6 +189,8 @@ __all__ = [
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",
+    "Wait",
+    "Gate",
     # ── Infrastructure ────────────────────────────────────────────────────
     # ── Search ────────────────────────────────────────────────────────────
     "Search",
