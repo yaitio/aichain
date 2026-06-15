@@ -19,9 +19,3 @@ venv/
 # local-only, not published
 /cookbooks/
 /products/
-
-# vendored third-party repo (OpenClaw sources, for study)
-/openclaw/
-
-# vendored third-party repo (Mastra sources, for study)
-/mastra/

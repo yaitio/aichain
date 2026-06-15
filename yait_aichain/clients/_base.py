@@ -18,6 +18,7 @@ from ._errors import (  # noqa: F401
     InvalidRequestError,
     NotFoundError,
     ServerError,
+    TaskFailedError,
     error_from_status,
 )
 

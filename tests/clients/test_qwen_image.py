@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from clients._errors import ServerError
+from clients._errors import TaskFailedError
 from clients._families.qwen import (
     QwenClient as _Family,
     _IMAGE_SYNTHESIS_PATH,
@@ -117,21 +117,38 @@ class TestSynthesisFlow(unittest.TestCase):
 
     def test_failed_task_raises(self):
         c = self._client_with_task("FAILED")
-        with self.assertRaises(ServerError) as ctx:
+        with self.assertRaises(TaskFailedError) as ctx:
             c.send(_IMAGE_SYNTHESIS_PATH, {"model": "wan2.2-t2i-flash"}, {})
         self.assertIn("FAILED", str(ctx.exception))
 
     def test_timeout_raises(self):
         c = self._client_with_task("PENDING")
         c._POLL_TIMEOUT = 0  # deadline already passed after the first poll
-        with self.assertRaises(ServerError) as ctx:
+        with self.assertRaises(TaskFailedError) as ctx:
             c.send(_IMAGE_SYNTHESIS_PATH, {"model": "wan2.2-t2i-flash"}, {})
         self.assertEqual(ctx.exception.status, 504)
 
     def test_no_results_raises(self):
         c = self._client_with_task("SUCCEEDED", results=[])
-        with self.assertRaises(ServerError):
+        with self.assertRaises(TaskFailedError):
             c.send(_IMAGE_SYNTHESIS_PATH, {"model": "wan2.2-t2i-flash"}, {})
+
+    def test_terminal_failure_is_not_retried_by_skill(self):
+        # A FAILED task must NOT be re-submitted on retry — that would create a
+        # second billable image job. With max_retries=2 the submit POST must
+        # still happen exactly once.
+        c = self._client_with_task("FAILED")
+        m = Model("wan2.2-t2i-flash", api_key="k")
+        m.client = c
+        skill = Skill(
+            model=m,
+            input={"messages": [{"role": "user", "parts": ["a fox"]}]},
+            output={"modalities": ["image"], "format": {"type": "image"}},
+            max_retries=2,
+        )
+        with self.assertRaises(TaskFailedError):
+            skill.run()
+        self.assertEqual(c._post.call_count, 1)   # submitted once, never re-submitted
 
 
 class TestSendRouting(unittest.TestCase):

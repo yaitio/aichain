@@ -304,6 +304,23 @@ MIT
 
 ## Changelog
 
+### 1.3.2
+
+Correctness & safety fixes from a code audit.
+
+- Qwen image: a terminal task failure (FAILED / timeout / no result) now raises
+  a non-retryable `TaskFailedError`, so a retry or model fallback can't silently
+  submit a second billable generation.
+- SSRF hardening: `RestApiTool` now blocks private / loopback / metadata
+  targets (opt out with `AICHAIN_ALLOW_PRIVATE_URLS`); the Qwen TTS audio
+  download is guarded and no longer follows redirects.
+- VectorDB: `ChromaBackend.delete` refuses an empty `ids`+`filter` (which would
+  wipe the whole collection), matching Qdrant.
+- `FileStore`: `fsync` before the atomic rename (durable parked runs); a corrupt
+  run file raises a clear error instead of a raw `JSONDecodeError`.
+- `convertToHTML` writes through the confined output path, consistent with the
+  other convert tools.
+
 ### 1.3.1
 
 Image-generation fixes and additions.
