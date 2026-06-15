@@ -102,7 +102,7 @@ from typing import Any
 import urllib3
 
 from ._base import Tool
-from ._security import assert_url_scheme
+from ._security import assert_safe_url
 
 # ---------------------------------------------------------------------------
 # Internal constants
@@ -376,10 +376,10 @@ class RestApiTool(Tool):
         if opts.get("timeout") is not None:
             req_kwargs["timeout"] = urllib3.Timeout(read=float(opts["timeout"]))
 
-        # Only ever speak http(s). Path params are percent-encoded (safe="")
-        # so they cannot introduce a new authority; the host comes from the
-        # developer-configured URL template, not from model output.
-        assert_url_scheme(url)
+        # Only ever speak http(s), and block SSRF targets (private / loopback /
+        # metadata IPs) unless AICHAIN_ALLOW_PRIVATE_URLS is set — needed when a
+        # REST endpoint is on an internal network.
+        assert_safe_url(url)
         response = self._http.request(self._method, url, **req_kwargs)
         raw = response.data.decode("utf-8", errors="replace")
 

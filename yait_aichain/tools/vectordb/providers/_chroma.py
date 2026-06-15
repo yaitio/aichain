@@ -244,6 +244,13 @@ class ChromaBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
+        # An empty ids+filter would tell Chroma to delete the whole collection.
+        # Guard at the backend too (defence in depth), mirroring Qdrant.
+        if not ids and not filter:
+            raise ValueError(
+                "delete() requires ids or a filter; refusing to delete the "
+                "entire collection."
+            )
         cid, _ = self._resolve(collection)
         body: dict = {}
         if ids:
