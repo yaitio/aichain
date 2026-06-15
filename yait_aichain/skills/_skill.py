@@ -272,7 +272,7 @@ class Skill:
                 time.sleep(retry_delay * (2 ** (attempt - 1)))
 
             try:
-                raw      = model.client._post(
+                raw      = model.client.send(
                     path, body, model.client._auth_headers()
                 )
                 response = json.loads(raw)

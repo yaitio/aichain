@@ -91,7 +91,7 @@ class TestFamilyEquivalence(unittest.TestCase):
         img = {"modalities": ["image"], "format": {"type": "image"}}
         for name, prov in [("gpt-image-1", "openai"),
                            ("grok-imagine-image-pro", "xai"),
-                           ("wanx2.1-t2i-turbo", "qwen"),
+                           ("wan2.2-t2i-flash", "qwen"),
                            ("gemini-3.1-flash-image-preview", "google")]:
             self._equiv_build(name, prov, prompt, img)
 

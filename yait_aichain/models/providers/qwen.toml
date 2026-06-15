@@ -62,8 +62,10 @@ price = { input = 0.8, output = 3.2 }
 caps  = ["image-to-text"]
 price = { input = 0.21, output = 0.63 }
 
-[models."wanx2.1-t2i-turbo"]
+# Text-to-image (wan series). DashScope serves these only through its native
+# async task API (submit → poll → download), handled by QwenClient.
+[models."wan2.2-t2i-flash"]
 caps  = ["text-to-image"]
 
-[models."wanx2.1-t2i-plus"]
+[models."wan2.2-t2i-plus"]
 caps  = ["text-to-image"]

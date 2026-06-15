@@ -302,6 +302,23 @@ MIT
 
 ## Changelog
 
+### 1.3.1
+
+Image-generation fixes and additions.
+
+- Qwen text-to-image now works. DashScope serves the `wan` models only through
+  its native *asynchronous* task API, so a new request lifecycle (submit → poll
+  → download) runs behind a `send()` seam on the client and returns the image in
+  the same shape the synchronous path does. Registry updated to the available
+  `wan2.2-t2i-flash` / `wan2.2-t2i-plus` (the old `wanx2.1-*` ids 404'd).
+- New OpenAI image models: `chatgpt-image-latest` (the always-current model used
+  by ChatGPT — fast, recommended default) and `gpt-image-2`.
+- Transparent backgrounds for `gpt-image-*` / `chatgpt-image-*`: `background`
+  and `output_format` are forwarded from the output format (`background:
+  "transparent"`, `output_format: "png"`), so these models can emit real PNG
+  alpha. The `response_format` param is correctly omitted for the
+  `chatgpt-image-*` family (it returns base64 natively and rejects the param).
+
 ### 1.3.0
 
 Durable, resumable runs — the serverless core. A Chain or Agent can **pause**
