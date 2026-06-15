@@ -142,7 +142,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (8 providers, 63 models):
+and is tested with (8 providers, 64 models):
 
 ```python
 from yait_aichain.models import registry
@@ -173,7 +173,7 @@ current lists live in `models/providers/*.toml` and the
 | Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash` |
 | xAI | `XAI_API_KEY` | `grok-4-0709`, `grok-4-fast-reasoning`, `grok-3`, `grok-imagine-image-pro` |
 | Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
-| Kimi | `MOONSHOT_API_KEY` | `kimi-k2.6`, `kimi-k2.5`, `kimi-k2-thinking` |
+| Kimi | `MOONSHOT_API_KEY` | `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2-thinking` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
 | Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash` |
 

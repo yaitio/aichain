@@ -151,6 +151,8 @@ No image-generation models. `kimi-k2.5` accepts image and video input.
 
 ### `text-to-text`
 ```
+kimi-k2.7-code           # Coding-focused; runs with Thinking enabled
+kimi-k2.6                # K2.6 series
 kimi-k2.5                # K2.5 series — multimodal, thinking toggle
 kimi-k2-0905-preview     # K2 series — text-only, 256K context
 kimi-k2-turbo-preview    # K2 series — high-speed (60–100 tok/s)
