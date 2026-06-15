@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yait-aichain"
-version = "1.3.4"
-description = "One interface. 8 providers. 62 models. Text, images, vision, RAG, agents, parallel pipelines."
+version = "1.3.5"
+description = "One interface. 8 providers. 63 models. Text, images, vision, RAG, agents, parallel pipelines."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "YAIT" }]

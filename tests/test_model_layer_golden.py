@@ -132,7 +132,7 @@ class TestModalityGolden(unittest.TestCase):
             # wanx runs on DashScope's native async task API, not the
             # OpenAI-compatible images endpoint.
             "wan2.2-t2i-flash":              "/api/v1/services/aigc/text2image/image-synthesis",
-            "gemini-3.1-flash-image-preview": "/models/gemini-3.1-flash-image-preview:generateContent",
+            "gemini-3.1-flash-image": "/models/gemini-3.1-flash-image:generateContent",
         }
         for name, path in expected.items():
             p, body = Model(name, api_key="k").to_request(prompt, self._IMG)
@@ -172,7 +172,7 @@ class TestModalityGolden(unittest.TestCase):
             {"data": [{"b64_json": "IMG"}]}, self._IMG)
         self.assertEqual(r["base64"], "IMG")
         self.assertEqual(r["mime_type"], "image/png")
-        rg = Model("gemini-3.1-flash-image-preview", api_key="k").from_response(
+        rg = Model("gemini-3.1-flash-image", api_key="k").from_response(
             {"candidates": [{"content": {"parts": [
                 {"inlineData": {"mimeType": "image/png", "data": "IMG"}}]}}]},
             self._IMG)

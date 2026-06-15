@@ -92,7 +92,7 @@ class TestFamilyEquivalence(unittest.TestCase):
         for name, prov in [("gpt-image-1", "openai"),
                            ("grok-imagine-image-pro", "xai"),
                            ("wan2.2-t2i-flash", "qwen"),
-                           ("gemini-3.1-flash-image-preview", "google")]:
+                           ("gemini-3.1-flash-image", "google")]:
             self._equiv_build(name, prov, prompt, img)
 
     def test_parse_text_and_json(self):
