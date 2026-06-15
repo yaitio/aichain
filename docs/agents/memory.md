@@ -43,7 +43,7 @@ Note: the `clear()` at the start means **reusing the same `AgentMemory` instance
 From outside the agent:
 
 ```python
-from agent import AgentMemory
+from yait_aichain.agent import AgentMemory
 
 memory = AgentMemory({"language": "Ukrainian"})
 
@@ -85,7 +85,7 @@ These are merged in **after** `clear()`, so they're always present at step 1.
 ### 2. Via a pre-populated `AgentMemory`
 
 ```python
-from agent import AgentMemory
+from yait_aichain.agent import AgentMemory
 
 memory = AgentMemory({
     "company_profile": "…",
@@ -115,7 +115,7 @@ Pure in-process. `clear()` wipes the dict; nothing is written anywhere. This is 
 Writes the full memory state to a JSON file atomically (temp file + rename, so a crash mid-write never corrupts the file).
 
 ```python
-from agent import AgentMemory, FileBackend
+from yait_aichain.agent import AgentMemory, FileBackend
 
 backend = FileBackend("~/.my_agent.json")
 memory  = AgentMemory(backend=backend)
@@ -130,7 +130,7 @@ On construction, `AgentMemory.__init__()` calls `backend.load()` and uses the re
 The correct pattern:
 
 ```python
-from agent import AgentMemory, FileBackend
+from yait_aichain.agent import AgentMemory, FileBackend
 
 PATH = "~/.my_agent.json"
 
@@ -157,7 +157,7 @@ Two rules:
 Subclass `MemoryBackend` and implement three methods:
 
 ```python
-from agent import MemoryBackend
+from yait_aichain.agent import MemoryBackend
 
 class RedisBackend(MemoryBackend):
     def __init__(self, redis_client, key: str):

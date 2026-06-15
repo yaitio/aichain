@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **57 models from 8 providers** — with one line to swap any of them.
+All of these work identically across **62 models from 8 providers** — with one line to swap any of them.
 
 ---
 
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-57 models total. Full list: [model registry →](docs/reference/model-registry.md)
+62 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -122,7 +122,7 @@ print(pool.history)  # per-item: status, output, error, duration
 
 ```python
 agent  = Agent(
-    orchestrator = Model("claude-opus-4-6"),
+    orchestrator = Model("claude-opus-4-8"),
     tools        = [searchPerplexity(), convertToMD()],
     mode         = "agile",
     max_steps    = 10,
@@ -239,7 +239,7 @@ Embedding("voyage/voyage-3-large")
 
 ## Examples
 
-→ **[examples/](examples/README.md)** — 16 focused examples, one concept each
+→ **[examples/](examples/README.md)** — 18 focused examples, one concept each
 
 | # | File | What it shows |
 |---|---|---|
@@ -259,6 +259,8 @@ Embedding("voyage/voyage-3-large")
 | 14 | `14_agent_tools.py` | Agent picks its own tools |
 | 15 | `15_agent_orchestrator.py` | Orchestrator spawns sub-agents |
 | 16 | `16_debug.py` | Inspect Chain history, Pool status, Agent steps |
+| 17 | `17_chain_human_input.py` | Pause a chain for human approval, then resume |
+| 18 | `18_agent_external_trigger.py` | Suspend an agent; a webhook resumes it (cross-process) |
 
 ---
 
@@ -279,14 +281,14 @@ chain = Chain.load("chains/research.yaml")
 
 | Provider | Text | Vision | Image gen | Env var |
 |---|---|---|---|---|
-| **Anthropic** | Claude Opus / Sonnet / Haiku 4 | ✓ | — | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-5.5, GPT-5.4, GPT-4o | ✓ | GPT-Image-1 | `OPENAI_API_KEY` |
+| **Anthropic** | Claude Fable 5, Opus / Sonnet / Haiku 4 | ✓ | — | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-5.5, GPT-5.4, GPT-4o | ✓ | ChatGPT-Image, GPT-Image-2 | `OPENAI_API_KEY` |
 | **Google** | Gemini 2.5 Pro / Flash, 3.x | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
 | **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `XAI_API_KEY` |
 | **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |
 | **Kimi** | K2.5, K2, K2 Turbo, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
 | **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | — | — | `DEEPSEEK_API_KEY` |
-| **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wanx image models | `DASHSCOPE_API_KEY` |
+| **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wan 2.2 image | `DASHSCOPE_API_KEY` |
 
 **Embedding:** OpenAI · Cohere · Voyage · Google · Qwen  
 **Reranking:** Cohere · Voyage · Qwen  

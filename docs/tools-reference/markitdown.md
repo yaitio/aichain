@@ -3,7 +3,7 @@
 Convert **any file or URL to Markdown** using Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) library. The standard companion to any link-returning search tool.
 
 ```python
-from tools import MarkItDownTool
+from yait_aichain.tools import MarkItDownTool
 
 tool     = MarkItDownTool()
 markdown = tool.run(source="report.pdf")
@@ -84,7 +84,7 @@ tool.run(source="data.xlsx", output_path="exports/data.md")
 
 ```python
 import openai
-from tools import MarkItDownTool
+from yait_aichain.tools import MarkItDownTool
 
 tool = MarkItDownTool(
     llm_client = openai.OpenAI(),
@@ -96,10 +96,10 @@ result = tool(source="architecture_diagram.png")
 ### In a Chain — search → fetch → summarise
 
 ```python
-from chain import Chain
-from tools import BraveSearchTool, MarkItDownTool
-from skills import Skill
-from models import Model
+from yait_aichain.chain import Chain
+from yait_aichain.tools import BraveSearchTool, MarkItDownTool
+from yait_aichain.skills import Skill
+from yait_aichain.models import Model
 
 summariser = Skill(
     model  = Model("gpt-4o-mini"),
@@ -123,9 +123,9 @@ chain = Chain(steps=[
 Together with a search tool, this is the canonical 2-tool research loop:
 
 ```python
-from agent import Agent
-from models import Model
-from tools import BraveSearchTool, MarkItDownTool
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.tools import BraveSearchTool, MarkItDownTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),

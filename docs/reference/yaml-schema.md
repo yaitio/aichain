@@ -16,7 +16,7 @@ pip install pyyaml
 ```python
 skill.save("skills/translation.yaml")
 
-from skills import Skill
+from yait_aichain.skills import Skill
 skill = Skill.load("skills/translation.yaml")
 ```
 
@@ -117,7 +117,7 @@ output:
 ```python
 chain.save("chains/analyse_and_translate.yaml")
 
-from chain import Chain
+from yait_aichain.chain import Chain
 chain = Chain.load("chains/analyse_and_translate.yaml")
 result = chain.run(variables={"topic": "AI safety", "language": "French"})
 ```

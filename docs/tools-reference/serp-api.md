@@ -3,7 +3,7 @@
 Multi-engine search via **SerpAPI**. One tool, 50+ underlying engines: Google, Bing, Yahoo, DuckDuckGo, Baidu, Yandex, Google News, Google Scholar, Google Shopping, Google Maps, Google Jobs, and more. Pick the engine with a single parameter.
 
 ```python
-from tools import SerpApiTool
+from yait_aichain.tools import SerpApiTool
 
 tool   = SerpApiTool()
 result = tool(query="Python asyncio tutorial", num=5)          # Google by default
@@ -100,9 +100,9 @@ tool.run(query="AI regulation",     engine="google_news", num=20)    # news only
 ### In an Agent
 
 ```python
-from agent import Agent
-from models import Model
-from tools import SerpApiTool, MarkItDownTool
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.tools import SerpApiTool, MarkItDownTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),

@@ -1,216 +1,199 @@
-# Agent overview
+# Agent
 
-An **Agent** is an autonomous execution engine. You describe a task in natural language; the agent figures out the steps, calls the right tools, reflects on what it got back, and stops when it has the answer.
+An **Agent** is an autonomous execution engine. You describe a task in natural
+language; the agent plans the steps, calls the right tools, reflects on each
+result, and stops when it has the answer. Use it when the *sequence* of steps
+isn't known upfront — research, multi-source reasoning, exploratory work. For a
+fixed pipeline, use a [Chain](../primitives/chain.md).
+
+---
+
+## Quick start
 
 ```python
-from models import Model
-from agent  import Agent
-from tools  import PerplexitySearchTool, MarkItDownTool
+import os
+from yait_aichain.models import Model
+from yait_aichain.agent  import Agent
+from yait_aichain.tools  import PerplexitySearchTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
-    tools        = [PerplexitySearchTool(), MarkItDownTool()],
-    mode         = "agile",
+    orchestrator = Model("claude-opus-4-8", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    tools        = [PerplexitySearchTool()],
     max_steps    = 8,
-    verbose      = 1,
 )
 
-result = agent.run("Research the top 3 ERP vendors in Kazakhstan and return a Markdown table.")
-
+result = agent.run("Find the top 3 ERP vendors in Kazakhstan and return a Markdown table.")
 if result:
-    print(result.output)
+    print(result.output, "·", result.steps_taken, "steps ·", result.tokens_used, "tokens")
 else:
     print("Failed:", result.error)
 ```
 
-Use an Agent when the work requires **planning**, **multiple tool calls**, and **judgement about intermediate results** — research tasks, multi-step transformations, anything where the sequence of steps isn't known upfront.
-
-For fixed pipelines with known data flow, use a [Chain](../primitives/chain.md) instead.
-
----
-
-## The three phases per step
-
-For every step, the **orchestrator model** makes three structured LLM calls:
-
-```
-┌───────────────────────────────────────────────────────────┐
-│                                                           │
-│   1. PLAN                                                 │
-│      (once, up front)                                     │
-│      task + tools + memory → ordered list of steps       │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌───────────────────────────────────────────────────────────┐
-│                                                           │
-│    for each step in plan:                                 │
-│                                                           │
-│    2. ACTION                                              │
-│       step goal + context → tool call OR skill prompt    │
-│                                                           │
-│    3. EXECUTE                                             │
-│       run the tool / call the skill                       │
-│                                                           │
-│    4. REFLECT                                             │
-│       what happened? → continue | retry | replan | stop  │
-│                       | final_answer                      │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
-```
-
-- **Plan** is called once at the start. It returns an ordered list of steps, each tagged `tool` or `skill`.
-- **Action** turns the step's natural-language goal into a concrete call: exact tool kwargs, or a system/user prompt for a skill.
-- **Reflect** assesses the output and decides what happens next.
-
-Every orchestrator call uses structured JSON. The agent parses it robustly — plain JSON, fenced `` ```json ``, or the first `{...}` block in the response.
+▶ One tool: [`examples/13_agent.py`](../../examples/13_agent.py) ·
+Multiple tools: [`examples/14_agent_tools.py`](../../examples/14_agent_tools.py) ·
+Sub-agents: [`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
+Deep dive ↓
 
 ---
 
-## Reflection decisions
+## Common gotchas
 
-After every step's execution, reflection picks one of five decisions:
+- **`run()` never raises.** It returns an `AgentResult`; check `result.success`
+  (and `bool(result)` *is* `success`). On failure, read `result.error`.
+- **It can also pause.** With a `Wait`/`Gate` tool, `run()` returns a
+  `SuspendedResult` instead — resume with `agent.resume(run_id, signal)`. See
+  [Suspend & resume](#suspend--resume).
+- **Budgets stop runaway loops.** `max_steps`, `max_attempts`, and `max_tokens`
+  each cap a different axis; the agent stops cleanly when any is hit.
+- **`agile` mode can replan.** Use it for exploratory tasks; `waterfall` (the
+  default) keeps the original plan and only retries.
+
+---
+
+## Reference
+
+### Constructor
+
+```python
+Agent(orchestrator, tools=None, executors=None, mode="waterfall",
+      max_steps=10, max_attempts=3, max_tokens=50_000, memory=None,
+      verbose=0, name=None, description=None, persona=None,
+      allow_spawn=False, store=None)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `orchestrator` | — | The `Model` that plans, decides actions, and reflects. |
+| `tools` | `None` | Tools the agent may call. |
+| `executors` | `[orchestrator]` | Models available to run "skill"-type steps (the orchestrator picks one). |
+| `mode` | `"waterfall"` | `"waterfall"` or `"agile"` (see [Modes](#modes)). |
+| `max_steps` | `10` | Hard cap on executed plan steps. |
+| `max_attempts` | `3` | Retries per step. |
+| `max_tokens` | `50_000` | Total token budget across all LLM calls. |
+| `memory` | `AgentMemory()` | Working memory; pass a persistent one to carry state across runs ([Memory](memory.md)). |
+| `persona` | `None` | System persona steering tone/role. |
+| `allow_spawn` | `False` | Let the agent spawn sub-agents via a `spawn_agent` tool. |
+| `store` | `InMemoryStore()` | Where suspended runs are parked ([Suspend & resume](#suspend--resume)). |
+| `verbose` | `0` | `0` silent · `1` per-step status · `2` full payloads + token breakdowns. |
+
+`agent.run(task, variables=None)` executes; `agent.resume(run_id, signal=None)`
+continues a suspended run. Both return an `AgentResult` (or a `SuspendedResult`
+on pause).
+
+### The loop: plan → act → reflect
+
+The orchestrator plans **once**, then for each step makes structured calls:
+
+```
+1. PLAN     (once)   task + tools + memory → ordered steps, each tagged tool|skill
+   for each step:
+2. ACTION            step goal + context → concrete tool kwargs OR a skill prompt
+3. EXECUTE           run the tool / call the skill
+4. REFLECT           assess → continue | retry | replan | stop | final_answer
+```
+
+Every orchestrator call is structured JSON; the agent parses it robustly (plain
+JSON, fenced ```` ```json ````, or the first `{...}` block).
+
+### Reflection decisions
 
 | Decision | Effect |
 |---|---|
-| `continue` | Success. Move to the next step. |
-| `retry` | Something went wrong; retry the same step. Capped by `max_attempts`. |
-| `replan` | (agile only) Produce a revised plan and optionally jump back to an earlier step. |
-| `stop` | Fatal error. Agent returns `success=False`. |
-| `final_answer` | Agent has everything it needs. Return that answer immediately, skipping any remaining steps. |
+| `continue` | Success — move to the next step. |
+| `retry` | Retry the same step (capped by `max_attempts`). |
+| `replan` | *(agile only)* Produce a revised plan; optionally jump to an earlier step. |
+| `stop` | Fatal — return `success=False`. |
+| `final_answer` | Done — return the answer now, skipping remaining steps. |
 
-Reflection also picks a **`store_as`** key — a snake_case variable name where the step's output lands in memory. Downstream steps reference it by that name.
+Reflection also assigns a `store_as` key: a snake_case name where the step
+output lands in memory for later steps to reference.
 
----
-
-## Waterfall vs agile
-
-Two execution modes:
+### Modes
 
 | Mode | Plan can change? | Use when |
 |---|---|---|
-| `waterfall` | No | The path is predictable (fixed research → synthesis → output). Retries still allowed. |
-| `agile` | Yes, via `replan` decisions | The path is exploratory. Early steps may reveal that later steps need to change — agent adapts based on what it learns. |
+| `waterfall` (default) | No (retries only) | The path is predictable. |
+| `agile` | Yes, via `replan` | The path is exploratory; later steps depend on what early ones reveal. |
 
-In agile mode, `replan` returns a new step list and a `goto_step` index. The agent jumps to that step and continues. The same `max_tokens` budget caps overall spend either way.
+### Budgets
 
----
-
-## Early exit: `final_answer`
-
-Two shortcuts let the agent return before running every step:
-
-1. **Action-level** — during action determination, the orchestrator can return `{"type": "final_answer", "answer": "..."}` directly. The step doesn't execute; the answer is returned immediately.
-2. **Reflection-level** — after a step executes, reflection can decide `"final_answer"` and provide the final output.
-
-Both count the tokens consumed up to that point and return `success=True`.
-
----
-
-## Budgets
-
-Three independent limits:
-
-| Limit | Default | What happens when hit |
+| Limit | Default | When hit |
 |---|---|---|
-| `max_steps` | `10` | The plan is truncated; the agent never runs more than this many distinct steps. |
-| `max_attempts` | `3` | Retries per step are capped. After the cap, the loop moves on (step recorded as failed). |
-| `max_tokens` | `50_000` | Total token budget across plan + actions + executions + reflections. Agent stops cleanly when exceeded. |
+| `max_steps` | `10` | The plan is truncated; never more than this many steps. |
+| `max_attempts` | `3` | Retries per step are capped, then the loop moves on. |
+| `max_tokens` | `50_000` | Total across plan + actions + executions + reflections; the agent stops cleanly. |
 
-Token usage is extracted from every raw provider response and accumulated in `result.tokens_used`.
+### `AgentResult`
 
----
-
-## AgentResult
-
-`agent.run()` **never raises**. Check the return value instead:
-
-```python
-result = agent.run("…")
-
-if result:                    # bool(result) == result.success
-    print(result.output)
-else:
-    print("Failed:", result.error)
-```
+`run()` never raises — inspect the result:
 
 | Field | Description |
 |---|---|
-| `success: bool` | `True` on successful completion. |
-| `output: Any` | The final answer (`None` on failure). |
-| `mode: str` | `"waterfall"` or `"agile"`. |
-| `steps_taken: int` | How many plan steps were executed. |
+| `success: bool` | `True` on completion; `bool(result)` mirrors it. |
+| `output` | The final answer (`None` on failure). |
+| `steps_taken: int` | Plan steps executed. |
 | `tokens_used: int` | Total tokens across all LLM calls. |
-| `plan: list[dict]` | The final plan (may differ from the initial plan in agile mode). |
-| `history: list[dict]` | Full per-attempt trace — action, output, reflection, tokens. |
-| `memory: dict` | Snapshot of the agent's memory at the end. |
+| `plan: list[dict]` | The final plan (may differ from the first in agile mode). |
+| `history: list[dict]` | Per-attempt trace: action, output, reflection, tokens. |
+| `memory: dict` | Memory snapshot at the end. |
 | `error: str \| None` | Failure reason. |
-
-Inspecting the trace:
 
 ```python
 for rec in result.history:
-    print(f"Step {rec['step']+1} attempt {rec['attempt']} [{rec['action_type']}] {rec['step_goal']}")
-    print(f"  → assessment: {rec['reflection']['assessment']}")
-    print(f"  → stored as : {rec['stored_as']}")
-    print(f"  → tokens    : {rec['tokens']:,}")
+    print(f"step {rec['step']+1} [{rec['action_type']}] {rec['step_goal']}"
+          f" → {rec['reflection']['assessment']} ({rec['tokens']:,} tok)")
 ```
 
----
+### Suspend & resume
 
-## Verbosity
+An agent run can pause for an external signal and continue later — even in
+another process. Give the agent a `Wait`/`Gate` tool and (for cross-process) a
+persistent `store`:
 
-Three levels:
+```python
+from yait_aichain.tools import Gate
+from yait_aichain.state import FileStore, SuspendedResult
 
-| `verbose` | Output |
+agent = Agent(
+    orchestrator = Model("gpt-4o"),
+    tools        = [Gate(IssueRefund(), reason="Manager must approve",
+                         resume_with={"approved": "bool"})],
+    store        = FileStore("runs/"),
+)
+
+res = agent.run("Issue a refund for order #123.")
+if isinstance(res, SuspendedResult):
+    # ...later, a webhook delivers the decision (possibly another process)...
+    final = agent.resume(res.run_id, signal={"approved": True})
+```
+
+`resume()` restores memory, the plan, and the cursor, then runs to completion.
+See [State](../primitives/state.md) for stores, `Wait`/`Gate`, and the
+cross-process pattern.
+
+### Sub-agents
+
+With `allow_spawn=True`, the orchestrator gets a `spawn_agent` tool and can
+delegate a sub-task to a fresh agent (its own tools/model), then use the result.
+Good for fan-out research — one sub-agent per topic.
+
+### When to reach for an Agent
+
+| Situation | Use |
 |---|---|
-| `0` (default) | Silent. |
-| `1` | Plan overview, one status line per step, final summary. |
-| `2` | Everything in level 1 plus full action payloads (tool kwargs / skill prompts), output previews, per-call token breakdowns, reflection reasoning. |
+| One model call, known prompt | [Skill](../primitives/skills.md) |
+| Fixed sequence with known data flow | [Chain](../primitives/chain.md) |
+| Search → read → cross-reference → reason | **Agent** |
+| Exploratory; next step depends on what you learned | **Agent (agile)** |
 
-Example at `verbose=1`:
-
-```
-╔══ Agent: research_agent │ mode=agile │ budget=40,000 tokens ══════════════
-║  Task   : Research top 3 ERP vendors in Kazakhstan…
-║  Tools  : ['perplexity_search', 'markitdown']
-║  Execs  : ['claude-opus-4-6']
-╚══════════════════════════════════════════════════════════════════════
-
-[Plan] Generating plan…
-[Plan] 4 step(s) · +612 tokens
-        1.  ⚙  perplexity_search       Search for ERP market share KZ
-        2.  ⚙  perplexity_search       Find vendor differentiators
-        3.  ◆  claude-opus-4-6         Synthesise findings
-        4.  ◆  claude-opus-4-6         Format as Markdown table
-
-[Step 1/4]  Search for ERP market share KZ
-  ⚙  perplexity_search  {"query": "ERP vendors market share Kazakhstan 2025"}
-  →  SAP holds approx. 38%, 1C ~30%, Oracle ~12%, others…
-  ↳  success  ·  →  next step  ·  stored as 'market_share_data'  ·  +890 tokens
-…
-[Done] ✓ All steps complete · 4 step(s) · 18,420 tokens total
-```
-
----
-
-## When to reach for an Agent
-
-| Situation | Use Agent? |
-|---|---|
-| Single model call with known prompt | No — use [Skill](../primitives/skills.md). |
-| Fixed sequence of Skills/Tools with known data flow | No — use [Chain](../primitives/chain.md). |
-| Task that needs searching, reading, cross-referencing, and reasoning across sources | **Yes**. |
-| Open-ended exploration where the right next step depends on what you just learned | **Yes, agile mode**. |
-| Long document generation with a predictable structure | Consider Chain with [sectional pattern](../primitives/chain.md); use Agent only for the research phase. |
-
-Agents can also be embedded **inside** a Chain — the agent handles the open-ended phase; the Chain handles the rest. See [Agent as Chain step](agent-as-chain-step.md).
+An agent can also be one step *inside* a Chain — it handles the open-ended
+phase, the Chain handles the rest. See [Agent as a Chain step](agent-as-chain-step.md).
 
 ---
 
 ## See also
 
-- **Constructor parameters, tools, executors, persona** → [Configuration](configuration.md)
-- **Shared state across steps; persistent memory across runs** → [Memory](memory.md)
-- **Use an Agent as one step in a Chain** → [Agent as Chain step](agent-as-chain-step.md)
+- [Configuration](configuration.md) — tools, executors, persona, modes in depth.
+- [Memory](memory.md) — shared step state and persistent cross-run memory.
+- [State](../primitives/state.md) — suspend/resume, stores, `Wait`/`Gate`.
+- [Agent as a Chain step](agent-as-chain-step.md).

@@ -9,14 +9,14 @@ A `Chain` that composes a text model and a text-to-image model: a frontier LLM e
 - `Chain`
 - `Skill` (prompt engineering + image rendering)
 - `Model` — text side (`claude-sonnet-4-6`, `gpt-4o`, `gemini-2.5-pro`, …)
-- `Model` — image side (`gpt-image-1`, `grok-imagine-image-pro`, `gemini-3.1-flash-image-preview`)
+- `Model` — image side (`chatgpt-image-latest`, `gpt-image-2`, `grok-imagine-image-pro`, `gemini-3.1-flash-image-preview`, `wan2.2-t2i-flash`)
 
 ## Key decisions
 
 - Single-step render vs two-step (prompt-engineer → render) — the engineered-prompt variant produces markedly stronger results because the image model receives concrete visual language rather than a raw brief.
 - One image vs N variants (conservative / contemporary / distinctive) — use `json_schema` output on the art-director step to produce structured direction objects, then invoke the renderer Skill once per direction.
-- Which image provider — OpenAI `gpt-image-1.5` for highest fidelity, xAI `grok-imagine-image-pro` for artistic range, Google `gemini-3-pro-image-preview` for scene coherence.
-- Base64 vs URL — all three image providers are normalised to the same `{url, base64, mime_type, revised_prompt}` dict; `mime_type` is detected from image magic bytes so the file extension is always accurate.
+- Which image provider — OpenAI `chatgpt-image-latest` for fast high fidelity (and real transparent PNG via `background: "transparent"`), xAI `grok-imagine-image-pro` for artistic range, Google `gemini-3.1-flash-image-preview` for scene coherence and the strongest in-image text.
+- Base64 vs URL — every image provider is normalised to the same `{url, base64, mime_type, revised_prompt}` dict; `mime_type` is detected from image magic bytes so the file extension is always accurate.
 
 ## Worked example
 

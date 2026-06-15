@@ -5,7 +5,7 @@ A complete, machine-queryable inventory of every model officially supported by t
 The registry is **reference data only** — the `Model` factory accepts any valid model name regardless of whether it appears here. Use the registry for discovery, documentation, and light validation in application code.
 
 ```python
-from models import registry
+from yait_aichain.models import registry
 
 registry.models(provider="anthropic")
 registry.providers(task="text-to-image")     # ["google", "openai", "xai"]
@@ -27,9 +27,9 @@ registry.is_supported("gpt-image-1", "text-to-image")   # True
 
 ## Providers
 
-`openai`, `anthropic`, `google`, `xai`, `perplexity`, `kimi`, `deepseek`.
+`openai`, `anthropic`, `google`, `xai`, `perplexity`, `kimi`, `deepseek`, `qwen`.
 
-A provider is absent for a task it does not support (Anthropic has no text-to-image; Perplexity, Kimi, and DeepSeek have no image-generation models).
+A provider is absent for a task it does not support (Anthropic has no text-to-image; Perplexity, Kimi, and DeepSeek have no image-generation models). Image generation is available on OpenAI, Google, xAI, and Qwen.
 
 ---
 
@@ -50,12 +50,13 @@ gpt-4o-mini
 
 ### `text-to-image`
 ```
-gpt-image-2             # latest
+chatgpt-image-latest    # always-current model used by ChatGPT — fast, recommended
+gpt-image-2             # latest snapshot
 gpt-image-1.5
 gpt-image-1-mini
 gpt-image-1
 ```
-`dall-e-2` / `dall-e-3` are deprecated (scheduled removal 2026-05-12) and excluded from the registry.
+For `gpt-image-*` / `chatgpt-image-*`, pass `output={"format": {"background": "transparent", "output_format": "png"}}` for a real PNG alpha channel. `dall-e-2` / `dall-e-3` are deprecated and excluded from the registry.
 
 ### `image-to-text`
 Every GPT-5, GPT-4.1, GPT-4o, and o-series model accepts image input.
@@ -68,6 +69,9 @@ All Claude models accept image input — the `image-to-text` list mirrors `text-
 
 ### `text-to-text` and `image-to-text`
 ```
+claude-fable-5            # flagship
+claude-opus-4-8
+claude-opus-4-7
 claude-opus-4-6
 claude-sonnet-4-6
 claude-haiku-4-5-20251001
@@ -170,6 +174,40 @@ deepseek-reasoner   # DeepSeek-R1 — always-on chain-of-thought; reasoning_cont
 ```
 
 > **Note:** When `reasoning="high"` is set on any DeepSeek model instance, the library automatically uses `deepseek-reasoner` as the effective model name. `temperature` and `top_p` are omitted from the request body for `deepseek-reasoner` (the API ignores them).
+
+---
+
+## Qwen (DashScope)
+
+The base URL is region-resolved (`ap` default, `us`, `cn`, `hk`; override with
+`client_options={"region": ...}` or `DASHSCOPE_REGION`). Text and vision ride
+the OpenAI-compatible endpoint; the `wan` image models use DashScope's native
+async task API (submit → poll → download), handled transparently by the client.
+
+### `text-to-text`
+```
+qwen3-max
+qwen-max
+qwen-plus
+qwen-turbo
+qwen3-235b-a22b
+qwen3-72b
+qwen3-32b
+QwQ-32B
+```
+
+### `image-to-text`
+```
+qwen3-vl-plus            # also text-to-text
+qwen-vl-max
+qwen-vl-plus
+```
+
+### `text-to-image`
+```
+wan2.2-t2i-flash         # fast
+wan2.2-t2i-plus          # higher quality
+```
 
 ---
 
