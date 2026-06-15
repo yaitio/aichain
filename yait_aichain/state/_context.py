@@ -2,10 +2,11 @@
 state._context — RunContext
 ===========================
 
-Non-secret per-request context, injected into a single ``run()`` and threaded
-down to steps and tools. Carries the tenant, tracing ids, and arbitrary
-metadata — NOT secrets. API keys stay on ``Model`` / ``Tool`` (``api_key=`` or
-env), supplied when the scenario is built.
+Non-secret per-request context for a single ``run()`` / ``resume()``. Carries
+the tenant, tracing ids, and arbitrary metadata — NOT secrets (API keys stay on
+``Model`` / ``Tool``). It is exposed as ``chain.context`` / ``agent.context``
+for the duration of the run and is persisted in the run document, so it is
+restored on ``resume`` (even in another process).
 """
 
 from __future__ import annotations
@@ -23,8 +24,9 @@ class RunContext:
     tenant : str | None
         Logical tenant / account this run belongs to.
     metadata : dict
-        Arbitrary non-secret data (user id, request id, locale, trace ids …)
-        available to steps and tools for logging and routing.
+        Arbitrary non-secret data (user id, request id, locale, trace ids …),
+        available via ``chain.context`` / ``agent.context`` for logging and
+        routing.
     """
 
     tenant:   "str | None" = None
@@ -33,3 +35,13 @@ class RunContext:
     def get(self, key: str, default=None):
         """Convenience read from ``metadata``."""
         return self.metadata.get(key, default)
+
+    def to_dict(self) -> dict:
+        return {"tenant": self.tenant, "metadata": dict(self.metadata)}
+
+    @classmethod
+    def from_dict(cls, data: "dict | None") -> "RunContext":
+        if not data:
+            return cls()
+        return cls(tenant=data.get("tenant"),
+                   metadata=dict(data.get("metadata") or {}))

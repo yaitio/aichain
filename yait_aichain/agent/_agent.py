@@ -317,6 +317,7 @@ class Agent:
         # path; pass store= for persistence across processes.
         from ..state import InMemoryStore
         self._store = store or InMemoryStore()
+        self.context = None              # per-request RunContext (set during run/resume)
 
         # ── Build tool list ───────────────────────────────────────────────
         tool_list: list = list(tools or [])
@@ -337,6 +338,8 @@ class Agent:
         self,
         task:      str,
         variables: dict | None = None,
+        *,
+        context=None,
     ) -> AgentResult:
         """
         Execute *task* autonomously and return an :class:`AgentResult`.
@@ -363,6 +366,7 @@ class Agent:
         self.memory.reset()
         if variables:
             self.memory.update(variables)
+        self.context = context           # per-request context for this run
 
         history:      list[dict] = []
         tokens_used:  int        = 0
@@ -447,7 +451,7 @@ class Agent:
             tokens_used=tokens_used, resume_action=None, resume_signal=None,
         )
 
-    def resume(self, run_id: str, signal=None) -> "AgentResult":
+    def resume(self, run_id: str, signal=None, *, context=None) -> "AgentResult":
         """
         Resume a previously suspended agent run.
 
@@ -456,7 +460,7 @@ class Agent:
         plan/act/reflect loop. Idempotent: a ``run_id`` no longer in the store
         raises ``KeyError`` (already resumed or unknown).
         """
-        from ..state import RunDocument
+        from ..state import RunDocument, RunContext
 
         raw = self._store.load(run_id)
         if raw is None:
@@ -467,6 +471,8 @@ class Agent:
         doc = RunDocument.from_dict(raw)
         if doc.suspended_step() is None:
             return None                      # not suspended → idempotent no-op
+        # Restore the run's context unless the caller supplied a new one.
+        self.context = context if context is not None else RunContext.from_dict(doc.context)
 
         defn = doc.definition or {}
         self.memory.reset()
@@ -1008,6 +1014,7 @@ class Agent:
         names = [str(s.get("goal") or f"step_{i}")
                  for i, s in enumerate(current_plan)]
         doc = RunDocument.new("agent", names, variables=self.memory.all())
+        doc.context = self.context.to_dict() if self.context is not None else None
         for i, st in enumerate(doc.steps):
             if i < step_idx:
                 st["status"] = StepStatus.DONE

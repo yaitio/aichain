@@ -74,8 +74,19 @@ class FileStore(StateStore):
         path = self._path(run_id)
         fd, tmp = tempfile.mkstemp(dir=self._dir, suffix=".tmp")
         try:
+            try:
+                payload = json.dumps(document, ensure_ascii=False)
+            except TypeError as exc:
+                # A chain variable or step output that reached the suspend point
+                # is not JSON-serialisable; a persistent store can't park it.
+                raise ValueError(
+                    "Cannot persist the suspended run: a variable or step "
+                    "output is not JSON-serialisable (e.g. bytes, a set, or a "
+                    "custom object). Persistent stores require JSON-safe values "
+                    f"at suspend points. ({exc})"
+                ) from exc
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(document, fh, ensure_ascii=False)
+                fh.write(payload)
                 fh.flush()
                 os.fsync(fh.fileno())     # durable on disk before the rename
             os.replace(tmp, path)

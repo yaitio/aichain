@@ -292,6 +292,9 @@ class Chain:
         # Summed token usage of the last run() across Skill steps; None until
         # the first run or when no step reported usage. Reading is optional.
         self.last_usage: "Usage | None" = None
+        # Per-request RunContext for the current run() / resume() (tenant +
+        # metadata); set while a run is in flight, restored on resume.
+        self.context = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -373,7 +376,7 @@ class Chain:
                 f"got {_on_error!r}"
             )
 
-        from ..state import RunDocument
+        from ..state import RunDocument, RunContext
         from ..models._usage import Usage
 
         raw = self._store.load(run_id)
@@ -383,6 +386,9 @@ class Chain:
                 f"(already resumed/completed, or unknown id)."
             )
         doc   = RunDocument.from_dict(raw)
+        # Restore the run's context unless the caller supplied a new one.
+        if context is None and doc.context is not None:
+            context = RunContext.from_dict(doc.context)
         start = doc.first_pending()
         if start is None or doc.suspended_step() is None:
             return None   # not actually suspended → idempotent no-op
@@ -398,6 +404,20 @@ class Chain:
         return self._run_from(doc, accumulated, start_idx=start, signal=signal,
                               usage_in=usage_in, on_error=_on_error, context=context)
 
+    def _park(self, doc, idx, awaiting, accumulated, usage_total, history):
+        """Persist the run as suspended at *idx* and return a SuspendedResult."""
+        from ..state import StepStatus, SuspendedResult
+        doc.steps[idx]["status"]  = StepStatus.SUSPENDED
+        doc.steps[idx]["suspend"] = awaiting
+        doc.variables = dict(accumulated)
+        doc.usage     = _usage_to_dict(usage_total)
+        self._history     = history
+        self._accumulated = dict(accumulated)
+        self.last_usage   = usage_total
+        self._store.save(doc.run_id, doc.to_dict())
+        return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
+                               document=doc.to_dict())
+
     def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
                   on_error, context) -> "str | dict | None":
         """
@@ -406,6 +426,11 @@ class Chain:
         *start_idx* (the suspended tool) via ``_signal=``.
         """
         from ..state import StepStatus, Suspend, SuspendedResult
+
+        # Expose the per-request context for the duration of the run and persist
+        # it in the document so it survives suspend/resume.
+        self.context = context
+        doc.context  = context.to_dict() if context is not None else None
 
         history:     list[dict] = []
         last_output: "str | dict | None" = None
@@ -426,15 +451,30 @@ class Chain:
                         output = runner.run(**kwargs)
 
                 elif kind == "agent":
-                    task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
-                    task     = accumulated.get(task_key, "")
-                    if not task:
-                        raise ValueError(
-                            f"Agent step {idx} ({name!r}): accumulated variable "
-                            f"{task_key!r} is empty or missing.  Set it in a "
-                            f"prior step or in the initial variables."
-                        )
-                    agent_result = runner.run(task=task, variables=accumulated)
+                    # On resume of a previously-suspended agent step, continue
+                    # the child run instead of starting a new one.
+                    child_id = (doc.steps[idx].get("suspend", {}).get("child_run_id")
+                                if step_signal is not None else None)
+                    if child_id is not None:
+                        agent_result = runner.resume(child_id, signal=step_signal)
+                    else:
+                        task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
+                        task     = accumulated.get(task_key, "")
+                        if not task:
+                            raise ValueError(
+                                f"Agent step {idx} ({name!r}): accumulated variable "
+                                f"{task_key!r} is empty or missing.  Set it in a "
+                                f"prior step or in the initial variables."
+                            )
+                        agent_result = runner.run(task=task, variables=accumulated)
+
+                    # The nested agent paused (Wait/Gate) — suspend the chain
+                    # too, recording the child run_id so resume can continue it.
+                    if isinstance(agent_result, SuspendedResult):
+                        awaiting = dict(agent_result.awaiting or {})
+                        awaiting["child_run_id"] = agent_result.run_id
+                        return self._park(doc, idx, awaiting, accumulated,
+                                          usage_total, history)
 
                     if not agent_result:
                         raise RuntimeError(
@@ -464,19 +504,8 @@ class Chain:
                 awaiting = {"reason":      susp.reason,
                             "resume_with": susp.resume_with,
                             "hint":        susp.hint}
-                doc.steps[idx]["status"]  = StepStatus.SUSPENDED
-                doc.steps[idx]["suspend"] = awaiting
-                doc.variables = dict(accumulated)
-                doc.usage     = _usage_to_dict(usage_total)
-                self._history     = history
-                self._accumulated = dict(accumulated)
-                self.last_usage   = usage_total
-                self._store.save(doc.run_id, doc.to_dict())
-                return SuspendedResult(
-                    run_id   = doc.run_id,
-                    awaiting = awaiting,
-                    document = doc.to_dict(),
-                )
+                return self._park(doc, idx, awaiting, accumulated,
+                                  usage_total, history)
 
             except Exception as exc:
                 history.append({
@@ -490,18 +519,24 @@ class Chain:
                     "error":      str(exc),
                 })
 
-                if on_error == "raise":
+                if on_error in ("raise", "stop"):
+                    # Terminal exit: mark the step failed and drop any parked
+                    # document so a re-resume can't re-run the already-attempted
+                    # steps (a duplicate trigger becomes a no-op / KeyError).
+                    doc.steps[idx]["status"] = StepStatus.FAILED
+                    self._store.delete(doc.run_id)
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total
-                    raise
-
-                if on_error == "stop":
-                    self._history     = history
-                    self._accumulated = dict(accumulated)
-                    self.last_usage   = usage_total
+                    if on_error == "raise":
+                        raise
                     return last_output
 
+                # skip: record a terminal SKIPPED status so resume does not
+                # re-run this step (first_pending would otherwise land on it).
+                doc.steps[idx]["status"] = StepStatus.SKIPPED
+                doc.steps[idx].pop("suspend", None)
+                doc.variables = dict(accumulated)
                 warnings.warn(
                     f"Chain step {idx} ({name!r}) failed and was skipped: {exc}. "
                     f"Downstream steps that read {output_key!r} will receive a "
