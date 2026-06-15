@@ -167,10 +167,15 @@ stay on `Model`/`Tool`) into a run:
 from yait_aichain.state import RunContext
 
 chain.run(variables={...}, context=RunContext(tenant="acme", metadata={"req": "r-42"}))
+chain.context.tenant          # "acme" — available for the duration of the run
+chain.context.get("req")      # "r-42"
 ```
 
 `RunContext(tenant=None, metadata={})` is a frozen value object with a
-convenience `.get(key, default)` reader.
+convenience `.get(key, default)` reader. It is exposed as `chain.context` /
+`agent.context` while the run is in flight and is **persisted in the run
+document**, so `resume()` restores it (even in another process — pass it again
+to override). `Agent.run()` / `Agent.resume()` accept `context=` the same way.
 
 ### The cross-process pattern
 

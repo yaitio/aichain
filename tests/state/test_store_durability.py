@@ -35,6 +35,15 @@ class TestFileStoreLoad(unittest.TestCase):
             store.save("run-2", doc)
             self.assertEqual(store.load("run-2"), doc)
 
+    def test_non_json_value_raises_clear_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = FileStore(d)
+            doc = {"kind": "chain", "variables": {"bad": {1, 2, 3}}}  # a set
+            with self.assertRaises(ValueError) as ctx:
+                store.save("run-3", doc)
+            self.assertIn("JSON", str(ctx.exception))
+            self.assertNotIsInstance(ctx.exception, TypeError)  # clear, not raw
+
 
 class TestChromaEmptyDeleteGuard(unittest.TestCase):
 

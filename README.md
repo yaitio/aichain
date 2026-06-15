@@ -304,6 +304,23 @@ MIT
 
 ## Changelog
 
+### 1.3.3
+
+Durable-run (suspend/resume) correctness fixes from the audit.
+
+- Resume no longer re-runs already-attempted steps: skipped/failed steps get a
+  terminal status and the resume cursor skips past them; a terminal error during
+  a resumed run clears the parked document, so a duplicate trigger is a no-op
+  (no double side effects).
+- A nested `Agent` that pauses (`Wait`/`Gate`) inside a `Chain` now propagates
+  the suspension up — `chain.run()` returns a `SuspendedResult` instead of
+  reporting a failed step, and `chain.resume()` continues the child agent run.
+- `RunContext` is now real: exposed as `chain.context` / `agent.context` during
+  a run, persisted in the run document, and restored on `resume`
+  (`Agent.run` / `Agent.resume` accept `context=` too).
+- `FileStore`: a non-JSON-serialisable variable/output at a suspend point raises
+  a clear error instead of a raw `TypeError`.
+
 ### 1.3.2
 
 Correctness & safety fixes from a code audit.

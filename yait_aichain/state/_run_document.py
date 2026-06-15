@@ -12,8 +12,8 @@ A self-contained, JSON-serialisable snapshot of one run. Holds three things:
 * ``definition`` — the serialised scenario (e.g. ``Chain.save`` output) so a run
   can be resumed from this one artifact alone.
 
-Resume continues from the first non-``done`` step; ``done`` steps are never
-re-run.
+Resume continues from the first non-terminal step; ``done`` / ``skipped`` /
+``failed`` steps are never re-run.
 """
 
 from __future__ import annotations
@@ -28,6 +28,10 @@ class StepStatus:
     DONE      = "done"
     SUSPENDED = "suspended"
     FAILED    = "failed"
+    SKIPPED   = "skipped"
+
+    #: Steps in a terminal state are never re-run on resume.
+    TERMINAL  = frozenset({"done", "skipped", "failed"})
 
 
 @dataclass
@@ -40,6 +44,7 @@ class RunDocument:
     steps:      list[dict]     = field(default_factory=list)
     usage:      dict           = field(default_factory=dict)
     definition: "dict | None"  = None
+    context:    "dict | None"  = None     # serialised RunContext (tenant, metadata)
 
     # ── construction ─────────────────────────────────────────────────
     @classmethod
@@ -71,9 +76,15 @@ class RunDocument:
         return StepStatus.RUNNING
 
     def first_pending(self) -> "int | None":
-        """Index of the first step not yet ``done`` (the resume cursor)."""
+        """
+        Index of the first non-terminal step (the resume cursor).
+
+        Terminal steps — ``done``, ``skipped`` and ``failed`` — were already
+        attempted and are never re-run, so the cursor advances past them; only
+        ``pending`` / ``running`` / ``suspended`` steps are resumable.
+        """
         for s in self.steps:
-            if s["status"] != StepStatus.DONE:
+            if s["status"] not in StepStatus.TERMINAL:
                 return s["id"]
         return None
 
@@ -94,6 +105,7 @@ class RunDocument:
             "steps":      self.steps,
             "usage":      self.usage,
             "definition": self.definition,
+            "context":    self.context,
         }
 
     @classmethod
@@ -105,4 +117,5 @@ class RunDocument:
             steps      = data.get("steps", []),
             usage      = data.get("usage", {}),
             definition = data.get("definition"),
+            context    = data.get("context"),
         )
