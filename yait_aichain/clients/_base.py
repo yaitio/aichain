@@ -1,3 +1,4 @@
+import os
 import urllib3
 import json
 import base64
@@ -7,6 +8,47 @@ from ._constants import (
     DEFAULT_RETRIES,
     DEFAULT_IDEMPOTENT_RETRIES,
 )
+
+
+def _proxy_from_env() -> "dict | None":
+    """Read a proxy URL from the standard HTTPS_PROXY / HTTP_PROXY env vars."""
+    url = (os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+           or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
+    return {"url": url} if url else None
+
+
+def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=DEFAULT_RETRIES):
+    """
+    Build the urllib3 manager used for all HTTP in the library.
+
+    Shared by ``BaseClient`` (model APIs) and every tool client, so a single
+    proxy configuration applies everywhere. An explicit *proxy* dict wins;
+    otherwise the standard ``HTTPS_PROXY`` / ``HTTP_PROXY`` environment
+    variables are honoured (urllib3 does not read them on its own).
+
+    *proxy* shape::
+
+        {"url": "http://host:3128", "username": "u", "password": "p"}
+
+    Basic ``Proxy-Authorization`` is added when username + password are given.
+    """
+    if proxy is None:
+        proxy = _proxy_from_env()
+    if not proxy:
+        return urllib3.PoolManager(timeout=timeout, retries=retries)
+
+    proxy_headers: dict = {}
+    username = proxy.get("username")
+    password = proxy.get("password")
+    if username and password:
+        encoded = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
+        proxy_headers["Proxy-Authorization"] = f"Basic {encoded}"
+    return urllib3.ProxyManager(
+        proxy_url=proxy["url"],
+        proxy_headers=proxy_headers,
+        timeout=timeout,
+        retries=retries,
+    )
 
 # APIError and its subclasses live in ._errors; re-exported here so the
 # long-standing ``from ._base import APIError`` imports keep working.
@@ -78,24 +120,9 @@ class BaseClient:
         self._api_key = api_key
         self._base_url = (url or self.BASE_URL).rstrip("/")
 
-        if proxy is None:
-            self._http = urllib3.PoolManager(timeout=timeout, retries=retries)
-        else:
-            proxy_headers: dict = {}
-            username = proxy.get("username")
-            password = proxy.get("password")
-            if username and password:
-                encoded = base64.b64encode(
-                    f"{username}:{password}".encode("utf-8")
-                ).decode("utf-8")
-                proxy_headers["Proxy-Authorization"] = f"Basic {encoded}"
-
-            self._http = urllib3.ProxyManager(
-                proxy_url=proxy["url"],
-                proxy_headers=proxy_headers,
-                timeout=timeout,
-                retries=retries,
-            )
+        # An explicit proxy wins; otherwise HTTPS_PROXY / HTTP_PROXY env vars
+        # are honoured (shared with every tool client via make_http).
+        self._http = make_http(proxy, timeout=timeout, retries=retries)
 
     # ------------------------------------------------------------------
     # Authentication — must be overridden by every provider subclass

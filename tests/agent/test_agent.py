@@ -629,9 +629,9 @@ class TestAgentExtractFinalOutput(unittest.TestCase):
         m.client = _stub_transport(m, _oai("ok"))
         return Agent(orchestrator=m)
 
-    def _rec(self, output, exec_error=None) -> dict:
+    def _rec(self, output, exec_error=None, step=0, attempt=1) -> dict:
         return {
-            "step": 0, "attempt": 1, "step_goal": "g",
+            "step": step, "attempt": attempt, "step_goal": "g",
             "action_type": "tool", "action": {},
             "output": output, "exec_error": exec_error,
             "stored_as": None, "reflection": {}, "tokens": 0,
@@ -640,17 +640,19 @@ class TestAgentExtractFinalOutput(unittest.TestCase):
     def test_empty_history_returns_none(self):
         self.assertIsNone(self._agent()._extract_final_output([]))
 
-    def test_returns_last_successful_output(self):
-        history = [self._rec("first"), self._rec("second")]
+    def test_returns_final_step_output(self):
+        history = [self._rec("first", step=0), self._rec("second", step=1)]
         self.assertEqual(self._agent()._extract_final_output(history), "second")
 
-    def test_skips_records_with_exec_error(self):
-        history = [self._rec("ok"), self._rec("bad", exec_error="boom")]
-        self.assertEqual(self._agent()._extract_final_output(history), "ok")
+    def test_final_step_none_is_not_stale_earlier_output(self):
+        # The final step's output is None — return None, not the earlier "good".
+        history = [self._rec("good", step=0), self._rec(None, step=1)]
+        self.assertIsNone(self._agent()._extract_final_output(history))
 
-    def test_skips_none_output(self):
-        history = [self._rec("good"), self._rec(None)]
-        self.assertEqual(self._agent()._extract_final_output(history), "good")
+    def test_last_attempt_of_final_step_wins(self):
+        history = [self._rec("x", step=1, attempt=1),
+                   self._rec("y", step=1, attempt=2)]
+        self.assertEqual(self._agent()._extract_final_output(history), "y")
 
 
 # ---------------------------------------------------------------------------

@@ -87,7 +87,7 @@ class EmbeddingGoogle(Embedder):
     """
 
     provider   = "google"
-    _ENV_KEY   = "GOOGLE_AI_API_KEY"
+    _ENV_KEY   = ("GOOGLE_AI_API_KEY", "GOOGLE_API_KEY")
     _MAX_BATCH = 100
 
     def _embed_chunk(

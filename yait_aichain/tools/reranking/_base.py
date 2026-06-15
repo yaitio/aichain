@@ -55,6 +55,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
@@ -166,7 +167,7 @@ class RerankBase:
             )
         self.model    = model
         self._api_key = key
-        self._http    = urllib3.PoolManager(
+        self._http    = make_http(
             timeout = DEFAULT_TIMEOUT,
             retries = DEFAULT_RETRIES,
         )

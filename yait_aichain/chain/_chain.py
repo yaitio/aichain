@@ -487,6 +487,14 @@ class Chain:
                     )
                     output = getattr(agent_result, output_field, None)
 
+                    # Fold the agent's token usage into the chain total. An
+                    # Agent has no ``last_usage`` (the generic accumulation
+                    # below would miss it); it reports tokens on AgentResult.
+                    _atok = getattr(agent_result, "tokens_used", 0) or 0
+                    if _atok:
+                        usage_total = (Usage(total_tokens=_atok) if usage_total is None
+                                       else usage_total + Usage(total_tokens=_atok))
+
                 else:
                     # Skill: pass full accumulated dict, honouring input_map renames.
                     if input_map:

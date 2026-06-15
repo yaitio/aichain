@@ -40,6 +40,7 @@ import os
 import urllib.parse
 
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from ._base import Search, SEARCH_RETRIES, SEARCH_TIMEOUT
 
@@ -208,7 +209,7 @@ class searchSerp(Search):
                 f"{_ENV_KEY} environment variable."
             )
         self._api_key = key
-        self._http    = urllib3.PoolManager(
+        self._http    = make_http(
             timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES
         )
 

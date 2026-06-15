@@ -39,7 +39,7 @@ def _is_xai_image(name: str) -> bool:    return name.startswith("grok-imagine-")
 def _is_qwen_image(name: str) -> bool:   return "t2i" in name.lower()   # wan*-t2i-*
 def _is_qwq(name: str) -> bool:          return name.lower().startswith("qwq")
 def _is_qwen3(name: str) -> bool:        return name.lower().startswith("qwen3")
-def _is_deepseek_reasoner(name: str) -> bool: return "reasoner" in name
+def _is_deepseek_reasoner(name: str) -> bool: return name == "deepseek-reasoner" or name.startswith("deepseek-reasoner")
 
 
 class OpenAIClient(BaseClient):
