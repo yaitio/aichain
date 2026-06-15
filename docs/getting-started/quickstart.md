@@ -1,46 +1,44 @@
 # Quickstart
 
-Four progressively more complex examples — from a single routed model call to an autonomous research agent. All use the same interface regardless of provider.
+Four steps, simplest first — from a single model call to an autonomous agent.
+The interface is the same for every provider.
 
 ---
 
 ## 1. Single model call
 
-Ask any model a question. The provider is detected automatically from the model name.
+Ask any model a question. The provider is detected from the model name; text
+output is the default, so a Skill is just a model plus a prompt.
 
 ```python
 from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 
 skill = Skill(
-    model  = Model("claude-sonnet-4-6"),
-    input  = {
-        "messages": [
-            {"role": "system", "parts": [{"type": "text", "text": "Be concise."}]},
-            {"role": "user",   "parts": [{"type": "text", "text": "What is {topic}?"}]},
-        ]
-    },
-    output = {"modalities": ["text"], "format": {"type": "text"}},
+    model = Model("claude-sonnet-4-6"),
+    input = {"messages": [{"role": "user", "parts": ["What is {topic}?"]}]},
 )
 
-answer = skill.run(variables={"topic": "the CAP theorem"})
-print(answer)
+print(skill.run(variables={"topic": "the CAP theorem"}))
 ```
+
+A `part` can be a plain string (shorthand) or `{"type": "text", "text": "…"}`.
 
 Swap the model name — nothing else changes:
 
 ```python
-Model("gpt-4o")           # OpenAI
-Model("gemini-2.0-flash") # Google
-Model("grok-3")           # xAI
-Model("sonar-pro")        # Perplexity (with web search)
+Model("gpt-4o")            # OpenAI
+Model("gemini-2.5-flash")  # Google
+Model("grok-3")            # xAI
+Model("sonar-pro")         # Perplexity (web search built in)
 ```
 
 ---
 
 ## 2. Two-step pipeline
 
-Summarise an article, then translate the summary. The output of step 1 flows automatically into step 2.
+Summarise an article, then translate the summary. Step 1's output flows into
+step 2 automatically.
 
 ```python
 from yait_aichain.models import Model
@@ -50,51 +48,33 @@ from yait_aichain.chain  import Chain
 model = Model("gpt-4o")
 
 summariser = Skill(
-    model  = model,
-    input  = {"messages": [
-        {"role": "system", "parts": [{"type": "text",
-            "text": "Summarise the article in exactly 3 sentences."}]},
-        {"role": "user",   "parts": [{"type": "text", "text": "{article}"}]},
-    ]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
-    name   = "summariser",
+    model = model,
+    input = {"messages": [{"role": "user", "parts": ["Summarise in 3 sentences:\n{article}"]}]},
+    name  = "summary",
 )
 
 translator = Skill(
-    model  = model,
-    input  = {"messages": [
-        {"role": "system", "parts": [{"type": "text",
-            "text": "Translate the text into {language}."}]},
-        {"role": "user",   "parts": [{"type": "text", "text": "{result}"}]},
-    ]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
-    name   = "translator",
+    model = model,
+    input = {"messages": [{"role": "user", "parts": ["Translate into {language}:\n{summary}"]}]},
+    name  = "final",
 )
 
-pipeline = Chain(steps=[summariser, translator])
+pipeline = Chain(steps=[(summariser, "summary"), (translator, "final")])
 
-output = pipeline.run(variables={
-    "article":  "Artificial intelligence is reshaping...",
+print(pipeline.run(variables={
+    "article":  "Artificial intelligence is reshaping how software is built...",
     "language": "Spanish",
-})
-
-print(output)
+}))
 ```
 
-`{result}` in the translator prompt refers to the summariser's output. That name is the default output key. You can use any name:
-
-```python
-Chain(steps=[
-    (summariser, "summary"),   # stored as accumulated["summary"]
-    (translator, "final"),     # reads {summary} from the prompt template
-])
-```
+The summariser stores its output under `"summary"`; the translator reads it as
+`{summary}`. (A bare step with no key stores under `"result"`.)
 
 ---
 
 ## 3. Web search + summarise
 
-Fetch live search results, then summarise them. Mix a Tool and a Skill in the same pipeline.
+Mix a Tool and a Skill: fetch live search results, then summarise them.
 
 ```python
 from yait_aichain.models import Model
@@ -102,64 +82,49 @@ from yait_aichain.skills import Skill
 from yait_aichain.tools  import PerplexitySearchTool
 from yait_aichain.chain  import Chain
 
-search = PerplexitySearchTool()
-
 summariser = Skill(
-    model  = Model("claude-haiku-4-5-20251001"),
-    input  = {"messages": [
-        {"role": "system", "parts": [{"type": "text",
-            "text": "You are a research analyst. Summarise the search results below."}]},
-        {"role": "user",   "parts": [{"type": "text",
-            "text": "Query: {query}\n\nResults:\n{search_results}"}]},
-    ]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
+    model = Model("claude-haiku-4-5-20251001"),
+    input = {"messages": [{"role": "user", "parts": [
+        "Summarise these search results for: {query}\n\n{search_results}"]}]},
 )
 
 pipeline = Chain(steps=[
-    (search,     "search_results", {"query": "query"}),
-    (summariser, "summary"),
+    (PerplexitySearchTool(), "search_results", {"input": "query"}),
+    (summariser,             "summary"),
 ])
 
-result = pipeline.run(variables={
-    "query": "SAP ERP market in Kazakhstan 2025",
-})
-
-print(result)
+print(pipeline.run(variables={"query": "best managed vector databases 2025"}))
 ```
 
-The `input_map` `{"query": "query"}` tells the tool to read its `query` parameter from the accumulated variable called `"query"`.
+`{"input": "query"}` tells the tool to read its `input` parameter from the
+accumulated variable `"query"`.
 
 ---
 
 ## 4. Autonomous agent
 
-For tasks that require planning, multiple tool calls, and reasoning about intermediate results.
+For tasks that need planning, multiple tool calls, and reasoning about what came
+back.
 
 ```python
 from yait_aichain.models import Model
 from yait_aichain.agent  import Agent
-from yait_aichain.tools  import PerplexitySearchTool, MarkItDownTool
+from yait_aichain.tools  import PerplexitySearchTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
-    tools        = [PerplexitySearchTool(), MarkItDownTool()],
-    mode         = "agile",       # can replan mid-task
+    orchestrator = Model("claude-opus-4-8"),
+    tools        = [PerplexitySearchTool()],
+    mode         = "agile",   # can replan mid-task
     max_steps    = 10,
-    verbose      = 1,             # shows progress in the terminal
+    verbose      = 1,         # progress in the terminal
 )
 
 result = agent.run(
-    task = (
-        "Research the top 3 ERP vendors in Kazakhstan. "
-        "For each: name, estimated market share, and main differentiator. "
-        "Return a structured Markdown table."
-    )
+    "Compare the top 3 managed vector databases: pricing model, hosting, "
+    "and standout feature. Return a Markdown table."
 )
 
-if result:
-    print(result.output)
-else:
-    print(f"Agent failed: {result.error}")
+print(result.output if result else f"Agent failed: {result.error}")
 ```
 
 ---
@@ -170,4 +135,5 @@ else:
 - **All Skill options** (JSON output, schemas, save/load) → [Skills](../primitives/skills.md)
 - **All Chain options** (error handling, history, input_map) → [Chain](../primitives/chain.md)
 - **All Agent options** (modes, memory, persona) → [Agent](../agents/overview.md)
+- **Suspend & resume** → [State](../primitives/state.md)
 - **Available tools** → [Tools reference](../tools-reference/)

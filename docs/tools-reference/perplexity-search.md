@@ -94,7 +94,7 @@ else:
 
 ```python
 text = tool.run(
-    query       = "ERP vendors market share Kazakhstan 2025",
+    query       = "managed vector databases comparison 2025",
     max_results = 10,
     country     = "KZ",
 )

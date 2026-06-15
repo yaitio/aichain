@@ -17,7 +17,7 @@ from yait_aichain.tools import PerplexitySearchTool, Tool
 
 # built-in — call it, get a ToolResult (never raises)
 search = PerplexitySearchTool()                 # reads PERPLEXITY_API_KEY
-result = search(input="ERP market in Kazakhstan 2025")
+result = search(input="best managed vector databases 2025")
 if result:
     print(result.output)
 
