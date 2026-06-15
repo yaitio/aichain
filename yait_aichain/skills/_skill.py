@@ -241,6 +241,10 @@ class Skill:
         # Substitute {placeholders} in a deep copy of the messages list
         messages = adapters.substitute(self._input["messages"], merged)
 
+        # Reset usage so that, if this call fails, ``last_usage`` is None rather
+        # than a stale value left over from a previous successful run().
+        self.last_usage = None
+
         # Try each model in the fallback chain.  Transient failures
         # (rate limit / server / network) advance to the next model; a
         # non-transient failure (bad request, auth, parse) propagates
@@ -282,9 +286,13 @@ class Skill:
                 return model.from_response(response, self._output)
 
             except APIError as exc:
-                # TaskFailedError is terminal — retrying would submit a new
-                # (billable) async job, so never retry it regardless of status.
-                if (exc.status in _TRANSIENT_STATUSES
+                # Retry transient server conditions and network failures
+                # (NetworkError has status 0, so check the type too). Never
+                # retry TaskFailedError — re-submitting would create a new
+                # (billable) async job.
+                transient = (exc.status in _TRANSIENT_STATUSES
+                             or isinstance(exc, NetworkError))
+                if (transient
                         and not isinstance(exc, TaskFailedError)
                         and attempt < max_retries):
                     continue   # wait and retry the same model

@@ -45,6 +45,7 @@ import os
 from urllib.parse import urlencode
 
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from ....clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 from .._base import VectorBackend, VectorRecord
@@ -122,7 +123,7 @@ class PineconeBackend(VectorBackend):
         self._region    = region
 
         # Two separate PoolManagers: one for control plane, one for data plane
-        self._ctrl_http = urllib3.PoolManager(
+        self._ctrl_http = make_http(
             timeout = DEFAULT_TIMEOUT,
             retries = DEFAULT_RETRIES,
         )

@@ -41,6 +41,7 @@ import datetime
 import json
 import os
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from .._base import Tool
 from .._security import assert_safe_url, confine_output_path
@@ -546,7 +547,7 @@ class ttsQwen(convertToSpeech):
         self._region = region
 
         # Build HTTP client (no extra dependency — pure urllib3)
-        self._http = urllib3.PoolManager(
+        self._http = make_http(
             timeout = urllib3.Timeout(connect=10.0, read=60.0),
             retries = urllib3.Retry(total=2, backoff_factor=0.5),
         )

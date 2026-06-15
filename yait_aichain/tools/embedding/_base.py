@@ -54,6 +54,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
@@ -185,16 +186,20 @@ class Embedder:
         api_key: str | None = None,
         **defaults: Any,
     ) -> None:
-        key = api_key or os.environ.get(self._ENV_KEY, "")
+        # _ENV_KEY may be a single name or several accepted names (the first
+        # set one wins) — e.g. Google embeddings accept GOOGLE_AI_API_KEY or
+        # GOOGLE_API_KEY, matching the rest of the library.
+        env_keys = (self._ENV_KEY,) if isinstance(self._ENV_KEY, str) else tuple(self._ENV_KEY)
+        key = api_key or next((os.environ[k] for k in env_keys if os.environ.get(k)), "")
         if not key:
             raise ValueError(
-                f"No {self.provider} API key found.  "
-                f"Pass api_key= or set the {self._ENV_KEY!r} environment variable."
+                f"No {self.provider} API key found.  Pass api_key= or set "
+                f"the {' / '.join(env_keys)} environment variable."
             )
         self.model    = model
         self._api_key = key
         self._defaults = defaults
-        self._http = urllib3.PoolManager(
+        self._http = make_http(
             timeout=DEFAULT_TIMEOUT,
             retries=DEFAULT_RETRIES,
         )

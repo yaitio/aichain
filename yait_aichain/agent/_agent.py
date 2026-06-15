@@ -502,6 +502,8 @@ class Agent:
         from ..state import Suspend, SuspendedResult
         try:
             advance = True
+            replans = 0   # agile replans are capped to avoid a non-progressing loop
+            self._uncounted_tokens = 0   # tokens from calls that failed to parse
 
             while step_idx < len(current_plan):
 
@@ -589,6 +591,12 @@ class Agent:
                             history=history, memory=self.memory.all(),
                         )
 
+                    # Budget check within the step: the action call may have
+                    # exhausted it; don't spend more on execution + reflection.
+                    if tokens_used >= self.max_tokens:
+                        advance = False
+                        break
+
                     # ── Execute action ────────────────────────────────────
                     exec_error:  str | None = None
                     exec_tokens: int        = 0
@@ -619,6 +627,11 @@ class Agent:
 
                     # Log execution result
                     self._log_exec(result, exec_error, exec_tokens)
+
+                    # Budget check before the reflection call.
+                    if tokens_used >= self.max_tokens:
+                        advance = False
+                        break
 
                     # ── Reflect ───────────────────────────────────────────
                     reflect_msgs = prompts.reflection_messages(
@@ -690,6 +703,20 @@ class Agent:
                         )
 
                     if decision == "replan" and self.mode == "agile":
+                        replans += 1
+                        if replans > self.max_steps:
+                            # A non-progressing orchestrator that keeps asking to
+                            # replan would otherwise loop until the token budget
+                            # is burned — cap it.
+                            error = (f"Replan limit reached "
+                                     f"({self.max_steps} replans) without completing.")
+                            self._log(1, f"\n[Fail] ✗ {error}")
+                            return AgentResult(
+                                success=False, output=None, mode=self.mode,
+                                steps_taken=step_idx, tokens_used=tokens_used,
+                                plan=current_plan, history=history,
+                                memory=self.memory.all(), error=error,
+                            )
                         revised = reflection.get("revised_plan")
                         # Keep only well-formed dict steps; ignore a malformed
                         # revised_plan (e.g. a list of strings) and keep going
@@ -771,13 +798,19 @@ class Agent:
                     error=error,
                 )
 
-            # Honest success: if the final executed step ended in an execution
-            # error (the orchestrator chose "continue" past a failed tool),
-            # the run did not truly complete — report failure, not success.
-            if history and history[-1].get("exec_error") is not None:
+            # Honest success: if ANY committed step ended with an execution
+            # error (the orchestrator chose "continue" past a failed tool — not
+            # just the last step), the run did not truly complete. Inspect the
+            # last attempt of each executed step, not only history[-1].
+            committed = {}
+            for rec in history:
+                committed[rec["step"]] = rec        # later attempts overwrite
+            failed = next((r for r in committed.values()
+                           if r.get("exec_error") is not None), None)
+            if failed is not None:
                 error = (
-                    f"Final step ended with an execution error: "
-                    f"{history[-1]['exec_error']}"
+                    f"Step {failed['step'] + 1} ended with an execution error: "
+                    f"{failed['exec_error']}"
                 )
                 self._log(1, f"\n[Fail] ✗ {error}")
                 return AgentResult(
@@ -804,7 +837,8 @@ class Agent:
             self._log(1, f"\n[Error] ✗ Unexpected exception: {exc}")
             return AgentResult(
                 success=False, output=None, mode=self.mode,
-                steps_taken=len(history), tokens_used=tokens_used,
+                steps_taken=len(history),
+                tokens_used=tokens_used + getattr(self, "_uncounted_tokens", 0),
                 plan=current_plan, history=history, memory=self.memory.all(),
                 error=str(exc),
             )
@@ -975,12 +1009,14 @@ class Agent:
         Make one LLM call and return ``(content, tokens_used)``.
 
         Follows the same path as :meth:`~skills.Skill.run`:
-        ``to_request`` → ``client._post`` → ``from_response``.
+        ``to_request`` → ``client.send`` → ``from_response``.
         Token usage is extracted from the raw provider response.
         """
         output   = {"modalities": ["text"], "format": {"type": output_format}}
         path, body = model.to_request(messages, output)
-        raw        = model.client._post(path, body, model.client._auth_headers())
+        # Go through the send() seam (like Skill) so async providers work and
+        # the transport path is consistent; the default send() is a single POST.
+        raw        = model.client.send(path, body, model.client._auth_headers())
         response   = json.loads(raw)
         content    = model.from_response(response, output)
         tokens     = self._extract_tokens(response)
@@ -988,15 +1024,21 @@ class Agent:
 
     def _extract_tokens(self, response: dict) -> int:
         """Extract total token count from a raw provider response dict."""
-        # Anthropic / OpenAI style
-        if "usage" in response:
-            usage = response["usage"]
-            inp   = usage.get("input_tokens")  or usage.get("prompt_tokens")     or 0
-            out   = usage.get("output_tokens") or usage.get("completion_tokens") or 0
-            return int(inp) + int(out)
+        def _int(v) -> int:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return 0
+        # Anthropic / OpenAI style — guard against usage being null / non-dict.
+        usage = response.get("usage")
+        if isinstance(usage, dict):
+            inp = usage.get("input_tokens")  or usage.get("prompt_tokens")     or 0
+            out = usage.get("output_tokens") or usage.get("completion_tokens") or 0
+            return _int(inp) + _int(out)
         # Google style
-        if "usageMetadata" in response:
-            return int(response["usageMetadata"].get("totalTokenCount", 0))
+        meta = response.get("usageMetadata")
+        if isinstance(meta, dict):
+            return _int(meta.get("totalTokenCount", 0))
         return 0
 
     # ------------------------------------------------------------------
@@ -1136,7 +1178,13 @@ class Agent:
                 "no code fences, no surrounding text."}]},
         ]
         raw2, tokens2 = self._llm_call(model, retry_msgs)
-        return self._parse_json(raw2), tokens + tokens2
+        try:
+            return self._parse_json(raw2), tokens + tokens2
+        except ValueError:
+            # Both attempts were unparseable, but the tokens were still spent —
+            # record them so the run's reported total doesn't lose them.
+            self._uncounted_tokens = getattr(self, "_uncounted_tokens", 0) + tokens + tokens2
+            raise
 
     def _parse_json(self, text: str) -> dict:
         """
@@ -1262,12 +1310,18 @@ class Agent:
         return "\n".join(lines)
 
     def _extract_final_output(self, history: list[dict]) -> Any:
-        """Return the last successful step's output."""
+        """
+        Return the output of the *final executed step* — the last attempt of
+        the highest-numbered step. This may legitimately be ``None`` (e.g. a
+        side-effecting final step); returning a stale earlier output instead
+        would misreport the answer.
+        """
         if not history:
             return None
+        last_step = max(rec["step"] for rec in history)
         for rec in reversed(history):
-            if rec.get("exec_error") is None and rec.get("output") is not None:
-                return rec["output"]
+            if rec["step"] == last_step:
+                return rec.get("output")
         return None
 
     # ------------------------------------------------------------------

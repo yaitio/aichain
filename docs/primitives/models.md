@@ -131,7 +131,7 @@ Model("deepseek-chat",   options={"reasoning": "high"})    # routes to deepseek-
 | `url` | `str` | Override the base URL (proxies, gateways, Azure-style endpoints). |
 | `timeout` | `urllib3.Timeout` | Custom connect / read timeout. |
 | `retries` | `urllib3.Retry` | Transport-level retry policy. |
-| `proxy` | `dict` | `{"url": "http://proxy:3128", "username": …, "password": …}`. |
+| `proxy` | `dict` | `{"url": "http://proxy:3128", "username": …, "password": …}`. Or set `HTTPS_PROXY` / `HTTP_PROXY` in the environment — that applies to tool traffic too, not just model calls. |
 | `region` | `str` | **Qwen only** — DashScope region (`ap` default, `us`, `cn`, `hk`); also via `DASHSCOPE_REGION`. |
 
 ```python

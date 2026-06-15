@@ -100,6 +100,7 @@ import urllib.parse
 from typing import Any
 
 import urllib3
+from yait_aichain.clients._base import make_http
 
 from ._base import Tool
 from ._security import assert_safe_url
@@ -267,7 +268,7 @@ class RestApiTool(Tool):
         }
 
         # ── HTTP client ────────────────────────────────────────────────
-        self._http = urllib3.PoolManager(
+        self._http = make_http(
             timeout = _DEFAULT_TIMEOUT,
             retries = _DEFAULT_RETRIES,
         )

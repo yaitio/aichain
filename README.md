@@ -304,6 +304,30 @@ MIT
 
 ## Changelog
 
+### 1.3.4
+
+Agent engine, token accounting, and transport fixes from the audit.
+
+- **Token budget** is enforced *within* a step (after the action and execution
+  calls, not only between steps), so one step can no longer overshoot
+  `max_tokens`; agile replans are capped; tokens from an unparseable
+  orchestrator reply are still counted.
+- **Honest success**: a run fails if *any* executed step ended in an execution
+  error (not only the last), and the final output is the last executed step's
+  output (even `None`) rather than a stale earlier value.
+- **Agent LLM calls go through the `send()` seam** (consistent with Skill;
+  async providers work).
+- **Usage**: `Skill.last_usage` resets each run (no stale value after a
+  failure); `chain.last_usage` includes Agent-step tokens; `NetworkError` is
+  retried within a model when `max_retries > 0`.
+- **Robustness**: token extraction tolerates `usage: null` / non-numeric; the
+  DeepSeek-reasoner gate matches the name exactly; Google embeddings accept
+  `GOOGLE_API_KEY` or `GOOGLE_AI_API_KEY`.
+- **Unified HTTP transport**: one `make_http()` factory builds the urllib3
+  manager for both model and tool clients and honours `HTTPS_PROXY` /
+  `HTTP_PROXY` — a proxy now applies to tool traffic (search, fetch, REST, …),
+  not just LLM calls.
+
 ### 1.3.3
 
 Durable-run (suspend/resume) correctness fixes from the audit.
