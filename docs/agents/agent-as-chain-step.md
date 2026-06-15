@@ -17,8 +17,8 @@ Chain
 ## The minimal integration
 
 ```python
-from chain import Chain
-from agent import Agent
+from yait_aichain.chain import Chain
+from yait_aichain.agent import Agent
 
 chain = Chain(steps=[
     my_agent,   # bare Agent — task read from accumulated["task"] by default
@@ -131,11 +131,11 @@ This is how you let one agent phase contribute several named outputs to downstre
 The most common reason to embed an Agent: open-ended research followed by deterministic document generation.
 
 ```python
-from models import Model
-from skills import Skill
-from agent  import Agent
-from chain  import Chain
-from tools  import PerplexitySearchTool, WeasyPrintTool
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.agent  import Agent
+from yait_aichain.chain  import Chain
+from yait_aichain.tools  import PerplexitySearchTool, WeasyPrintTool
 
 # Phase 1 — Agent: gather everything we need
 research_agent = Agent(

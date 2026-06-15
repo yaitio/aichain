@@ -47,7 +47,7 @@ Model("gpt-4o", api_key="sk-…")     # explicit override — env var ignored
 | `DEEPL_API_KEY` | `DeepLTranslateTool`, `DeepLRephraseTool` | Keys ending with `:fx` use the free endpoint automatically. |
 | `LATE_API_KEY` | `LateAccountsTool`, `LatePublishTool` | <https://getlate.dev/dashboard/api-keys> |
 
-Tools with no API requirements: `MarkItDownTool`, `MistletoeTool`, `WeasyprintTool`, `SectionContextTool`.
+Tools with no API requirements: `MarkItDownTool`, `MistletoeTool`, `WeasyprintTool`.
 
 ---
 

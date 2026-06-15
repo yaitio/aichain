@@ -3,7 +3,7 @@
 Live web search **synthesized by an OpenAI model in a single call**. Unlike raw-results tools (Brave, Perplexity, SerpAPI), this one returns a prose answer with inline citations — the model decides which sources to consult and weaves them into a single response.
 
 ```python
-from tools import OpenAIWebSearchTool
+from yait_aichain.tools import OpenAIWebSearchTool
 
 tool   = OpenAIWebSearchTool()
 result = tool(query="nuclear fusion breakthroughs 2025")

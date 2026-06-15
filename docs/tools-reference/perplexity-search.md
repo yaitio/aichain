@@ -3,7 +3,7 @@
 Web search powered by the **Perplexity Search API**. Returns rich text snippets extracted directly from page content — the best-in-class choice when an agent needs substantive excerpts without a separate URL-fetch step.
 
 ```python
-from tools import PerplexitySearchTool
+from yait_aichain.tools import PerplexitySearchTool
 
 tool   = PerplexitySearchTool()
 result = tool(query="nuclear fusion breakthroughs 2025", max_results=5)
@@ -103,10 +103,10 @@ text = tool.run(
 ### In a Chain
 
 ```python
-from chain import Chain
-from skills import Skill
-from tools import PerplexitySearchTool
-from models import Model
+from yait_aichain.chain import Chain
+from yait_aichain.skills import Skill
+from yait_aichain.tools import PerplexitySearchTool
+from yait_aichain.models import Model
 
 query_skill = Skill(
     model  = Model("gpt-4o-mini"),
@@ -128,9 +128,9 @@ chain.run(variables={"topic": "AI regulation in the EU (2025)"})
 ### In an Agent
 
 ```python
-from agent import Agent
-from models import Model
-from tools import PerplexitySearchTool
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.tools import PerplexitySearchTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),

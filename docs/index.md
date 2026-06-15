@@ -32,8 +32,8 @@ Your code
 ## One interface. Every provider.
 
 ```python
-from models import Model
-from skills import Skill
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
 
 skill = Skill(
     model  = Model("claude-sonnet-4-6"),   # ← swap this for any model below
@@ -97,15 +97,19 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 **[Chain](primitives/chain.md)** — a sequential pipeline. Each step's output flows forward as named variables. Mixes Skills, Tools, and Agents freely.
 
+**[Pool](primitives/pool.md)** — run one Skill or Chain across many inputs in parallel. Total time is the slowest item, not the sum.
+
 **[Agent](agents/overview.md)** — an autonomous engine that plans, acts with tools, reflects, and replans. Runs inside a Chain or standalone.
+
+**[State](primitives/state.md)** — suspend a Chain or Agent until an external signal (human, webhook, cron) and resume later, even in another process.
 
 ---
 
 ## What's in the box
 
-**7 providers** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek
+**8 providers** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen
 
-**12 built-in tools** — Perplexity search, Brave search, SerpAPI, OpenAI web search, MarkItDown (URL/file → Markdown), Mistletoe (→ HTML), WeasyPrint (→ PDF), DeepL translate, DeepL rephrase, section context, social scheduling (Late)
+**Built-in tools** — web search (Perplexity, Brave, SerpAPI, OpenAI), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 
 **Sectional document generation** — produce documents of any length without hitting output token limits. Each section is an independent model call; sections are assembled in order at the end.
 

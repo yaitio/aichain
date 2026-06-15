@@ -9,8 +9,8 @@ Four progressively more complex examples — from a single routed model call to 
 Ask any model a question. The provider is detected automatically from the model name.
 
 ```python
-from models import Model
-from skills import Skill
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
 
 skill = Skill(
     model  = Model("claude-sonnet-4-6"),
@@ -43,9 +43,9 @@ Model("sonar-pro")        # Perplexity (with web search)
 Summarise an article, then translate the summary. The output of step 1 flows automatically into step 2.
 
 ```python
-from models import Model
-from skills import Skill
-from chain  import Chain
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.chain  import Chain
 
 model = Model("gpt-4o")
 
@@ -97,10 +97,10 @@ Chain(steps=[
 Fetch live search results, then summarise them. Mix a Tool and a Skill in the same pipeline.
 
 ```python
-from models import Model
-from skills import Skill
-from tools  import PerplexitySearchTool
-from chain  import Chain
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.tools  import PerplexitySearchTool
+from yait_aichain.chain  import Chain
 
 search = PerplexitySearchTool()
 
@@ -136,9 +136,9 @@ The `input_map` `{"query": "query"}` tells the tool to read its `query` paramete
 For tasks that require planning, multiple tool calls, and reasoning about intermediate results.
 
 ```python
-from models import Model
-from agent  import Agent
-from tools  import PerplexitySearchTool, MarkItDownTool
+from yait_aichain.models import Model
+from yait_aichain.agent  import Agent
+from yait_aichain.tools  import PerplexitySearchTool, MarkItDownTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),

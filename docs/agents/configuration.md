@@ -3,9 +3,9 @@
 Every knob that shapes how an Agent plans, acts, and spends its budget.
 
 ```python
-from models import Model
-from agent  import Agent
-from tools  import PerplexitySearchTool, MarkItDownTool
+from yait_aichain.models import Model
+from yait_aichain.agent  import Agent
+from yait_aichain.tools  import PerplexitySearchTool, MarkItDownTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),
@@ -129,7 +129,7 @@ Keep it declarative — describe who the agent is and how it thinks, not step-by
 Custom memory instance. Omit for a fresh in-process memory per `run()` call.
 
 ```python
-from agent import AgentMemory, FileBackend
+from yait_aichain.agent import AgentMemory, FileBackend
 
 memory = AgentMemory(backend=FileBackend("~/.my_agent.json"))
 agent  = Agent(..., memory=memory)
@@ -203,9 +203,9 @@ Key/value pairs seeded into memory **before** the first step. The orchestrator s
 A Phase-1 research agent — strong orchestrator, cheap executor, single search tool, agile mode with a healthy token budget, verbose progress for monitoring:
 
 ```python
-from models import Model
-from agent  import Agent
-from tools  import PerplexitySearchTool
+from yait_aichain.models import Model
+from yait_aichain.agent  import Agent
+from yait_aichain.tools  import PerplexitySearchTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6",

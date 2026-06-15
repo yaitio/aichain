@@ -3,7 +3,7 @@
 Convert Markdown to **HTML**, **LaTeX**, or **normalised Markdown** using the [mistletoe](https://github.com/miyuchina/mistletoe) library. Each format has a first-class renderer — no regex post-processing.
 
 ```python
-from tools import MistletoeTool
+from yait_aichain.tools import MistletoeTool
 
 tool = MistletoeTool()
 html = tool.run(text="# Hello\n\nWorld", format="html")
@@ -70,8 +70,8 @@ clean_md = tool.run(text=messy_markdown, format="markdown")
 ### In a Chain — Markdown → HTML → PDF
 
 ```python
-from chain import Chain
-from tools import MistletoeTool, WeasyprintTool
+from yait_aichain.chain import Chain
+from yait_aichain.tools import MistletoeTool, WeasyprintTool
 
 chain = Chain(steps=[
     (write_report_skill,   "report_md"),

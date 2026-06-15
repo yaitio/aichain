@@ -1,225 +1,172 @@
 # Tool
 
-A **Tool** is a Python function with a declared JSON Schema interface. It does something in the real world: search the web, fetch a URL, render PDF, call an external API, convert a file.
-
-Skills reason about text. Tools actually **do** things.
-
-```python
-from tools import PerplexitySearchTool
-
-search = PerplexitySearchTool()
-result = search(query="latest ERP market analysis Kazakhstan 2025")
-
-if result:
-    print(result.output)
-```
+A **Tool** is a Python callable with a declared JSON-Schema interface that does
+something in the real world: search the web, fetch and convert a file, embed
+text, call a REST API, pause a run for approval. Skills reason about text; Tools
+act.
 
 ---
 
-## The contract
+## Quick start
 
-Every Tool subclass sets three class-level attributes and implements `run()`:
+Use a built-in tool, or define your own in a few lines:
 
 ```python
-from tools import Tool
+import os
+from yait_aichain.tools import PerplexitySearchTool, Tool
 
-class ReverseTextTool(Tool):
-    name        = "reverse_text"
-    description = "Reverse the characters in a string."
-    parameters  = {
+# built-in — call it, get a ToolResult (never raises)
+search = PerplexitySearchTool()                 # reads PERPLEXITY_API_KEY
+result = search(input="ERP market in Kazakhstan 2025")
+if result:
+    print(result.output)
+
+# custom — name + description + parameters + run()
+class ReverseTool(Tool):
+    name        = "reverse"
+    description = "Reverse a string."
+    parameters  = {"type": "object",
+                   "properties": {"input": {"type": "string"}},
+                   "required": ["input"]}
+    def run(self, input, options=None):
+        return input[::-1]
+
+print(ReverseTool()(input="hello").output)       # 'olleh'
+```
+
+▶ Built-in convert tool: [`examples/05_tool_convert.py`](../../examples/05_tool_convert.py) ·
+Custom tool: [`examples/07_tool_custom.py`](../../examples/07_tool_custom.py) ·
+Deep dive ↓
+
+---
+
+## Common gotchas
+
+- **Two call styles, different error behaviour.** `tool(...)` returns a
+  `ToolResult` and **never raises**; `tool.run(...)` returns the bare value and
+  **propagates** exceptions. Chains and Agents use the safe form internally.
+- **`bool(result)` is `result.success`**, so `if result:` works — but a failed
+  call is *falsy*, so don't forget the `else`.
+- **The standard shape is `run(self, input, options=None)`** — one primary
+  input. Tools that need several named fields declare them in `parameters` and
+  take them as kwargs (see [Tool shapes](#tool-shapes)); those are driven by
+  Chain/Agent, not by the single-input `tool(input=…)` form.
+- **A `dict` return merges** into a Chain's accumulated variables (many keys at
+  once); a `str` return is stored under one key.
+
+---
+
+## Reference
+
+### The contract
+
+A Tool sets three class attributes and implements `run()`:
+
+```python
+from yait_aichain.tools import Tool
+
+class WordCountTool(Tool):
+    name        = "word_count"                       # function name in tool-use schemas
+    description = "Count the words in a text."        # what an LLM reads to decide to use it
+    parameters  = {                                   # JSON Schema for the arguments
         "type": "object",
-        "properties": {
-            "text": {"type": "string", "description": "Text to reverse."},
-        },
-        "required": ["text"],
+        "properties": {"input": {"type": "string", "description": "Text to count."}},
+        "required": ["input"],
     }
-
-    def run(self, text: str) -> str:
-        return text[::-1]
+    def run(self, input, options=None) -> int:
+        return len(input.split())
 ```
 
-| Attribute | Purpose |
-|---|---|
-| `name` | Machine-readable identifier. Used as the function name in OpenAI / Anthropic tool-use schemas. |
-| `description` | One sentence. This is what an LLM reads to decide whether to use the tool. |
-| `parameters` | JSON Schema `object` describing accepted kwargs. |
-| `run(**kwargs)` | The actual logic. |
+Validation, error wrapping, and schema export come from the base class — you
+write only `run()`.
 
-That is the complete surface. Everything else — validation, error wrapping, schema export — comes from the base class.
+### Tool shapes
 
----
+| Shape | `run` signature | Called as | Use for |
+|---|---|---|---|
+| **Single-input** | `run(self, input, options=None)` | `tool(input=…)` / `tool.run(input=…)` | Most tools — one main argument plus an optional `options` dict. All built-ins use this. |
+| **Multi-parameter** | `run(self, a, b, …)` | inside a Chain/Agent (matched kwargs), or `tool.run(a=…, b=…)` | Tools that produce several named outputs or need several inputs. |
 
-## Two call styles
+In a Chain/Agent, the engine reads the tool's declared `parameters`, pulls the
+matching values from the accumulated variables, and calls `run(**kwargs)`. The
+single-input safe form `tool(input, options)` is the convenience for standalone
+use.
 
-Tools expose two entry points with different error semantics:
-
-### `tool(**kwargs)` — safe
-
-Returns a `ToolResult`. Never raises.
+### Two call styles
 
 ```python
-result = search(query="AI agents")
+result = tool(input="…")        # safe  → ToolResult; never raises
+if result: print(result.output)
+else:      print(result.error)
 
-if result:
-    print(result.output)
-else:
-    print("Error:", result.error)
+raw = tool.run(input="…")       # raw   → bare output; raises on error
 ```
 
-`ToolResult` has three fields:
+`ToolResult` has `success: bool`, `output: Any`, `error: str | None`, and is
+truthy when `success`.
 
-| Field | Meaning |
-|---|---|
-| `success: bool` | `True` if `run()` completed without exception. |
-| `output: Any` | The raw return value of `run()` (or `None` on failure). |
-| `error: str \| None` | Human-readable error message (or `None` on success). |
+### Provider function-calling schema
 
-`bool(result)` returns `result.success`, so `if result:` works naturally.
-
-This is the style used internally by `Chain` and `Agent`.
-
-### `tool.run(**kwargs)` — raw
-
-Returns the bare output; propagates any exception.
-
-```python
-raw = search.run(query="AI agents")   # raises on error
-```
-
-Use this when you want normal Python error handling.
-
----
-
-## The parameters schema
-
-The schema must be a JSON Schema `object` with a `"properties"` dict and an optional `"required"` list:
-
-```python
-parameters = {
-    "type": "object",
-    "properties": {
-        "source": {
-            "type":        "string",
-            "description": "File path or URL to process.",
-        },
-        "output_path": {
-            "type":        "string",
-            "description": "Optional path to write the result.",
-        },
-    },
-    "required": ["source"],
-}
-```
-
-Two things use this schema:
-
-1. **`tool.__call__`** — validates that every required key is present in kwargs before calling `run()`.
-2. **`Agent`** — serialises it to the provider's tool-use format so the LLM knows how to call the tool.
-
-### OpenAI / Anthropic function-calling
-
-Every Tool exposes a ready-to-use schema for direct use with provider SDKs:
+Every tool exposes an OpenAI/Anthropic-ready schema via `tool.schema()` — useful
+if you drive a provider SDK directly:
 
 ```python
 tool.schema()
-# {
-#   "type": "function",
-#   "function": {
-#     "name":        "reverse_text",
-#     "description": "Reverse the characters in a string.",
-#     "parameters":  { ... }
-#   }
-# }
+# {"type": "function", "function": {"name": …, "description": …, "parameters": {…}}}
 ```
 
-```python
-import openai
-client = openai.OpenAI()
-client.chat.completions.create(
-    model="gpt-4o",
-    messages=[...],
-    tools=[tool.schema()],
-)
-```
+An [Agent](../agents/overview.md) does this for you.
 
----
+### Using a Tool in a Chain
 
-## Using a Tool in a Chain
-
-Tools slot into a `Chain` like Skills, with one important difference: they receive only the kwargs that match their declared parameters.
+A tool slots into a Chain step. It receives only the kwargs matching its
+declared `parameters`; `input_map` renames an accumulated variable to a
+parameter name:
 
 ```python
-from chain import Chain
-from tools import MarkItDownTool
-
-fetch = MarkItDownTool()
+from yait_aichain.chain  import Chain
+from yait_aichain.tools  import MarkItDownTool
 
 chain = Chain(steps=[
-    (fetch, "content", {"source": "url"}),   # input_map renames accumulated["url"] → source
-    (summariser, "summary"),
+    (MarkItDownTool(), "content", {"source": "url"}),   # accumulated["url"] → param "source"
+    (summariser,       "summary"),
 ])
-
 chain.run(variables={"url": "https://example.com/article"})
 ```
 
-The third tuple element — `input_map` — lets you rename an accumulated variable to match the tool's parameter name:
+A tool whose `run()` returns a **dict** writes several named outputs at once —
+the dict is merged into the accumulated variables. See [Chain](chain.md) for the
+full step syntax.
+
+### Built-in tools
+
+| Group | Tools |
+|---|---|
+| **Web search** | `PerplexitySearchTool`, `BraveSearchTool`, `OpenAIWebSearchTool`, `SerpApiTool` (functional forms: `searchPerplexity`, `searchBrave`, `searchOpenAI`, `searchSerp`) |
+| **Convert** | `convertToMD` / `MarkItDownTool` (→ Markdown), `convertToHTML` / `MistletoeTool` (→ HTML), `convertToPDF` / `WeasyprintTool` (→ PDF), `convertToText` |
+| **Speech** | `convertToSpeech`, `TTS` (`ttsOpenAI/Google/XAI/Qwen`), `STT` (`sttOpenAI/Google/XAI/Qwen`) |
+| **Embeddings** | `Embedding` + `EmbeddingOpenAI/Cohere/Voyage/Google/Qwen` |
+| **Vector DB** | `VectorDB`, `VectorStore` |
+| **HTTP** | `RestApiTool` — call any REST endpoint as a tool |
+| **Suspend** | `Wait`, `Gate` — pause a run for an external signal ([State](state.md)) |
+
+Per-tool parameters and examples: [Tools reference](../tools-reference/).
+
+### Wait & Gate
+
+`Wait` and `Gate` are tools that *pause* a run instead of returning immediately —
+the basis of suspend/resume. Drop a `Wait` into a Chain to pause for human
+input, or wrap any tool in a `Gate` to require approval before it runs. Full
+treatment in [State — suspend & resume](state.md).
+
+### Writing a custom Tool
+
+A multi-parameter tool that fetches weather (returns a dict, so it writes two
+variables in one Chain step):
 
 ```python
-(fetch, "content", {"source": "url"})
-#                    ^      ^
-#                    |      accumulated variable to read
-#                    tool parameter to fill
-```
-
-See [Chain](chain.md) for the full step-tuple syntax.
-
-### Dict-valued tools
-
-A Tool whose `run()` returns a **dict** writes multiple named outputs at once — the dict is merged into the accumulated variables:
-
-```python
-class FetchStatsTool(Tool):
-    name = "fetch_stats"
-    ...
-    def run(self, url: str) -> dict:
-        return {"stats_raw": "...", "stats_count": 42}
-
-# After this step, both stats_raw and stats_count are in accumulated vars.
-```
-
-This is the only way a single step can produce several output keys.
-
----
-
-## Built-in tools
-
-| Tool | Class | Purpose |
-|---|---|---|
-| Perplexity search | `PerplexitySearchTool` | Live web search via Perplexity Sonar. |
-| Brave search | `BraveSearchTool` | Web search via Brave Search API. |
-| SerpAPI | `SerpApiTool` | Google search via SerpAPI. |
-| OpenAI web search | `OpenAIWebSearchTool` | Web search via OpenAI Responses API. |
-| MarkItDown | `MarkItDownTool` | URL or file → Markdown. |
-| Mistletoe | `MistletoeTool` | Markdown → HTML. |
-| WeasyPrint | `WeasyPrintTool` | HTML → PDF. |
-| DeepL translate | `DeepLTranslateTool` | Translate text via DeepL. |
-| DeepL rephrase | `DeepLRephraseTool` | Rephrase text via DeepL. |
-| Section context | `SectionContextTool` | Rolling context window for sectional document generation. |
-| Late | `LateTool` | Social-media scheduling via Late. |
-
-See **[Tools reference](../tools-reference/)** for per-tool parameters and examples.
-
----
-
-## Writing a custom Tool
-
-A real-world example — fetch the current weather for a city:
-
-```python
-import json
-import urllib3
-
-from tools import Tool
+import os, json, urllib3
+from yait_aichain.tools import Tool
 
 class WeatherTool(Tool):
     name        = "get_weather"
@@ -233,37 +180,33 @@ class WeatherTool(Tool):
         "required": ["city"],
     }
 
-    def __init__(self, api_key: str | None = None):
-        import os
+    def __init__(self, api_key=None):
         self._api_key = api_key or os.getenv("OPENWEATHER_API_KEY")
         if not self._api_key:
             raise ValueError("Set OPENWEATHER_API_KEY or pass api_key=...")
         self._http = urllib3.PoolManager()
 
-    def run(self, city: str, country: str = "") -> dict:
-        q   = f"{city},{country}" if country else city
-        url = (f"https://api.openweathermap.org/data/2.5/weather"
-               f"?q={q}&units=metric&appid={self._api_key}")
-        resp = self._http.request("GET", url)
-        if resp.status != 200:
-            raise RuntimeError(f"Weather API returned {resp.status}")
-        data = json.loads(resp.data.decode("utf-8"))
-        return {
-            "temperature_c": data["main"]["temp"],
-            "description":   data["weather"][0]["description"],
-        }
+    def run(self, city, country="") -> dict:
+        q = f"{city},{country}" if country else city
+        r = self._http.request("GET",
+            f"https://api.openweathermap.org/data/2.5/weather"
+            f"?q={q}&units=metric&appid={self._api_key}")
+        if r.status != 200:
+            raise RuntimeError(f"Weather API returned {r.status}")
+        d = json.loads(r.data.decode())
+        return {"temperature_c": d["main"]["temp"], "description": d["weather"][0]["description"]}
 ```
 
-Three things to notice:
-
-1. **Constructor** — reads its API key from the environment, matching the pattern used by every built-in tool.
-2. **Return type** — a dict, so this tool writes both `temperature_c` and `description` into a Chain's accumulated variables in one step.
-3. **Errors** — raised as exceptions. The `__call__` wrapper catches them and returns a failed `ToolResult`.
+Notes: the constructor reads its key from the environment (the built-in
+pattern); `run` declares its parameters as kwargs (so Chain/Agent can call it);
+and it raises on error — the safe `__call__` wrapper turns that into a failed
+`ToolResult`.
 
 ---
 
 ## See also
 
-- **Use a Tool in a pipeline** → [Chain](chain.md)
-- **Let an LLM choose tools** → [Agent](../agents/overview.md)
-- **All built-in tools** → [Tools reference](../tools-reference/)
+- [Chain](chain.md) — use Tools as pipeline steps.
+- [Agent](../agents/overview.md) — let an LLM choose and call tools.
+- [State](state.md) — `Wait` / `Gate` and suspend/resume.
+- [Tools reference](../tools-reference/) — every built-in tool in detail.

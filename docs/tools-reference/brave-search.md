@@ -3,7 +3,7 @@
 Web search via the **Brave Search API**. Returns ranked links with short description snippets — the tool to reach for when you want **URLs an agent can feed straight into `markitdown`**.
 
 ```python
-from tools import BraveSearchTool
+from yait_aichain.tools import BraveSearchTool
 
 tool   = BraveSearchTool()
 result = tool(query="Python asyncio tutorial", count=5)
@@ -91,9 +91,9 @@ text = tool.run(
 ### Brave → MarkItDown — canonical pattern
 
 ```python
-from agent import Agent
-from models import Model
-from tools import BraveSearchTool, MarkItDownTool
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.tools import BraveSearchTool, MarkItDownTool
 
 agent = Agent(
     orchestrator = Model("claude-opus-4-6"),

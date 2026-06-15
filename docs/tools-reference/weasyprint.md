@@ -3,7 +3,7 @@
 Render HTML to **PDF** using [WeasyPrint](https://weasyprint.org/). Accepts either a raw HTML string or a path to an HTML file; returns either the saved PDF's path or raw bytes.
 
 ```python
-from tools import WeasyprintTool
+from yait_aichain.tools import WeasyprintTool
 
 tool = WeasyprintTool()
 path = tool.run(source="<h1>Hello</h1>", output_path="hello.pdf")
@@ -87,8 +87,8 @@ tool.run(
 ### In a Chain — Markdown → HTML → PDF
 
 ```python
-from chain import Chain
-from tools import MistletoeTool, WeasyprintTool
+from yait_aichain.chain import Chain
+from yait_aichain.tools import MistletoeTool, WeasyprintTool
 
 chain = Chain(steps=[
     (report_skill,      "report_md"),
