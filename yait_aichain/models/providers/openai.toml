@@ -60,6 +60,11 @@ price = { input = 0.15, output = 0.6 }
 caps  = ["text-to-image"]
 price = { input = 5.0, output = 30.0 }
 
+# Always-current image model used by ChatGPT (alias to the latest snapshot).
+[models."chatgpt-image-latest"]
+caps  = ["text-to-image"]
+price = { input = 5.0, output = 30.0 }
+
 [models."gpt-image-1.5"]
 caps  = ["text-to-image"]
 price = { input = 5.0, output = 32.0 }

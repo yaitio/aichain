@@ -6,7 +6,7 @@ Tests for text-to-image models:
   - OpenAI   : dall-e-3, gpt-image-1
   - xAI      : grok-imagine-image
   - Google   : gemini-3.1-flash-image-preview  (responseModalities)
-  - Qwen     : wanx2.1-t2i-turbo
+  - Qwen     : wan2.2-t2i-flash
 
 Covers:
   1. Factory routing    — correct provider subclass
@@ -91,7 +91,7 @@ class TestImageModelFactory(unittest.TestCase):
         self.assertEqual(Model("gemini-3.1-flash-image-preview")._provider, "google")
 
     def test_wanx_routes_to_qwen(self):
-        self.assertEqual(Model("wanx2.1-t2i-turbo")._provider, "qwen")
+        self.assertEqual(Model("wan2.2-t2i-flash")._provider, "qwen")
 
 
 # ---------------------------------------------------------------------------
@@ -216,19 +216,21 @@ class TestGoogleImageToRequest(unittest.TestCase):
 class TestQwenImageToRequest(unittest.TestCase):
 
     def test_wanx_path(self):
-        model = Model("wanx2.1-t2i-turbo")
+        # wanx runs on DashScope's native async task API, not the OpenAI-
+        # compatible images endpoint.
+        model = Model("wan2.2-t2i-flash")
         path, _ = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
-        self.assertEqual(path, "/compatible-mode/v1/images/generations")
+        self.assertEqual(path, "/api/v1/services/aigc/text2image/image-synthesis")
 
     def test_body_has_model_name(self):
-        model = Model("wanx2.1-t2i-turbo")
+        model = Model("wan2.2-t2i-flash")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
-        self.assertEqual(body["model"], "wanx2.1-t2i-turbo")
+        self.assertEqual(body["model"], "wan2.2-t2i-flash")
 
     def test_body_has_prompt(self):
-        model = Model("wanx2.1-t2i-turbo")
+        model = Model("wan2.2-t2i-flash")
         _, body = model.to_request(_PROMPT_MSG, _IMAGE_OUTPUT)
-        self.assertIn("prompt", body)
+        self.assertIn("prompt", body["input"])
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +313,7 @@ class TestGoogleImageFromResponse(unittest.TestCase):
 class TestQwenImageFromResponse(unittest.TestCase):
 
     def test_returns_dict_with_required_keys(self):
-        model = Model("wanx2.1-t2i-turbo")
+        model = Model("wan2.2-t2i-flash")
         resp  = _openai_image_response(_TINY_PNG_B64)
         result = model.from_response(resp, _IMAGE_OUTPUT)
         self.assertIsInstance(result, dict)

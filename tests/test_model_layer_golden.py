@@ -129,7 +129,9 @@ class TestModalityGolden(unittest.TestCase):
         expected = {
             "gpt-image-1":                    "/v1/images/generations",
             "grok-imagine-image-pro":         "/v1/images/generations",
-            "wanx2.1-t2i-turbo":              "/compatible-mode/v1/images/generations",
+            # wanx runs on DashScope's native async task API, not the
+            # OpenAI-compatible images endpoint.
+            "wan2.2-t2i-flash":              "/api/v1/services/aigc/text2image/image-synthesis",
             "gemini-3.1-flash-image-preview": "/models/gemini-3.1-flash-image-preview:generateContent",
         }
         for name, path in expected.items():
@@ -137,6 +139,8 @@ class TestModalityGolden(unittest.TestCase):
             self.assertEqual(p, path, f"{name} image route drifted")
             if "images/generations" in p:
                 self.assertIn("prompt", body)
+            elif "image-synthesis" in p:
+                self.assertIn("prompt", body["input"])
 
     def test_vision_input_conversion(self):
         msg = [{"role": "user", "parts": [

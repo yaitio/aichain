@@ -36,7 +36,7 @@ from ._openai_compat import (
 
 # ── model-name gates (by prefix) ────────────────────────────────────────────
 def _is_xai_image(name: str) -> bool:    return name.startswith("grok-imagine-")
-def _is_qwen_image(name: str) -> bool:   return name.startswith("wanx")
+def _is_qwen_image(name: str) -> bool:   return "t2i" in name.lower()   # wan*-t2i-*
 def _is_qwq(name: str) -> bool:          return name.lower().startswith("qwq")
 def _is_qwen3(name: str) -> bool:        return name.lower().startswith("qwen3")
 def _is_deepseek_reasoner(name: str) -> bool: return "reasoner" in name
@@ -149,8 +149,8 @@ class OpenAIClient(BaseClient):
             return path, body
 
         if p == "qwen":
-            if _is_qwen_image(m.name):
-                return _build_image_generations_request(m, messages, output, self._images_path)
+            # wanx text-to-image is async and handled by QwenClient (the only
+            # client used for this provider); here we only do chat / vision.
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
             if _is_qwq(m.name):
                 body["enable_thinking"] = True

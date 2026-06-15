@@ -144,6 +144,24 @@ class BaseClient:
         )
 
     # ------------------------------------------------------------------
+    # Request lifecycle seam
+    # ------------------------------------------------------------------
+
+    def send(self, path: str, body: dict, headers: dict) -> bytes:
+        """
+        Execute one logical completion and return the raw response bytes that
+        ``parse_response`` will consume.
+
+        The default is a single JSON POST — the right behaviour for every
+        synchronous API.  A provider whose endpoint is *asynchronous* (submit a
+        job, poll for completion, then download the artefact) overrides this to
+        run that multi-step flow and synthesise a response in the same shape the
+        synchronous path would have returned, so ``parse_response`` stays
+        unchanged.  See ``QwenClient`` for the DashScope image-synthesis case.
+        """
+        return self._post(path, body, headers)
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 

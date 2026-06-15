@@ -173,7 +173,7 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
 # Image generation helpers  (for dall-e-* and gpt-image-* models)
 # ---------------------------------------------------------------------------
 
-_OPENAI_IMAGE_MODEL_PREFIXES = ("dall-e-", "gpt-image-")
+_OPENAI_IMAGE_MODEL_PREFIXES = ("dall-e-", "gpt-image-", "chatgpt-image-")
 
 
 def _is_openai_image_model(name: str) -> bool:
@@ -240,11 +240,17 @@ def _build_image_generations_request(
         body["size"] = fmt["size"]
     if fmt.get("quality"):
         body["quality"] = fmt["quality"]
+    # gpt-image-* accepts a transparent background and an explicit file format
+    # (``png``/``webp`` keep the alpha channel; ``jpeg`` would flatten it).
+    if fmt.get("background"):
+        body["background"] = fmt["background"]
+    if fmt.get("output_format"):
+        body["output_format"] = fmt["output_format"]
 
     # Request base64 output on every model that accepts the parameter.
-    # gpt-image-* always returns b64_json natively and rejects the param —
-    # omit it only for that family.
-    if not model.name.startswith("gpt-image-"):
+    # gpt-image-* / chatgpt-image-* always return b64_json natively and reject
+    # the param — omit it only for those families (dall-e-* still needs it).
+    if not model.name.startswith(("gpt-image-", "chatgpt-image-")):
         body["response_format"] = "b64_json"
 
     return path, body
