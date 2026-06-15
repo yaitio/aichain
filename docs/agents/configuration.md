@@ -171,7 +171,7 @@ These are the only inputs to `agent.run()`, not the constructor:
 
 ```python
 result = agent.run(
-    task      = "Research the top 3 ERP vendors in Kazakhstan.",
+    task      = "Compare the top 3 managed vector databases.",
     variables = {
         "language":  "English",
         "audience":  "C-level IT decision makers",
@@ -186,11 +186,11 @@ The natural-language description of what to accomplish. Be specific about **outp
 
 Good:
 
-> "Research the top 3 ERP vendors in Kazakhstan. For each: name, estimated market share, and main differentiator. Return a Markdown table."
+> "Compare the top 3 managed vector databases. For each: name, estimated market share, and main differentiator. Return a Markdown table."
 
 Less good:
 
-> "Do some research on ERP in Kazakhstan."
+> "Do some research on vector databases."
 
 ### `variables: dict | None`
 
