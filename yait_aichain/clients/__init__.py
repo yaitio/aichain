@@ -26,6 +26,7 @@ from ._errors import (
     InvalidRequestError,
     NotFoundError,
     ServerError,
+    TaskFailedError,
 )
 from ._families.openai     import OpenAIClient
 from ._families.perplexity import PerplexityClient
@@ -42,6 +43,7 @@ __all__ = [
     "InvalidRequestError",
     "NotFoundError",
     "ServerError",
+    "TaskFailedError",
     "OpenAIClient",
     "PerplexityClient",
     "QwenClient",

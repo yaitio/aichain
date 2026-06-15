@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 __author__  = "YAIT"
 
 # ── Convenience re-exports ─────────────────────────────────────────────────────
@@ -49,4 +49,5 @@ from .clients import (                                             # noqa: F401
     InvalidRequestError,
     NotFoundError,
     ServerError,
+    TaskFailedError,
 )

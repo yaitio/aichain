@@ -36,8 +36,7 @@ jobs:
       - name: Install and test
         run: |
           pip install -e ".[all]" pytest pytest-asyncio
-          # *Live* tests need real API keys; test_tool.py has a stale import path.
-          pytest -k "not Live" --ignore=tests/tools/test_tool.py
+          pytest -k "not Live"   # *Live* tests need real API keys; skip in CI
 
       - name: Build
         run: |

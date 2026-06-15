@@ -76,6 +76,18 @@ class ServerError(APIError):
     """HTTP 5xx — provider-side outage or transient failure."""
 
 
+class TaskFailedError(APIError):
+    """
+    A provider's asynchronous job reached a terminal failure.
+
+    Raised when an async task API (e.g. DashScope image-synthesis) reports the
+    job FAILED / CANCELED / returned no usable result, or did not finish within
+    the poll budget.  Unlike a transport ``ServerError``, this is **terminal**:
+    re-issuing the same request would submit a brand-new (billable) job, so it
+    is never retried and never triggers model fallback.
+    """
+
+
 def _parse_retry_after(headers) -> "float | None":
     """Extract a numeric ``Retry-After`` (seconds) from response headers."""
     if not headers:

@@ -26,7 +26,7 @@ import json as _json
 import os
 import time
 
-from .._errors import ServerError
+from .._errors import TaskFailedError
 from .openai import OpenAIClient, _is_qwen_image, _last_user_text
 
 REGION_URLS = {
@@ -109,7 +109,7 @@ class QwenClient(OpenAIClient):
         submitted = _json.loads(self._post(_IMAGE_SYNTHESIS_PATH, body, submit_headers))
         task_id = submitted.get("output", {}).get("task_id")
         if not task_id:
-            raise ServerError(502, f"DashScope returned no task_id: {submitted}")
+            raise TaskFailedError(502, f"DashScope returned no task_id: {submitted}")
 
         output = self._poll_task(task_id, headers)
         return self._collect(output)
@@ -126,10 +126,10 @@ class QwenClient(OpenAIClient):
             if status in ("FAILED", "CANCELED", "UNKNOWN"):
                 code = output.get("code", status)
                 message = output.get("message", "")
-                raise ServerError(502, f"DashScope task {task_id} {status}: {code} {message}".rstrip())
+                raise TaskFailedError(502, f"DashScope task {task_id} {status}: {code} {message}".rstrip())
 
             if time.monotonic() >= deadline:
-                raise ServerError(
+                raise TaskFailedError(
                     504,
                     f"DashScope task {task_id} did not finish within "
                     f"{self._POLL_TIMEOUT:.0f}s (last status: {status}).",
@@ -146,5 +146,5 @@ class QwenClient(OpenAIClient):
             blob = self._download(url)
             items.append({"b64_json": base64.b64encode(blob["data"]).decode("ascii")})
         if not items:
-            raise ServerError(502, f"DashScope task returned no image results: {output}")
+            raise TaskFailedError(502, f"DashScope task returned no image results: {output}")
         return _json.dumps({"data": items}).encode("utf-8")
