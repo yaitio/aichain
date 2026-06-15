@@ -71,6 +71,20 @@ An **Agent** plans, picks tools, acts, reflects, and decides when to stop — au
 
 ---
 
+## State — suspend & resume
+
+A run can **pause** until an external signal arrives (a human, a webhook, a
+cron tick) and **resume** later — even in a different process. The run is
+parked in a store; `resume(run_id, signal)` continues from exactly where it
+stopped, without re-running completed steps. This is the serverless core.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`17_chain_human_input.py`](17_chain_human_input.py) | Human-in-the-loop: a chain drafts a reply, **pauses** for a person to approve/edit it at the console, then resumes and sends it. | `OPENAI_API_KEY` |
+| [`18_agent_external_trigger.py`](18_agent_external_trigger.py) | An agent pauses at an approval `Gate`; a **separate** trigger (webhook/cron) resumes it later, sharing only a `FileStore` — the cross-process serverless pattern. | `OPENAI_API_KEY` |
+
+---
+
 ## Debug
 
 | File | What it shows | Keys needed |
@@ -82,12 +96,13 @@ An **Agent** plans, picks tools, acts, reflects, and decides when to stop — au
 ## Quick reference
 
 ```python
-from models import Model
-from skills import Skill
-from chain  import Chain
-from pool   import Pool, DONE, FAILED
-from agent  import Agent
-from tools  import convertToMD, MCPTools
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.chain  import Chain
+from yait_aichain.pool   import Pool, DONE, FAILED
+from yait_aichain.agent  import Agent
+from yait_aichain.tools  import convertToMD, MCPTools, Wait, Gate
+from yait_aichain.state  import FileStore, SuspendedResult
 
 # Skill — one prompt, one model
 skill = Skill(model=Model("claude-sonnet-4-6"), input={...})
@@ -107,4 +122,11 @@ print(pool.status)            # {PENDING: 0, RUNNING: 0, DONE: 5, FAILED: 0}
 agent = Agent(orchestrator=Model("claude-sonnet-4-6"), tools=[...], max_steps=10)
 result = agent.run("Research the top 3 vector databases.")
 print(result.output, result.steps_taken, result.tokens_used)
+
+# Suspend / resume — pause until an external signal (human, webhook, cron)
+chain = Chain(steps=[draft, Wait(reason="approve?"), send], store=FileStore("runs/"))
+result = chain.run(variables={...})
+if isinstance(result, SuspendedResult):
+    # ...later, possibly in another process sharing the same store...
+    chain.resume(result.run_id, signal={"reply": "approved text"})
 ```

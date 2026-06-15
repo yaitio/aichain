@@ -18,7 +18,7 @@ import importlib
 import pkgutil
 import sys
 
-_SUBPACKAGES = ("models", "skills", "chain", "pool", "agent", "clients", "tools")
+_SUBPACKAGES = ("models", "skills", "chain", "pool", "agent", "clients", "tools", "state")
 
 for _name in _SUBPACKAGES:
     _pkg = importlib.import_module(f"yait_aichain.{_name}")

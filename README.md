@@ -302,6 +302,41 @@ MIT
 
 ## Changelog
 
+### 1.3.0
+
+Durable, resumable runs — the serverless core. A Chain or Agent can **pause**
+until an external signal arrives (a human, a webhook, a cron tick) and
+**resume** later, even in a different process. All additive; existing programs
+are unchanged.
+
+- `Wait` / `Gate` suspend tools — pause a run until a signal arrives; on resume
+  the signal drives the step. `Wait` is a leaf (its output is the signal);
+  `Gate` wraps any tool behind an approval decision.
+- `Chain.resume(run_id, signal)` / `Agent.resume(run_id, signal)` — continue a
+  suspended run from where it paused; completed steps are not re-run.
+- Self-contained run documents in a pluggable `StateStore`: `InMemoryStore`
+  (default, process-local) and `FileStore` (survives restart); subclass for
+  S3/DynamoDB/any KV. The store holds only suspended runs and a resume is
+  idempotent — a duplicate trigger is a no-op.
+- `run()` returns a falsy `SuspendedResult` (carrying `run_id` and `awaiting`)
+  when paused instead of a final result. `RunContext` (tenant, metadata) can be
+  passed to `run()` for per-request context.
+
+### 1.2.6
+
+- Security hardening: SSRF guard on outbound URL tools (private/loopback ranges
+  blocked; opt out with `AICHAIN_ALLOW_PRIVATE_URLS=1`), URL-scheme allow-list,
+  and output-path confinement (`AICHAIN_OUTPUT_ROOT`). Safe-class checks on
+  tool instantiation during chain load.
+
+### 1.2.5
+
+- Correctness fixes across the model and tooling layer: response parsing,
+  search/MCP timeouts, table chunking when a header exceeds the chunk size,
+  and assorted edge cases surfaced by analysis.
+- Refreshed the model registry to current provider catalogues and June 2026
+  pricing.
+
 ### 1.2.3
 
 Two-tier model layer: **format is code (by API family), provider is data.**
