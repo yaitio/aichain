@@ -22,7 +22,7 @@ agent = Agent(
     max_steps    = 8,
 )
 
-result = agent.run("Find the top 3 ERP vendors in Kazakhstan and return a Markdown table.")
+result = agent.run("Compare the top 3 managed vector databases and return a Markdown table.")
 if result:
     print(result.output, "·", result.steps_taken, "steps ·", result.tokens_used, "tokens")
 else:

@@ -24,7 +24,7 @@ chain = Chain(steps=[
     my_agent,   # bare Agent — task read from accumulated["task"] by default
 ])
 
-chain.run(variables={"task": "Research top 3 ERP vendors in Kazakhstan."})
+chain.run(variables={"task": "Compare the top 3 managed vector databases."})
 ```
 
 The Chain treats the Agent like any other step: it passes the accumulated variable dict in, and the agent's final `output` goes back into the dict.
@@ -169,7 +169,7 @@ chain = Chain(steps=[
 ])
 
 chain.run(variables={
-    "research_task": "Find top 3 ERP vendors in Kazakhstan; cite sources.",
+    "research_task": "Compare the top 3 managed vector databases; cite sources.",
     "report_task":   "Deliver a 5-page market briefing in English.",
 })
 ```
