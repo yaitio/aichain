@@ -21,6 +21,13 @@ low = "enabled"
 medium = "enabled"
 high = "enabled"
 
+# Coding-focused; runs with Thinking enabled by default on the Kimi API (the
+# client never disables it, so it works out of the box). For non-coding tasks
+# Moonshot recommends kimi-k2.6.
+[models."kimi-k2.7-code"]
+caps  = ["text-to-text"]
+price = { input = 0.95, output = 4.0 }
+
 [models."kimi-k2-0905-preview"]
 caps  = ["text-to-text"]
 price = { input = 0.6, output = 2.5 }

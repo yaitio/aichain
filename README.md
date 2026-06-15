@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **63 models from 8 providers** — with one line to swap any of them.
+All of these work identically across **64 models from 8 providers** — with one line to swap any of them.
 
 ---
 
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-63 models total. Full list: [model registry →](docs/reference/model-registry.md)
+64 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -286,7 +286,7 @@ chain = Chain.load("chains/research.yaml")
 | **Google** | Gemini 2.5 Pro / Flash, 3.x | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
 | **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `XAI_API_KEY` |
 | **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |
-| **Kimi** | K2.5, K2, K2 Turbo, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
+| **Kimi** | K2.7 Code, K2.6, K2.5, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
 | **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | — | — | `DEEPSEEK_API_KEY` |
 | **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wan 2.2 image | `DASHSCOPE_API_KEY` |
 
@@ -303,6 +303,13 @@ MIT
 ---
 
 ## Changelog
+
+### 1.3.6
+
+Added **Kimi K2.7 Code** (`kimi-k2.7-code`) — Moonshot's coding-focused model
+($0.95 / $4.00 per 1M input/output). It runs with Thinking enabled by default
+on the Kimi API; the client never disables it, so it works out of the box. For
+non-coding tasks, `kimi-k2.6` stays the recommendation.
 
 ### 1.3.5
 
