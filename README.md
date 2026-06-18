@@ -309,6 +309,13 @@ MIT
 
 ## Changelog
 
+### 1.4.1
+
+Version is now a **single source of truth** in `yait_aichain/__init__.py`
+(`__version__`); `pyproject.toml` reads it dynamically (`[tool.setuptools.dynamic]`)
+and the publish workflow checks the same file — no more drift between the two
+(which silently blocked the 1.4.0 publish until both were bumped).
+
 ### 1.4.0
 
 **Multimodal: image-to-image (image editing).** Restyle / recompose / edit an

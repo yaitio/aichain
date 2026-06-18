@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yait-aichain"
-version = "1.4.0"
+dynamic = ["version"]            # single source of truth: yait_aichain.__version__
 description = "One interface. 10 providers. 77 models. Text, image generation & editing, vision, RAG, agents, parallel pipelines."
 readme = "README.md"
 license = { text = "MIT" }
@@ -31,6 +31,10 @@ include = ["yait_aichain*"]
 
 [tool.setuptools.package-data]
 "yait_aichain.models" = ["providers/*.toml"]
+
+# Version is read from yait_aichain/__init__.py (__version__) — one place to bump.
+[tool.setuptools.dynamic]
+version = { attr = "yait_aichain.__version__" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
