@@ -28,7 +28,11 @@ from ._openai_compat import (
     _parse_responses_api_response,
     _build_image_generations_request,
     _parse_image_generations_response,
+    _build_image_edits_request,
+    _build_xai_image_edit_request,
     _is_openai_image_model,
+    _is_openai_editable_image_model,
+    _messages_have_image,
     _is_o_series_model,
     _should_use_responses_api,
 )
@@ -55,9 +59,10 @@ class OpenAIClient(BaseClient):
         )
         self._data        = data
         self._provider    = prov["key"]
-        self._chat_path   = prov.get("chat_path", "/v1/chat/completions")
-        self._images_path = prov.get("images_path", "/v1/images/generations")
-        self._models_path = prov.get("models_path", "/v1/models")
+        self._chat_path        = prov.get("chat_path", "/v1/chat/completions")
+        self._images_path       = prov.get("images_path", "/v1/images/generations")
+        self._images_edits_path = prov.get("images_edits_path", "/v1/images/edits")
+        self._models_path       = prov.get("models_path", "/v1/models")
         self._mtf         = prov.get("max_tokens_field", "max_completion_tokens")
 
     # ── transport ────────────────────────────────────────────────────
@@ -68,6 +73,16 @@ class OpenAIClient(BaseClient):
     def list_models(self) -> list[str]:
         data = self._get(self._models_path, self._auth_headers())
         return [m["id"] for m in _json.loads(data)["data"]]
+
+    # ── request lifecycle ────────────────────────────────────────────
+    def send(self, path: str, body: dict, headers: dict) -> bytes:
+        # Image edits go out as multipart/form-data: urllib3 sets the
+        # Content-Type (with its boundary), so the JSON Content-Type we carry
+        # for every other call must be dropped. Everything else is a JSON POST.
+        if isinstance(body, dict) and body.get("_multipart"):
+            h = {k: v for k, v in headers.items() if k.lower() != "content-type"}
+            return self._post_form(path, body["fields"], h)
+        return super().send(path, body, headers)
 
     # ── format: model params → provider body ─────────────────────────
     def _wrap(self, params: dict):
@@ -91,6 +106,9 @@ class OpenAIClient(BaseClient):
             if _should_use_responses_api(m.name):
                 return _build_responses_api_request(m, messages, output)
             if _is_openai_image_model(m.name):
+                # An input image + an editable image model ⇒ edit, else generate.
+                if _is_openai_editable_image_model(m.name) and _messages_have_image(messages):
+                    return _build_image_edits_request(m, messages, output, self._images_edits_path)
                 return _build_image_generations_request(m, messages, output, self._images_path)
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
             # reasoning_effort is only valid on the o-series reasoning models;
@@ -105,6 +123,9 @@ class OpenAIClient(BaseClient):
 
         if p == "xai":
             if _is_xai_image(m.name):
+                # An input image ⇒ edit (JSON /v1/images/edits), else generate.
+                if _messages_have_image(messages):
+                    return _build_xai_image_edit_request(m, messages, output, self._images_edits_path)
                 prompt = _last_user_text(messages)
                 return self._images_path, {"model": m.name, "prompt": prompt,
                                            "n": 1, "response_format": "b64_json"}

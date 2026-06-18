@@ -1,0 +1,35 @@
+# recraft — provider settings + its models (data tier)
+#
+# Image-only provider. Rides the OpenAI Bearer transport: text-to-image on the
+# OpenAI-shaped /v1/images/generations, image-to-image on the multipart
+# /v1/images/imageToImage. Verified live against the Recraft API.
+
+[provider]
+key      = "recraft"
+client   = "recraft"
+base_url = "https://external.api.recraft.ai"
+env_key  = "RECRAFT_API_TOKEN"
+auth     = "bearer"
+images_path       = "/v1/images/generations"
+images_edits_path = "/v1/images/imageToImage"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096
+
+# Generation: recraftv4_1 is the API default. Editing (imageToImage) is
+# available on the V3 models only, per the Recraft reference. Note:
+# imageToImage is a strength-controlled whole-image *variation* (img2img),
+# NOT a subject-preserving edit — for "place this product in a scene" use an
+# instruction editor (gpt-image / gemini image / qwen-image-edit / flux-kontext).
+[models."recraftv4_1"]
+caps  = ["text-to-image"]
+
+[models."recraftv4_1_vector"]
+caps  = ["text-to-image"]
+
+[models."recraftv3"]
+caps  = ["text-to-image", "image-to-image"]
+
+[models."recraftv3_vector"]
+caps  = ["text-to-image", "image-to-image"]

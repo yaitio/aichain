@@ -69,3 +69,14 @@ caps  = ["text-to-image"]
 
 [models."wan2.2-t2i-plus"]
 caps  = ["text-to-image"]
+
+# Image editing (qwen-image-edit series). Synchronous multimodal-generation
+# endpoint: input image as a base64 data-URI (or URL) + an edit instruction.
+[models."qwen-image-edit"]
+caps  = ["image-to-image"]
+
+[models."qwen-image-edit-plus"]
+caps  = ["image-to-image"]
+
+[models."qwen-image-edit-max"]
+caps  = ["image-to-image"]

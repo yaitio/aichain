@@ -142,7 +142,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (8 providers, 64 models):
+and is tested with (10 providers, 77 models):
 
 ```python
 from yait_aichain.models import registry
@@ -156,9 +156,45 @@ registry.tasks("gpt-4o")                    # ['image-to-text', 'text-to-text']
 registry.is_supported("gpt-image-2", "text-to-image")   # True
 ```
 
-Tasks: `text-to-text`, `text-to-image`, `image-to-text`. To diff the registry
-against a provider's live roster (new/removed models), call
+Tasks: `text-to-text`, `text-to-image`, `image-to-text`, `image-to-image`. To
+diff the registry against a provider's live roster (new/removed models), call
 `registry.refresh("openai")`.
+
+### Image editing (image-to-image)
+
+Editing an image is just **an input image part plus an image output** — the same
+`Skill` you use for generation, with the model named accordingly. The provider is
+a one-word swap.
+
+Two flavours, depending on the model:
+
+- **Instruction edit — preserves the subject** (OpenAI `gpt-image-*`, Google
+  Gemini image, xAI `grok-imagine-*`, Qwen `qwen-image-edit`, BFL `flux-kontext-*`):
+  follows the prompt while keeping the original object — e.g. "place *this*
+  product on a marble counter" keeps your product. This is what you want for
+  product photography and scene composition.
+- **Whole-image variation — not subject-preserving** (Recraft `imageToImage`):
+  a `strength`-controlled img2img transform of the *entire* image; great for
+  restyling a picture, but it will not lift your object into a new scene
+  (low `strength` stays near the original, high `strength` invents a new one).
+
+```python
+from yait_aichain import Model, Skill
+
+Skill(
+    model  = Model("gpt-image-1.5"),   # → gemini-3.1-flash-image / grok-imagine-image / qwen-image-edit
+    input  = {"messages": [{"role": "user", "parts": [
+        {"type": "image", "source": {"kind": "file", "path": "product.png"}},
+        "Place this product on a marble kitchen counter, soft morning light",
+    ]}]},
+    output = {"modalities": ["image"], "format": {"type": "image"}},
+).run()      # → {"base64": ..., "mime_type": ..., "url": ..., "revised_prompt": ...}
+```
+
+A media source of `{"kind": "file", "path": "..."}` is read and base64-encoded for
+you (MIME inferred); `{"kind": "base64", "data": ..., "mime": ...}` and
+`{"kind": "url", "url": ...}` work too. Discover edit-capable models with
+`registry.models(task="image-to-image")`.
 
 ### Provider reference
 
@@ -175,7 +211,9 @@ current lists live in `models/providers/*.toml` and the
 | Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
 | Kimi | `MOONSHOT_API_KEY` | `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2-thinking` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
-| Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash` |
+| Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash`, `qwen-image-edit` |
+| Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
+| BFL (FLUX) | `BFL_API_KEY` | `flux-2-pro`, `flux-pro-1.1`, `flux-kontext-pro`, `flux-kontext-max` *(image only)* |
 
 ### What a Model does (and doesn't)
 

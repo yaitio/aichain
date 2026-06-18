@@ -190,8 +190,11 @@ class GoogleClient(BaseClient):
         cands = response.get("candidates", [])
         if not cands:
             if ftype == "image":
-                return {"url": None, "base64": None,
-                        "mime_type": "image/png", "revised_prompt": ""}
+                block = (response.get("promptFeedback") or {}).get("blockReason")
+                raise ValueError(
+                    "Google returned no image — the request was blocked or refused"
+                    + (f": {block}" if block else ".")
+                )
             return ""
         parts = cands[0].get("content", {}).get("parts", [])
         if ftype == "image":
@@ -200,8 +203,12 @@ class GoogleClient(BaseClient):
                 return {"url": None, "base64": ip["inlineData"]["data"],
                         "mime_type": ip["inlineData"].get("mimeType", "image/png"),
                         "revised_prompt": ""}
-            return {"url": None, "base64": None,
-                    "mime_type": "image/png", "revised_prompt": ""}
+            reason = cands[0].get("finishReason")
+            raise ValueError(
+                "Google returned no image part — the model emitted text instead "
+                "of an image, or the request was blocked"
+                + (f" (finish_reason={reason})" if reason else ".")
+            )
         try:
             text = next(p["text"] for p in parts if "text" in p)
         except StopIteration:

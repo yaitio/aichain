@@ -1,6 +1,6 @@
 # aichain
 
-**The simplest way to build AI pipelines. 8 providers. 1 interface. Zero lock-in.**
+**The simplest way to build AI pipelines. 10 providers. 1 interface. Zero lock-in.**
 
 ```python
 from yait_aichain import Model, Skill
@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **64 models from 8 providers** — with one line to swap any of them.
+All of these work identically across **77 models from 10 providers** — with one line to swap any of them.
 
 ---
 
@@ -68,7 +68,7 @@ export VOYAGE_API_KEY="…"           # embeddings + reranking
 
 ---
 
-## 8 providers, one syntax
+## 10 providers, one syntax
 
 ```python
 from yait_aichain.models import Model
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-64 models total. Full list: [model registry →](docs/reference/model-registry.md)
+77 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -261,6 +261,7 @@ Embedding("voyage/voyage-3-large")
 | 16 | `16_debug.py` | Inspect Chain history, Pool status, Agent steps |
 | 17 | `17_chain_human_input.py` | Pause a chain for human approval, then resume |
 | 18 | `18_agent_external_trigger.py` | Suspend an agent; a webhook resumes it (cross-process) |
+| 19 | `19_image_edit.py` | Edit one product photo across four image providers |
 
 ---
 
@@ -289,7 +290,11 @@ chain = Chain.load("chains/research.yaml")
 | **Kimi** | K2.7 Code, K2.6, K2.5, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
 | **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | — | — | `DEEPSEEK_API_KEY` |
 | **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wan 2.2 image | `DASHSCOPE_API_KEY` |
+| **Recraft** | — | — | Recraft V3 (raster + vector) | `RECRAFT_API_TOKEN` |
+| **BFL (FLUX)** | — | — | FLUX.2, FLUX Kontext | `BFL_API_KEY` |
 
+**Image editing — instruction edit, preserves the subject:** OpenAI · Google · xAI · Qwen · FLUX Kontext (place / restyle / recompose while keeping the original object)  
+**Image-to-image — whole-image variation (restyle, not subject-preserving):** Recraft (`imageToImage`, `strength`-controlled)  
 **Embedding:** OpenAI · Cohere · Voyage · Google · Qwen  
 **Reranking:** Cohere · Voyage · Qwen  
 **Vector DB:** Chroma · Qdrant · Pinecone
@@ -303,6 +308,45 @@ MIT
 ---
 
 ## Changelog
+
+### 1.4.0
+
+**Multimodal: image-to-image (image editing).** Restyle / recompose / edit an
+existing image across four providers behind the same `Skill` — an input image
+part plus an image-output model *is* an edit; swap the provider by changing the
+model name, nothing else.
+
+```python
+Skill(
+    model  = Model("gpt-image-1.5"),     # or gemini-3.1-flash-image / grok-imagine-image / qwen-image-edit
+    input  = {"messages": [{"role": "user", "parts": [
+        {"type": "image", "source": {"kind": "file", "path": "product.png"}},
+        "Place this product on a marble kitchen counter, soft morning light",
+    ]}]},
+    output = {"modalities": ["image"], "format": {"type": "image"}},
+).run()
+```
+
+- **Six image providers** edit: OpenAI (`gpt-image-*`, `chatgpt-image-latest`,
+  multipart `/v1/images/edits`), Google (Gemini image, conversational edit), xAI
+  (`grok-imagine-*`, JSON edits), Qwen (`qwen-image-edit` series, synchronous
+  multimodal-generation), plus two dedicated image houses — **Recraft**
+  (`recraftv3`, multipart imageToImage) and **Black Forest Labs / FLUX**
+  (`flux-kontext-*`, async submit→poll→download). New `image-to-image` task in
+  the registry.
+- **+2 providers, now 10 / 77 models.** Recraft (`RECRAFT_API_TOKEN`) and BFL
+  (`BFL_API_KEY`) join as image specialists — `Model("flux-kontext-pro")` /
+  `Model("recraftv3")` resolve and edit like any other.
+- **Multiple reference images for edits.** Pass several image parts to compose /
+  restyle with references — OpenAI (`image[]`, ≤16), xAI (`images`, ≤3), Qwen and
+  Gemini all accept multi-image input.
+- **Empty image responses raise a clear error.** When a provider returns no image
+  (blocked / refused / text-instead-of-image), the call raises a descriptive
+  `ValueError` instead of silently returning `base64=None` (which crashed callers
+  on decode).
+- **Local files as input.** A media source `{"kind": "file", "path": "..."}` is
+  read and base64-encoded automatically (MIME inferred), so you can pass a path
+  straight into any vision or edit call.
 
 ### 1.3.6
 
