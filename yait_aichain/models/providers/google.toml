@@ -32,13 +32,13 @@ caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.5, output = 3.0 }
 
 [models."gemini-3-pro-image"]
-caps  = ["text-to-image"]
+caps  = ["text-to-image", "image-to-image"]
 
 [models."gemini-3.1-flash-image"]
-caps  = ["text-to-image"]
+caps  = ["text-to-image", "image-to-image"]
 
 [models."gemini-2.5-flash-image"]
-caps  = ["text-to-image"]
+caps  = ["text-to-image", "image-to-image"]
 
 [models."gemini-2.5-pro"]
 caps  = ["image-to-text", "text-to-text"]

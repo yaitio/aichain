@@ -418,11 +418,18 @@ class TestRegistry(unittest.TestCase):
         with self.assertRaises(ValueError):
             registry.is_supported("gpt-4o", "text-to-audio")
 
-    def test_tasks_constant_has_three_entries(self):
-        self.assertEqual(len(registry.TASKS), 3)
+    def test_tasks_constant_entries(self):
+        self.assertEqual(
+            set(registry.TASKS),
+            {"text-to-text", "text-to-image", "image-to-text", "image-to-image"},
+        )
 
-    def test_providers_constant_has_eight_entries(self):
-        self.assertEqual(len(registry.PROVIDERS), 8)
+    def test_providers_constant_entries(self):
+        self.assertEqual(
+            set(registry.PROVIDERS),
+            {"openai", "anthropic", "google", "xai", "perplexity",
+             "kimi", "deepseek", "qwen", "recraft", "bfl"},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -454,6 +461,11 @@ class TestDetectImageMime(unittest.TestCase):
     def test_gif_detected(self):
         header = b"GIF89a" + b"\x00" * 10
         self.assertEqual(self._detect(self._b64(header)), "image/gif")
+
+    def test_svg_detected(self):
+        # Recraft's *_vector models return raw SVG markup, not a raster image.
+        self.assertEqual(self._detect(self._b64(b'<svg xmlns="http://')), "image/svg+xml")
+        self.assertEqual(self._detect(self._b64(b'<?xml version="1.0"')), "image/svg+xml")
 
     def test_unknown_fallback_is_png(self):
         header = b"\x00\x01\x02\x03" * 4

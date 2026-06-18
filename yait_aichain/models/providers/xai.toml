@@ -50,7 +50,7 @@ caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.3, output = 0.5 }
 
 [models."grok-imagine-image"]
-caps  = ["text-to-image"]
+caps  = ["text-to-image", "image-to-image"]
 
 [models."grok-imagine-image-pro"]
-caps  = ["text-to-image"]
+caps  = ["text-to-image", "image-to-image"]

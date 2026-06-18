@@ -27,6 +27,7 @@ import os
 import time
 
 from .._errors import TaskFailedError
+from ._openai_compat import _image_source_to_data_uri
 from .openai import OpenAIClient, _is_qwen_image, _last_user_text
 
 REGION_URLS = {
@@ -40,6 +41,15 @@ _DEFAULT_REGION = "ap"
 # DashScope native image-synthesis endpoints (relative to the regional base).
 _IMAGE_SYNTHESIS_PATH = "/api/v1/services/aigc/text2image/image-synthesis"
 _TASKS_PATH = "/api/v1/tasks/"
+
+# Image *editing* rides a different, synchronous endpoint (confirmed by live
+# probe): the multimodal-generation API, with a message-shaped body and the
+# input image as a base64 data-URI (or URL). No polling.
+_MULTIMODAL_GEN_PATH = "/api/v1/services/aigc/multimodal-generation/generation"
+
+
+def _is_qwen_image_edit(name: str) -> bool:
+    return "image-edit" in name.lower()   # qwen-image-edit / -plus / -max
 
 
 def resolve_qwen_base_url(region: "str | None" = None) -> str:
@@ -76,6 +86,36 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str
     return _IMAGE_SYNTHESIS_PATH, body
 
 
+def _build_qwen_image_edit_request(model, messages: list, output: dict) -> "tuple[str, dict]":
+    """
+    Build the DashScope multimodal-generation (image-edit) *(path, body)* pair.
+
+    Synchronous endpoint. The input image(s) ride ``content[].image`` as a
+    base64 data-URI (or a URL); the edit instruction is a ``content[].text``
+    item. Size is converted from our ``"1280x720"`` to DashScope's ``"1280*720"``.
+    """
+    input_messages: list[dict] = []
+    for msg in messages:
+        content: list[dict] = []
+        for part in msg["parts"]:
+            if part["type"] == "text":
+                content.append({"text": part["text"]})
+            elif part["type"] == "image" and isinstance(part.get("source"), dict):
+                content.append({"image": _image_source_to_data_uri(part["source"])})
+        if content:
+            input_messages.append({"role": msg["role"], "content": content})
+
+    parameters: dict = {"n": 1}
+    size = output.get("format", {}).get("size")
+    if size:
+        parameters["size"] = size.replace("x", "*")
+
+    body = {"model": model.name,
+            "input": {"messages": input_messages},
+            "parameters": parameters}
+    return _MULTIMODAL_GEN_PATH, body
+
+
 class QwenClient(OpenAIClient):
 
     #: Seconds between task-status polls, and the overall ceiling.
@@ -91,17 +131,44 @@ class QwenClient(OpenAIClient):
     # ── format ───────────────────────────────────────────────────────
     def build_request(self, messages, output, params) -> "tuple[str, dict]":
         m = self._wrap(params)
+        if _is_qwen_image_edit(m.name):
+            return _build_qwen_image_edit_request(m, messages, output)
         if _is_qwen_image(m.name):
             return _build_qwen_image_request(m, messages, output)
         return super().build_request(messages, output, params)
 
     # ── request lifecycle ────────────────────────────────────────────
     def send(self, path: str, body: dict, headers: dict) -> bytes:
-        # wanx text-to-image is the only async path; everything else is a
-        # single POST handled by the base implementation.
+        # wanx text-to-image is async (submit → poll → download); image-edit is
+        # a synchronous multimodal-generation call that returns result URLs.
+        # Everything else defers to the base (JSON POST / multipart) seam.
         if path == _IMAGE_SYNTHESIS_PATH:
             return self._image_synthesis(body, headers)
-        return self._post(path, body, headers)
+        if path == _MULTIMODAL_GEN_PATH:
+            return self._image_edit_sync(body, headers)
+        return super().send(path, body, headers)
+
+    # ── synchronous image edit: POST → download result URL(s) → base64 ─
+    def _image_edit_sync(self, body: dict, headers: dict) -> bytes:
+        """
+        Run the synchronous edit and reshape its result into the
+        ``{"data": [{"b64_json": …}]}`` form the image parser already consumes.
+
+        The response carries result image **URLs** under
+        ``output.choices[].message.content[].image``; download each and base64
+        it (the same normalisation ``_collect`` does for the async wan path).
+        An empty result falls through to the parser's descriptive error.
+        """
+        resp = _json.loads(self._post(_MULTIMODAL_GEN_PATH, body, headers))
+        items: list = []
+        for choice in resp.get("output", {}).get("choices", []):
+            content = (choice.get("message") or {}).get("content") or []
+            for c in content:
+                url = c.get("image")
+                if url:
+                    blob = self._download(url)
+                    items.append({"b64_json": base64.b64encode(blob["data"]).decode("ascii")})
+        return _json.dumps({"data": items}).encode("utf-8")
 
     # ── async image synthesis: submit → poll → collect ───────────────
     def _image_synthesis(self, body: dict, headers: dict) -> bytes:

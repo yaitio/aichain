@@ -98,9 +98,64 @@ Partial forms (each missing key is filled in with its default)::
     →  (already complete; unchanged)
 """
 
+import base64
 import copy
+import pathlib
 
 from .._template import substitute_placeholders
+
+
+# ---------------------------------------------------------------------------
+# Local-file media sources
+# ---------------------------------------------------------------------------
+
+#: File-extension → MIME, used when a ``kind:"file"`` source omits ``mime``.
+_EXT_MIME = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".webp": "image/webp", ".gif": "image/gif",
+    ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg", ".flac": "audio/flac",
+    ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+}
+
+
+def _guess_mime(path: pathlib.Path, head: bytes) -> str:
+    """Best-effort MIME for a local file: extension first, then magic bytes."""
+    by_ext = _EXT_MIME.get(path.suffix.lower())
+    if by_ext:
+        return by_ext
+    if head[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if head[:4] == b"\x89PNG":
+        return "image/png"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    if head[:4] == b"GIF8":
+        return "image/gif"
+    return "application/octet-stream"
+
+
+def _resolve_file_source(part: dict) -> None:
+    """
+    Resolve a ``kind:"file"`` media source into inline base64 *in place*.
+
+    When a media part's ``source`` is ``{"kind": "file", "path": "...",}`` and
+    carries no ``data`` yet, read the file, base64-encode it into ``data``, and
+    fill in ``mime`` (from the extension, falling back to magic bytes) if absent.
+    A ``"file"`` source that already has ``data`` is left untouched, so the
+    family clients (which read ``source["data"]`` for both ``base64`` and
+    ``file`` kinds) keep working unchanged.
+    """
+    src = part.get("source")
+    if not isinstance(src, dict) or src.get("kind") != "file":
+        return
+    if src.get("data") or "path" not in src:
+        return
+    path = pathlib.Path(src["path"]).expanduser()
+    raw = path.read_bytes()
+    src["data"] = base64.b64encode(raw).decode("ascii")
+    if not src.get("mime"):
+        src["mime"] = _guess_mime(path, raw[:16])
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +219,9 @@ def normalize_input(input_: dict) -> dict:
                 # Dict with "text" but no "type" → default type to "text"
                 normalised_parts.append({"type": "text", **part})
             else:
+                # Media part: load a local-file source into inline base64.
+                if isinstance(part, dict):
+                    _resolve_file_source(part)
                 normalised_parts.append(part)
         msg["parts"] = normalised_parts
     return result

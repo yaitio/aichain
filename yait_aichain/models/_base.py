@@ -68,6 +68,8 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
     from ..clients._families.google     import GoogleClient
     from ..clients._families.perplexity import PerplexityClient
     from ..clients._families.qwen       import QwenClient
+    from ..clients._families.recraft    import RecraftClient
+    from ..clients._families.bfl        import BFLClient
 
     family = {
         "openai":     OpenAIClient,
@@ -75,6 +77,8 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
         "google":     GoogleClient,
         "perplexity": PerplexityClient,
         "qwen":       QwenClient,
+        "recraft":    RecraftClient,
+        "bfl":        BFLClient,
     }[ctype]
     return family(api_key, data=data, **client_options)
 
@@ -91,6 +95,8 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^kimi-"),                                            "kimi"),
     (re.compile(r"^deepseek-"),                                        "deepseek"),
     (re.compile(r"^(qwen|qwq|wanx|wan\d)"),                            "qwen"),
+    (re.compile(r"^recraftv\d"),                                       "recraft"),
+    (re.compile(r"^flux"),                                             "bfl"),
     (re.compile(r"^(gpt-|dall-e-|chatgpt-image-|text-embedding-|whisper-|tts-|o\d)"), "openai"),
 ]
 
@@ -99,6 +105,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
+    "recraft", "bfl",
 })
 
 
@@ -358,7 +365,9 @@ class Model:
 # supports).  These functions read that data; there is no separate registry.
 
 #: Canonical task vocabulary.
-TASKS: tuple[str, ...] = ("text-to-text", "text-to-image", "image-to-text")
+TASKS: tuple[str, ...] = (
+    "text-to-text", "text-to-image", "image-to-text", "image-to-image",
+)
 
 
 def _check_task(task: "str | None") -> None:

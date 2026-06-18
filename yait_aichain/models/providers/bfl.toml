@@ -1,0 +1,38 @@
+# bfl — Black Forest Labs (FLUX). Provider settings + models (data tier).
+#
+# Asynchronous image generation + editing. Auth is an `x-key` header; the model
+# name is the endpoint path (POST /v1/{model}); a request returns {id,
+# polling_url}; poll until status == "Ready", then download result.sample (a
+# signed URL). FLUX Kontext models also edit (an input image switches them from
+# generate to edit). Verified live against the BFL API (docs.bfl.ai).
+
+[provider]
+key      = "bfl"
+client   = "bfl"
+base_url = "https://api.bfl.ai"
+env_key  = "BFL_API_KEY"
+auth     = "x-key"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096
+
+# Generation
+[models."flux-2-pro"]
+caps  = ["text-to-image"]
+
+[models."flux-pro-1.1"]
+caps  = ["text-to-image"]
+
+[models."flux-pro-1.1-ultra"]
+caps  = ["text-to-image"]
+
+[models."flux-dev"]
+caps  = ["text-to-image"]
+
+# FLUX Kontext — context-aware editing (also generates from a bare prompt).
+[models."flux-kontext-pro"]
+caps  = ["text-to-image", "image-to-image"]
+
+[models."flux-kontext-max"]
+caps  = ["text-to-image", "image-to-image"]

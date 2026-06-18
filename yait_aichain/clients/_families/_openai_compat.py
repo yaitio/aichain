@@ -9,6 +9,7 @@ kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
 
 from __future__ import annotations
 
+import base64
 import json
 
 
@@ -277,6 +278,9 @@ def _detect_image_mime(b64_data: "str | None") -> str:
             return "image/webp"
         if header[:4] == b"GIF8":
             return "image/gif"
+        # Vector output (e.g. Recraft's *_vector models) returns raw SVG markup.
+        if header[:4] == b"<svg" or header[:5] == b"<?xml":
+            return "image/svg+xml"
     except Exception:
         pass
     return "image/png"
@@ -313,9 +317,127 @@ def _parse_image_generations_response(response: dict) -> dict:
     return {
         "url":            item.get("url"),
         "base64":         b64,
-        "mime_type":      _detect_image_mime(b64),
+        "mime_type":      item.get("mime_type") or _detect_image_mime(b64),
         "revised_prompt": item.get("revised_prompt", ""),
     }
+
+
+# ---------------------------------------------------------------------------
+# Image editing helpers  (image-to-image — input image(s) + prompt → image)
+# ---------------------------------------------------------------------------
+
+def _messages_have_image(messages: list) -> bool:
+    """True when any message carries an image input part (→ an edit, not a gen)."""
+    return any(
+        p.get("type") == "image"
+        for msg in messages
+        for p in msg.get("parts", [])
+    )
+
+
+def _image_sources(messages: list) -> list:
+    """Every image part's ``source`` dict, in message/part order."""
+    return [
+        p["source"]
+        for msg in messages
+        for p in msg.get("parts", [])
+        if p.get("type") == "image" and isinstance(p.get("source"), dict)
+    ]
+
+
+def _image_source_to_data_uri(src: dict) -> str:
+    """A URL source → its URL; a base64/file source → a ``data:`` URI."""
+    if src.get("kind") == "url":
+        return src["url"]
+    mime = src.get("mime", "image/png")
+    return f"data:{mime};base64,{src['data']}"
+
+
+def _prompt_from_messages(messages: list) -> str:
+    """The last user message's concatenated text — the edit instruction."""
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            texts = [p["text"] for p in msg["parts"] if p["type"] == "text"]
+            if texts:
+                return "\n".join(texts)
+    return ""
+
+
+def _is_openai_editable_image_model(name: str) -> bool:
+    """True for OpenAI image models that accept the ``/v1/images/edits`` endpoint."""
+    return name.startswith(("gpt-image-", "chatgpt-image-")) or name == "dall-e-2"
+
+
+def _build_image_edits_request(
+    model,
+    messages: list,
+    output:   dict,
+    path:     str = "/v1/images/edits",
+) -> "tuple[str, dict]":
+    """
+    Build an OpenAI ``/v1/images/edits`` **multipart** ``(path, body)`` pair.
+
+    The body is a sentinel the client's ``send()`` seam turns into a
+    ``multipart/form-data`` POST: ``{"_multipart": True, "fields": [...]}`` —
+    a list of ``(name, value)`` tuples so multiple input images can share the
+    ``image[]`` key. ``gpt-image-*`` accepts multiple references via ``image[]``;
+    ``dall-e-2`` takes a single ``image``. ``response_format`` is omitted
+    (gpt-image returns b64 natively).
+    """
+    sources = _image_sources(messages)
+    if not sources:
+        raise ValueError("image edit requires at least one input image part")
+
+    is_gpt_image = model.name.startswith(("gpt-image-", "chatgpt-image-"))
+    field_name   = "image[]" if is_gpt_image else "image"
+
+    fields: list = [("model", model.name), ("prompt", _prompt_from_messages(messages))]
+    fmt = output.get("format", {})
+    for key in ("size", "quality", "background", "output_format", "input_fidelity"):
+        if fmt.get(key):
+            fields.append((key, str(fmt[key])))
+
+    for i, src in enumerate(sources):
+        if src.get("kind") == "url":
+            raise ValueError(
+                "OpenAI image edits need binary image data, not a URL — "
+                "pass a base64 or file source."
+            )
+        raw  = base64.b64decode(src["data"])
+        mime = src.get("mime", "image/png")
+        ext  = mime.split("/")[-1]
+        fields.append((field_name, (f"image_{i}.{ext}", raw, mime)))
+
+    return path, {"_multipart": True, "fields": fields}
+
+
+def _build_xai_image_edit_request(
+    model,
+    messages: list,
+    output:   dict,
+    path:     str = "/v1/images/edits",
+) -> "tuple[str, dict]":
+    """
+    Build an xAI ``/v1/images/edits`` **JSON** ``(path, body)`` pair.
+
+    Confirmed by live probe: xAI edits is JSON (not multipart); the source image
+    rides a nested ``image: {"url": <data-uri|url>, "type": "image_url"}`` and
+    ``response_format:"b64_json"`` yields base64 directly — so
+    ``_parse_image_generations_response`` consumes it unchanged.
+    """
+    sources = _image_sources(messages)
+    if not sources:
+        raise ValueError("image edit requires at least one input image part")
+    imgs = [{"url": _image_source_to_data_uri(s), "type": "image_url"}
+            for s in sources[:3]]                      # xAI Imagine: up to 3 source images
+    body = {"model": model.name, "prompt": _prompt_from_messages(messages),
+            "response_format": "b64_json"}
+    # Single image → `image`; multiple → `images` array (both confirmed by live probe).
+    if len(imgs) == 1:
+        body["image"] = imgs[0]
+    else:
+        body["images"] = imgs
+    return path, body
 
 
 # ---------------------------------------------------------------------------

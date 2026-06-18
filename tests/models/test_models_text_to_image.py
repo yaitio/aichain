@@ -301,9 +301,11 @@ class TestGoogleImageFromResponse(unittest.TestCase):
         result = self.model.from_response(_google_image_response(), self._output)
         self.assertIsNone(result["url"])
 
-    def test_empty_candidates_returns_none_base64(self):
-        result = self.model.from_response({"candidates": []}, self._output)
-        self.assertIsNone(result["base64"])
+    def test_empty_candidates_raises(self):
+        # No image in the response must raise a clear error, not return base64=None
+        # (callers decode base64 and would otherwise crash on None).
+        with self.assertRaises(ValueError):
+            self.model.from_response({"candidates": []}, self._output)
 
 
 # ---------------------------------------------------------------------------
