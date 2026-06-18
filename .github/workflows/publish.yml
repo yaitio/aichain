@@ -22,15 +22,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Refuse to publish if the tag does not match the packaged version,
-      # so `v1.3.1` can never ship a pyproject that still says 1.3.0.
+      # Refuse to publish if the tag does not match the packaged version.
+      # Version is the single source of truth in yait_aichain/__init__.py
+      # (__version__); pyproject reads it dynamically, so we check that file.
       - name: Verify tag matches package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          PKG=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
-          echo "tag=$TAG  pyproject=$PKG"
+          PKG=$(python -c "import re,pathlib; print(re.search(r'__version__\s*=\s*[\x27\x22]([^\x27\x22]+)', pathlib.Path('yait_aichain/__init__.py').read_text()).group(1))")
+          echo "tag=$TAG  __version__=$PKG"
           if [ "$TAG" != "$PKG" ]; then
-            echo "::error::tag v$TAG does not match pyproject version $PKG"; exit 1
+            echo "::error::tag v$TAG does not match yait_aichain.__version__ $PKG"; exit 1
           fi
 
       - name: Install and test
