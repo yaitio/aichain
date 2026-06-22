@@ -195,5 +195,6 @@ phase, the Chain handles the rest. See [Agent as a Chain step](agent-as-chain-st
 
 - [Configuration](configuration.md) — tools, executors, persona, modes in depth.
 - [Memory](memory.md) — shared step state and persistent cross-run memory.
+- [Observability & control](observability.md) — hooks, events, the permission matrix, tool-call repair.
 - [State](../primitives/state.md) — suspend/resume, stores, `Wait`/`Gate`.
 - [Agent as a Chain step](agent-as-chain-step.md).

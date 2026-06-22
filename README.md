@@ -309,6 +309,52 @@ MIT
 
 ## Changelog
 
+### 1.4.4
+
+**The step boundary — observability & control.** Make every step of an Agent,
+Chain, or Skill legible and governable from *outside* the model, without
+touching `run()`.
+
+```python
+from yait_aichain import Tracer, PermissionPolicy
+from yait_aichain.tools import Tool, FINANCIAL
+
+class IssueRefund(Tool):
+    name = "issue_refund"; risk = FINANCIAL          # ← risk class as data
+    ...
+
+tracer = Tracer()
+agent = Agent(
+    orchestrator = Model("gpt-4o-mini"),
+    tools        = [IssueRefund()],
+    hooks        = [tracer],                          # structured event stream
+    permissions  = PermissionPolicy({"financial": "approve"}),
+)
+result = agent.run("Refund order #123")              # pauses for approval
+result = agent.resume(result.run_id, signal={"approved": True})
+for e in tracer.events: print(e)                     # run/step/llm_call/tool_call
+```
+
+- **Logging instead of `print()`.** The library emits through named
+  `logging` loggers (`yait_aichain.*`) with a `NullHandler`; the application
+  decides the sink. `verbose=` still prints to the console (now routed through
+  the logger). Nothing is printed by default.
+- **Lifecycle hooks + events.** `Agent`, `Chain`, and `Skill` accept
+  `hooks=[...]` — callables that receive a structured `Event` at every boundary
+  (`run.*`, `step.*`, `llm_call.*`, `tool_call.*`) carrying `run_id`, `step`,
+  token `usage`, `cost`, `duration`, `error`. Ships `Hook`, `Tracer`, and
+  `LoggingTracer` conveniences. A buggy hook can never crash the run.
+- **Permission matrix.** A tool declares a `risk` class (`read`/`draft`/`write`/
+  `external`/`financial`/`destructive`/`privileged`); a `PermissionPolicy` maps
+  it to `allow` / `approve` / `deny` enforced *before* the tool runs, outside the
+  model. `approve` pauses for an external approval (reusing suspend/resume —
+  no manual `Gate`); `deny` still returns a result. Opt-in: no policy → no gating.
+- **Tool-call repair.** Tool arguments are validated locally against the schema
+  before execution; a malformed call returns a model-readable remediation so the
+  agent corrects it within the step's attempt budget.
+- **Invariant:** every tool call returns a result — even on denial, validation
+  failure, or error.
+
 ### 1.4.1
 
 Version is now a **single source of truth** in `yait_aichain/__init__.py`

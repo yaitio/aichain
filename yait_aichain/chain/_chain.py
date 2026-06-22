@@ -97,6 +97,7 @@ import os
 import warnings
 
 from ..models._usage import Usage
+from .._events import Event, emit
 
 _VALID_ON_STEP_ERROR: frozenset[str] = frozenset({"raise", "stop", "skip"})
 
@@ -269,6 +270,7 @@ class Chain:
         description:    str  | None = None,
         on_step_error:  str         = "raise",
         store=None,
+        hooks:          list | None = None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
@@ -282,6 +284,7 @@ class Chain:
         self.name           = name
         self.description    = description
         self.on_step_error  = on_step_error
+        self.hooks          = list(hooks or [])     # observability hooks (1.4.4)
         # A store is always present (default: process-local in-memory) so the
         # engine has one uniform path; pass store= for persistence (FileStore,
         # S3, …). It holds suspended runs for resume.
@@ -295,6 +298,11 @@ class Chain:
         # Per-request RunContext for the current run() / resume() (tenant +
         # metadata); set while a run is in flight, restored on resume.
         self.context = None
+
+    def _emit(self, etype: str, **fields) -> None:
+        """Dispatch a step-boundary :class:`Event` to registered hooks (1.4.4)."""
+        if self.hooks:
+            emit(self.hooks, Event(type=etype, **fields))
 
     # ------------------------------------------------------------------
     # Public API
@@ -442,6 +450,8 @@ class Chain:
             name        = getattr(runner, "name", None) or f"step_{idx}"
             step_signal = signal if idx == start_idx else None
 
+            self._emit("step.started", step=idx, name=name, payload={"kind": kind})
+
             try:
                 if kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
@@ -579,6 +589,8 @@ class Chain:
             doc.steps[idx]["status"] = StepStatus.DONE
             doc.steps[idx].pop("suspend", None)
             doc.variables = dict(accumulated)
+
+            self._emit("step.ended", step=idx, name=name, payload={"kind": kind})
 
         # Completed run: a finished run leaves no parked document (no-op when
         # the run never suspended and was therefore never stored).
