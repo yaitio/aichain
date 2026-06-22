@@ -23,3 +23,6 @@ venv/
 /cookbook/
 /cookbooks/
 /products/
+
+# Cloned reference repo (karpathy/llm-council) — not part of the package
+/llm-council-master/

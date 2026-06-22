@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 from ..clients._base import APIError
 from ..clients._errors import RateLimitError, ServerError, NetworkError, TaskFailedError
 from ..models._usage import Usage, extract_usage, attach_cost
+from .._events import Event, emit
 from . import _adapters as adapters
 
 if TYPE_CHECKING:
@@ -160,6 +161,7 @@ class Skill:
         description:  str   | None  = None,
         max_retries:  int           = 0,
         retry_delay:  float         = 2.0,
+        hooks:        list  | None  = None,
     ) -> None:
         input  = adapters.normalize_input(input)
         output = adapters.normalize_output(output)
@@ -181,10 +183,16 @@ class Skill:
         self.description = description
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.hooks       = list(hooks or [])     # observability hooks (1.4.4)
 
         # Token usage of the most recent run() — None until the first call.
         # Reading it is optional; it never affects run()'s inputs or output.
         self.last_usage: "Usage | None" = None
+
+    def _emit(self, etype: str, **fields) -> None:
+        """Dispatch an observability :class:`Event` to registered hooks (1.4.4)."""
+        if self.hooks:
+            emit(self.hooks, Event(type=etype, **fields))
 
     # ------------------------------------------------------------------
     # Public
@@ -276,6 +284,8 @@ class Skill:
                 time.sleep(retry_delay * (2 ** (attempt - 1)))
 
             try:
+                self._emit("llm_call.started", name=model.name)
+                _t0 = time.monotonic()
                 raw      = model.client.send(
                     path, body, model.client._auth_headers()
                 )
@@ -283,9 +293,16 @@ class Skill:
                 self.last_usage = attach_cost(
                     extract_usage(response), model.name
                 )
-                return model.from_response(response, self._output)
+                result = model.from_response(response, self._output)
+                self._emit("llm_call.ended", name=model.name,
+                           usage=getattr(self.last_usage, "total_tokens", None),
+                           cost=getattr(self.last_usage, "cost", None),
+                           duration=time.monotonic() - _t0)
+                return result
 
             except APIError as exc:
+                self._emit("llm_call.ended", name=model.name,
+                           duration=time.monotonic() - _t0, error=str(exc))
                 # Retry transient server conditions and network failures
                 # (NetworkError has status 0, so check the type too). Never
                 # retry TaskFailedError — re-submitting would create a new

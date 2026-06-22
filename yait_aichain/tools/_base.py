@@ -159,6 +159,12 @@ class Tool:
     description: str  = ""
     parameters:  dict = {}
 
+    # Risk class consulted by an Agent's PermissionPolicy before the tool runs
+    # (1.4.4). Default ``"write"``; tag mutating/external tools accordingly —
+    # see ``tools._permissions`` for the vocabulary. Enforcement is opt-in: with
+    # no policy attached this attribute is inert.
+    risk:        str  = "write"
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -275,6 +281,28 @@ class Tool:
             raise ValueError(
                 f"Tool '{self.name}' missing required parameter: 'input'"
             )
+
+    def check_args(self, kwargs: dict) -> "str | None":
+        """
+        Validate keyword arguments against ``parameters`` (1.4.4 tool-call
+        repair). Returns a model-readable remediation message when a required
+        argument is missing, or ``None`` when the call looks well-formed.
+
+        Lightweight on purpose — required-presence only, no full JSON-Schema
+        type enforcement (which would need an extra dependency). An Agent feeds
+        the returned message back to the model as a structured observation so it
+        can correct the call within the step's attempt budget.
+        """
+        required   = self.parameters.get("required", [])
+        properties = self.parameters.get("properties", {})
+        missing    = [k for k in required if k not in kwargs or kwargs.get(k) is None]
+        if missing:
+            return (
+                f"Invalid call to tool '{self.name}': missing required "
+                f"argument(s) {missing}. Expected parameters: "
+                f"{sorted(properties) or 'see the tool schema'}."
+            )
+        return None
 
     # ------------------------------------------------------------------
     # Dunder helpers

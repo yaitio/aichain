@@ -80,6 +80,12 @@ All previous class names still work:
 
 from ._base           import Tool, ToolResult
 from ._wait           import Wait, Gate
+from ._permissions    import (
+    PermissionPolicy,
+    RISK_CLASSES, DECISIONS,
+    READ, DRAFT, WRITE, EXTERNAL, FINANCIAL, DESTRUCTIVE, PRIVILEGED,
+    ALLOW, APPROVE, DENY,
+)
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
@@ -191,6 +197,11 @@ __all__ = [
     "ToolResult",
     "Wait",
     "Gate",
+    # ── Permissions (1.4.4) ───────────────────────────────────────────────
+    "PermissionPolicy",
+    "RISK_CLASSES", "DECISIONS",
+    "READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL", "DESTRUCTIVE", "PRIVILEGED",
+    "ALLOW", "APPROVE", "DENY",
     # ── Infrastructure ────────────────────────────────────────────────────
     # ── Search ────────────────────────────────────────────────────────────
     "Search",

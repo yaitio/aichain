@@ -53,15 +53,65 @@ Verbosity
 from __future__ import annotations
 
 import json
+import logging
 import re
 import textwrap
+import time
 from typing import Any
 
 from ._memory      import AgentMemory
 from ._result      import AgentResult
 from .             import _prompts as prompts
 from .._template     import substitute_placeholders
+from .._events       import Event, emit
 from ..tools._base   import Tool
+from ..tools._permissions import APPROVE, DENY
+
+_logger = logging.getLogger("yait_aichain.agent")
+
+# Map the legacy ``verbose`` level to a logging level.
+_VERBOSE_LEVELS = {1: logging.INFO, 2: logging.DEBUG}
+
+
+def _install_console_handler(verbose: int) -> None:
+    """
+    Route ``verbose`` console output through the package logger.
+
+    When ``verbose`` is 1 or 2, ensure a single StreamHandler is attached to the
+    ``yait_aichain`` logger (idempotent — tagged so it is never added twice) and
+    the logger level is at least INFO/DEBUG. This preserves the old "verbose
+    prints to the console" behavior while keeping every message routable by the
+    application (which can add its own handlers / formatters / filters).
+    ``verbose=0`` attaches nothing — the library stays silent by default.
+    """
+    if not verbose:
+        return
+    pkg = logging.getLogger("yait_aichain")
+    level = _VERBOSE_LEVELS.get(verbose, logging.INFO)
+    existing = next(
+        (h for h in pkg.handlers if getattr(h, "_aichain_console", False)), None
+    )
+    if existing is None:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        handler._aichain_console = True          # type: ignore[attr-defined]
+        pkg.addHandler(handler)
+    if pkg.level == logging.NOTSET or pkg.level > level:
+        pkg.setLevel(level)
+
+
+def _new_run_id() -> str:
+    """A short run identifier for the event stream (matches the state module)."""
+    import uuid
+    return f"run-{uuid.uuid4().hex[:12]}"
+
+
+def _safe_kwargs(kwargs: "dict | None", limit: int = 200) -> dict:
+    """Shallow-copy tool kwargs for an event payload, truncating long strings."""
+    out: dict = {}
+    for k, v in (kwargs or {}).items():
+        out[k] = (v[:limit] + "…") if isinstance(v, str) and len(v) > limit else v
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +259,20 @@ class Agent:
         Children inherit the parent's config by default; any field passed to
         ``spawn_agent`` overrides the inherited value.  Default ``False``.
 
+    hooks : list | None, optional
+        Observability hooks (1.4.4) — callables ``hook(event)`` that receive a
+        structured :class:`~yait_aichain.Event` at every boundary (``run.*``,
+        ``step.*``, ``llm_call.*``, ``tool_call.*``). Use ``Tracer`` to record
+        them. A hook that raises never crashes the run. Spawned children share
+        the parent's hooks. See ``docs/agents/observability.md``.
+
+    permissions : PermissionPolicy | None, optional
+        Tool governance (1.4.4). Maps each tool's ``risk`` class to
+        ``allow`` / ``approve`` / ``deny``, enforced before the tool runs.
+        ``approve`` pauses for an external approval (suspend/resume); ``deny``
+        returns a denial result. Opt-in: omit for no gating (the prior
+        behavior). Children inherit it.
+
     Dynamic sub-agents (``allow_spawn=True``)
     ------------------------------------------
     Enable spawn so the orchestrator can delegate sub-tasks at runtime::
@@ -287,6 +351,8 @@ class Agent:
         persona:      str | None         = None,
         allow_spawn:  bool               = False,
         store=None,
+        hooks:        list | None        = None,
+        permissions=None,
         _depth:       int                = 0,
         _max_depth:   int                = 5,
     ) -> None:
@@ -313,6 +379,16 @@ class Agent:
         self.allow_spawn  = allow_spawn
         self._depth       = _depth
         self._max_depth   = _max_depth
+        # Observability hooks + permission policy (1.4.4).
+        self.hooks        = list(hooks or [])
+        self.permissions  = permissions
+        self._run_id:   "str | None" = None   # set per run/resume; used in events
+        self._step_idx: "int | None" = None
+        # ``verbose`` is a convenience that routes console output through the
+        # package logger; the canonical channel is ``logging``. Attaching the
+        # handler here (once, idempotently) preserves the old console behavior
+        # while keeping every message routable by the application.
+        _install_console_handler(verbose)
         # Always present (default in-memory) so suspend/resume has one uniform
         # path; pass store= for persistence across processes.
         from ..state import InMemoryStore
@@ -335,6 +411,39 @@ class Agent:
     # ------------------------------------------------------------------
 
     def run(
+        self,
+        task:      str,
+        variables: dict | None = None,
+        *,
+        context=None,
+    ) -> AgentResult:
+        """
+        Execute *task* autonomously and return an :class:`AgentResult`.
+
+        Emits ``run.started`` then ``run.finished`` (or ``run.suspended``) to any
+        registered ``hooks``; the body is :meth:`_run_core`.
+        """
+        self._run_id   = _new_run_id()
+        self._step_idx = None
+        self._emit("run.started", payload={"task": task, "mode": self.mode})
+        result = self._run_core(task, variables, context=context)
+        self._emit_terminal(result)
+        return result
+
+    def _emit_terminal(self, result) -> None:
+        """Emit the closing lifecycle event for a finished/suspended run."""
+        if not self.hooks:
+            return
+        from ..state import SuspendedResult
+        if isinstance(result, SuspendedResult):
+            self._emit("run.suspended", payload={"awaiting": result.awaiting})
+        else:
+            self._emit("run.finished",
+                       payload={"success": getattr(result, "success", None)},
+                       usage=getattr(result, "tokens_used", None),
+                       error=getattr(result, "error", None))
+
+    def _run_core(
         self,
         task:      str,
         variables: dict | None = None,
@@ -459,7 +568,17 @@ class Agent:
         re-runs the suspended action with *signal* — then continues the normal
         plan/act/reflect loop. Idempotent: a ``run_id`` no longer in the store
         raises ``KeyError`` (already resumed or unknown).
+
+        Emits ``run.resumed`` then the closing lifecycle event to any ``hooks``.
         """
+        self._run_id   = run_id
+        self._step_idx = None
+        self._emit("run.resumed", payload={"signal": signal})
+        result = self._resume_core(run_id, signal, context=context)
+        self._emit_terminal(result)
+        return result
+
+    def _resume_core(self, run_id: str, signal=None, *, context=None) -> "AgentResult":
         from ..state import RunDocument, RunContext
 
         raw = self._store.load(run_id)
@@ -518,6 +637,10 @@ class Agent:
                     f"\n[Step {step_idx + 1}/{len(current_plan)}]  "
                     + textwrap.shorten(step.get("goal", ""), 70, placeholder="…")
                 )
+                self._step_idx = step_idx
+                self._emit("step.started", name=step.get("goal"),
+                           payload={"type":      step.get("type"),
+                                    "tool_name": step.get("tool_name")})
 
                 for attempt in range(1, self.max_attempts + 1):
 
@@ -776,6 +899,9 @@ class Agent:
                         error=error,
                     )
 
+                self._emit("step.ended", name=step.get("goal"),
+                           payload={"advanced": advance})
+
                 if advance:
                     step_idx += 1
 
@@ -910,6 +1036,8 @@ class Agent:
             max_attempts = self.max_attempts,
             max_tokens   = max_tokens or self.max_tokens,
             verbose      = self.verbose,
+            hooks        = self.hooks,         # children share the observability sinks
+            permissions  = self.permissions,   # and the same governance policy
             _depth       = self._depth + 1,
             _max_depth   = self._max_depth,
         )
@@ -926,9 +1054,27 @@ class Agent:
     # ------------------------------------------------------------------
 
     def _log(self, level: int, message: str = "") -> None:
-        """Print *message* when ``self.verbose >= level``."""
-        if self.verbose >= level:
-            print(message, flush=True)
+        """
+        Emit *message* through the package logger (1.4.4).
+
+        ``level`` 1 → INFO, 2 → DEBUG. The library never writes to the console
+        directly; ``verbose=`` (see ``__init__``) attaches a console handler so
+        the old behavior is preserved, and any application can route the same
+        records elsewhere by adding its own handlers.
+        """
+        _logger.log(_VERBOSE_LEVELS.get(level, logging.INFO), "%s", message)
+
+    # ------------------------------------------------------------------
+    # Event emission (1.4.4)
+    # ------------------------------------------------------------------
+
+    def _emit(self, etype: str, **fields) -> None:
+        """Build an :class:`Event` (with run/step filled) and dispatch to hooks."""
+        if not self.hooks:
+            return
+        emit(self.hooks, Event(
+            type=etype, run_id=self._run_id, step=self._step_idx, **fields,
+        ))
 
     def _log_action(self, action: dict, tokens: int) -> None:
         """Log the action chosen by the orchestrator for a step."""
@@ -1013,13 +1159,22 @@ class Agent:
         Token usage is extracted from the raw provider response.
         """
         output   = {"modalities": ["text"], "format": {"type": output_format}}
-        path, body = model.to_request(messages, output)
-        # Go through the send() seam (like Skill) so async providers work and
-        # the transport path is consistent; the default send() is a single POST.
-        raw        = model.client.send(path, body, model.client._auth_headers())
-        response   = json.loads(raw)
-        content    = model.from_response(response, output)
-        tokens     = self._extract_tokens(response)
+        self._emit("llm_call.started", name=getattr(model, "name", None))
+        _t0 = time.monotonic()
+        try:
+            path, body = model.to_request(messages, output)
+            # Go through the send() seam (like Skill) so async providers work and
+            # the transport path is consistent; the default send() is a single POST.
+            raw        = model.client.send(path, body, model.client._auth_headers())
+            response   = json.loads(raw)
+            content    = model.from_response(response, output)
+            tokens     = self._extract_tokens(response)
+        except Exception as exc:
+            self._emit("llm_call.ended", name=getattr(model, "name", None),
+                       duration=time.monotonic() - _t0, error=str(exc))
+            raise
+        self._emit("llm_call.ended", name=getattr(model, "name", None),
+                   usage=tokens, duration=time.monotonic() - _t0)
         return content, tokens
 
     def _extract_tokens(self, response: dict) -> int:
@@ -1056,6 +1211,10 @@ class Agent:
         names = [str(s.get("goal") or f"step_{i}")
                  for i, s in enumerate(current_plan)]
         doc = RunDocument.new("agent", names, variables=self.memory.all())
+        # Keep the parked run_id aligned with the event-stream run_id so the
+        # SuspendedResult.run_id used to resume matches the emitted events.
+        if self._run_id:
+            doc.run_id = self._run_id
         doc.context = self.context.to_dict() if self.context is not None else None
         for i, st in enumerate(doc.steps):
             if i < step_idx:
@@ -1111,7 +1270,58 @@ class Agent:
                 else:
                     kwargs[k] = v
 
-            result = tool.run(**kwargs) if signal is None else tool.run(_signal=signal, **kwargs)
+            # ── Tool-call repair: validate args locally before running ────
+            # On the first reach only (a resume signal means the call already
+            # passed validation). A bad call raises with a model-readable
+            # remediation message; the attempt loop feeds it back so the model
+            # can correct within the step's budget.
+            if signal is None:
+                problem = tool.check_args(kwargs)
+                if problem is not None:
+                    raise ValueError(problem)
+
+            # ── Permission matrix: decide before executing (outside model) ─
+            decision = self.permissions.decide(tool) if self.permissions else "allow"
+
+            if decision == DENY:
+                # Invariant: a tool call always returns a result — even a denial.
+                self._emit("tool_call.ended", name=tool.name,
+                           payload={"decision": DENY, "risk": getattr(tool, "risk", None)})
+                return {"denied": True,
+                        "reason": (f"Permission denied for tool '{tool.name}' "
+                                   f"(risk={getattr(tool, 'risk', '?')}).")}, 0
+
+            if decision == APPROVE:
+                if signal is None:
+                    # Pause for an external approval, reusing suspend/resume.
+                    from ..state import Suspend
+                    raise Suspend(
+                        f"Approval required to run '{tool.name}' "
+                        f"(risk={getattr(tool, 'risk', '?')}).",
+                        {"approved": "bool"},
+                    )
+                # Resuming with the approval decision.
+                if not (isinstance(signal, dict) and signal.get("approved")):
+                    self._emit("tool_call.ended", name=tool.name,
+                               payload={"decision": "rejected"})
+                    return {"approved": False, "skipped": True}, 0
+                # Approved → fall through and run the tool with its own kwargs
+                # (NOT the signal — that was the approval, not a tool argument).
+                signal = None
+
+            self._emit("tool_call.started", name=tool.name,
+                       payload={"kwargs": _safe_kwargs(kwargs),
+                                "risk": getattr(tool, "risk", None)})
+            _t0 = time.monotonic()
+            try:
+                result = (tool.run(**kwargs) if signal is None
+                          else tool.run(_signal=signal, **kwargs))
+            except Exception as exc:
+                self._emit("tool_call.ended", name=tool.name,
+                           duration=time.monotonic() - _t0, error=str(exc))
+                raise
+            self._emit("tool_call.ended", name=tool.name,
+                       duration=time.monotonic() - _t0)
             return result, 0
 
         # ── Skill call (dynamic LLM call) ─────────────────────────────
