@@ -26,7 +26,7 @@ from yait_aichain.models._data import PROVIDERS, provider_of
 
 _PROVIDER_KEYS = {"openai", "anthropic", "google", "xai",
                   "perplexity", "kimi", "deepseek", "qwen",
-                  "recraft", "bfl"}
+                  "recraft", "bfl", "reve"}
 
 
 class TestProviderDataConsistency(unittest.TestCase):
