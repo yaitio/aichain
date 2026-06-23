@@ -1,6 +1,6 @@
 # aichain
 
-**The simplest way to build AI pipelines. 10 providers. 1 interface. Zero lock-in.**
+**The simplest way to build AI pipelines. 11 providers. 1 interface. Zero lock-in.**
 
 ```python
 from yait_aichain import Model, Skill
@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **77 models from 10 providers** — with one line to swap any of them.
+All of these work identically across **78 models from 11 providers** — with one line to swap any of them.
 
 ---
 
@@ -68,7 +68,7 @@ export VOYAGE_API_KEY="…"           # embeddings + reranking
 
 ---
 
-## 10 providers, one syntax
+## 11 providers, one syntax
 
 ```python
 from yait_aichain.models import Model
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-77 models total. Full list: [model registry →](docs/reference/model-registry.md)
+78 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -292,6 +292,7 @@ chain = Chain.load("chains/research.yaml")
 | **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wan 2.2 image | `DASHSCOPE_API_KEY` |
 | **Recraft** | — | — | Recraft V3 (raster + vector) | `RECRAFT_API_TOKEN` |
 | **BFL (FLUX)** | — | — | FLUX.2, FLUX Kontext | `BFL_API_KEY` |
+| **Reve** | — | — | Reve Image (create / edit / remix) | `REVE_API_KEY` |
 
 **Image editing — instruction edit, preserves the subject:** OpenAI · Google · xAI · Qwen · FLUX Kontext (place / restyle / recompose while keeping the original object)  
 **Image-to-image — whole-image variation (restyle, not subject-preserving):** Recraft (`imageToImage`, `strength`-controlled)  
@@ -308,6 +309,23 @@ MIT
 ---
 
 ## Changelog
+
+### 1.4.5
+
+**+1 image provider: Reve** (`api.reve.com`). `Model("reve-image")` generates,
+edits, and remixes images behind the same `Skill`. Reve has its own (non-OpenAI)
+wire shape, so it is its own client family: the operation is chosen by the input —
+no image → `POST /v1/image/create`; one input image → `/v1/image/edit`
+(`edit_instruction` + `reference_image`); two or more → `/v1/image/remix`
+(`reference_images[]`, with `<img>0</img>` tokens in the prompt). Bearer auth
+(`REVE_API_KEY`), `aspect_ratio` and `version` (default `latest`) forwarded.
+**Now 11 providers / 78 models.**
+
+```python
+Skill(model=Model("reve-image"),
+      input={"messages": [{"role": "user", "parts": ["A stack of golden pancakes"]}]},
+      output={"modalities": ["image"], "format": {"type": "image", "aspect_ratio": "16:9"}}).run()
+```
 
 ### 1.4.4
 

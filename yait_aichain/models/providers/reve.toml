@@ -1,0 +1,40 @@
+# reve — provider settings + its models (data tier)
+#
+# Image-only provider with its own (non-OpenAI) wire shape. Bearer auth; the
+# operation is chosen by the input and maps to one of three synchronous endpoints:
+#   generate  POST /v1/image/create   {prompt, aspect_ratio?, version}
+#   edit      POST /v1/image/edit     {edit_instruction, reference_image, ...}   (1 image)
+#   remix     POST /v1/image/remix    {prompt, reference_images:[...], ...}       (>=2 images)
+# `version` defaults to "latest". Request shapes confirmed against the official
+# console docs; the response parser is defensive pending a first live call.
+
+[provider]
+key      = "reve"
+client   = "reve"
+base_url = "https://api.reve.com"
+env_key  = "REVE_API_KEY"
+auth     = "bearer"
+images_path = "/v1/image/create"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096
+
+# One image model with three operations. An input image switches generation →
+# edit (single reference) or remix (multiple references); the prompt references
+# images by position with <img>0</img> tokens in remix.
+#
+# Pricing is per-image (credits; $10 = 7,500 credits → ~$0.00133/credit), not
+# per-token, so there is no `price` entry — `cost` stays None, like the other
+# flat-per-image providers (grok-imagine / recraft / bfl). For reference:
+#   create  18 credits  (~$0.024)
+#   edit    30 credits  (~$0.040)
+#   remix   30 credits  (~$0.040)
+# Optional add-ons (forwarded via output.format) cost extra, variable by image size:
+#   test_time_scaling      multiples of base cost (~$0.01 and up)
+#   postprocessing upscale ~$0.002/MP (2x/3x/4x)
+#   postprocessing remove_background ~$0.002/MP
+#   postprocessing fit_image  free
+# The response's `credits_used` field reports the exact amount per call.
+[models."reve-image"]
+caps  = ["text-to-image", "image-to-image"]

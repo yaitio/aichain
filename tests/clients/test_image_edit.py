@@ -301,7 +301,7 @@ class TestRegistry(unittest.TestCase):
 
     def test_providers_listed(self):
         self.assertEqual(set(registry.providers(task="image-to-image")),
-                         {"openai", "google", "xai", "qwen", "recraft", "bfl"})
+                         {"openai", "google", "xai", "qwen", "recraft", "bfl", "reve"})
 
     def test_is_supported(self):
         self.assertTrue(registry.is_supported("qwen-image-edit", "image-to-image"))

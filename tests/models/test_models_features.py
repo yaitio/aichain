@@ -428,7 +428,7 @@ class TestRegistry(unittest.TestCase):
         self.assertEqual(
             set(registry.PROVIDERS),
             {"openai", "anthropic", "google", "xai", "perplexity",
-             "kimi", "deepseek", "qwen", "recraft", "bfl"},
+             "kimi", "deepseek", "qwen", "recraft", "bfl", "reve"},
         )
 
 
