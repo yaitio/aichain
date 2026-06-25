@@ -84,34 +84,52 @@ class TestPerplexityInvalidAuth(unittest.TestCase):
         self.assertFalse(self.client.check_auth())
 
 
-class TestPerplexityListModelsStatic(unittest.TestCase):
+class TestPerplexityListModels(unittest.TestCase):
     """
-    list_models() is static — it requires no network and no valid key.
-    These tests always run.
+    list_models() reads the live /v1/models router catalog, falling back to the
+    curated static list when the call fails. Transport is mocked — no network.
     """
 
     def setUp(self):
-        # api_key is irrelevant; list_models never uses it.
+        from unittest.mock import MagicMock
         self.client = PerplexityClient("any-key")
+        self.client._auth_headers = MagicMock(return_value={})
+
+    def test_keeps_only_perplexity_models_stripped(self):
+        # The router catalog mixes in third-party ids; keep only perplexity/*,
+        # with the namespace prefix stripped.
+        from unittest.mock import MagicMock
+        self.client._get = MagicMock(return_value=json.dumps(
+            {"object": "list", "data": [
+                {"id": "perplexity/sonar"},
+                {"id": "perplexity/glm-5.2"},
+                {"id": "openai/gpt-5.5"},          # third-party → dropped
+                {"id": "anthropic/claude-opus-4-8"},
+            ]}).encode())
+        models = self.client.list_models()
+        self.assertEqual(models, ["sonar", "glm-5.2"])
+        self.client._get.assert_called_once()
+
+    def test_empty_filter_falls_back_to_static(self):
+        # If the catalog has no perplexity/* entries, fall back to the static list.
+        from unittest.mock import MagicMock
+        self.client._get = MagicMock(return_value=json.dumps(
+            {"object": "list", "data": [{"id": "openai/gpt-5.5"}]}).encode())
+        self.assertEqual(self.client.list_models(), _KNOWN_MODELS)
+
+    def test_falls_back_to_static_on_error(self):
+        from unittest.mock import MagicMock
+        self.client._get = MagicMock(side_effect=APIError(503, "down"))
+        models = self.client.list_models()
+        self.assertEqual(models, _KNOWN_MODELS)
+        self.assertIn("sonar", models)
 
     def test_returns_list_of_strings(self):
-        models = self.client.list_models()
+        from unittest.mock import MagicMock
+        self.client._get = MagicMock(side_effect=APIError(0, "offline"))
+        models = self.client.list_models()        # fallback path
         self.assertIsInstance(models, list)
-        for m in models:
-            self.assertIsInstance(m, str)
-
-    def test_returns_non_empty_list(self):
-        self.assertGreater(len(self.client.list_models()), 0)
-
-    def test_contains_sonar(self):
-        self.assertIn("sonar", self.client.list_models())
-
-    def test_returns_copy_not_module_list(self):
-        """Mutating the returned list must not affect subsequent calls."""
-        first  = self.client.list_models()
-        first.clear()
-        second = self.client.list_models()
-        self.assertEqual(second, _KNOWN_MODELS)
+        self.assertTrue(all(isinstance(m, str) for m in models))
 
 
 # ---------------------------------------------------------------------------

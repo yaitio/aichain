@@ -128,7 +128,7 @@ class TestModalityGolden(unittest.TestCase):
         prompt = [{"role": "user", "parts": [{"type": "text", "text": "a cat"}]}]
         expected = {
             "gpt-image-1":                    "/v1/images/generations",
-            "grok-imagine-image-pro":         "/v1/images/generations",
+            "grok-imagine-image":         "/v1/images/generations",
             # wanx runs on DashScope's native async task API, not the
             # OpenAI-compatible images endpoint.
             "wan2.2-t2i-flash":              "/api/v1/services/aigc/text2image/image-synthesis",

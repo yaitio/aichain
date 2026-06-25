@@ -85,7 +85,7 @@ class TestImageModelFactory(unittest.TestCase):
         self.assertEqual(Model("gpt-image-1")._provider, "openai")
 
     def test_grok_imagine_routes_to_xai(self):
-        self.assertEqual(Model("grok-imagine-image-pro")._provider, "xai")
+        self.assertEqual(Model("grok-imagine-image")._provider, "xai")
 
     def test_gemini_image_routes_to_google(self):
         self.assertEqual(Model("gemini-3.1-flash-image")._provider, "google")

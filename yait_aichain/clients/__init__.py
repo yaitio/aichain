@@ -9,7 +9,7 @@ requests) for one API family.  Five family classes cover all eight providers:
   ``BaseClient``        — transport primitives + abstract format hooks
   ``OpenAIClient``      — OpenAI Chat Completions family
                           (openai, xai, kimi, deepseek)
-  ``PerplexityClient``  — OpenAI-compatible; static model list  (perplexity)
+  ``PerplexityClient``  — OpenAI-compatible; live /v1/models catalog  (perplexity)
   ``QwenClient``        — OpenAI-compatible; region-resolved URL (qwen)
   ``AnthropicClient``   — Anthropic Messages family            (anthropic)
   ``GoogleClient``      — Google Generative AI family           (google)
@@ -23,6 +23,7 @@ from ._errors import (
     NetworkError,
     RateLimitError,
     AuthenticationError,
+    InsufficientCreditsError,
     InvalidRequestError,
     NotFoundError,
     ServerError,
@@ -40,6 +41,7 @@ __all__ = [
     "NetworkError",
     "RateLimitError",
     "AuthenticationError",
+    "InsufficientCreditsError",
     "InvalidRequestError",
     "NotFoundError",
     "ServerError",

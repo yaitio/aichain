@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yait-aichain"
 dynamic = ["version"]            # single source of truth: yait_aichain.__version__
-description = "One interface. 11 providers. 78 models. Text, image generation & editing, vision, RAG, agents, parallel pipelines."
+description = "One interface. 11 providers. 81 models. Text, image generation & editing, vision, RAG, agents, parallel pipelines."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "YAIT" }]
