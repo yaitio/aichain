@@ -25,7 +25,10 @@ import time
 from typing import TYPE_CHECKING
 
 from ..clients._base import APIError
-from ..clients._errors import RateLimitError, ServerError, NetworkError, TaskFailedError
+from ..clients._errors import (
+    RateLimitError, ServerError, NetworkError, TaskFailedError,
+    InsufficientCreditsError,
+)
 from ..models._usage import Usage, extract_usage, attach_cost
 from .._events import Event, emit
 from . import _adapters as adapters
@@ -307,10 +310,14 @@ class Skill:
                 # (NetworkError has status 0, so check the type too). Never
                 # retry TaskFailedError — re-submitting would create a new
                 # (billable) async job.
+                # An out-of-credits state can arrive as 429 (e.g. OpenAI
+                # insufficient_quota); it is terminal — retrying the same
+                # account will not add funds, so never retry it.
                 transient = (exc.status in _TRANSIENT_STATUSES
                              or isinstance(exc, NetworkError))
                 if (transient
-                        and not isinstance(exc, TaskFailedError)
+                        and not isinstance(exc, (TaskFailedError,
+                                                 InsufficientCreditsError))
                         and attempt < max_retries):
                     continue   # wait and retry the same model
                 raise          # non-transient, or retries exhausted

@@ -28,6 +28,21 @@ caps  = ["text-to-image"]
 [models."recraftv4_1_vector"]
 caps  = ["text-to-image"]
 
+# V4.1 variants (live-verified model names, 2026-06): `utility` is the
+# controlled raster model (flat light, front-facing, product/icon/e-commerce);
+# `_pro` is the higher tier; `_vector` outputs SVG.
+[models."recraftv4_1_utility"]
+caps  = ["text-to-image"]
+
+[models."recraftv4_1_utility_pro"]
+caps  = ["text-to-image"]
+
+[models."recraftv4_1_pro"]
+caps  = ["text-to-image"]
+
+[models."recraftv4_1_utility_vector"]
+caps  = ["text-to-image"]
+
 [models."recraftv3"]
 caps  = ["text-to-image", "image-to-image"]
 

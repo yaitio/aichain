@@ -107,6 +107,14 @@ class TestRecraftMisc(unittest.TestCase):
         self.assertIn("recraftv4_1", registry.models(task="text-to-image"))
         self.assertNotIn("recraftv4_1", registry.models(task="image-to-image"))
 
+    def test_v4_1_variants_registered(self):
+        # Live-verified V4.1 model names (incl. utility) — text-to-image only.
+        t2i = registry.models(provider="recraft", task="text-to-image")
+        for name in ("recraftv4_1_utility", "recraftv4_1_utility_pro",
+                     "recraftv4_1_pro", "recraftv4_1_utility_vector"):
+            self.assertIn(name, t2i)
+            self.assertEqual(Model(name, api_key="k")._provider, "recraft")
+
 
 if __name__ == "__main__":
     unittest.main()

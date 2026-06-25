@@ -12,6 +12,9 @@ for the model fallback chain (block 1.2-F).
 
 Mapping (HTTP status → class):
 
+    billing signal   → InsufficientCreditsError   (402, or a credits/quota body
+                       on 400/403/429 — checked FIRST so it is not misread as
+                       auth / rate-limit / bad-request)
     429              → RateLimitError       (carries ``retry_after`` seconds)
     401, 403         → AuthenticationError
     400, 422         → InvalidRequestError
@@ -64,6 +67,19 @@ class AuthenticationError(APIError):
     """HTTP 401 / 403 — missing, invalid, or unauthorized API key."""
 
 
+class InsufficientCreditsError(APIError):
+    """
+    The account is out of credits / funds / quota — a **billing** problem, not
+    a credentials problem.
+
+    Providers signal this inconsistently (HTTP 402, or a 403 / 429 / 400 whose
+    body mentions credits / quota / budget), which is why it is detected from the
+    response body and surfaced as its own class: the fix is to top up the account,
+    not to re-check the API key. Non-transient — retrying the same account will
+    not add funds, so it is never retried.
+    """
+
+
 class InvalidRequestError(APIError):
     """HTTP 400 / 422 — malformed request (bad params, schema, etc.)."""
 
@@ -105,6 +121,28 @@ def _parse_retry_after(headers) -> "float | None":
         return None
 
 
+# Substrings (lowercased body) that mean "out of credits/funds/quota", not a
+# credentials or rate-limit problem. Kept conservative to avoid false positives
+# (e.g. a plain 429 rate limit has none of these).
+_BILLING_SIGNALS: tuple[str, ...] = (
+    "insufficient_quota", "insufficient quota",
+    "insufficient funds", "insufficient credit", "insufficient balance",
+    "credit balance", "out of credits", "available credits",
+    "used all available credits", "no credits",
+    "budget has run out", "budget_exhausted", "budget exhausted",
+    "quota_exceeded", "billing_hard_limit", "billing hard limit",
+    "add funds", "top up", "purchase credits", "payment required",
+)
+
+
+def _looks_like_billing(message: str) -> bool:
+    """True when *message* (a response body) signals an out-of-credits state."""
+    if not message:
+        return False
+    low = message.lower()
+    return any(sig in low for sig in _BILLING_SIGNALS)
+
+
 def error_from_status(
     status: int,
     message: str,
@@ -118,6 +156,11 @@ def error_from_status(
     """
     if status == 0:
         return NetworkError(status, message)
+    # Billing is checked FIRST: an out-of-credits state arrives under several
+    # codes (402 Payment Required, or a 403/429/400 with a credits/quota body)
+    # and must not be misread as auth / rate-limit / bad-request.
+    if status == 402 or _looks_like_billing(message):
+        return InsufficientCreditsError(status, message)
     if status == 429:
         return RateLimitError(status, message, _parse_retry_after(headers))
     if status in (401, 403):

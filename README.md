@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **78 models from 11 providers** — with one line to swap any of them.
+All of these work identically across **81 models from 11 providers** — with one line to swap any of them.
 
 ---
 
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-78 models total. Full list: [model registry →](docs/reference/model-registry.md)
+81 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -200,12 +200,15 @@ skill = Skill(
 **Typed errors** — catch a specific failure mode, or `APIError` for all:
 
 ```python
-from yait_aichain import RateLimitError, AuthenticationError, APIError
+from yait_aichain import (RateLimitError, AuthenticationError,
+                          InsufficientCreditsError, APIError)
 
 try:
     skill.run()
 except RateLimitError as e:
     wait(e.retry_after)        # honours the Retry-After header
+except InsufficientCreditsError:
+    ...                        # out of credits/quota — top up (not a key problem)
 except AuthenticationError:
     ...
 ```
@@ -309,6 +312,29 @@ MIT
 ---
 
 ## Changelog
+
+### 1.4.6
+
+**Honest billing errors + registry hygiene.**
+
+- New **`InsufficientCreditsError`** (subclass of `APIError`). An out-of-credits
+  state is a *billing* problem, not a credentials problem, but providers signal
+  it inconsistently — xAI as `403 permission-denied "used all available credits"`,
+  Reve as `402 PARTNER_API_BUDGET_EXHAUSTED`, OpenAI as `429 insufficient_quota`,
+  Anthropic as `400 credit balance is too low`. These used to surface as
+  `AuthenticationError` / `RateLimitError` / `InvalidRequestError`, sending you to
+  re-check the key. Now they are detected from the response body (checked before
+  the status-code mapping) and raised as `InsufficientCreditsError`, which is
+  **never retried** (retrying the same account won't add funds).
+- Registry hygiene (model names verified live against each API): removed the
+  phantom `grok-imagine-image-pro` (xAI rejects it) and added the live-verified
+  Recraft **V4.1 variants** — `recraftv4_1_utility` (controlled raster for
+  product/icon/e-commerce), `recraftv4_1_utility_pro`, `recraftv4_1_pro`,
+  `recraftv4_1_utility_vector`. **11 providers / 81 models.**
+- `registry.refresh("perplexity")` now works: Perplexity exposes a public
+  `/v1/models` router catalog, so `list_models()` reads it live (falling back to
+  the curated static list only if the call fails) instead of always returning a
+  hard-coded list.
 
 ### 1.4.5
 
