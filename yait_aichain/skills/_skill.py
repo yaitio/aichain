@@ -41,6 +41,11 @@ if TYPE_CHECKING:
 # indicate a problem with the request itself and must not be retried.
 _TRANSIENT_STATUSES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 
+# Output spec for intermediate generate turns in multi-turn directed reasoning —
+# always plain text (they only feed the running context; only the final turn
+# uses the skill's real output format).
+_TEXT_OUTPUT: dict = {"modalities": ["text"], "format": {"type": "text"}}
+
 # Error types that trigger fallback to the next model in the chain.  Auth /
 # invalid-request / not-found are NOT here — falling back would hide them.
 _FALLBACK_ERRORS = (RateLimitError, ServerError, NetworkError)
@@ -76,6 +81,13 @@ class Skill:
                 {"role": "user",   "parts": [{"type": "text", "text": "Explain {topic}."}]},
               ]
             }
+
+        **Multi-turn (directed reasoning, 1.5.0).** Several ``user`` turns
+        separated by a "generate here" marker — an ``assistant`` turn with no
+        ``parts`` — run as a sequence: each marker is one model call whose reply
+        is appended to the running context (an ``assistant`` turn *with* parts
+        is a fixed/seed turn, not a call). ``run()`` returns the last reply;
+        ``history`` holds each turn. Backward compatible: no markers → one call.
 
     output : dict | None, optional
         Declares the expected output format.  Omit entirely (or pass ``None``
@@ -190,7 +202,12 @@ class Skill:
 
         # Token usage of the most recent run() — None until the first call.
         # Reading it is optional; it never affects run()'s inputs or output.
+        # For a multi-turn run it is the sum across turns.
         self.last_usage: "Usage | None" = None
+        # Generated replies of the most recent run(), in order (multi-turn
+        # directed reasoning); ``history[-1]`` is the returned value. A single-
+        # shot run leaves a one-element list. ``None`` until the first call.
+        self.history: "list | None" = None
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch an observability :class:`Event` to registered hooks (1.4.4)."""
@@ -252,9 +269,10 @@ class Skill:
         # Substitute {placeholders} in a deep copy of the messages list
         messages = adapters.substitute(self._input["messages"], merged)
 
-        # Reset usage so that, if this call fails, ``last_usage`` is None rather
+        # Reset usage/history so that, if this call fails, they are None rather
         # than a stale value left over from a previous successful run().
         self.last_usage = None
+        self.history    = None
 
         # Try each model in the fallback chain.  Transient failures
         # (rate limit / server / network) advance to the next model; a
@@ -277,10 +295,67 @@ class Skill:
         max_retries: int,
         retry_delay: float,
     ) -> "str | dict":
-        """Run the request against a single model, with transient retries."""
-        # Build the native (path, body) pair once — the payload is the same
-        # on every attempt; only the server-side condition changes.
-        path, body = model.to_request(messages, self._output)
+        """
+        Run *messages* against a single model.
+
+        Single-shot when there are no ``assistant`` generate markers (the
+        original behavior). With markers (multi-turn directed reasoning), each
+        marker — and the implicit final generate after a trailing ``user`` turn
+        — is one model call; each reply is appended to the running context so
+        later turns see it. The last call uses the skill's real output format;
+        intermediate calls are plain text (they only feed the context).
+        ``last_usage`` is the sum across turns; ``history`` holds each reply.
+        """
+        if not any(adapters.is_generate_marker(m) for m in messages):
+            result, usage = self._call_once(
+                model, messages, self._output, max_retries, retry_delay)
+            self.last_usage = usage
+            self.history    = [result]
+            return result
+
+        # Build the turn sequence: real messages interleaved with generate
+        # points; add an implicit final generate when the script ends on an
+        # unanswered ``user`` turn.
+        seq: list = [("gen",) if adapters.is_generate_marker(m) else ("msg", m)
+                     for m in messages]
+        if seq and seq[-1][0] == "msg" and seq[-1][1].get("role") == "user":
+            seq.append(("gen",))
+        last_gen = max(k for k, s in enumerate(seq) if s[0] == "gen")
+
+        running: list = []
+        total_usage = None
+        history: list = []
+        final: "str | dict | None" = None
+        for k, item in enumerate(seq):
+            if item[0] == "msg":
+                running.append(item[1])
+                continue
+            output = self._output if k == last_gen else _TEXT_OUTPUT
+            reply, usage = self._call_once(
+                model, running, output, max_retries, retry_delay)
+            total_usage = usage if total_usage is None else total_usage + usage
+            history.append(reply)
+            final = reply
+            # Splice the reply into the context as an assistant turn so the next
+            # turn sees it. A non-text (json) reply is stringified for context.
+            text = reply if isinstance(reply, str) else json.dumps(reply, ensure_ascii=False)
+            running.append({"role": "assistant",
+                            "parts": [{"type": "text", "text": text}]})
+
+        self.last_usage = total_usage
+        self.history    = history
+        return final
+
+    def _call_once(
+        self,
+        model:       "Model",
+        messages:    list,
+        output:      dict,
+        max_retries: int,
+        retry_delay: float,
+    ) -> "tuple[str | dict, Usage]":
+        """One model call with transient retries; returns ``(result, usage)``."""
+        path, body = model.to_request(messages, output)
 
         for attempt in range(max(0, max_retries) + 1):
             if attempt > 0:
@@ -293,26 +368,22 @@ class Skill:
                     path, body, model.client._auth_headers()
                 )
                 response = json.loads(raw)
-                self.last_usage = attach_cost(
-                    extract_usage(response), model.name
-                )
-                result = model.from_response(response, self._output)
+                usage    = attach_cost(extract_usage(response), model.name)
+                result   = model.from_response(response, output)
                 self._emit("llm_call.ended", name=model.name,
-                           usage=getattr(self.last_usage, "total_tokens", None),
-                           cost=getattr(self.last_usage, "cost", None),
+                           usage=getattr(usage, "total_tokens", None),
+                           cost=getattr(usage, "cost", None),
                            duration=time.monotonic() - _t0)
-                return result
+                return result, usage
 
             except APIError as exc:
                 self._emit("llm_call.ended", name=model.name,
                            duration=time.monotonic() - _t0, error=str(exc))
                 # Retry transient server conditions and network failures
                 # (NetworkError has status 0, so check the type too). Never
-                # retry TaskFailedError — re-submitting would create a new
-                # (billable) async job.
-                # An out-of-credits state can arrive as 429 (e.g. OpenAI
-                # insufficient_quota); it is terminal — retrying the same
-                # account will not add funds, so never retry it.
+                # retry TaskFailedError (would create a new billable async job)
+                # or InsufficientCreditsError (which can arrive as 429 but is
+                # terminal — retrying the same account won't add funds).
                 transient = (exc.status in _TRANSIENT_STATUSES
                              or isinstance(exc, NetworkError))
                 if (transient

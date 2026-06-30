@@ -75,10 +75,14 @@ class TestValidateInput(unittest.TestCase):
         })
 
     def test_valid_all_roles(self):
-        for role in ("system", "user", "assistant"):
-            validate_input({
-                "messages": [{"role": role, "parts": [{"type": "text", "text": "hi"}]}]
-            })
+        # All three roles are accepted within a structurally valid sequence
+        # ([system?] user (assistant user)*).
+        validate_input({"messages": [
+            {"role": "system",    "parts": [{"type": "text", "text": "be brief"}]},
+            {"role": "user",      "parts": [{"type": "text", "text": "hi"}]},
+            {"role": "assistant", "parts": [{"type": "text", "text": "hello"}]},
+            {"role": "user",      "parts": [{"type": "text", "text": "bye"}]},
+        ]})
 
     def test_valid_audio_base64(self):
         validate_input({

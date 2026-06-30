@@ -128,6 +128,42 @@ inline base64:
 Whether a given model accepts image input depends on its capabilities — see
 [Models](models.md) for the per-provider vision support.
 
+### Multi-turn (directed reasoning)
+
+*Since 1.5.0.* When the template has several `user` turns separated by **"generate
+here" markers** — an `assistant` turn with **no** `parts` — the Skill runs them as
+a sequence: each marker is one model call, and its reply is appended to the
+running context so later turns see it. This is *directed* reasoning — you author
+the steps (unlike an [Agent](../agents/overview.md), which decides them).
+
+```python
+Skill(model=Model("claude-sonnet-4-6"), input={"messages": [
+    {"role": "system",    "parts": ["Be concise."]},
+    {"role": "user",      "parts": ["Write 10 quotes about {topic}."]},
+    {"role": "assistant"},                                  # ← generate, keep in context
+    {"role": "user",      "parts": ["Drop the 5 most clichéd, write 5 fresh."]},
+    {"role": "assistant"},                                  # ← generate, keep in context
+    {"role": "user",      "parts": ["Translate the result into {language}."]},
+]}).run(variables={"topic": "perseverance", "language": "French"})
+```
+
+Rules:
+
+- `assistant` **with** `parts` → a fixed/seed turn (few-shot example or a default
+  answer): used as-is, **no model call**.
+- `assistant` **without** `parts` → the generate marker (one model call).
+- A trailing `user` turn triggers an implicit final call — its reply is the
+  return value, and it uses the skill's `output` format. Intermediate calls are
+  plain text (they only feed the context).
+- `skill.history` lists each generated turn (`history[-1]` is the return);
+  `skill.last_usage` sums across turns.
+- **Backward compatible:** with no markers, the messages are sent in one call,
+  exactly as before.
+
+Validated at construction (`ValueError`): the messages must contain at least one
+`user` turn, must not start with an `assistant`, and must not have two `assistant`
+turns in a row. Valid shape: `[system?] user (assistant user)*`.
+
 ### Variables & substitution
 
 Variables come from two places and are merged, **call-time wins**:
