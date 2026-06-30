@@ -309,6 +309,11 @@ def validate_input(input_: dict) -> None:
                 f"messages[{i}]['role'] must be 'system', 'user', or 'assistant'"
             )
         parts = msg.get("parts")
+        # An ``assistant`` turn with no parts is a "generate here" marker
+        # (multi-turn directed reasoning): the model fills it in at run time, so
+        # it legitimately carries no content. Every other turn needs parts.
+        if msg["role"] == "assistant" and not parts:
+            continue
         if not isinstance(parts, list) or not parts:
             raise ValueError(
                 f"messages[{i}]['parts'] must be a non-empty list"
@@ -338,6 +343,53 @@ def validate_input(input_: dict) -> None:
                         f"messages[{i}]['parts'][{j}]['source']['kind'] must be "
                         "'url', 'base64', or 'file'"
                     )
+
+    _validate_turn_structure(messages)
+
+
+def is_generate_marker(msg: dict) -> bool:
+    """
+    True for an ``assistant`` turn with no ``parts`` — the "generate here"
+    marker used by multi-turn directed reasoning (the model produces this turn
+    at run time and the reply is appended to the running context).
+    """
+    return (isinstance(msg, dict) and msg.get("role") == "assistant"
+            and not msg.get("parts"))
+
+
+def _validate_turn_structure(messages: list) -> None:
+    """
+    Enforce the turn-structure contract for multi-turn directed reasoning:
+
+    * at least one ``user`` turn (otherwise there is nothing to run);
+    * an ``assistant`` turn cannot come first (after an optional ``system``) —
+      it must follow a ``user`` turn;
+    * no two ``assistant`` turns in a row (a generated turn followed by a canned
+      one, or vice-versa, breaks the user/assistant alternation).
+
+    Valid shape: ``[system?] user (assistant user)*``. Consecutive ``user``
+    turns are allowed (they are sent together in one call). Raises ``ValueError``
+    at construction time — this is a template error, not a runtime fault.
+    """
+    content_idx = [i for i, m in enumerate(messages) if m.get("role") != "system"]
+    if not any(messages[i].get("role") == "user" for i in content_idx):
+        raise ValueError("input['messages'] must contain at least one 'user' turn")
+
+    if content_idx and messages[content_idx[0]].get("role") == "assistant":
+        raise ValueError(
+            f"messages[{content_idx[0]}]: an 'assistant' turn cannot come first "
+            f"— it must follow a 'user' turn"
+        )
+
+    prev_assistant = False
+    for i in content_idx:
+        is_assistant = messages[i].get("role") == "assistant"
+        if is_assistant and prev_assistant:
+            raise ValueError(
+                f"messages[{i}]: two 'assistant' turns in a row — every "
+                f"'assistant' turn must be preceded by a 'user' turn"
+            )
+        prev_assistant = is_assistant
 
 
 def validate_output(output: dict) -> None:

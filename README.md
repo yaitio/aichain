@@ -313,6 +313,37 @@ MIT
 
 ## Changelog
 
+### 1.5.0
+
+**Directed multi-turn reasoning in one `Skill`.** Some tasks are a guided
+sequence of refinements — ask, refine, refine, finish — where *you* know the
+steps (unlike an `Agent`, which decides them). Express it inside a single Skill:
+put several `user` turns in the message template, separated by **"generate here"
+markers** — an `assistant` turn with no `parts`. Each marker is one model call;
+its reply is appended to the running context, so later turns see what earlier
+ones produced. No `Chain`, no manual output threading.
+
+```python
+Skill(model=Model("claude-sonnet-4-6"), input={"messages": [
+    {"role": "system",    "parts": ["Be concise."]},
+    {"role": "user",      "parts": ["Write 10 quotes about {topic}."]},
+    {"role": "assistant"},                                   # ← generate, keep in context
+    {"role": "user",      "parts": ["Drop the 5 most clichéd, write 5 fresh."]},
+    {"role": "assistant"},                                   # ← generate, keep in context
+    {"role": "user",      "parts": ["Translate the result into {language}."]},
+]}).run(variables={"topic": "perseverance", "language": "French"})
+```
+
+- An `assistant` turn **with** `parts` is a fixed/seed turn (few-shot, a default
+  answer) — no model call. **Without** `parts` it's the generate marker.
+- The final turn uses the skill's `output` format (text / json); intermediate
+  turns are plain text (they only feed the context).
+- `skill.history` holds each generated turn (`history[-1]` is the return);
+  `skill.last_usage` is the sum across turns.
+- **Backward compatible:** no markers → one call, exactly as before.
+- Structure is validated at construction (`ValueError`): at least one `user`
+  turn, no leading `assistant`, no two `assistant` turns in a row.
+
 ### 1.4.6
 
 **Honest billing errors + registry hygiene.**

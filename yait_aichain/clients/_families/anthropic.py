@@ -16,6 +16,34 @@ from types import SimpleNamespace
 
 from .._base import BaseClient
 
+
+def _extract_first_json(t: str) -> str:
+    """Return the first balanced top-level JSON object/array in t.
+
+    Models sometimes append commentary after the JSON, or wrap it in prose.
+    Scans for the first { or [ and walks until the matching close, respecting
+    string literals and escapes."""
+    start = next((i for i, ch in enumerate(t) if ch in "{["), -1)
+    if start == -1:
+        raise json.JSONDecodeError("no JSON object found", t, 0)
+    open_ch  = t[start]
+    close_ch = "}" if open_ch == "{" else "]"
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(t)):
+        ch = t[i]
+        if in_str:
+            if esc:        esc = False
+            elif ch == "\\": esc = True
+            elif ch == '"':  in_str = False
+        else:
+            if ch == '"':       in_str = True
+            elif ch == open_ch:  depth += 1
+            elif ch == close_ch:
+                depth -= 1
+                if depth == 0:
+                    return t[start:i + 1]
+    raise json.JSONDecodeError("unbalanced JSON", t, start)
+
 _API_VERSION = "2023-06-01"
 
 
@@ -158,5 +186,10 @@ class AnthropicClient(BaseClient):
             t = text.strip()
             if t.startswith("```"):
                 t = t.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            return json.loads(t)
+            try:
+                return json.loads(t)
+            except json.JSONDecodeError:
+                # Model emitted trailing prose after the JSON, or led with it.
+                # Recover the first balanced top-level {...} / [...] object.
+                return json.loads(_extract_first_json(t))
         return text

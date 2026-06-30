@@ -83,6 +83,7 @@ stopped, without re-running completed steps. This is the serverless core.
 | [`17_chain_human_input.py`](17_chain_human_input.py) | Human-in-the-loop: a chain drafts a reply, **pauses** for a person to approve/edit it at the console, then resumes and sends it. | `OPENAI_API_KEY` |
 | [`18_agent_external_trigger.py`](18_agent_external_trigger.py) | An agent pauses at an approval `Gate`; a **separate** trigger (webhook/cron) resumes it later, sharing only a `FileStore` — the cross-process serverless pattern. | `OPENAI_API_KEY` |
 | [`20_observability.py`](20_observability.py) | The step boundary (1.4.4): a `Tracer` hook records an event timeline, a `PermissionPolicy` gates a `FINANCIAL` tool for approval (then resumes), and the agent's `logging` is routed to a handler. | `OPENAI_API_KEY` |
+| [`21_multi_turn.py`](21_multi_turn.py) | Directed multi-turn reasoning in one `Skill` (1.5.0): several `user` turns separated by empty-`assistant` "generate here" markers run in sequence with shared context — *10 quotes → refine → translate*. `skill.history` holds each turn. | `ANTHROPIC_API_KEY` |
 
 ---
 
