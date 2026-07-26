@@ -97,7 +97,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^kimi-"),                                            "kimi"),
     (re.compile(r"^deepseek-"),                                        "deepseek"),
     (re.compile(r"^(qwen|qwq|wanx|wan\d)"),                            "qwen"),
-    (re.compile(r"^recraftv\d"),                                       "recraft"),
+    (re.compile(r"^recraft"),                                          "recraft"),
     (re.compile(r"^flux"),                                             "bfl"),
     (re.compile(r"^reve-"),                                            "reve"),
     (re.compile(r"^(gpt-|dall-e-|chatgpt-image-|text-embedding-|whisper-|tts-|o\d)"), "openai"),
