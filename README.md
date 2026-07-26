@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **81 models from 11 providers** — with one line to swap any of them.
+All of these work identically across **82 models from 11 providers** — with one line to swap any of them.
 
 ---
 
@@ -83,7 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 ```
 
-81 models total. Full list: [model registry →](docs/reference/model-registry.md)
+82 models total. Full list: [model registry →](docs/reference/model-registry.md)
 
 ---
 
@@ -312,6 +312,27 @@ MIT
 ---
 
 ## Changelog
+
+### 1.5.1
+
+**Recraft raster → vector (vectorize).** `Model("recraft-vectorize")` traces an
+existing raster image into an SVG — no prompt, no generation, just a format
+conversion (distinct from `imageToImage`, which is a content *variation*). Same
+`Model` + `Skill` ergonomics; the model name selects the `/v1/images/vectorize`
+endpoint. Verified live (returns `{"mime_type": "image/svg+xml", ...}`).
+
+```python
+Skill(model=Model("recraft-vectorize"),
+      input={"messages": [{"role": "user", "parts": [
+          {"type": "image", "source": {"kind": "file", "path": "logo.png"}}]}]},
+      output={"modalities": ["image"], "format": {"type": "image"}}).run()
+```
+
+**11 providers / 82 models.**
+
+- Anthropic json-mode robustness: when the model wraps its JSON in prose (leading
+  or trailing commentary), the first balanced top-level object/array is now
+  recovered instead of failing to parse (`_extract_first_json`).
 
 ### 1.5.0
 

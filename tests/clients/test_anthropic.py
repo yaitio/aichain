@@ -141,5 +141,30 @@ class TestAnthropicLive(unittest.TestCase):
         self.assertTrue(client.check_auth())
 
 
+class TestExtractFirstJson(unittest.TestCase):
+    """Recover the first balanced JSON object when the model wraps it in prose."""
+
+    def setUp(self):
+        from clients._families.anthropic import _extract_first_json
+        self._x = _extract_first_json
+
+    def test_trailing_prose(self):
+        self.assertEqual(self._x('{"a": 1, "b": 2}\nHope that helps!'),
+                         '{"a": 1, "b": 2}')
+
+    def test_leading_prose(self):
+        self.assertEqual(self._x('Sure! {"x": [1, 2]} done'), '{"x": [1, 2]}')
+
+    def test_braces_inside_strings_ignored(self):
+        self.assertEqual(self._x('{"s": "a } b { c"} tail'), '{"s": "a } b { c"}')
+
+    def test_array_top_level(self):
+        self.assertEqual(self._x('[1, 2, 3] extra'), '[1, 2, 3]')
+
+    def test_no_json_raises(self):
+        with self.assertRaises(json.JSONDecodeError):
+            self._x("no json here")
+
+
 if __name__ == "__main__":
     unittest.main()

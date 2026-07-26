@@ -116,5 +116,46 @@ class TestRecraftMisc(unittest.TestCase):
             self.assertEqual(Model(name, api_key="k")._provider, "recraft")
 
 
+class TestRecraftVectorize(unittest.TestCase):
+    """Raster → SVG conversion (POST /v1/images/vectorize)."""
+
+    def test_provider_resolves(self):
+        # The broadened ^recraft prefix resolves the dash-named model.
+        self.assertEqual(Model("recraft-vectorize", api_key="k")._provider, "recraft")
+
+    def test_registered_under_image_to_image(self):
+        self.assertIn("recraft-vectorize", registry.models(task="image-to-image"))
+
+    def test_routes_to_vectorize_multipart_no_prompt(self):
+        m = Model("recraft-vectorize", api_key="k")
+        msgs = [{"role": "user", "parts": [_img(data=_B64, mime="image/png")]}]
+        path, body = m.to_request(msgs, _OUT)
+        self.assertEqual(path, "/v1/images/vectorize")
+        self.assertTrue(body["_multipart"])
+        names = [f[0] for f in body["fields"]]
+        self.assertEqual(names, ["response_format", "image"])   # no model, no prompt
+
+    def test_url_source_rejected(self):
+        m = Model("recraft-vectorize", api_key="k")
+        msgs = [{"role": "user", "parts": [_img(kind="url", url="https://x/y.png")]}]
+        with self.assertRaises(ValueError):
+            m.to_request(msgs, _OUT)
+
+    def test_parse_vectorize_response(self):
+        c = RecraftClient("k", data=_PROVIDERS["recraft"])
+        # live shape: {"image": {"b64_json": ..., "image_id": ...}, "credits": N}
+        svg_b64 = base64.b64encode(b'<svg xmlns="..."></svg>').decode()
+        out = c.parse_response({"credits": 10,
+                                "image": {"b64_json": svg_b64, "image_id": "x"}}, _OUT)
+        self.assertEqual(out["base64"], svg_b64)
+        self.assertEqual(out["mime_type"], "image/svg+xml")
+
+    def test_generation_response_still_parsed(self):
+        # The {"data": [...]} generation shape must still work (no regression).
+        c = RecraftClient("k", data=_PROVIDERS["recraft"])
+        out = c.parse_response({"data": [{"b64_json": _B64}]}, _OUT)
+        self.assertEqual(out["base64"], _B64)
+
+
 if __name__ == "__main__":
     unittest.main()

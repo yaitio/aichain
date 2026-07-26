@@ -2,7 +2,7 @@
 yait-aichain
 ============
 
-One interface. 11 providers. 81 models.
+One interface. 11 providers. 82 models.
 Text, image generation & editing, vision, RAG, agents, parallel pipelines.
 
     pip install yait-aichain
@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
