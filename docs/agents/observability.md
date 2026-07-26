@@ -147,6 +147,82 @@ success, denial, validation failure, or error.
 
 ---
 
+## The attempt journal
+
+*Since 1.5.2.* Every run keeps an **append-only, typed record of what was
+attempted** — separate from `AgentMemory`, which holds the *data* the agent
+works with. It rides on `AgentResult.journal` and is preserved across
+suspend/resume.
+
+```python
+res = agent.run("…")
+for e in res.journal:
+    print(e["seq"], e["outcome"], e["evidence"]["kind"], e["intent"])
+```
+
+Each entry carries `seq` (the primary key), `intent`, `action`, `outcome`,
+`evidence`, `reason`, `artifact`, `tokens`, and — for the plan-driven modes —
+`step` / `attempt`.
+
+**Outcomes:** `done` · `failed` (may be retried) · `refuted` (established as not
+viable) · `skipped` (blocked by the permission policy).
+
+**Evidence is typed, and the asymmetry is the point:**
+
+| kind | meaning |
+|---|---|
+| `check` | a programmatic fact — a tool raised, a permission denied. We *know*. |
+| `model_claim` | the orchestrator asserts it worked. Nothing verified it. |
+
+A failure is normally a `check`; a success is normally a `model_claim`. A run
+whose `done` entries are all `model_claim` has proven nothing — and the journal
+says so rather than hiding it behind a green result.
+
+### Do not redo
+
+Entries recorded as `refuted` are rendered back into the next action prompt as an
+`ALREADY RULED OUT` block, so a long run stops re-attempting what it has already
+ruled out. The block is omitted entirely when nothing has been refuted.
+
+### Detecting a stuck run
+
+```python
+from yait_aichain.agent import Journal
+j = Journal.from_list(res.journal)
+j.has_progress(5)      # False → only failed/skipped lately: the agent is spinning
+j.refuted()            # what was ruled out, and why
+j.done()               # what landed, and on what evidence
+```
+
+`has_progress()` is what makes an open-ended loop *stoppable*: a budget alone
+would let an agent spin in place until the tokens run out.
+
+### Checkpoints and crash recovery
+
+*Since 1.5.2.* The run is checkpointed to the `Store` **after every committed
+step** — not only when it suspends. An unplanned death (crash, OOM, function
+timeout) is therefore recoverable: a brand-new `Agent` instance sharing the
+store picks the run up with `resume(run_id)`, restoring memory, the plan cursor
+and the journal.
+
+```python
+agent = Agent(orchestrator=..., tools=[...], store=FileStore("./runs"))
+agent.run(task)          # process dies mid-run
+
+# …restart, different process…
+Agent(orchestrator=..., tools=[...], store=FileStore("./runs")).resume(run_id)
+```
+
+Suspend/resume is now the special case of the same mechanism — a step that is
+additionally marked `suspended` with a pending action to re-run against the
+external signal.
+
+> **Re-execution caveat.** Recovery restarts the step that was *in flight* when
+> the process died — its completion was never recorded, so it must be retried
+> (at-least-once). A side-effecting tool can therefore run twice. Gate such
+> tools with a `PermissionPolicy` (an approval pauses before the effect) or make
+> them idempotent. Committed steps are never re-run.
+
 ## Serverless note
 
 Approval (`approve`) and human-in-the-loop both ride the existing

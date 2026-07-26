@@ -122,14 +122,18 @@ Inspecting results
     print(result.memory)
 """
 
-from ._agent  import Agent
-from ._memory import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
-from ._result import AgentResult
+from ._agent   import Agent
+from ._journal import Journal, JournalEntry, evidence
+from ._memory  import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
+from ._result  import AgentResult
 
 __all__ = [
     "Agent",
     "AgentMemory",
     "AgentResult",
+    "Journal",
+    "JournalEntry",
+    "evidence",
     # Memory backends
     "MemoryBackend",
     "InMemoryBackend",

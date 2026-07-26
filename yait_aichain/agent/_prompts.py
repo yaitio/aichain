@@ -296,6 +296,7 @@ def action_messages(
     tool_schemas:         list | None = None,
     available_tool_names: list | None = None,
     persona:              str | None  = None,
+    do_not_redo:          str         = "",
 ) -> list[dict]:
     """
     Build the messages that ask the orchestrator to decide the exact action
@@ -343,6 +344,12 @@ def action_messages(
         if persona else _SYSTEM_ACTION
     )
 
+    # Approaches already ruled out — omitted entirely when nothing was refuted.
+    ruled_out_block = (
+        f"\nALREADY RULED OUT — do NOT attempt these again:\n{do_not_redo}\n"
+        if do_not_redo else ""
+    )
+
     user = f"""Determine the exact action to take for the current step.
 
 OVERALL TASK:
@@ -351,7 +358,7 @@ OVERALL TASK:
 CURRENT STEP ({step_num} of {total_steps}):
   Goal : {step.get('goal', '')}
   Type : {step.get('type', '')}
-{step_tool_line}
+{step_tool_line}{ruled_out_block}
 AVAILABLE CONTEXT VARIABLES:
 {_vars_list(context)}
 

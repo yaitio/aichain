@@ -88,6 +88,10 @@ class AgentResult:
     history:     list[dict]     = field(default_factory=list)
     memory:      dict           = field(default_factory=dict)
     error:       str | None     = None
+    #: Append-only record of what was attempted (see ``agent._journal``): each
+    #: entry carries an outcome and the evidence behind it. ``done`` entries
+    #: whose evidence is ``model_claim`` were asserted, not verified.
+    journal:     list[dict]     = field(default_factory=list)
 
     def __bool__(self) -> bool:
         return self.success
