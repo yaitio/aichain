@@ -59,6 +59,9 @@ import textwrap
 import time
 from typing import Any
 
+from ._journal     import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
+                          DONE as _J_DONE, FAILED as _J_FAILED, \
+                          REFUTED as _J_REFUTED, SKIPPED as _J_SKIPPED
 from ._memory      import AgentMemory
 from ._result      import AgentResult
 from .             import _prompts as prompts
@@ -104,6 +107,57 @@ def _new_run_id() -> str:
     """A short run identifier for the event stream (matches the state module)."""
     import uuid
     return f"run-{uuid.uuid4().hex[:12]}"
+
+
+def _classify_attempt(result, exec_error, reflection) -> "tuple[str, dict, str]":
+    """
+    Map one attempt onto ``(outcome, evidence, reason)`` for the journal.
+
+    The asymmetry is deliberate and honest: a **failure is a check** (the tool
+    raised, the harness denied — we know it), while a **success is a claim**
+    (only the orchestrator asserts it worked; nothing verified it). A run whose
+    ``done`` entries are all ``model_claim`` has proven nothing, and the journal
+    shows that instead of hiding it behind a green result.
+    """
+    if exec_error is not None:
+        return (_J_FAILED,
+                _evidence(CHECK, f"execution error: {exec_error[:200]}"),
+                exec_error)
+
+    # A permission denial surfaces as a structured result, not an exception.
+    if isinstance(result, dict) and (result.get("denied") or result.get("skipped")):
+        return (_J_SKIPPED,
+                _evidence(CHECK, "blocked by the permission policy"),
+                str(result.get("reason", "not executed")))
+
+    decision = (reflection or {}).get("decision", "continue")
+    reason   = (reflection or {}).get("reason", "")
+
+    # "stop" is the orchestrator declaring this approach dead — record it as
+    # refuted so it is fed back as "do not redo" rather than re-attempted.
+    if decision == "stop":
+        return (_J_REFUTED, _evidence(MODEL_CLAIM, reason or "stopped"), reason)
+    if decision == "retry":
+        return (_J_FAILED, _evidence(MODEL_CLAIM, reason or "retrying"), reason)
+
+    assessment = (reflection or {}).get("assessment", "")
+    return (_J_DONE, _evidence(MODEL_CLAIM, assessment), "")
+
+
+def _first_failed(history: list) -> "dict | None":
+    """
+    The first committed step that ended with an execution error, or ``None``.
+
+    "Committed" = the last attempt of each step (later attempts overwrite
+    earlier ones), so a step that failed once and then succeeded on retry does
+    not count. Used by every exit path so the honest-success guarantee cannot be
+    bypassed by the orchestrator choosing one decision word over another.
+    """
+    committed: dict = {}
+    for rec in history:
+        committed[rec["step"]] = rec
+    return next((r for r in committed.values()
+                 if r.get("exec_error") is not None), None)
 
 
 def _safe_kwargs(kwargs: "dict | None", limit: int = 200) -> dict:
@@ -558,6 +612,7 @@ class Agent:
         return self._execute_loop(
             task, current_plan, step_idx=0, history=history,
             tokens_used=tokens_used, resume_action=None, resume_signal=None,
+            journal=Journal(),
         )
 
     def resume(self, run_id: str, signal=None, *, context=None) -> "AgentResult":
@@ -579,7 +634,7 @@ class Agent:
         return result
 
     def _resume_core(self, run_id: str, signal=None, *, context=None) -> "AgentResult":
-        from ..state import RunDocument, RunContext
+        from ..state import RunDocument, RunContext, SuspendedResult
 
         raw = self._store.load(run_id)
         if raw is None:
@@ -588,8 +643,9 @@ class Agent:
                 f"(already resumed/completed, or unknown id)."
             )
         doc = RunDocument.from_dict(raw)
-        if doc.suspended_step() is None:
-            return None                      # not suspended → idempotent no-op
+        suspended = doc.suspended_step()
+        if suspended is None and doc.first_pending() is None:
+            return None                      # nothing left to do → idempotent no-op
         # Restore the run's context unless the caller supplied a new one.
         self.context = context if context is not None else RunContext.from_dict(doc.context)
 
@@ -599,19 +655,38 @@ class Agent:
         result = self._execute_loop(
             defn.get("task", ""),
             defn.get("plan", []),
-            step_idx      = defn.get("step_idx", 0),
+            step_idx      = (defn.get("step_idx", 0) if suspended
+                             else defn.get("step_idx", 0) + 1),
             history       = defn.get("history", []),
             tokens_used   = defn.get("tokens_used", 0),
-            resume_action = defn.get("pending_action"),
-            resume_signal = signal,
+            resume_action = defn.get("pending_action") if suspended else None,
+            resume_signal = signal if suspended else None,
+            journal       = Journal.from_list(defn.get("journal")),
         )
-        # This parked run is consumed: it either finished or re-suspended under
-        # a NEW run_id. Drop the old one so a duplicate resume is a no-op.
-        self._store.delete(run_id)
+        # The parked run is consumed — UNLESS the loop suspended again under the
+        # same run_id, in which case the freshly parked document must survive
+        # (deleting it would make the run permanently unresumable).
+        if not (isinstance(result, SuspendedResult) and result.run_id == run_id):
+            self._store.delete(run_id)
         return result
 
-    def _execute_loop(self, task, current_plan, *, step_idx, history,
-                      tokens_used, resume_action, resume_signal) -> "AgentResult":
+    def _execute_loop(self, task, current_plan, *, journal=None, **kw):
+        """
+        Own the per-run journal and attach it to the result.
+
+        The journal is created here (per run, never on the instance) and passed
+        down; every exit point of the step loop therefore returns a result that
+        carries the full record of what was attempted.
+        """
+        journal = journal if journal is not None else Journal()
+        result  = self._run_steps(task, current_plan, journal=journal, **kw)
+        if isinstance(result, AgentResult):
+            result.journal = journal.to_list()
+        return result
+
+    def _run_steps(self, task, current_plan, *, step_idx, history,
+                   tokens_used, resume_action, resume_signal,
+                   journal) -> "AgentResult":
         """
         Plan/act/reflect step loop, shared by ``run()`` (from step 0) and
         ``resume()`` (from the suspended step). On resume, *resume_action* is
@@ -692,6 +767,7 @@ class Agent:
                             tool_schemas         = tool_schemas_for_action,
                             available_tool_names = [t.name for t in self.tools],
                             persona              = self.persona,
+                            do_not_redo          = journal.do_not_redo(),
                         )
                         action, action_tokens = self._llm_call_json(
                             self.orchestrator, action_msgs
@@ -732,7 +808,7 @@ class Agent:
                         self._log(1, f"\n[Wait] ⏸  {susp.reason}")
                         doc = self._park_document(
                             task, current_plan, step_idx, history,
-                            tokens_used, action, susp,
+                            tokens_used, action, susp, journal,
                         )
                         self._store.save(doc.run_id, doc.to_dict())
                         return SuspendedResult(
@@ -798,9 +874,40 @@ class Agent:
                         "tokens":      action_tokens + exec_tokens + reflect_tokens,
                     })
 
+                    # Journal: the durable, typed record of the attempt.
+                    _outcome, _evid, _reason = _classify_attempt(
+                        result, exec_error, reflection)
+                    journal.append(
+                        step.get("goal", ""),
+                        action   = action,
+                        outcome  = _outcome,
+                        evidence = _evid,
+                        reason   = _reason,
+                        artifact = store_as or None,
+                        step     = step_idx,
+                        attempt  = attempt,
+                        tokens   = action_tokens + exec_tokens + reflect_tokens,
+                    )
+                    # Durable checkpoint: an unplanned death is now recoverable.
+                    self._checkpoint(task, current_plan, step_idx, history,
+                                     tokens_used, journal)
+
                     # ── Handle decision ───────────────────────────────────
 
                     if decision == "final_answer":
+                        # The honest-success rule applies here too: a final
+                        # answer does not erase an earlier step that failed.
+                        _failed = _first_failed(history)
+                        if _failed is not None:
+                            error = (f"Step {_failed['step'] + 1} ended with an "
+                                     f"execution error: {_failed['exec_error']}")
+                            self._log(1, f"\n[Fail] ✗ {error}")
+                            return AgentResult(
+                                success=False, output=None, mode=self.mode,
+                                steps_taken=step_idx + 1, tokens_used=tokens_used,
+                                plan=current_plan, history=history,
+                                memory=self.memory.all(), error=error,
+                            )
                         self._log(1,
                             f"\n[Done] ✓ Final answer · "
                             f"{step_idx + 1} step(s) · "
@@ -928,11 +1035,7 @@ class Agent:
             # error (the orchestrator chose "continue" past a failed tool — not
             # just the last step), the run did not truly complete. Inspect the
             # last attempt of each executed step, not only history[-1].
-            committed = {}
-            for rec in history:
-                committed[rec["step"]] = rec        # later attempts overwrite
-            failed = next((r for r in committed.values()
-                           if r.get("exec_error") is not None), None)
+            failed = _first_failed(history)
             if failed is not None:
                 error = (
                     f"Step {failed['step'] + 1} ended with an execution error: "
@@ -1200,12 +1303,17 @@ class Agent:
     # Action execution
     # ------------------------------------------------------------------
 
-    def _park_document(self, task, current_plan, step_idx, history,
-                       tokens_used, action, susp):
+    def _build_document(self, task, current_plan, step_idx, history,
+                        tokens_used, journal=None, *, action=None, susp=None):
         """
-        Build the run document for a suspended agent run. Memory is the
-        key-value data (variables); the plan steps carry status; the agent
-        runtime needed to resume lives in ``definition``.
+        Build the run document for a checkpoint or a suspend.
+
+        Memory is the key-value data (variables); the plan steps carry status;
+        the agent runtime needed to resume lives in ``definition``. When *susp*
+        is given the current step is marked SUSPENDED and the pending action is
+        stored so ``resume()`` can re-run it with the external signal; without
+        it this is a plain checkpoint and resume continues at the next pending
+        step.
         """
         from ..state import RunDocument, StepStatus
         names = [str(s.get("goal") or f"step_{i}")
@@ -1219,7 +1327,7 @@ class Agent:
         for i, st in enumerate(doc.steps):
             if i < step_idx:
                 st["status"] = StepStatus.DONE
-            elif i == step_idx:
+            elif i == step_idx and susp is not None:
                 st["status"]  = StepStatus.SUSPENDED
                 st["suspend"] = {"reason":      susp.reason,
                                  "resume_with": susp.resume_with,
@@ -1234,8 +1342,33 @@ class Agent:
             "history":        history,
             "pending_action": action,
             "mode":           self.mode,
+            "journal":        journal.to_list() if journal is not None else [],
         }
         return doc
+
+    def _park_document(self, task, current_plan, step_idx, history,
+                       tokens_used, action, susp, journal=None):
+        """Build the run document for a **suspended** run (see _build_document)."""
+        return self._build_document(task, current_plan, step_idx, history,
+                                    tokens_used, journal,
+                                    action=action, susp=susp)
+
+    def _checkpoint(self, task, current_plan, step_idx, history,
+                    tokens_used, journal) -> None:
+        """
+        Persist the run after a completed step so an unplanned death (crash,
+        OOM, function timeout) is recoverable — ``resume(run_id)`` picks up at
+        the next pending step. Suspend/resume is then just the case where a step
+        is additionally marked SUSPENDED with a pending action.
+
+        Best-effort: a store failure must not kill an otherwise healthy run.
+        """
+        try:
+            doc = self._build_document(task, current_plan, step_idx, history,
+                                       tokens_used, journal)
+            self._store.save(doc.run_id, doc.to_dict())
+        except Exception as exc:                       # pragma: no cover
+            _logger.debug("checkpoint failed: %s", exc)
 
     def _execute_action(
         self,

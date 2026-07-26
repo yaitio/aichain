@@ -313,6 +313,51 @@ MIT
 
 ## Changelog
 
+### 1.5.2
+
+**The attempt journal — an append-only record of what the agent did.** Separate
+from `AgentMemory` (which holds the data the agent works *with*), the journal
+records every attempt with a typed outcome and the evidence behind it, and is
+preserved across suspend/resume.
+
+```python
+res = agent.run("…")
+for e in res.journal:
+    print(e["outcome"], e["evidence"]["kind"], e["intent"])
+# failed  check        call the API      ← we KNOW it failed: the tool raised
+# done    model_claim  fallback path     ← the model says so; nothing verified it
+```
+
+- **Outcomes:** `done` · `failed` · `refuted` · `skipped`.
+- **Evidence is typed** — `check` (a programmatic fact) vs `model_claim` (asserted,
+  not verified). A run whose `done` entries are all `model_claim` has proven
+  nothing, and the journal shows that instead of hiding it.
+- **Do not redo** — `refuted` entries are fed back into the next action prompt as
+  an `ALREADY RULED OUT` block, so a long run stops re-attempting dead ends.
+- **Stuck detection** — `Journal.has_progress(k)` answers "did anything actually
+  move lately", the stop rule an open-ended loop needs (a budget alone lets an
+  agent spin until the tokens run out).
+
+**Crash recovery.** The run is now checkpointed to the `Store` after **every
+committed step**, not only when it suspends — so an unplanned death (crash, OOM,
+function timeout) is recoverable: a fresh `Agent` sharing the store picks the run
+up with `resume(run_id)`, restoring memory, cursor and journal. Suspend/resume
+becomes the special case of the same mechanism. (Recovery retries the step that
+was in flight — gate side-effecting tools with a `PermissionPolicy` or make them
+idempotent; committed steps are never re-run.)
+
+**Fix — a run that suspended twice became unresumable.** Since 1.4.4 the parked
+`run_id` is kept aligned with the event-stream id, but `resume()` still deleted
+that id unconditionally afterwards — so a second suspend parked a document and
+immediately dropped it. Any approval → resume → approval flow lost the run.
+`resume()` now keeps the document when the loop re-suspended under the same id.
+
+**Fix — honest success could be bypassed.** The 1.3.4 guarantee ("a step that
+ended with an execution error fails the run") was only enforced on the
+run-to-completion path: an orchestrator emitting `final_answer` skipped the check
+and the run reported `success=True` despite an earlier failed step. The same rule
+now applies on every exit path.
+
 ### 1.5.1
 
 **Recraft raster → vector (vectorize).** `Model("recraft-vectorize")` traces an
