@@ -313,6 +313,75 @@ MIT
 
 ## Changelog
 
+### 1.6.0
+
+**Goal mode** — a third agent mode, for tasks where no plan can be written in
+advance because each step depends on what the last one returned.
+
+```python
+agent = Agent(orchestrator=Model("claude-sonnet-4-6"), tools=[...],
+              mode="goal", done_when=lambda memory: "answer" in memory)
+```
+
+- No planning phase. Each iteration the orchestrator sees the objective, the
+  observation trail, and what has been ruled out — and picks one action.
+- `done_when` is **required** and is best given as a callable: a callable lets
+  the run finish on a `check` the harness performed, a string only ever on the
+  model's own claim. An unearned `final_answer` is recorded as `refuted` and the
+  loop continues.
+- Stop rules an open-ended loop needs: `done_when` met, iteration cap (50),
+  token budget (250 000), and **no progress** — five consecutive failed attempts
+  end the run instead of spending the rest of the budget proving it again.
+- Suspend/resume, permissions, checkpoints and the journal all work unchanged.
+
+**Journal entries now carry the observation.** A record of what was *attempted*,
+without what it *returned*, cannot drive a next decision — an agent that cannot
+read its own feedback re-issues the same action forever. Entries keep a bounded
+excerpt of the result (the full value stays in memory), and the trail rendered
+into the prompt includes failures, since a failed probe still returned
+information. Applies to all modes.
+
+**`memory_read` — a built-in tool on every agent.** Memory previews in the
+prompt are truncated so one large value cannot crowd out everything else, but
+until now there was no way past that limit: an agent could store a document,
+see its first 500 characters on every subsequent turn, and never reach the
+rest. Measured on a research task, that failure is total — the agent searched
+15 times, stored 48 sources and never wrote an answer, because it could not
+read what it had gathered. `memory_read(key, offset, length)` pages through a
+stored value, and a truncated preview now says so and names the tool. Prompt
+stays bounded; access does not.
+
+**Three fixes found by running the agent, not by reading it.**
+
+- Spawning from a goal-mode agent raised `ValueError`. `spawn()` forwarded
+  `mode` but not `done_when`, and goal mode requires one — so `allow_spawn=True`
+  crashed the moment the orchestrator delegated. A child now falls back to the
+  plan-driven mode: `done_when` is a predicate over *this* agent's objective and
+  memory, and neither transfers to a scoped sub-task.
+- A spawned child could read its **parent's** memory. `spawn()` forwards the
+  parent's tool list, which now contains an agent-bound `memory_read`; the child
+  prepended its own and ended up with two tools of the same name, one pointed at
+  the wrong memory. A foreign reader is dropped on construction.
+- Reading memory wrote it back. The result of a `memory_read` was eligible for
+  `store_as` like any other, so looking at a stored document copied it under a
+  second key — measured on a research run as 9 of 13 reads going to the agent's
+  own bookkeeping rather than to sources. A memory view is no longer stored.
+
+**Repetition detector** — `has_progress()` catches a run that is failing; it
+cannot catch one that is succeeding pointlessly. `Journal.is_repeating(k)`
+reports a window of attempts that were all the same move, and goal mode writes
+that into the next action prompt. Surfaced, never enforced: an agent circling a
+hard sub-problem must not be cut off, so the model decides. Only exact
+repetition counts — a similarity-based rule was measured against real runs and
+did not separate a stuck agent from a healthy search.
+
+**Fix — `Journal.has_progress()` judged on a partial window,** reporting "no
+progress" after a single early failure. It now requires a full window, so one
+bad attempt cannot end a run that was about to recover.
+
+See [`examples/22_goal_mode.py`](examples/22_goal_mode.py) and
+[docs/agents/overview.md](docs/agents/overview.md#goal-mode).
+
 ### 1.5.2
 
 **The attempt journal — an append-only record of what the agent did.** Separate

@@ -128,7 +128,11 @@ def _vars_list(context: dict) -> str:
         if len(s) <= 500:
             preview = s
         else:
-            preview = s[:497] + "…"
+            # Say that this is a preview and how to get the rest. A truncation
+            # the reader cannot see is indistinguishable from a short value.
+            preview = (s[:497] + "…"
+                       + f"\n      [preview — {len(s):,} characters total; "
+                         f"read the rest with memory_read('{k}')]")
         # Show multi-line values indented
         if "\n" in preview:
             indented = preview.replace("\n", "\n      ")
@@ -524,6 +528,189 @@ Important:
   - In waterfall mode, only use "stop" for truly unrecoverable fatal failures
   - In agile mode, use "replan" sparingly — only when the current plan is structurally wrong"""
 
+    return [
+        {"role": "system", "parts": [{"type": "text", "text": system_text}]},
+        {"role": "user",   "parts": [{"type": "text", "text": user}]},
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Goal loop — no upfront plan; the objective and the journal drive each step
+# ---------------------------------------------------------------------------
+
+_SYSTEM_GOAL_ACT = (
+    "You are an autonomous agent pursuing one objective. There is no fixed plan: "
+    "you decide the single next action from what has been achieved so far. "
+    "Prefer the cheapest action that produces new information or moves toward the "
+    "done condition. Never repeat an approach listed as ruled out. "
+    "Respond with ONE JSON object and nothing else."
+)
+
+_SYSTEM_GOAL_ASSESS = (
+    "You assess the result of one action against an objective. Be strict: only "
+    "report the done condition as met when the evidence actually supports it. "
+    "If an approach has been shown not to work, say so explicitly so it is never "
+    "retried. Respond with ONE JSON object and nothing else."
+)
+
+
+def goal_action_messages(
+    objective:            str,
+    done_when:            str,
+    progress:             str,
+    ruled_out:            str,
+    context:              dict,
+    iteration:            int,
+    max_iterations:       int,
+    repeating:            bool = False,
+    tool_schemas:         list | None = None,
+    available_tool_names: list | None = None,
+    persona:              str | None  = None,
+) -> list[dict]:
+    """
+    Ask the orchestrator for the next action in a goal loop.
+
+    Unlike :func:`action_messages` there is no step to execute — the model picks
+    the action from the objective, what has already landed (*progress*) and what
+    has been ruled out (*ruled_out*).
+    """
+    if tool_schemas:
+        sig_lines   = "\n".join(_tool_signature(s) for s in tool_schemas)
+        tools_block = (
+            f"\nAVAILABLE TOOLS — names and EXACT parameter names to use:\n"
+            f"{sig_lines}\n"
+            f"  ↑ Use ONLY these tool names and ONLY these parameter names.\n"
+        )
+    else:
+        tools_block = "\nAVAILABLE TOOLS: (none — use skill or final_answer)\n"
+
+    ruled_block = (f"\nALREADY RULED OUT — never attempt these again:\n{ruled_out}\n"
+                   if ruled_out else "")
+    # Surfaced, not enforced: the loop reports the pattern and the model decides.
+    repeat_block = ("\nSTOP AND RECONSIDER — your recent attempts have all been the "
+                    "same move. Repeating it will not produce new information. Either "
+                    "change approach substantially, or, if the objective cannot be "
+                    "reached with the tools you have, emit final_answer stating "
+                    "plainly what you established and what remains open.\n"
+                    if repeating else "")
+    progress_block = progress or "(nothing achieved yet)"
+
+    system_text = (persona + "\n\n" + _SYSTEM_GOAL_ACT) if persona else _SYSTEM_GOAL_ACT
+
+    user = f"""Decide the single next action.
+
+OBJECTIVE:
+{objective}
+
+DONE WHEN:
+{done_when}
+
+PROGRESS SO FAR:
+{progress_block}
+{ruled_block}{repeat_block}{tools_block}
+AVAILABLE CONTEXT VARIABLES:
+{_vars_list(context)}
+
+Iteration {iteration} of at most {max_iterations}.
+
+Respond with EXACTLY ONE of the following JSON formats:
+
+── To call a tool ───────────────────────────────────────────────────────────
+{{
+  "intent": "what this action is meant to achieve, in a few words",
+  "type": "tool",
+  "tool_name": "MUST be one of the names listed above",
+  "kwargs": {{"param_name": "literal value"}}
+}}
+
+── To reason / generate with the model ──────────────────────────────────────
+{{
+  "intent": "what this action is meant to achieve",
+  "type": "skill",
+  "system_prompt": "role for the executor model",
+  "user_prompt": "the actual request; use {{variable}} to inject context"
+}}
+
+── When the objective is already achieved ───────────────────────────────────
+{{
+  "intent": "finish",
+  "type": "final_answer",
+  "answer": "the complete result"
+}}
+"""
+    return [
+        {"role": "system", "parts": [{"type": "text", "text": system_text}]},
+        {"role": "user",   "parts": [{"type": "text", "text": user}]},
+    ]
+
+
+def goal_assess_messages(
+    objective:  str,
+    done_when:  str,
+    intent:     str,
+    result:     str,
+    progress:   str,
+    remaining_tokens: int,
+    persona:    str | None = None,
+) -> list[dict]:
+    """Assess one iteration: record the outcome, and judge the done condition."""
+    system_text = (persona + "\n\n" + _SYSTEM_GOAL_ASSESS) if persona else _SYSTEM_GOAL_ASSESS
+
+    user = f"""Assess the action just taken.
+
+OBJECTIVE:
+{objective}
+
+DONE WHEN:
+{done_when}
+
+THIS ACTION AIMED TO:
+{intent}
+
+RESULT:
+{_truncate_result(str(result))}
+
+PROGRESS SO FAR:
+{progress or "(nothing achieved yet)"}
+
+Remaining budget: ~{remaining_tokens:,} tokens.
+
+Respond with ONE JSON object:
+{{
+  "outcome": "done" | "failed" | "refuted",
+  "assessment": "one short sentence on what happened",
+  "reason": "REQUIRED when outcome is failed or refuted — why it did not work",
+  "store_as": "snake_case key to store the result under, or empty to discard",
+  "objective_met": true | false,
+  "final_answer": "the complete result — REQUIRED when objective_met is true"
+}}
+
+Choosing the outcome — this is the part that matters. Ask what the action was
+testing, then ask what the result did to it:
+
+  "done"    — the action ran and returned information — even negative
+              information — and nothing was ruled out. A probe answered
+              "wrong, go higher" narrowed a search: that is progress, and the
+              method it belongs to is still alive.
+  "failed"  — the action could not run, or returned nothing usable. Transient;
+              it may be worth retrying.
+  "refuted" — the result DISPROVED the idea the action was testing. That
+              hypothesis, rule or approach is now dead and must never be
+              proposed again. Write the dead idea itself into "reason",
+              precisely enough that a later step will recognise it.
+
+The line falls between a candidate and the idea behind it. Guessing 437 and
+being told "higher" kills the candidate, not the search → "done". Submitting a
+rule and being told it does not fit kills the rule itself → "refuted", with the
+rule written into "reason". Both actions ran perfectly; only one closed a door.
+
+"refuted" is about the IDEA, never about the action's own execution. If the
+action did not actually test what it set out to test — the wrong example was
+chosen, the result was ambiguous — that is "failed": the intent was not
+achieved and nothing was ruled out. Only write "refuted" when you can name the
+idea that is now dead and say what killed it. If your "reason" would contain
+"does not refute", "not yet" or "still possible", the outcome is NOT "refuted".
+"""
     return [
         {"role": "system", "parts": [{"type": "text", "text": system_text}]},
         {"role": "user",   "parts": [{"type": "text", "text": user}]},

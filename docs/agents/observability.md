@@ -161,8 +161,8 @@ for e in res.journal:
 ```
 
 Each entry carries `seq` (the primary key), `intent`, `action`, `outcome`,
-`evidence`, `reason`, `artifact`, `tokens`, and — for the plan-driven modes —
-`step` / `attempt`.
+`evidence`, `reason`, `artifact`, `observation`, `tokens`, and — for the
+plan-driven modes — `step` / `attempt`.
 
 **Outcomes:** `done` · `failed` (may be retried) · `refuted` (established as not
 viable) · `skipped` (blocked by the permission policy).
@@ -177,6 +177,19 @@ viable) · `skipped` (blocked by the permission policy).
 A failure is normally a `check`; a success is normally a `model_claim`. A run
 whose `done` entries are all `model_claim` has proven nothing — and the journal
 says so rather than hiding it behind a green result.
+
+### The observation trail
+
+`observation` is a bounded excerpt (240 chars) of **what came back**; the full
+value lives in memory under `artifact`. `Journal.progress_summary()` renders the
+recent trail — every outcome, not just successes — and in
+[goal mode](../agents/overview.md#goal-mode) it is fed straight back into the
+next action prompt.
+
+This is not cosmetic. A record of what was *tried*, without what it *returned*,
+is not enough to decide a next move: an agent that cannot see its own
+observations will re-issue the same action forever. Failed attempts stay in the
+trail for the same reason — a probe that failed still returned information.
 
 ### Do not redo
 
@@ -196,6 +209,30 @@ j.done()               # what landed, and on what evidence
 
 `has_progress()` is what makes an open-ended loop *stoppable*: a budget alone
 would let an agent spin in place until the tokens run out.
+
+### Spinning while succeeding
+
+*Since 1.6.0.* `has_progress()` catches a run that is **failing**. It cannot
+catch one that is **succeeding pointlessly** — an agent re-issuing a call that
+returns cleanly every time records an honest `done` on every iteration, and
+nothing in the outcomes says otherwise.
+
+```python
+j.is_repeating(5)      # True → the last 5 attempts were the same move
+```
+
+It fires only on exact repetition: the same stated intent throughout the
+window, or the identical action re-issued. In [goal mode](../agents/overview.md#goal-mode)
+the result is written into the next action prompt as a `STOP AND RECONSIDER`
+block — **surfaced, never enforced**, since an agent legitimately circling a
+hard sub-problem must not be cut off.
+
+> A fuzzier rule, flagging intents that merely *resemble* each other, was
+> measured against three real runs and rejected: an agent bisecting past its
+> instrument's resolution scored a median word-overlap of 0.73 between
+> consecutive intents, while a binary search that finished correctly scored
+> 0.64. Not separable — restating "probe the midpoint of X–Y" every turn is
+> what a healthy search looks like.
 
 ### Checkpoints and crash recovery
 

@@ -114,14 +114,67 @@ output lands in memory for later steps to reference.
 |---|---|---|
 | `waterfall` (default) | No (retries only) | The path is predictable. |
 | `agile` | Yes, via `replan` | The path is exploratory; later steps depend on what early ones reveal. |
+| `goal` | There is no plan | The steps cannot be known in advance at all. |
+
+#### Goal mode
+
+*Since 1.6.0.* A plan is a bet that you know the steps up front. When you don't
+— when step 4 is unknowable until step 3 answers — `mode="goal"` drops the
+planning phase entirely: you give an objective and a **done condition**, and the
+agent decides one action at a time from what it has learned.
+
+```python
+agent = Agent(
+    orchestrator = Model("claude-sonnet-4-6"),
+    tools        = [Probe(), RecordAnswer()],
+    mode         = "goal",
+    done_when    = lambda memory: "answer" in memory,   # the harness checks it
+)
+result = agent.run("Find the combination and record it.")
+```
+
+Each iteration the orchestrator sees the objective, the **observation trail**
+(recent attempts *with what came back*) and what has been
+[ruled out](observability.md#do-not-redo) — then picks one action. The
+[journal](observability.md#the-attempt-journal) is not a side-effect here, it is
+the loop's working memory.
+
+`done_when` is required, and should be a **callable** where possible: a callable
+lets the run finish on a `check`, a string only ever on a `model_claim`. See
+[Configuration](configuration.md#done_when--goal-mode-only-required).
+
+**Sub-agents.** A goal-mode agent with `allow_spawn=True` spawns children in the
+plan-driven mode, not in goal mode: `done_when` is a predicate over the parent's
+objective and memory, and a scoped sub-task is exactly what a plan is for.
+
+**Stopping.** An open-ended loop needs stop rules a plan gives for free:
+
+| Rule | Meaning |
+|---|---|
+| `done_when` met | Success — the only exit that reports `success=True`. |
+| `max_steps` | Iteration cap (default `50`). |
+| `max_tokens` | Budget cap (default `250_000`). |
+| No progress | The last `NO_PROGRESS_WINDOW` (5) attempts all failed — stop rather than burn the rest of the budget proving it again. |
+| Repetition | The last `REPEAT_WINDOW` (5) attempts were the same move. Not a stop: the prompt says so and the model decides. |
+
+The last one is the reason a goal run terminates in practice: a budget alone
+lets an agent spin in place until the tokens run out. The verdict needs a full
+window, so an early failure never ends a run that was about to recover.
+
+> The loop is only as good as the orchestrator driving it. On
+> [`examples/22_goal_mode.py`](../../examples/22_goal_mode.py) (find a number in
+> 1–1000, 15 iterations): `claude-sonnet-4-6` ran a clean binary search and
+> finished in 9 probes; `gpt-4o-mini` bisected for a while, then degenerated
+> into +1 scanning and hit the cap. Same harness both times — which is exactly
+> why the stop rules exist.
 
 ### Budgets
 
 | Limit | Default | When hit |
 |---|---|---|
-| `max_steps` | `10` | The plan is truncated; never more than this many steps. |
+| `max_steps` | `10` (`50` in goal mode) | The plan is truncated; never more than this many steps (iterations in goal mode). |
 | `max_attempts` | `3` | Retries per step are capped, then the loop moves on. |
-| `max_tokens` | `50_000` | Total across plan + actions + executions + reflections; the agent stops cleanly. |
+| `max_tokens` | `50_000` (`250_000` in goal mode) | Total across plan + actions + executions + reflections; the agent stops cleanly. |
 
 ### `AgentResult`
 
@@ -185,6 +238,7 @@ Good for fan-out research — one sub-agent per topic.
 | Fixed sequence with known data flow | [Chain](../primitives/chain.md) |
 | Search → read → cross-reference → reason | **Agent** |
 | Exploratory; next step depends on what you learned | **Agent (agile)** |
+| No plan is possible; only a finish line | **Agent (goal)** |
 
 An agent can also be one step *inside* a Chain — it handles the open-ended
 phase, the Chain handles the rest. See [Agent as a Chain step](agent-as-chain-step.md).

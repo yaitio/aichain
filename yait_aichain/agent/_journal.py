@@ -33,6 +33,7 @@ proven nothing, and the journal says so instead of hiding it.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -63,6 +64,56 @@ def evidence(kind: str, detail: str = "") -> dict:
     return {"kind": kind, "detail": detail}
 
 
+#: How much of an observation is kept inline on an entry.
+OBSERVATION_CHARS = 240
+
+#: How much of the attempted action is rendered into the prompt trail.
+ACTION_CHARS = 320
+
+
+def _normalise_intent(text: str) -> str:
+    """Fold an intent to its content, so punctuation and case are not novelty."""
+    return " ".join("".join(ch if ch.isalnum() or ch.isspace() else " "
+                            for ch in str(text).lower()).split())
+
+
+def _action_signature(action: "dict | None") -> str:
+    """Stable identity of an action, for spotting a call re-issued verbatim."""
+    if not action:
+        return ""
+    try:
+        return json.dumps(action, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return str(action)
+
+
+def _action_excerpt(action: "dict | None") -> str:
+    """
+    One-line, bounded rendering of what an action actually did.
+
+    For a tool call the arguments *are* the attempt, so a trail that omits them
+    records that something was tried without recording what.
+    """
+    if not action:
+        return ""
+    kind = action.get("type")
+    if kind == "tool":
+        args = ", ".join(f"{k}={_excerpt(v, ACTION_CHARS // 2)}"
+                         for k, v in (action.get("kwargs") or {}).items())
+        return _excerpt(f"{action.get('tool_name', '?')}({args})", ACTION_CHARS)
+    if kind == "skill":
+        return _excerpt(action.get("user_prompt", ""), ACTION_CHARS)
+    return ""
+
+
+def _excerpt(value, limit: int = OBSERVATION_CHARS) -> str:
+    """One-line, bounded excerpt of a value — the journal stays small."""
+    if value is None or value == "":
+        return ""
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[:limit - 1] + "…"
+
+
 # ── Entry ──────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -81,6 +132,10 @@ class JournalEntry:
     reason : why it failed or was refuted — the text fed back as "do not redo".
     artifact : reference (a memory key / path) to a bulky result; the result
         itself is NOT copied into the journal.
+    observation : a short excerpt of what came back. An attempt record that
+        says only what was *tried* is not enough to decide the next move — the
+        loop must be able to read its own feedback. Truncated to
+        ``OBSERVATION_CHARS``; the full value lives under *artifact*.
     step, attempt : plan coordinates; ``None`` in a goal loop.
     tokens : tokens spent on this attempt.
     ts : unix timestamp.
@@ -93,6 +148,7 @@ class JournalEntry:
     evidence: "dict | None"  = None
     reason:   str            = ""
     artifact: "str | None"   = None
+    observation: str        = ""
     step:     "int | None"   = None
     attempt:  "int | None"   = None
     tokens:   int            = 0
@@ -125,6 +181,7 @@ class Journal:
         evidence: "dict | None" = None,
         reason:   str  = "",
         artifact: "str | None" = None,
+        observation: str = "",
         step:     "int | None" = None,
         attempt:  "int | None" = None,
         tokens:   int  = 0,
@@ -137,7 +194,8 @@ class Journal:
         entry = JournalEntry(
             seq=len(self._entries), intent=intent, action=action or {},
             outcome=outcome, evidence=evidence, reason=reason,
-            artifact=artifact, step=step, attempt=attempt, tokens=tokens,
+            artifact=artifact, observation=_excerpt(observation),
+            step=step, attempt=attempt, tokens=tokens,
         )
         self._entries.append(entry)
         return entry
@@ -169,13 +227,97 @@ class Journal:
         space shrank). A tail of only ``failed`` / ``skipped`` means the agent is
         spinning — the stop rule a goal loop needs, since a budget alone would
         let it spin until the tokens run out.
+
+        The verdict needs a **full window**: with fewer than *last_k* entries
+        there is not yet enough evidence to call a run stuck, and reporting one
+        would let a single early failure end the run before it had a chance to
+        recover.
         """
+        if len(self._entries) < last_k:
+            return True                    # not enough evidence to judge
+        return any(e.outcome in (DONE, REFUTED)
+                   for e in self._entries[-last_k:])
+
+    def is_repeating(self, last_k: int = 5) -> bool:
+        """
+        True when the last *last_k* attempts stopped carrying new information.
+
+        :meth:`has_progress` catches a run that is *failing*; this catches one
+        that is *succeeding pointlessly*. An agent can keep issuing calls that
+        return cleanly — bisecting past the resolution of its own instrument,
+        re-asking a question already answered — and every entry is an honest
+        ``done``. Nothing in the outcomes distinguishes that from real work.
+
+        Two signals, both requiring a full window and both deliberately strict,
+        because a false positive would interrupt an agent that is genuinely
+        working:
+
+        * every attempt in the window states the same intent, or
+        * every attempt in the window issues the identical action.
+
+        This reports; it does not stop. The judgement of whether a repeated
+        approach is still worth pursuing belongs to the caller.
+
+        **What this deliberately does not do.** A fuzzier version — flagging
+        intents that merely *resemble* each other — was measured against three
+        real runs and rejected. An agent bisecting past its instrument's
+        resolution scored a median word-overlap of 0.73 between consecutive
+        intents; a textbook binary search that finished correctly scored 0.64.
+        The two are not separable, because restating "probe the midpoint of
+        X–Y" every turn is what a healthy search looks like. Any threshold in
+        that gap is fitted to one example and would interrupt working runs, so
+        only exact repetition is reported.
+        """
+        if len(self._entries) < last_k:
+            return False                   # not enough evidence to judge
         tail = self._entries[-last_k:]
-        if not tail:
-            return True                    # nothing recorded yet → not stuck
-        return any(e.outcome in (DONE, REFUTED) for e in tail)
+        intents = {_normalise_intent(e.intent) for e in tail}
+        if len(intents) == 1 and intents != {""}:
+            return True
+        actions = {_action_signature(e.action) for e in tail}
+        return len(actions) == 1 and actions != {""}
 
     # ── prompt view ──────────────────────────────────────────────────
+    def progress_summary(self, limit: int = 12) -> str:
+        """
+        Render the observation trail for the next action prompt.
+
+        Every recent attempt appears, whatever its outcome, with **what was
+        tried** and **what came back**. Both halves are needed. A summary of
+        intents alone is useless to a loop that has to decide its next move from
+        feedback; and an observation without the candidate that produced it is
+        just as bad — "4 problems remain" cannot be acted on when the draft that
+        had 4 problems is nowhere to be seen. Failures earn their place here
+        too: a failed probe still returned information.
+
+        Both halves are bounded, so a genuinely large artifact will still be
+        clipped. That is what ``artifact`` is for: put it in memory, which the
+        action prompt renders separately and does not roll off after
+        *limit* entries.
+
+        Successes are additionally marked by evidence kind, so the model can see
+        which of its "achievements" nothing ever verified. What has been ruled
+        out is rendered separately by :meth:`do_not_redo`.
+        """
+        items = self._entries[-limit:]
+        if not items:
+            return ""
+        lines = []
+        for e in items:
+            if e.outcome == DONE:
+                kind = (e.evidence or {}).get("kind", MODEL_CLAIM)
+                mark = "verified" if kind == CHECK else "claimed"
+            else:
+                mark = e.outcome
+            stored = f" → memory['{e.artifact}']" if e.artifact else ""
+            lines.append(f"- [{mark}] {e.intent or '(no intent)'}{stored}")
+            tried = _action_excerpt(e.action)
+            if tried:
+                lines.append(f"    tried:  {tried}")
+            if e.observation:
+                lines.append(f"    result: {e.observation}")
+        return "\n".join(lines)
+
     def do_not_redo(self, limit: int = 10) -> str:
         """
         Render the refuted set for the action prompt. Empty string when nothing
