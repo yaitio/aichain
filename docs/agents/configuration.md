@@ -71,24 +71,45 @@ The orchestrator can ask for a specific executor by name in its action response 
 
 ## Mode and limits
 
-### `mode: "waterfall" | "agile"` — default `"waterfall"`
+### `mode: "waterfall" | "agile" | "goal"` — default `"waterfall"`
 
-See [Overview: waterfall vs agile](overview.md#waterfall-vs-agile).
+See [Overview: waterfall vs agile](overview.md#waterfall-vs-agile), and
+[Goal mode](#goal-mode) below.
 
 - `"waterfall"` — plan is fixed; reflection can `continue`/`retry`/`stop`/`final_answer`.
 - `"agile"` — reflection can also `replan`, producing a revised step list and optionally jumping back.
+- `"goal"` — *no plan at all*; the agent decides one action at a time until `done_when` is met. Requires `done_when`. *Since 1.6.0.*
 
-### `max_steps: int` — default `10`
+### `done_when` — goal mode only, **required**
+
+The condition that ends the run. Either:
+
+- a **string** the orchestrator judges (`"the report is written and cites 3 sources"`), or
+- a **callable** `done_when(memory: dict) -> bool` the harness evaluates itself.
+
+Prefer the callable. A string can only ever produce a `model_claim` — the model
+asserting it is finished. A callable produces a `check`: the harness ran the
+predicate, so the run cannot be talked into success. A predicate that raises is
+treated as *not met* and recorded, never as a crash.
+
+Passing `done_when` outside goal mode is an error, as is goal mode without it —
+an open-ended loop with no stop condition can only end by exhausting its budget.
+
+### `max_steps: int` — default `10` (`50` in goal mode)
 
 Upper bound on how many distinct plan steps the agent will ever run. If the plan returned by the orchestrator is longer, it is truncated. If replanning produces more steps, the new plan is also truncated.
+
+In goal mode there is no plan, so this caps **iterations** instead.
 
 ### `max_attempts: int` — default `3`
 
 Retries **per step**. After the cap, the step is recorded as failed and the loop advances (in waterfall) or the orchestrator decides what to do (in agile).
 
-### `max_tokens: int` — default `50_000`
+### `max_tokens: int` — default `50_000` (`250_000` in goal mode)
 
-Total token budget across **all** LLM calls — planning, every action determination, every skill execution, every reflection. When exceeded, the agent stops cleanly with whatever it has. Tokens are extracted from every raw provider response; OpenAI, Anthropic, Google, xAI, and Perplexity are all supported.
+Total token budget across **all** LLM calls — planning, every action determination, every skill execution, every reflection. When exceeded, the agent stops cleanly with whatever it has.
+
+It is a **stop threshold, not a hard ceiling**: the budget is checked between steps, and the cost of a call is not known until it returns, so a run can finish slightly over. A 100 000-token budget was observed stopping at 102 211. Size the budget for the overshoot rather than assuming it caps spend exactly. Tokens are extracted from every raw provider response; OpenAI, Anthropic, Google, xAI, and Perplexity are all supported.
 
 Rough budgeting:
 

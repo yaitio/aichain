@@ -256,3 +256,28 @@ Each phase sees everything the previous phases left behind.
 - **Three-phase execution flow** → [Overview](overview.md)
 - **Full configuration reference** → [Configuration](configuration.md)
 - **Embedding an Agent in a Chain** → [Agent as Chain step](agent-as-chain-step.md)
+
+
+## Reading a value in full
+
+*Since 1.6.0.* Memory is rendered into the prompt as a **preview** — up to 500
+characters per key — so a single large value cannot crowd out the rest of the
+context. Every agent therefore carries a built-in `memory_read` tool to page
+past that limit:
+
+```
+memory_read(key, offset=0, length=4000)   # up to 16 000 characters per call
+```
+
+A truncated preview says so and names the tool, so the orchestrator can see
+there is more to read:
+
+```
+  search_result: Search results for "…"…
+      [preview — 13,721 characters total; read the rest with memory_read('search_result')]
+```
+
+This matters most for retrieval work, where the payload *is* the text. Without
+it, storing a document and previewing it are indistinguishable from storing a
+500-character summary — the agent keeps gathering because it never sees what it
+already has.

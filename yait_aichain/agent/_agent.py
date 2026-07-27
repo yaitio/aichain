@@ -68,7 +68,7 @@ from .             import _prompts as prompts
 from .._template     import substitute_placeholders
 from .._events       import Event, emit
 from ..tools._base   import Tool
-from ..tools._permissions import APPROVE, DENY
+from ..tools._permissions import APPROVE, DENY, READ
 
 _logger = logging.getLogger("yait_aichain.agent")
 
@@ -160,6 +160,20 @@ def _first_failed(history: list) -> "dict | None":
                  if r.get("exec_error") is not None), None)
 
 
+def _is_memory_view(action: "dict | None") -> bool:
+    """
+    Whether an action merely *read* memory rather than producing anything new.
+
+    Storing the result of a memory read back into memory duplicates content
+    under a second key and grows the namespace every time the agent looks at
+    what it already has — churn that reads, from inside the loop, exactly like
+    progress.
+    """
+    action = action or {}
+    return (action.get("type") == "tool"
+            and action.get("tool_name") == _MemoryReadTool.name)
+
+
 def _safe_kwargs(kwargs: "dict | None", limit: int = 200) -> dict:
     """Shallow-copy tool kwargs for an event payload, truncating long strings."""
     out: dict = {}
@@ -171,6 +185,63 @@ def _safe_kwargs(kwargs: "dict | None", limit: int = 200) -> dict:
 # ---------------------------------------------------------------------------
 # _SpawnTool — exposes Agent.spawn() to the orchestrator LLM as a tool
 # ---------------------------------------------------------------------------
+
+class _MemoryReadTool(Tool):
+    """
+    Internal tool that lets the orchestrator read its own memory in full.
+
+    Memory previews in the prompt are truncated so a large value cannot crowd
+    out everything else. Without a way to page past that limit the truncation
+    is silent data loss: an agent can store a document, see the first few
+    hundred characters of it on every subsequent turn, and never reach the rest
+    — which looks from the outside like an agent that gathers and gathers and
+    never produces. This tool is the way past it, so the prompt stays bounded
+    while access does not.
+
+    Added to every agent automatically; users never instantiate it.
+    """
+
+    name: str = "memory_read"
+    description: str = (
+        "Read the full stored value of a memory variable, a slice at a time. "
+        "Prompt previews are truncated — use this to read what a preview cut "
+        "off, continuing with offset until the end is reached."
+    )
+    risk: str = READ
+    parameters: dict = {
+        "type": "object",
+        "properties": {
+            "key":    {"type": "string",
+                       "description": "The memory variable to read."},
+            "offset": {"type": "integer",
+                       "description": "Character position to start at (default 0)."},
+            "length": {"type": "integer",
+                       "description": "How many characters to return "
+                                      "(default 4000, max 16000)."},
+        },
+        "required": ["key"],
+    }
+
+    MAX_LENGTH = 16_000
+
+    def __init__(self, agent: "Agent") -> None:
+        super().__init__()
+        self._agent = agent
+
+    def run(self, key, offset=0, length=4000, options=None):
+        memory = self._agent.memory.all()
+        if key not in memory:
+            return (f"no such memory key {key!r}. "
+                    f"Available: {sorted(memory.keys())}")
+        text   = str(memory[key])
+        offset = max(0, int(offset))
+        length = max(1, min(int(length), self.MAX_LENGTH))
+        chunk  = text[offset:offset + length]
+        end    = offset + len(chunk)
+        more   = (f" — {len(text) - end} characters remain, continue with "
+                  f"offset={end}" if end < len(text) else " — end of value")
+        return f"[{key}: characters {offset}..{end} of {len(text)}{more}]\n{chunk}"
+
 
 class _SpawnTool(Tool):
     """
@@ -387,7 +458,21 @@ class Agent:
         # Adds full prompts, output previews, and per-call token breakdowns.
     """
 
-    MODES = ("waterfall", "agile")
+    MODES = ("waterfall", "agile", "goal")
+
+    #: How many recent attempts must be all-failure before a goal run gives up.
+    NO_PROGRESS_WINDOW = 5
+
+    #: How many identical attempts in a row before the loop says so in the
+    #: prompt. Reported, never enforced — an agent legitimately circling a hard
+    #: sub-problem must not be cut off, so the model decides what to do with it.
+    REPEAT_WINDOW = 5
+
+    #: Defaults for ``mode="goal"``: an open-ended loop needs a longer leash
+    #: than a fixed plan, and the budget — not the step count — is the real
+    #: guardrail. Explicit ``max_steps`` / ``max_tokens`` always win.
+    GOAL_MAX_STEPS  = 50
+    GOAL_MAX_TOKENS = 250_000
 
     def __init__(
         self,
@@ -395,9 +480,10 @@ class Agent:
         tools:        list | None        = None,
         executors:    list | None        = None,
         mode:         str                = "waterfall",
-        max_steps:    int                = 10,
+        max_steps:    int | None         = None,
         max_attempts: int                = 3,
-        max_tokens:   int                = 50_000,
+        max_tokens:   int | None         = None,
+        done_when                        = None,
         memory:       AgentMemory | None = None,
         verbose:      int                = 0,
         name:         str | None         = None,
@@ -419,12 +505,28 @@ class Agent:
                 f"verbose must be 0, 1, or 2; got {verbose!r}"
             )
 
+        if mode == "goal" and not done_when:
+            raise ValueError(
+                "mode='goal' requires done_when — a goal loop with no stop "
+                "condition can only end by exhausting its budget. Pass a string "
+                "the orchestrator can judge, or a callable(memory) -> bool for a "
+                "condition the harness checks itself."
+            )
+        if mode != "goal" and done_when is not None:
+            raise ValueError(
+                f"done_when applies to mode='goal'; got mode={mode!r}."
+            )
+
         self.orchestrator = orchestrator
         self.executors    = executors or [orchestrator]
         self.mode         = mode
-        self.max_steps    = max_steps
+        self.done_when    = done_when
+        _goal             = mode == "goal"
+        self.max_steps    = max_steps  if max_steps  is not None else (
+                            self.GOAL_MAX_STEPS  if _goal else 10)
         self.max_attempts = max_attempts
-        self.max_tokens   = max_tokens
+        self.max_tokens   = max_tokens if max_tokens is not None else (
+                            self.GOAL_MAX_TOKENS if _goal else 50_000)
         self.memory       = memory if memory is not None else AgentMemory()
         self.verbose      = verbose
         self.name         = name
@@ -451,6 +553,14 @@ class Agent:
 
         # ── Build tool list ───────────────────────────────────────────────
         tool_list: list = list(tools or [])
+        # A _MemoryReadTool is bound to the agent that owns the memory it reads,
+        # so one inherited from elsewhere (spawn forwards the parent's tool list)
+        # would let this agent read another agent's memory under a duplicate
+        # name. Drop any foreign one and bind a fresh one here.
+        tool_list = [t for t in tool_list if not isinstance(t, _MemoryReadTool)]
+        # Always available: without it, a truncated memory preview is a value
+        # the agent can never finish reading.
+        tool_list = [_MemoryReadTool(self)] + tool_list
         if allow_spawn:
             # Prepend spawn_agent so the LLM sees it first in the schema list
             tool_list = [_SpawnTool(self)] + tool_list
@@ -552,6 +662,14 @@ class Agent:
         self._log(1, f"║  Tools  : {tool_names}")
         self._log(1, f"║  Execs  : {exec_names}")
         self._log(1, f"╚{'═' * 70}")
+
+        # Goal mode has no planning phase: the objective and the journal
+        # drive each iteration, so there is nothing to plan up front.
+        if self.mode == "goal":
+            return self._execute_loop(
+                task, [], step_idx=0, history=history, tokens_used=0,
+                resume_action=None, resume_signal=None, journal=Journal(),
+            )
 
         try:
             # ── Phase 1: Planning ─────────────────────────────────────────
@@ -655,7 +773,8 @@ class Agent:
         result = self._execute_loop(
             defn.get("task", ""),
             defn.get("plan", []),
-            step_idx      = (defn.get("step_idx", 0) if suspended
+            step_idx      = (defn.get("step_idx", 0)
+                             if suspended or defn.get("mode") == "goal"
                              else defn.get("step_idx", 0) + 1),
             history       = defn.get("history", []),
             tokens_used   = defn.get("tokens_used", 0),
@@ -679,7 +798,11 @@ class Agent:
         carries the full record of what was attempted.
         """
         journal = journal if journal is not None else Journal()
-        result  = self._run_steps(task, current_plan, journal=journal, **kw)
+        if self.mode == "goal":
+            result = self._run_goal(task, self.done_when, journal=journal,
+                                    current_plan=current_plan, **kw)
+        else:
+            result = self._run_steps(task, current_plan, journal=journal, **kw)
         if isinstance(result, AgentResult):
             result.journal = journal.to_list()
         return result
@@ -854,7 +977,7 @@ class Agent:
 
                     # Store result in memory using the orchestrator's suggested key
                     store_as = self._sanitise_key(reflection.get("store_as", ""))
-                    if store_as and exec_error is None:
+                    if store_as and exec_error is None and not _is_memory_view(action):
                         self.memory.set(store_as, result)
 
                     # Log reflection
@@ -884,6 +1007,7 @@ class Agent:
                         evidence = _evid,
                         reason   = _reason,
                         artifact = store_as or None,
+                        observation = result,
                         step     = step_idx,
                         attempt  = attempt,
                         tokens   = action_tokens + exec_tokens + reflect_tokens,
@@ -1073,6 +1197,269 @@ class Agent:
             )
 
     # ------------------------------------------------------------------
+    # Goal loop — no upfront plan
+    # ------------------------------------------------------------------
+
+    def _check_done(self, done_when) -> "tuple[bool, dict] | tuple[bool, None]":
+        """
+        Evaluate a **callable** done condition against memory.
+
+        Returns ``(met, evidence)``. A callable condition is the only way to
+        finish a goal run on a ``check`` rather than a ``model_claim`` — the
+        harness ran the predicate itself. A predicate that raises is treated as
+        not-met (and recorded), never as a crash.
+        """
+        try:
+            met = bool(done_when(self.memory.all()))
+        except Exception as exc:
+            return False, _evidence(CHECK, f"done_when raised: {exc}")
+        return met, _evidence(CHECK, "done_when(memory) returned "
+                                    f"{'True' if met else 'False'}")
+
+    def _run_goal(self, task, done_when, *, step_idx, history, tokens_used,
+                  resume_action, resume_signal, journal,
+                  current_plan=None) -> "AgentResult":
+        """
+        Pursue *task* until *done_when* is met, the budget runs out, or the run
+        stops making progress. There is no plan: each iteration asks the
+        orchestrator for the single next action given the objective, what has
+        landed, and what the journal has already ruled out.
+
+        ``current_plan`` is not an input plan — it is the record of iterations
+        taken so far, grown one entry per iteration. Keeping that shape lets the
+        goal loop reuse the checkpoint / suspend / resume machinery unchanged.
+        """
+        from ..state import Suspend, SuspendedResult
+
+        current_plan = list(current_plan or [])
+        callable_done = callable(done_when)
+        done_text     = (getattr(done_when, "__doc__", None) or
+                         f"the predicate {getattr(done_when, '__name__', 'done_when')}"
+                         "(memory) returns True") if callable_done else str(done_when)
+
+        try:
+            self._uncounted_tokens = 0
+            stop_reason: "str | None" = None
+
+            while step_idx < self.max_steps:
+
+                if tokens_used >= self.max_tokens:
+                    stop_reason = (f"Token budget exhausted after {step_idx} "
+                                   f"iteration(s) "
+                                   f"({tokens_used:,}/{self.max_tokens:,}).")
+                    break
+
+                # An open-ended loop needs a stop rule a budget cannot give: an
+                # agent that only fails is spinning, and should stop now rather
+                # than burn the remaining budget proving it again.
+                if not journal.has_progress(self.NO_PROGRESS_WINDOW):
+                    stop_reason = (f"No progress in the last "
+                                   f"{self.NO_PROGRESS_WINDOW} attempts — stopping "
+                                   f"rather than spending the remaining budget.")
+                    break
+
+                self._step_idx = step_idx
+                self._log(1, f"\n[Goal {step_idx + 1}/{self.max_steps}]  "
+                             f"{tokens_used:,}/{self.max_tokens:,} tokens")
+                self._emit("step.started", payload={"iteration": step_idx})
+
+                context = self.memory.all()
+
+                # ── Decide the next action ────────────────────────────────
+                _iter_signal = None
+                if resume_action is not None:
+                    action, act_tokens = resume_action, 0
+                    _iter_signal  = resume_signal
+                    resume_action = resume_signal = None
+                else:
+                    act_msgs = prompts.goal_action_messages(
+                        objective            = task,
+                        done_when            = done_text,
+                        progress             = journal.progress_summary(),
+                        ruled_out            = journal.do_not_redo(),
+                        context              = context,
+                        iteration            = step_idx + 1,
+                        max_iterations       = self.max_steps,
+                        repeating            = journal.is_repeating(
+                                                   self.REPEAT_WINDOW),
+                        tool_schemas         = [t.schema() for t in self.tools],
+                        available_tool_names = [t.name for t in self.tools],
+                        persona              = self.persona,
+                    )
+                    action, act_tokens = self._llm_call_json(
+                        self.orchestrator, act_msgs)
+                tokens_used += act_tokens
+                self._log_action(action, act_tokens)
+
+                intent = str(action.get("intent") or action.get("type") or "action")
+
+                # The orchestrator claims the objective is already met. Trust it
+                # only when there is no programmatic condition to check.
+                if action.get("type") == "final_answer":
+                    if callable_done:
+                        met, evid = self._check_done(done_when)
+                        if not met:
+                            journal.append(
+                                intent, action=action, outcome=_J_REFUTED,
+                                evidence=evid,
+                                reason="Claimed done, but done_when(memory) is False.",
+                                step=step_idx, tokens=act_tokens,
+                            )
+                            step_idx += 1
+                            continue
+                    else:
+                        evid = _evidence(MODEL_CLAIM, "orchestrator emitted final_answer")
+                    journal.append(intent, action=action, outcome=_J_DONE,
+                                   evidence=evid, step=step_idx, tokens=act_tokens)
+                    return self._goal_result(True, action.get("answer"), step_idx + 1,
+                                             tokens_used, current_plan, history)
+
+                current_plan.append({"id": step_idx + 1, "goal": intent,
+                                     "type": action.get("type"),
+                                     "tool_name": action.get("tool_name")})
+
+                if tokens_used >= self.max_tokens:
+                    stop_reason = ("Token budget exhausted before the action "
+                                   "could be executed.")
+                    break
+
+                # ── Execute ───────────────────────────────────────────────
+                exec_error:  "str | None" = None
+                exec_tokens: int          = 0
+                try:
+                    result, exec_tokens = self._execute_action(
+                        action, context, signal=_iter_signal)
+                except Suspend as susp:
+                    self._log(1, f"\n[Wait] ⏸  {susp.reason}")
+                    doc = self._park_document(task, current_plan, step_idx,
+                                              history, tokens_used, action,
+                                              susp, journal)
+                    self._store.save(doc.run_id, doc.to_dict())
+                    return SuspendedResult(
+                        run_id   = doc.run_id,
+                        awaiting = {"reason":      susp.reason,
+                                    "resume_with": susp.resume_with,
+                                    "hint":        susp.hint},
+                        document = doc.to_dict(),
+                    )
+                except Exception as exc:
+                    result     = f"ERROR: {exc}"
+                    exec_error = str(exc)
+
+                tokens_used += exec_tokens
+                self._log_exec(result, exec_error, exec_tokens)
+
+                if tokens_used >= self.max_tokens:
+                    stop_reason = ("Token budget exhausted before the result "
+                                   "could be assessed.")
+                    break
+
+                # ── Assess ────────────────────────────────────────────────
+                assess_msgs = prompts.goal_assess_messages(
+                    objective        = task,
+                    done_when        = done_text,
+                    intent           = intent,
+                    result           = str(result),
+                    progress         = journal.progress_summary(),
+                    remaining_tokens = max(0, self.max_tokens - tokens_used),
+                    persona          = self.persona,
+                )
+                assessment, assess_tokens = self._llm_call_json(
+                    self.orchestrator, assess_msgs)
+                tokens_used += assess_tokens
+
+                store_as = self._sanitise_key(assessment.get("store_as", ""))
+                if store_as and exec_error is None and not _is_memory_view(action):
+                    self.memory.set(store_as, result)
+
+                iter_tokens = act_tokens + exec_tokens + assess_tokens
+                history.append({
+                    "step":        step_idx,
+                    "attempt":     1,
+                    "step_goal":   intent,
+                    "action_type": action.get("type"),
+                    "action":      action,
+                    "output":      result,
+                    "exec_error":  exec_error,
+                    "stored_as":   store_as or None,
+                    "reflection":  assessment,
+                    "tokens":      iter_tokens,
+                })
+
+                # ── Record ────────────────────────────────────────────────
+                if exec_error is not None:
+                    outcome = (_J_REFUTED if assessment.get("outcome") == _J_REFUTED
+                               else _J_FAILED)
+                    evid    = _evidence(CHECK, f"execution error: {exec_error}")
+                    reason  = str(assessment.get("reason") or exec_error)
+                elif isinstance(result, dict) and result.get("denied"):
+                    outcome = _J_SKIPPED
+                    evid    = _evidence(CHECK, str(result.get("reason", "denied")))
+                    reason  = str(result.get("reason", "denied by permission policy"))
+                elif assessment.get("outcome") == _J_REFUTED:
+                    outcome = _J_REFUTED
+                    evid    = _evidence(MODEL_CLAIM,
+                                       str(assessment.get("assessment", "")))
+                    reason  = str(assessment.get("reason", ""))
+                else:
+                    outcome = _J_DONE
+                    evid    = _evidence(MODEL_CLAIM,
+                                       str(assessment.get("assessment", "")))
+                    reason  = ""
+
+                journal.append(intent, action=action, outcome=outcome,
+                               evidence=evid, reason=reason,
+                               artifact=store_as or None, observation=result,
+                               step=step_idx, attempt=1, tokens=iter_tokens)
+
+                self._emit("step.ended", name=intent,
+                           payload={"outcome": outcome})
+                step_idx += 1
+                self._checkpoint(task, current_plan, step_idx - 1, history,
+                                 tokens_used, journal)
+
+                # ── Done? ─────────────────────────────────────────────────
+                if callable_done:
+                    met, done_evid = self._check_done(done_when)
+                    if met:
+                        journal.append("done_when satisfied", action={},
+                                       outcome=_J_DONE, evidence=done_evid,
+                                       step=step_idx)
+                        return self._goal_result(
+                            True, assessment.get("final_answer") or result,
+                            step_idx, tokens_used, current_plan, history)
+                elif assessment.get("objective_met") and assessment.get("final_answer"):
+                    return self._goal_result(True, assessment["final_answer"],
+                                             step_idx, tokens_used,
+                                             current_plan, history)
+
+            if stop_reason is None:
+                stop_reason = (f"Reached the iteration cap ({self.max_steps}) "
+                               f"without satisfying the done condition.")
+            self._log(1, f"\n[Stop] ✗ {stop_reason}")
+            return self._goal_result(False, None, step_idx, tokens_used,
+                                     current_plan, history, error=stop_reason)
+
+        except Exception as exc:
+            self._log(1, f"\n[Error] ✗ Unexpected exception: {exc}")
+            return self._goal_result(
+                False, None, step_idx,
+                tokens_used + getattr(self, "_uncounted_tokens", 0),
+                current_plan, history, error=str(exc))
+
+    def _goal_result(self, success, output, steps, tokens, plan, history,
+                     error=None) -> AgentResult:
+        """Build the terminal result of a goal run."""
+        if success:
+            self._log(1, f"\n[Done] ✓ Objective met · {steps} iteration(s) · "
+                         f"{tokens:,} tokens total")
+        return AgentResult(
+            success=success, output=output, mode=self.mode, steps_taken=steps,
+            tokens_used=tokens, plan=plan, history=history,
+            memory=self.memory.all(), error=error,
+        )
+
+    # ------------------------------------------------------------------
     # spawn() — dynamic child-agent creation
     # ------------------------------------------------------------------
 
@@ -1127,14 +1514,23 @@ class Agent:
 
         child_tools = (
             tools if tools is not None
-            else [t for t in self.tools if t.name != "spawn_agent"]
+            else [t for t in self.tools
+                  if t.name not in ("spawn_agent", _MemoryReadTool.name)]
         )
+
+        # A child cannot inherit goal mode: done_when is a predicate over the
+        # parent's memory and its own objective, and neither transfers to a
+        # scoped sub-task. A sub-task is what a plan is for, so fall back.
+        child_mode = "waterfall" if self.mode == "goal" else self.mode
+        if child_mode != self.mode:
+            _logger.debug("spawned child runs in %r mode; goal mode needs a "
+                          "done_when that does not transfer", child_mode)
 
         child = Agent(
             orchestrator = model or self.orchestrator,
             tools        = child_tools,
             executors    = self.executors,
-            mode         = self.mode,
+            mode         = child_mode,
             max_steps    = max_steps or self.max_steps,
             max_attempts = self.max_attempts,
             max_tokens   = max_tokens or self.max_tokens,
