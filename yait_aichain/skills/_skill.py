@@ -368,7 +368,13 @@ class Skill:
                     path, body, model.client._auth_headers()
                 )
                 response = json.loads(raw)
-                usage    = attach_cost(extract_usage(response), model.name)
+                # ``cache_ttl`` is read leniently where ``name`` is not: a
+                # Model always has it, but this boundary accepts anything
+                # model-shaped, and the lifetime only picks a price multiplier.
+                # A cost estimate is the last thing that should abort a call
+                # that already succeeded.
+                usage    = attach_cost(extract_usage(response), model.name,
+                                       getattr(model, "cache_ttl", "5m"))
                 result   = model.from_response(response, output)
                 self._emit("llm_call.ended", name=model.name,
                            usage=getattr(usage, "total_tokens", None),
