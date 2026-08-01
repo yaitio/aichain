@@ -87,6 +87,19 @@ stopped, without re-running completed steps. This is the serverless core.
 
 ---
 
+## Private models
+
+Everything above talks to a vendor. This one does not: the model runs on your
+hardware and the data never leaves it. See
+[Private models](../docs/getting-started/private-models.md) for the server
+side.
+
+| File | What it shows | Keys needed |
+|---|---|---|
+| [`23_private_model.py`](23_private_model.py) | Summarise a confidential contract on a model you host — `Model("private/…")` against vLLM / Ollama / LM Studio. No key, nothing sent to a vendor. Shows why `cost` is `None` (a hosted model is priced in GPU-hours, not tokens) and why a reasoning model needs headroom in `max_tokens`. | *(none)* |
+
+---
+
 ## Debug
 
 | File | What it shows | Keys needed |
