@@ -58,7 +58,9 @@ Add the `export` line to your `~/.zshrc` to make it permanent.
 
 ## API keys
 
-Set keys only for the providers you use:
+Set keys only for the providers you use — or none at all: a model you host
+yourself needs no key and sends nothing outside your network. See
+[Private models](private-models.md).
 
 | Provider | Environment variable | Get a key |
 |---|---|---|

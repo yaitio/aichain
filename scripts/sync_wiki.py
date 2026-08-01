@@ -26,6 +26,7 @@ SOURCE_PAGES = {
     "docs/getting-started/quickstart.md":  "Quickstart",
     "docs/getting-started/installation.md":"Installation",
     "docs/getting-started/concepts.md":    "Concepts",
+    "docs/getting-started/private-models.md": "Private-Models",
     "docs/primitives/skills.md":           "Skill",
     "docs/primitives/models.md":           "Model",
     "docs/primitives/chain.md":            "Chain",
@@ -43,6 +44,7 @@ PAGE = {
     "overview.md": "Agent", "model-registry.md": "Model-Registry",
     "concepts.md": "Concepts", "installation.md": "Installation",
     "quickstart.md": "Quickstart", "index.md": "Home",
+    "private-models.md": "Private-Models",
 }
 # Link target basename → repo path (rendered as a GitHub blob URL).
 BLOB_PAGES = {
@@ -85,6 +87,7 @@ _SIDEBAR = """### yait-aichain
 - [[Quickstart]]
 - [[Installation]]
 - [[Concepts]]
+- [[Private-Models]]
 
 **Primitives**
 - [[Skill]]

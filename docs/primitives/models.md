@@ -215,7 +215,7 @@ current lists live in `models/providers/*.toml` and the
 | Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash`, `qwen-image-edit` |
 | Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
 | BFL (FLUX) | `BFL_API_KEY` | `flux-2-pro`, `flux-pro-1.1`, `flux-kontext-pro`, `flux-kontext-max` *(image only)* |
-| Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](private-models.md) |
+| Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](../getting-started/private-models.md) |
 
 ### What a Model does (and doesn't)
 
@@ -232,7 +232,7 @@ to [Skill](skills.md) and [Chain](chain.md). That isolation is the whole point.
 
 ## See also
 
-- [Private models](private-models.md) — the same interface against a server you
+- [Private models](../getting-started/private-models.md) — the same interface against a server you
   control (vLLM, Ollama, LM Studio), with the data staying in your perimeter.
 - [Skill](skills.md) — bind a Model to a prompt and run it.
 - [Chain](chain.md) — sequence model calls with automatic variable flow.

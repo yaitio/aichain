@@ -65,7 +65,7 @@ Model("deepseek-chat")       # DeepSeek
 
 | Modality | Supported providers |
 |---|---|
-| **Text → Text** | OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, [your own private server](primitives/private-models.md) |
+| **Text → Text** | OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, [your own private server](getting-started/private-models.md) |
 | **Text → Image** | OpenAI (gpt-image-1), Google (Imagen via Gemini), xAI (Aurora) |
 | **Image → Text** | OpenAI, Anthropic, Google, xAI, Kimi (k2.5) |
 | **Text → Search** | Perplexity (sonar), OpenAI web search, Brave, SerpAPI |
@@ -107,7 +107,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 ## What's in the box
 
-**11 cloud providers + your own** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen, Recraft, BFL (FLUX), Reve, and any [private OpenAI-compatible server](primitives/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
+**11 cloud providers + your own** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen, Recraft, BFL (FLUX), Reve, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
 **Built-in tools** — web search (Perplexity, Brave, SerpAPI, OpenAI), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 

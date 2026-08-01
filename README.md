@@ -87,7 +87,7 @@ Model("private/llama3.3")    # your own server — vLLM, Ollama, LM Studio, …
 88 cloud models total (full list: [model registry →](docs/reference/model-registry.md)).
 The `private` provider needs no key and accepts whatever your server serves —
 the prompts and the answers stay inside your perimeter
-([private models →](docs/primitives/private-models.md)).
+([private models →](docs/getting-started/private-models.md)).
 
 ---
 
