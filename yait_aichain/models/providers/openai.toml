@@ -22,6 +22,21 @@ low = "low"
 medium = "medium"
 high = "high"
 
+# GPT-5.6 — three tiers of one family rather than a size ladder; all three
+# carry the same 1.05M context and 128K output, and differ only in price and
+# depth. Terra and Luna were cut on 2026-07-30; these are the rates after.
+[models."gpt-5.6-sol"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 5.0, output = 30.0 }
+
+[models."gpt-5.6-terra"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 12.0 }
+
+[models."gpt-5.6-luna"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.2, output = 1.2 }
+
 [models."gpt-5.5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 30.0 }

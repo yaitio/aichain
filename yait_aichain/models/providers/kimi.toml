@@ -21,6 +21,14 @@ low = "enabled"
 medium = "enabled"
 high = "enabled"
 
+# Flagship: 1M context, and the first Kimi priced like a frontier model —
+# output at 15.0 is nearly four times k2.6, and every reply carries a
+# reasoning trace billed at that same output rate, so a short answer is not a
+# cheap one here.
+[models."kimi-k3"]
+caps  = ["text-to-text"]
+price = { input = 3.0, output = 15.0 }
+
 # Coding-focused; runs with Thinking enabled by default on the Kimi API (the
 # client never disables it, so it works out of the box). For non-coding tasks
 # Moonshot recommends kimi-k2.6.

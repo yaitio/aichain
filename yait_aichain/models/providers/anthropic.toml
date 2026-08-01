@@ -22,6 +22,10 @@ high = 20000
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 10.0, output = 50.0 }
 
+[models."claude-opus-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 5.0, output = 25.0 }
+
 [models."claude-opus-4-8"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
@@ -33,6 +37,14 @@ price = { input = 5.0, output = 25.0 }
 [models."claude-opus-4-6"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+
+# Standard rate. An introductory 2.0/10.0 runs through 2026-08-31, so cost
+# estimates read high until then — deliberately, since the discount expires
+# and a price that has to be edited back up is worse than one that is right
+# a month from now.
+[models."claude-sonnet-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 3.0, output = 15.0 }
 
 [models."claude-sonnet-4-6"]
 caps  = ["image-to-text", "text-to-text"]
