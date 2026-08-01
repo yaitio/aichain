@@ -1,6 +1,6 @@
 # aichain
 
-**The simplest way to build AI pipelines. 11 cloud providers + your own local server. 1 interface. Zero lock-in.**
+**The simplest way to build AI pipelines. 11 cloud providers + your own private server. 1 interface. Zero lock-in.**
 
 ```python
 from yait_aichain import Model, Skill
@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **88 models from 11 cloud providers** — plus any model your own local server (vLLM, Ollama, LM Studio, …) serves — with one line to swap any of them.
+All of these work identically across **88 models from 11 cloud providers** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
 
 ---
 
@@ -81,12 +81,13 @@ Model("sonar-pro")           # Perplexity
 Model("kimi-k2.5")           # Kimi
 Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
-Model("local/llama3.3")      # your own server — vLLM, Ollama, LM Studio, …
+Model("private/llama3.3")    # your own server — vLLM, Ollama, LM Studio, …
 ```
 
-88 cloud models total (full list: [model registry →](docs/reference/model-registry.md));
-the local provider accepts whatever your server serves
-([local models →](docs/primitives/local-models.md)).
+88 cloud models total (full list: [model registry →](docs/reference/model-registry.md)).
+The `private` provider needs no key and accepts whatever your server serves —
+the prompts and the answers stay inside your perimeter
+([private models →](docs/primitives/private-models.md)).
 
 ---
 

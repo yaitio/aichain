@@ -1,0 +1,62 @@
+# private — a model server you control (data tier)
+#
+# One provider for every OpenAI-compatible server: vLLM, Ollama, LM Studio,
+# TGI, SGLang and llama.cpp all expose the same /v1, so the client neither
+# knows nor cares which one answers. Talking to it needs nothing beyond the
+# urllib3 the library already carries; the heavy packages (vllm, torch, CUDA)
+# belong to *running* the server, which is the user's side of the line and
+# stays out of this library.
+#
+# On the name. An earlier draft called this "vllm" and immediately read as
+# "the library embeds vLLM" — exactly the dependency it was built not to
+# have. The second draft, "local", was accurate but undersold the point and
+# was itself imprecise, since a private server is often a remote GPU box.
+# "private" names the reason the feature exists: the weights and the prompts
+# stay inside a perimeter you own.
+#
+# What "private" does NOT mean: the library cannot verify it. Point this
+# provider at a hosted aggregator (Together, Fireworks, OpenRouter, Groq) and
+# it will work — the request simply leaves your perimeter, and the word on
+# the prefix does not make it otherwise. The prefix describes the intent of
+# your configuration, not a checked property. The docs say so out loud in a
+# section of their own, because a name that quietly overpromises is worse
+# than one that undersells.
+#
+# Model names are passed through verbatim; there is no registry to keep
+# because the server decides what it serves:
+#
+#     Model("private/meta-llama/Llama-3.3-70B-Instruct")   # vLLM / TGI (HF id)
+#     Model("private/llama3.3")                            # Ollama tag
+#
+# The prefix picks this provider; everything after the first slash — slashes
+# included — is the wire name.
+#
+# No [models] section, deliberately. A model you host has no price per token:
+# its economics are GPU-hours divided by throughput, which depends on the
+# card, not the model. estimate_cost() returns None for them, and that None
+# is honest — a number here would be invented.
+
+[provider]
+key      = "private"
+client   = "openai"
+base_url = "http://localhost:8000"
+env_key  = "PRIVATE_API_KEY"
+# Your own server usually runs without auth; started with --api-key it
+# expects a Bearer token, and an aggregator always needs one. auth = "none"
+# makes the key optional instead of required: no key sends no Authorization
+# header, a provided key is sent normally. (Needing a key at all is a useful
+# tell — a server of your own rarely asks for one.)
+auth     = "none"
+# Point at another machine without touching code:
+# PRIVATE_BASE_URL=http://gpu.internal:8000 — private is about who controls
+# the box, not about localhost. An explicit client_options={"url": ...}
+# still wins over the env var.
+base_url_env     = "PRIVATE_BASE_URL"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+
+chat_path        = "/v1/chat/completions"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096

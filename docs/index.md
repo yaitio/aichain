@@ -8,7 +8,7 @@ Text, image, and video — route to any AI model through a single, centralized i
 
 ## What it is
 
-aichain is a pure-Python library that sits between your application and the AI providers you use. It normalises the differences between OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek — and your own local server (vLLM, Ollama, LM Studio) — into one universal interface, then gives you programmable building blocks to compose those models into pipelines, tools, and autonomous agents.
+aichain is a pure-Python library that sits between your application and the AI providers you use. It normalises the differences between OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek — and a private server of your own (vLLM, Ollama, LM Studio), where nothing leaves your perimeter — into one universal interface, then gives you programmable building blocks to compose those models into pipelines, tools, and autonomous agents.
 
 ```
 Your code
@@ -65,7 +65,7 @@ Model("deepseek-chat")       # DeepSeek
 
 | Modality | Supported providers |
 |---|---|
-| **Text → Text** | OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, [local servers](primitives/local-models.md) |
+| **Text → Text** | OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, [your own private server](primitives/private-models.md) |
 | **Text → Image** | OpenAI (gpt-image-1), Google (Imagen via Gemini), xAI (Aurora) |
 | **Image → Text** | OpenAI, Anthropic, Google, xAI, Kimi (k2.5) |
 | **Text → Search** | Perplexity (sonar), OpenAI web search, Brave, SerpAPI |
@@ -107,7 +107,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 ## What's in the box
 
-**11 cloud providers + local** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen, Recraft, BFL (FLUX), Reve, and any [local OpenAI-compatible server](primitives/local-models.md) (vLLM, Ollama, LM Studio, …)
+**11 cloud providers + your own** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen, Recraft, BFL (FLUX), Reve, and any [private OpenAI-compatible server](primitives/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
 **Built-in tools** — web search (Perplexity, Brave, SerpAPI, OpenAI), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 
