@@ -21,7 +21,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `DEEPSEEK_API_KEY` | DeepSeek | <https://platform.deepseek.com/api_keys> |
 
 Private servers are the exception to "required": the `private/` prefix works with
-no key at all (see [Private models](../primitives/private-models.md)).
+no key at all (see [Private models](../getting-started/private-models.md)).
 
 | Variable | Provider | Meaning |
 |---|---|---|

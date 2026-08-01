@@ -32,7 +32,7 @@ registry.is_supported("gpt-image-1", "text-to-image")   # True
 
 The `private` provider is registry-less by design: its catalogue belongs to the
 server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and
-none is listed here. See [Private models](../primitives/private-models.md).
+none is listed here. See [Private models](../getting-started/private-models.md).
 
 A provider is absent for a task it does not support (Anthropic has no text-to-image; Perplexity, Kimi, and DeepSeek have no image-generation models). Image generation is available on OpenAI, Google, xAI, and Qwen.
 
