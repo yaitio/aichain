@@ -1,15 +1,17 @@
 # Local models
 
 Run open-weight models on your own hardware and call them through the same
-`Model` interface as every cloud provider. The `vllm` provider speaks to any
+`Model` interface as every cloud provider. The `local` provider speaks to any
 server that exposes the OpenAI-compatible `/v1` — which is all of them: vLLM,
-Ollama, LM Studio, TGI, SGLang, llama.cpp.
+Ollama, LM Studio, TGI, SGLang, llama.cpp. Nothing is embedded: the provider
+is an HTTP client to a server *you* run, named for what you have (a server of
+your own), not for any one implementation.
 
 ```python
 from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 
-model = Model("vllm/meta-llama/Llama-3.3-70B-Instruct")   # no api_key needed
+model = Model("local/meta-llama/Llama-3.3-70B-Instruct")   # no api_key needed
 
 skill = Skill(model=model, input={
     "messages": [{"role": "user", "parts": ["Summarise: {text}"]}],
@@ -70,13 +72,13 @@ on that, not this page.
 
 ## Naming models
 
-The name after `vllm/` is passed to the server **verbatim** — there is no
+The name after `local/` is passed to the server **verbatim** — there is no
 registry to keep in sync, because the server decides what it serves.
 
 - **vLLM / TGI** serve models by Hugging Face id — the same string you gave
-  `vllm serve`: `Model("vllm/meta-llama/Llama-3.3-70B-Instruct")`. Slashes in
+  `vllm serve`: `Model("local/meta-llama/Llama-3.3-70B-Instruct")`. Slashes in
   the id are fine; only the first one selects the provider.
-- **Ollama** serves by its own tag: `Model("vllm/llama3.3")`.
+- **Ollama** serves by its own tag: `Model("local/llama3.3")`.
 - **LM Studio** shows the served name in its server panel.
 
 If the names disagree, the server's error will say so — ask it what it serves:
@@ -88,13 +90,13 @@ Three ways, in order of precedence:
 
 ```python
 # 1. Explicit — wins over everything
-Model("vllm/llama3.3", client_options={"url": "http://localhost:11434"})
+Model("local/llama3.3", client_options={"url": "http://localhost:11434"})
 
 # 2. Environment — for a remote GPU box, no code change
-#    export VLLM_BASE_URL=http://gpu-box:8000
+#    export LOCAL_BASE_URL=http://gpu-box:8000
 
 # 3. Default — http://localhost:8000 (vLLM's port)
-Model("vllm/qwen3-30b")
+Model("local/qwen3-30b")
 ```
 
 Both URL spellings work: `http://localhost:11434` and
@@ -107,8 +109,8 @@ None needed — the provider sends no `Authorization` header when there is no
 key. If the server was started with `--api-key`, provide it either way:
 
 ```python
-Model("vllm/llama3.3", api_key="my-server-key")
-# or: export VLLM_API_KEY=my-server-key
+Model("local/llama3.3", api_key="my-server-key")
+# or: export LOCAL_API_KEY=my-server-key
 ```
 
 ## What `cost` means here: `None`
@@ -137,4 +139,4 @@ number would be invented.
 
 - [Model](models.md) — the shared interface this provider plugs into.
 - [Environment variables](../reference/environment-variables.md) —
-  `VLLM_BASE_URL`, `VLLM_API_KEY`.
+  `LOCAL_BASE_URL`, `LOCAL_API_KEY`.

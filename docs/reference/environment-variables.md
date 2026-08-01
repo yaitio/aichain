@@ -20,13 +20,13 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `MOONSHOT_API_KEY` | Kimi (Moonshot AI) | <https://platform.kimi.ai/> |
 | `DEEPSEEK_API_KEY` | DeepSeek | <https://platform.deepseek.com/api_keys> |
 
-Local servers are the exception to "required": the `vllm/` prefix works with
+Local servers are the exception to "required": the `local/` prefix works with
 no key at all (see [Local models](../primitives/local-models.md)).
 
 | Variable | Provider | Meaning |
 |---|---|---|
-| `VLLM_BASE_URL` | Local (vLLM/Ollama/…) | Server URL when not `http://localhost:8000` — e.g. a remote GPU box |
-| `VLLM_API_KEY` | Local (vLLM/Ollama/…) | Only if the server was started with `--api-key`; otherwise unset |
+| `LOCAL_BASE_URL` | Local (vLLM/Ollama/…) | Server URL when not `http://localhost:8000` — e.g. a remote GPU box |
+| `LOCAL_API_KEY` | Local (vLLM/Ollama/…) | Only if the server was started with `--api-key`; otherwise unset |
 
 ### How the `Model` factory resolves keys
 

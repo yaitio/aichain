@@ -1,0 +1,47 @@
+# local — self-hosted OpenAI-compatible endpoint (data tier)
+#
+# One provider for every local server: vLLM, Ollama, LM Studio, TGI, SGLang
+# and llama.cpp all expose the same OpenAI-compatible /v1, so the client
+# neither knows nor cares which one answers. The provider is named for what
+# the user has — a server of their own — not for any one implementation:
+# an earlier draft called it "vllm" and immediately read as "the library
+# embeds vLLM", which is exactly wrong. Talking to the server needs nothing
+# beyond the urllib3 the library already carries; the heavy packages (vllm,
+# torch, CUDA) belong to *running* the server, which is the user's side of
+# the line and stays out of this library.
+#
+# Model names are passed through verbatim; there is no registry to keep
+# because the server decides what it serves:
+#
+#     Model("local/meta-llama/Llama-3.3-70B-Instruct")   # vLLM / TGI (HF id)
+#     Model("local/llama3.3")                            # Ollama tag
+#
+# The prefix picks this provider; everything after the first slash — slashes
+# included — is the wire name.
+#
+# No [models] section, deliberately. Local models have no price per token:
+# their economics are GPU-hours divided by throughput, which depends on the
+# card, not the model. estimate_cost() returns None for them, and that None
+# is honest — a number here would be invented.
+
+[provider]
+key      = "local"
+client   = "openai"
+base_url = "http://localhost:8000"
+env_key  = "LOCAL_API_KEY"
+# The server usually runs without auth; started with --api-key it expects a
+# Bearer token. auth = "none" makes the key optional instead of required:
+# no key sends no Authorization header, a provided key is sent normally.
+auth     = "none"
+# Point at a remote box without touching code: LOCAL_BASE_URL=http://gpu:8000
+# ("local" names whose server it is, not where it runs). An explicit
+# client_options={"url": ...} still wins over the env var.
+base_url_env     = "LOCAL_BASE_URL"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+
+chat_path        = "/v1/chat/completions"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096

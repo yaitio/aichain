@@ -2,7 +2,7 @@
 tests.clients.test_local_provider
 =================================
 
-The vllm provider: local OpenAI-compatible servers, asserted on the wire.
+The local provider: self-hosted OpenAI-compatible servers, on the wire.
 
 Everything here failed or misled before the provider existed. An HF-style id
 raised "Cannot detect provider"; a missing key raised at construction even
@@ -40,15 +40,15 @@ class TestRouting(unittest.TestCase):
         Face ids are org/name, so eating the second slash would corrupt
         every real id there is.
         """
-        m = Model("vllm/meta-llama/Llama-3.3-70B-Instruct")
-        self.assertEqual(m._provider, "vllm")
+        m = Model("local/meta-llama/Llama-3.3-70B-Instruct")
+        self.assertEqual(m._provider, "local")
         self.assertEqual(m.name, "meta-llama/Llama-3.3-70B-Instruct")
         _, body = request_of(m)
         self.assertEqual(body["model"], "meta-llama/Llama-3.3-70B-Instruct")
 
     def test_no_registry_gate(self):
         """The server decides what it serves; any name constructs."""
-        Model("vllm/anything-at-all")
+        Model("local/anything-at-all")
 
     def test_cost_is_none_not_a_guess(self):
         """
@@ -62,7 +62,7 @@ class TestRouting(unittest.TestCase):
 class TestKeyless(unittest.TestCase):
 
     def test_constructs_without_any_key(self):
-        m = Model("vllm/qwen3-30b")
+        m = Model("local/qwen3-30b")
         self.assertNotIn("Authorization", m.client._auth_headers())
 
     def test_no_key_means_no_header_at_all(self):
@@ -70,22 +70,22 @@ class TestKeyless(unittest.TestCase):
         "Bearer " with nothing after it is not neutral: some servers 401 on
         a malformed header where they would accept no header.
         """
-        headers = Model("vllm/qwen3-30b").client._auth_headers()
+        headers = Model("local/qwen3-30b").client._auth_headers()
         for v in headers.values():
             self.assertNotIn("Bearer", v)
 
     def test_a_provided_key_is_still_sent(self):
         """Started with --api-key, the server expects the token."""
-        m = Model("vllm/qwen3-30b", api_key="secret")
+        m = Model("local/qwen3-30b", api_key="secret")
         self.assertEqual(m.client._auth_headers()["Authorization"], "Bearer secret")
 
     def test_env_key_is_honoured(self):
-        os.environ["VLLM_API_KEY"] = "from-env"
+        os.environ["LOCAL_API_KEY"] = "from-env"
         try:
-            m = Model("vllm/qwen3-30b")
+            m = Model("local/qwen3-30b")
             self.assertEqual(m.client._auth_headers()["Authorization"], "Bearer from-env")
         finally:
-            del os.environ["VLLM_API_KEY"]
+            del os.environ["LOCAL_API_KEY"]
 
     def test_other_providers_still_require_a_key(self):
         """The gate is lifted for auth="none" only, not weakened globally."""
@@ -110,31 +110,31 @@ class TestBaseURL(unittest.TestCase):
                     "http://localhost:1234/v1",
                     "http://localhost:1234/v1/"):
             with self.subTest(url=url):
-                m = Model("vllm/qwen3-30b", client_options={"url": url})
+                m = Model("local/qwen3-30b", client_options={"url": url})
                 full, _ = request_of(m)
                 self.assertNotIn("/v1/v1/", full)
                 self.assertTrue(full.endswith("/v1/chat/completions"))
 
     def test_bare_host_gets_the_path(self):
-        m = Model("vllm/qwen3-30b", client_options={"url": "http://gpu-box:8000"})
+        m = Model("local/qwen3-30b", client_options={"url": "http://gpu-box:8000"})
         full, _ = request_of(m)
         self.assertEqual(full, "http://gpu-box:8000/v1/chat/completions")
 
     def test_env_var_points_at_a_remote_box(self):
-        os.environ["VLLM_BASE_URL"] = "http://gpu:9000"
+        os.environ["LOCAL_BASE_URL"] = "http://gpu:9000"
         try:
-            m = Model("vllm/qwen3-30b")
+            m = Model("local/qwen3-30b")
             self.assertTrue(request_of(m)[0].startswith("http://gpu:9000/"))
         finally:
-            del os.environ["VLLM_BASE_URL"]
+            del os.environ["LOCAL_BASE_URL"]
 
     def test_explicit_url_beats_the_env_var(self):
-        os.environ["VLLM_BASE_URL"] = "http://wrong:9000"
+        os.environ["LOCAL_BASE_URL"] = "http://wrong:9000"
         try:
-            m = Model("vllm/qwen3-30b", client_options={"url": "http://right:8000"})
+            m = Model("local/qwen3-30b", client_options={"url": "http://right:8000"})
             self.assertTrue(request_of(m)[0].startswith("http://right:8000/"))
         finally:
-            del os.environ["VLLM_BASE_URL"]
+            del os.environ["LOCAL_BASE_URL"]
 
     def test_qwen_compatible_mode_path_is_untouched(self):
         """
