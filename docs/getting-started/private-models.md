@@ -193,8 +193,32 @@ you can compute your own rate from your hardware cost.
 - **Reasoning options are not translated.** `options={"reasoning": ...}` is
   ignored here rather than mapped to server-specific flags.
 - **Verified at the wire level** — request shape, routing, auth, URL forms —
-  against the OpenAI-compatible contract these servers document. Run one call
-  against your own server before relying on it in a pipeline.
+  against the OpenAI-compatible contract these servers document, plus the
+  live suite below against a real one.
+
+## Checking it against your own server
+
+The repository carries a live test suite for exactly this. It skips when
+nothing is listening, needs no key and costs nothing but your own
+electricity:
+
+```bash
+vllm serve Qwen/Qwen3-0.6B          # or: ollama run llama3.3
+python3 -m unittest tests.clients.test_private_live -v
+```
+
+Point it elsewhere when your setup differs:
+
+```bash
+PRIVATE_BASE_URL=http://localhost:11434 \
+PRIVATE_TEST_MODEL=llama3.3 \
+python3 -m unittest tests.clients.test_private_live -v
+```
+
+It asserts what a mock cannot: that a keyless request is *accepted* rather
+than merely well-formed, that token counts come back populated, that `cost`
+stays `None` even when a real usage block arrives, and that both URL
+spellings answer.
 
 ## See also
 
