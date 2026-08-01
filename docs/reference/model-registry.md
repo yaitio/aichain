@@ -27,7 +27,12 @@ registry.is_supported("gpt-image-1", "text-to-image")   # True
 
 ## Providers
 
-`openai`, `anthropic`, `google`, `xai`, `perplexity`, `kimi`, `deepseek`, `qwen`.
+`openai`, `anthropic`, `google`, `xai`, `perplexity`, `kimi`, `deepseek`,
+`qwen`, `recraft`, `bfl`, `reve`.
+
+The `local` provider is registry-less by design: its catalogue belongs to the
+server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and
+none is listed here. See [Local models](../primitives/local-models.md).
 
 A provider is absent for a task it does not support (Anthropic has no text-to-image; Perplexity, Kimi, and DeepSeek have no image-generation models). Image generation is available on OpenAI, Google, xAI, and Qwen.
 
@@ -37,6 +42,9 @@ A provider is absent for a task it does not support (Anthropic has no text-to-im
 
 ### `text-to-text`
 ```
+gpt-5.6-sol              # GPT-5.6 family — one 1.05M-context tier ladder
+gpt-5.6-terra
+gpt-5.6-luna
 gpt-5.5                  # GPT-5.5 series — Responses API
 gpt-5.5-pro
 gpt-5.4                  # GPT-5.4 series
@@ -70,6 +78,8 @@ All Claude models accept image input — the `image-to-text` list mirrors `text-
 ### `text-to-text` and `image-to-text`
 ```
 claude-fable-5            # flagship
+claude-opus-5             # current Opus
+claude-sonnet-5           # current Sonnet
 claude-opus-4-8
 claude-opus-4-7
 claude-opus-4-6
@@ -151,6 +161,8 @@ No image-generation models. `kimi-k2.5` accepts image and video input.
 
 ### `text-to-text`
 ```
+kimi-k3                  # flagship — 1M context; every reply carries a
+                         # reasoning trace billed at the output rate
 kimi-k2.7-code           # Coding-focused; runs with Thinking enabled
 kimi-k2.6                # K2.6 series
 kimi-k2.5                # K2.5 series — multimodal, thinking toggle

@@ -142,7 +142,8 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (10 providers, 77 models):
+and is tested with (11 cloud providers, 88 models — the `local` provider
+deliberately lists none, because its catalogue belongs to your server):
 
 ```python
 from yait_aichain.models import registry
@@ -204,12 +205,12 @@ current lists live in `models/providers/*.toml` and the
 
 | Provider | Env var | Representative models |
 |---|---|---|
-| OpenAI | `OPENAI_API_KEY` | `gpt-5.5`, `gpt-5.4`, `gpt-4o`, `chatgpt-image-latest`, `gpt-image-2` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-fable-5`, `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-4o`, `gpt-image-2` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-5`, `claude-sonnet-5`, `claude-fable-5`, `claude-haiku-4-5-20251001` |
 | Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash` |
 | xAI | `XAI_API_KEY` | `grok-4-0709`, `grok-4-fast-reasoning`, `grok-3`, `grok-imagine-image-pro` |
 | Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
-| Kimi | `MOONSHOT_API_KEY` | `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2-thinking` |
+| Kimi | `MOONSHOT_API_KEY` | `kimi-k3`, `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
 | Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash`, `qwen-image-edit` |
 | Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
