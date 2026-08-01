@@ -17,6 +17,7 @@ property of the API, so it belongs in the client layer).
 from __future__ import annotations
 
 import json as _json
+import os as _os
 from types import SimpleNamespace
 
 from .._base import BaseClient
@@ -51,9 +52,24 @@ class OpenAIClient(BaseClient):
 
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:
         prov = data["provider"]
+        # Explicit url > provider env var (base_url_env, e.g. VLLM_BASE_URL
+        # for a remote GPU box) > the data-file default.
+        url = client_opts.get("url")
+        if not url and prov.get("base_url_env"):
+            url = _os.getenv(prov["base_url_env"])
+        url = url or prov.get("base_url")
+        # Every local server's docs quote the base URL *with* /v1 — Ollama's
+        # http://localhost:11434/v1, LM Studio's http://localhost:1234/v1 —
+        # while our paths already start with /v1. Pasting the documented URL
+        # therefore produced /v1/v1/chat/completions and an unhelpful 404, a
+        # trap costing exactly one confused half-hour per new user. Both
+        # spellings now mean the same server.
+        if url and url.rstrip("/").endswith("/v1") \
+                and prov.get("chat_path", "/v1/chat/completions").startswith("/v1/"):
+            url = url.rstrip("/")[: -len("/v1")]
         super().__init__(
             api_key,
-            url=client_opts.get("url") or prov.get("base_url"),
+            url=url,
             **{k: client_opts[k] for k in ("timeout", "retries", "proxy")
                if k in client_opts},
         )
@@ -67,6 +83,12 @@ class OpenAIClient(BaseClient):
 
     # ── transport ────────────────────────────────────────────────────
     def _auth_headers(self) -> dict:
+        # An empty key means a keyless provider (auth = "none" — a local
+        # server running open). Sending "Bearer " with nothing after it is
+        # not neutral: some servers 401 on a malformed header where they
+        # would accept no header at all. So no key, no header.
+        if not self._api_key:
+            return {"Content-Type": "application/json"}
         return {"Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json"}
 
@@ -137,7 +159,13 @@ class OpenAIClient(BaseClient):
                 if eff: body["reasoning_effort"] = eff
             return path, body
 
-        if p == "perplexity":
+        if p in ("perplexity", "vllm"):
+            # vllm is the plain-compat case on purpose: the servers behind it
+            # (vLLM, Ollama, LM Studio, TGI, SGLang, llama.cpp) advertise
+            # OpenAI compatibility and nothing more, so any quirk branch we
+            # added here would be guessing about six different servers at
+            # once. The model name is a Hugging Face id passed through
+            # verbatim; the server either serves it or says it doesn't.
             return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
 
         if p == "kimi":

@@ -108,7 +108,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "reve",
+    "recraft", "bfl", "reve", "vllm",
 })
 
 
@@ -285,12 +285,20 @@ class Model:
         defaults = prov["defaults"]
 
         # ── resolve API key (env var named in the provider data) ──────
+        # auth = "none" marks a provider whose key is optional rather than
+        # required — a local server usually runs open, but accepts a Bearer
+        # token when started with --api-key. So the key is still *resolved*
+        # (passed or from env) and still sent when present; only the "you
+        # must have one" gate is lifted.
         resolved_key = api_key or os.getenv(prov["env_key"])
         if not resolved_key:
-            raise ValueError(
-                f"No API key found for the {self._provider!r} provider. "
-                f"Pass api_key= or set the {prov['env_key']!r} environment variable."
-            )
+            if prov.get("auth") == "none":
+                resolved_key = ""
+            else:
+                raise ValueError(
+                    f"No API key found for the {self._provider!r} provider. "
+                    f"Pass api_key= or set the {prov['env_key']!r} environment variable."
+                )
         # Do not store the raw key as a public attribute; keep it private.
         self._api_key = resolved_key
 
