@@ -41,12 +41,32 @@ One line each. The library connects to whichever you run.
 
 | Server | Start command | Default URL |
 |---|---|---|
-| vLLM | `vllm serve meta-llama/Llama-3.3-70B-Instruct` | `http://localhost:8000` |
-| Ollama | `ollama run llama3.3` | `http://localhost:11434` |
-| LM Studio | *Developer → Start server* | `http://localhost:1234` |
-| llama.cpp | `llama-server -m model.gguf` | `http://localhost:8080` |
+| [vLLM](https://docs.vllm.ai) | `vllm serve meta-llama/Llama-3.3-70B-Instruct` | `http://localhost:8000` |
+| [Ollama](https://ollama.com) | `ollama run llama3.3` | `http://localhost:11434` |
+| [LM Studio](https://lmstudio.ai) | *Developer → Start server* | `http://localhost:1234` |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `llama-server -m model.gguf` | `http://localhost:8080` |
 
 vLLM needs Linux + CUDA; Ollama and LM Studio run on macOS and Windows.
+
+## Which models can I run?
+
+The catalogue belongs to the server, not to this library — browse it where
+the server does:
+
+- **vLLM** loads models straight from the
+  [Hugging Face Hub](https://huggingface.co/models); its docs keep the list
+  of [supported architectures](https://docs.vllm.ai/en/latest/models/supported_models.html).
+  Most open-weight text models (Llama, Qwen, Mistral, Gemma, DeepSeek) work.
+- **Ollama** has its own curated [model library](https://ollama.com/library)
+  with quantised builds sized for laptops.
+- **LM Studio** ships a built-in model browser and a
+  [catalogue](https://lmstudio.ai/models) on the web.
+- **llama.cpp** runs any [GGUF file](https://huggingface.co/models?library=gguf)
+  from the Hub.
+
+Which model *fits* is a hardware question — the parameter count and
+quantisation must fit your VRAM/RAM — and the server's docs are the authority
+on that, not this page.
 
 ## Naming models
 
