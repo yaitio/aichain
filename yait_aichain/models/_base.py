@@ -108,7 +108,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "reve", "local",
+    "recraft", "bfl", "reve", "private",
 })
 
 

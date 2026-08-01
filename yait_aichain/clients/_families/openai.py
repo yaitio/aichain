@@ -159,13 +159,14 @@ class OpenAIClient(BaseClient):
                 if eff: body["reasoning_effort"] = eff
             return path, body
 
-        if p in ("perplexity", "local"):
-            # local is the plain-compat case on purpose: the servers behind
-            # it (vLLM, Ollama, LM Studio, TGI, SGLang, llama.cpp) advertise
-            # OpenAI compatibility and nothing more, so any quirk branch we
-            # added here would be guessing about six different servers at
-            # once. The model name is passed through verbatim; the server
-            # either serves it or says it doesn't.
+        if p in ("perplexity", "private"):
+            # private is the plain-compat case on purpose: the servers behind
+            # it (vLLM, Ollama, LM Studio, TGI, SGLang, llama.cpp — or an
+            # aggregator someone pointed it at) advertise OpenAI
+            # compatibility and nothing more, so any quirk branch we added
+            # here would be guessing about six different servers at once. The
+            # model name is passed through verbatim; the server either serves
+            # it or says it doesn't.
             return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
 
         if p == "kimi":
