@@ -415,6 +415,7 @@ class TestSkillUnsupportedModel(unittest.TestCase):
         fake.top_k         = None
         fake.reasoning     = None
         fake.cache_control = False
+        fake.cache_ttl     = "5m"
         fake._api_key      = "key"
         fake.client        = BaseClient("key", url="http://example.invalid")
 

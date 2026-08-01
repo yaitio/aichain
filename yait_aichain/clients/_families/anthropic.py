@@ -147,6 +147,63 @@ class AnthropicClient(BaseClient):
                 body["system"] = "\n\n".join(b["text"] for b in system_parts)
             else:
                 body["system"] = system_parts
+        # ── prompt cache breakpoint ──────────────────────────────────────
+        # Everything up to and including the marked block is cached. The mark
+        # goes on the last block of the second-to-last message, so the newest
+        # turn stays outside it: on the next call that turn has become part of
+        # the stable prefix and is read back rather than recomputed. Marking
+        # the newest message instead would store a prefix that never repeats.
+        # ``cache_control`` may be True, which marks the second-to-last message,
+        # or an integer index naming the message the stable prefix ends at.
+        # The default guess is only right when the array grows by appending;
+        # a caller that rebuilds part of the array — a memory that sends
+        # retrieved context plus a sliding window of recent turns — has a
+        # prefix that ends well before the last message, and marking past it
+        # asks the provider to cache content that changes every call. Measured:
+        # a composed prompt whose first 29 of 36 messages were byte-identical
+        # turn after turn got a cache read of zero, because the mark sat on
+        # message 34.
+        mark = params.get("cache_control")
+        by_index = isinstance(mark, int) and not isinstance(mark, bool)
+        if mark is True or by_index:
+            target = None
+            if by_index:
+                # Absolute index only, and index 0 is a real answer: a memory
+                # that puts a fixed preamble first is saying exactly that.
+                # Testing the mark for truthiness threw it away, because zero
+                # is false. Python would also read -1 as the *last* message,
+                # the opposite of what a caller reporting "nothing is stable
+                # yet" means by it. Both mistakes surface the same way — a
+                # cache that silently never hits — which is why an index that
+                # names no message marks nothing rather than being second-
+                # guessed: an explicit index is an instruction, not a hint.
+                if 0 <= mark < len(amsgs):
+                    target = amsgs[mark]["content"]
+            else:
+                if len(amsgs) >= 2:
+                    target = amsgs[-2]["content"]
+                if target is None and system_parts:
+                    # An all-text system prompt was collapsed into a string a
+                    # few lines above, and a string has no block to carry the
+                    # mark. Normalising it back is what makes
+                    # ``cache_control=True`` mean anything for the commonest
+                    # skill shape there is — one system prompt plus one short
+                    # user message — where ``amsgs`` holds a single message and
+                    # the branch above cannot fire. Marking that message
+                    # instead would be worse than doing nothing: it asks the
+                    # provider to store a prefix that changes every call.
+                    if isinstance(body.get("system"), str):
+                        body["system"] = [{"type": "text", "text": body["system"]}]
+                    target = body["system"]
+            if target:
+                control = {"type": "ephemeral"}
+                if params.get("cache_ttl") == "1h":
+                    control["ttl"] = "1h"
+                for blk in reversed(target):
+                    if isinstance(blk, dict) and blk.get("type") == "text":
+                        blk["cache_control"] = control
+                        break
+
         if params.get("top_p") is not None:
             body["top_p"] = params["top_p"]
         if params.get("top_k") is not None:

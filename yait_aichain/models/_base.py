@@ -180,7 +180,11 @@ class Model:
         ``max_tokens``    int       Maximum output tokens.
         ``top_p``         float     Nucleus-sampling probability mass.
         ``top_k``         int       Top-K sampling (provider-dependent).
-        ``cache_control`` bool      Enable provider-level prompt caching.
+        ``cache_control`` bool|int  Prompt caching. True marks the
+                                    second-to-last message; an int names
+                                    the message the stable prefix ends at.
+        ``cache_ttl``     str       How long the mark lives: ``"5m"``
+                                    (default) or ``"1h"``.
         ``reasoning``     str|None  Universal reasoning depth (see below).
         ================  ========  =======================================
 
@@ -296,7 +300,27 @@ class Model:
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
         self.top_p         = opts.get("top_p",         defaults.get("top_p"))
         self.top_k         = opts.get("top_k",         defaults.get("top_k"))
-        self.cache_control = opts.get("cache_control", False)
+        # Prompt caching. The option has been accepted and documented since
+        # before 1.6.1 but reached nothing but ``__repr__``; it is wired to the
+        # family clients here. Off by default: a cache breakpoint costs 1.25x
+        # to store, so it only pays back when the same prefix is sent again.
+        # True marks the second-to-last message; an int names the message the
+        # stable prefix ends at, for callers that know where that is.
+        cc = opts.get("cache_control", defaults.get("cache_control", False))
+        self.cache_control = cc if isinstance(cc, int) and not isinstance(cc, bool) else bool(cc)
+        # How long the stored prefix lives. Which one is right is a property of
+        # the caller's cadence, not of the library: a write costs 1.25x at five
+        # minutes and 2x at an hour, against 0.1x per read, so 5m pays back on
+        # the second read and 1h on the third. A caller invoking a skill every
+        # few minutes misses the 5m window every time and pays the write
+        # premium forever at a hit rate of zero — worse than not caching — so
+        # the choice has to be reachable even though the default stays 5m.
+        ttl = opts.get("cache_ttl", defaults.get("cache_ttl", "5m"))
+        if ttl not in ("5m", "1h"):
+            raise ValueError(
+                f"cache_ttl must be '5m' or '1h'; got {ttl!r}"
+            )
+        self.cache_ttl = ttl
 
         reasoning = opts.get("reasoning", None)
         if reasoning not in (None, "low", "medium", "high"):
@@ -322,6 +346,8 @@ class Model:
             "top_p":       self.top_p,
             "top_k":       self.top_k,
             "reasoning":   self.reasoning,
+            "cache_control": self.cache_control,
+            "cache_ttl":     self.cache_ttl,
         }
 
     def to_request(self, messages: list, output: dict) -> "tuple[str, dict]":
