@@ -15,17 +15,16 @@ Required packages:
 
 import os
 from yait_aichain.models import Model
-from yait_aichain.agent  import Agent
+from yait_aichain.agent  import Agent, step_count
 from yait_aichain.tools import searchPerplexity, convertToMD
 
 agent = Agent(
-    orchestrator = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    tools        = [
+    Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    tools     = [
         searchPerplexity(api_key=os.getenv("PERPLEXITY_API_KEY")),
         convertToMD(),
     ],
-    max_steps    = 8,
-    mode         = "agile",
+    stop_when = [step_count(8)],
 )
 
 result = agent.run(

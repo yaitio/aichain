@@ -78,22 +78,27 @@ class TestChainIncludesAgentTokens(unittest.TestCase):
 
         m = Model("gpt-4o", api_key="k")
         m.client._auth_headers = MagicMock(return_value={})
+        # First reply: a native tool call; second: plain text (the answer).
         seq = [
-            _resp(json.dumps({"steps": [{"id": 1, "type": "tool", "tool_name": "noop", "goal": "g"}]}), 100),
-            _resp(json.dumps({"type": "tool", "tool_name": "noop", "kwargs": {}}), 50),
-            _resp(json.dumps({"decision": "final_answer", "final_answer": "done"}), 30),
+            json.dumps({
+                "choices": [{"message": {"content": None, "tool_calls": [
+                    {"id": "n1", "type": "function",
+                     "function": {"name": "noop", "arguments": "{}"}}]}}],
+                "usage": {"input_tokens": 100, "output_tokens": 0},
+            }).encode(),
+            _resp("done", 80),
         ]
         call = [0]
         def post(*a, **k):
             i = min(call[0], len(seq) - 1); call[0] += 1; return seq[i]
         m.client._post = MagicMock(side_effect=post)
 
-        agent = Agent(orchestrator=m, tools=[Noop()])
+        agent = Agent(m, tools=[Noop()])
         chain = Chain(steps=[(agent, "result")])
         chain.run(variables={"task": "do it"})
 
         self.assertIsNotNone(chain.last_usage)
-        self.assertEqual(chain.last_usage.total_tokens, 180)   # 100 + 50 + 30
+        self.assertEqual(chain.last_usage.total_tokens, 180)   # 100 + 80
 
 
 if __name__ == "__main__":

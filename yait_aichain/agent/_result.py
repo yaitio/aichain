@@ -36,6 +36,19 @@ class AgentResult:
         Total tokens consumed across *all* LLM calls: planning,
         action determination, skill execution, and reflection.
 
+    cost : float | None
+        Estimated USD spent on those calls, priced per model from the provider
+        registry.  ``None`` when nothing could be priced — a self-hosted model
+        has no price per token, and this reports that rather than inventing a
+        zero.
+
+        Not derivable from ``tokens_used``: that field sums input and output
+        together, and output costs five to six times input at frontier rates.
+
+        Covers the calls made by *this* invocation.  A run picked up with
+        :meth:`~Agent.resume` therefore reports only the resumed leg, because
+        cost is not written to the checkpoint the way ``tokens_used`` is.
+
     plan : list[dict]
         The final plan the agent executed.  In agile mode this may
         differ from the original plan if replanning occurred.
@@ -84,6 +97,13 @@ class AgentResult:
     mode:        str
     steps_taken: int
     tokens_used: int
+    cost:        "float | None" = None
+    #: What ended the run — ``"answered"``, ``"check:<name>"``, ``"step_count"``,
+    #: ``"token_budget"``, ``"cost_budget"``, or an error name. Without it a run
+    #: that finished and a run that ran out of budget look identical from the
+    #: outside, which is exactly how a benchmark came to score four zeroes it
+    #: could not tell apart.
+    stopped_by:  "str | None" = None
     plan:        list[dict]     = field(default_factory=list)
     history:     list[dict]     = field(default_factory=list)
     memory:      dict           = field(default_factory=dict)
