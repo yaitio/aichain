@@ -18,6 +18,12 @@ max_tokens  = 16384
 top_p = 1.0
 
 [provider.reasoning_map]
+# "none" switches deliberation off entirely on the Responses API (gpt-5.x).
+# Without it the server default is "medium" — an agent that reasons on every
+# turn while a chat-completions twin runs with reasoning_effort="none" is NOT
+# a leveled comparison, and a deliberating model is measurably more
+# policy-cautious in dialogue.
+none = "none"
 low = "low"
 medium = "medium"
 high = "high"

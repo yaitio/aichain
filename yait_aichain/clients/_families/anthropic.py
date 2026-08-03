@@ -117,7 +117,10 @@ class AnthropicClient(BaseClient):
         return [m["id"] for m in json.loads(data)["data"]]
 
     # ── format ───────────────────────────────────────────────────────
-    def build_request(self, messages, output, params) -> "tuple[str, dict]":
+    #: Native tool calling implemented: tool_use / tool_result blocks.
+    supports_tools = True
+
+    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         prov = self._data["provider"]
         rmap = prov.get("reasoning_map", {})
         default_max = prov["defaults"]["max_tokens"]
@@ -127,14 +130,43 @@ class AnthropicClient(BaseClient):
         system_parts: list[dict] = []
         amsgs: list[dict] = []
         for msg in messages:
+            role = msg["role"]
+
+            # One call's result: a tool_result block inside a USER message —
+            # Anthropic's wire shape. Consecutive results merge into one user
+            # message, because the API requires strict role alternation.
+            if role == "tool":
+                block = {"type": "tool_result",
+                         "tool_use_id": msg.get("call_id", ""),
+                         "content": "\n".join(p.get("text", "")
+                                               for p in msg.get("parts") or []
+                                               if p.get("type") == "text")}
+                if amsgs and amsgs[-1]["role"] == "user" and \
+                   all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
+                    amsgs[-1]["content"].append(block)
+                else:
+                    amsgs.append({"role": "user", "content": [block]})
+                continue
+
+            # The model's own request to act: tool_use blocks, with any
+            # accompanying prose as a text block in the same message.
+            if role == "assistant" and msg.get("tool_calls"):
+                blocks = [_part_to_anthropic(p) for p in msg.get("parts") or []]
+                blocks = [b for b in blocks if b is not None]
+                blocks += [{"type": "tool_use", "id": c.get("id", ""),
+                            "name": c["name"], "input": c.get("arguments", {})}
+                           for c in msg["tool_calls"]]
+                amsgs.append({"role": "assistant", "content": blocks})
+                continue
+
             blocks = [_part_to_anthropic(p) for p in msg["parts"]]
             blocks = [b for b in blocks if b is not None]
             if not blocks:
                 continue
-            if msg["role"] == "system":
+            if role == "system":
                 system_parts.extend(blocks)
             else:
-                amsgs.append({"role": msg["role"], "content": blocks})
+                amsgs.append({"role": role, "content": blocks})
 
         body: dict = {
             "model":       name,
@@ -218,11 +250,39 @@ class AnthropicClient(BaseClient):
                     body["max_tokens"] = budget + default_max
 
         fmt = output.get("format", {})
+        if tools:
+            # Structured output on this provider IS a forced tool call —
+            # tool_choice pins the model to one synthetic tool, which would
+            # make every real tool unreachable. The combination is not
+            # mergeable; saying so beats silently breaking one half.
+            if fmt.get("type") == "json_schema":
+                raise ValueError(
+                    "Anthropic cannot combine native tools with "
+                    "output json_schema: structured output is implemented as "
+                    "a forced tool call, which would shadow the real tools. "
+                    "Drop one of the two."
+                )
+            body["tools"] = [
+                {"name": t["function"]["name"],
+                 "description": t["function"].get("description", ""),
+                 "input_schema": t["function"].get("parameters",
+                                                   {"type": "object"})}
+                if "function" in t else t
+                for t in tools
+            ]
         if fmt.get("type") == "json_schema":
             tool = fmt.get("name", "structured_output")
-            body["tools"] = [{"name": tool,
-                              "description": "Return the result matching the given schema.",
-                              "input_schema": fmt["schema"]}]
+            spec = {"name": tool,
+                    "description": "Return the result matching the given schema.",
+                    "input_schema": fmt["schema"]}
+            # Without this the schema is advisory: the provider forces the tool
+            # call but not its shape, so a model may fill one field and drop the
+            # rest — measured on claude-sonnet-5, which returned the first
+            # property carrying XML tags for the others. ``strict`` was accepted
+            # and documented in the output spec but never left the library.
+            if fmt.get("strict"):
+                spec["strict"] = True
+            body["tools"] = [spec]
             body["tool_choice"] = {"type": "tool", "name": tool}
 
         return "/v1/messages", body
@@ -239,6 +299,15 @@ class AnthropicClient(BaseClient):
         for block in content:
             if block.get("type") == "text":
                 text = block["text"]; break
+        calls = [b for b in content if b.get("type") == "tool_use"]
+        if calls:
+            from ...models._calls import ToolCall, ToolCallRequest
+            return ToolCallRequest(
+                calls=tuple(ToolCall(id=b.get("id", ""), name=b.get("name", ""),
+                                     arguments=b.get("input") or {})
+                            for b in calls),
+                text=text,
+            )
         if ftype == "json":
             t = text.strip()
             if t.startswith("```"):

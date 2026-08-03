@@ -219,12 +219,19 @@ class TestQwenReasoning(unittest.TestCase):
 
 class TestPerplexityReasoning(unittest.TestCase):
 
-    def test_reasoning_silently_ignored(self):
-        # Perplexity has no reasoning parameter; setting it must not crash.
-        model = Model("sonar", options={"reasoning": "high"})
+    def test_reasoning_on_a_provider_without_it_is_a_loud_error(self):
+        # This test used to assert the opposite — that the option is silently
+        # ignored. Asking for reasoning and getting none, with no error
+        # anywhere, is a silent failure; valid levels now come from the
+        # provider's own reasoning_map, and a provider without one says so.
+        with self.assertRaises(ValueError) as ctx:
+            Model("sonar", options={"reasoning": "high"})
+        self.assertIn("perplexity", str(ctx.exception))
+
+    def test_no_reasoning_option_stays_fine(self):
+        model = Model("sonar")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("reasoning_effort", body)
-        self.assertNotIn("thinking", body)
 
 
 # ---------------------------------------------------------------------------

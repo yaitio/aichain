@@ -304,14 +304,48 @@ def validate_input(input_: dict) -> None:
     for i, msg in enumerate(messages):
         if not isinstance(msg, dict):
             raise ValueError(f"messages[{i}] must be a dict")
-        if msg.get("role") not in ("system", "user", "assistant"):
+        if msg.get("role") not in ("system", "user", "assistant", "tool"):
             raise ValueError(
-                f"messages[{i}]['role'] must be 'system', 'user', or 'assistant'"
+                f"messages[{i}]['role'] must be 'system', 'user', 'assistant', "
+                "or 'tool'"
             )
+        # A ``tool`` turn is one call's result, keyed to the call id. The id is
+        # mandatory: providers reject results that reference nothing, and a
+        # result without one is indistinguishable from ordinary conversation.
+        if msg["role"] == "tool" and not isinstance(msg.get("call_id"), str):
+            raise ValueError(
+                f"messages[{i}]: a 'tool' turn must carry a string 'call_id' "
+                "referencing the assistant tool call it answers"
+            )
+        # An ``assistant`` turn may carry ``tool_calls`` — the model asked to
+        # act. Each call needs a name and dict arguments; a malformed one here
+        # would only surface later as a provider 400 with no pointer back.
+        calls = msg.get("tool_calls")
+        if calls is not None:
+            if msg["role"] != "assistant":
+                raise ValueError(
+                    f"messages[{i}]: only 'assistant' turns may carry 'tool_calls'"
+                )
+            if not isinstance(calls, list) or not calls:
+                raise ValueError(
+                    f"messages[{i}]['tool_calls'] must be a non-empty list"
+                )
+            for k, call in enumerate(calls):
+                if not isinstance(call, dict) or not isinstance(call.get("name"), str):
+                    raise ValueError(
+                        f"messages[{i}]['tool_calls'][{k}] must be a dict "
+                        "with a string 'name'"
+                    )
+                if not isinstance(call.get("arguments", {}), dict):
+                    raise ValueError(
+                        f"messages[{i}]['tool_calls'][{k}]['arguments'] "
+                        "must be a dict"
+                    )
         parts = msg.get("parts")
-        # An ``assistant`` turn with no parts is a "generate here" marker
-        # (multi-turn directed reasoning): the model fills it in at run time, so
-        # it legitimately carries no content. Every other turn needs parts.
+        # An ``assistant`` turn with no parts and no tool_calls is a "generate
+        # here" marker (multi-turn directed reasoning): the model fills it in at
+        # run time, so it legitimately carries no content. An assistant turn
+        # WITH tool_calls needs no parts either — the calls are its content.
         if msg["role"] == "assistant" and not parts:
             continue
         if not isinstance(parts, list) or not parts:
@@ -354,7 +388,7 @@ def is_generate_marker(msg: dict) -> bool:
     at run time and the reply is appended to the running context).
     """
     return (isinstance(msg, dict) and msg.get("role") == "assistant"
-            and not msg.get("parts"))
+            and not msg.get("parts") and not msg.get("tool_calls"))
 
 
 def _validate_turn_structure(messages: list) -> None:
@@ -381,15 +415,29 @@ def _validate_turn_structure(messages: list) -> None:
             f"— it must follow a 'user' turn"
         )
 
-    prev_assistant = False
+    prev_assistant  = False
+    open_call_turn  = False   # last turn was assistant-with-tool_calls or tool
     for i in content_idx:
-        is_assistant = messages[i].get("role") == "assistant"
+        role = messages[i].get("role")
+        if role == "tool":
+            # A result must answer a call: it may only follow the assistant
+            # turn that made the call, or a sibling result of the same turn.
+            if not open_call_turn:
+                raise ValueError(
+                    f"messages[{i}]: a 'tool' turn must directly follow an "
+                    f"'assistant' turn carrying tool_calls (or another 'tool' "
+                    f"turn answering the same calls)"
+                )
+            prev_assistant = False
+            continue
+        is_assistant = role == "assistant"
         if is_assistant and prev_assistant:
             raise ValueError(
                 f"messages[{i}]: two 'assistant' turns in a row — every "
                 f"'assistant' turn must be preceded by a 'user' turn"
             )
         prev_assistant = is_assistant
+        open_call_turn = is_assistant and bool(messages[i].get("tool_calls"))
 
 
 def validate_output(output: dict) -> None:
