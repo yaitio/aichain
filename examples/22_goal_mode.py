@@ -1,11 +1,15 @@
 """
-22 · Goal mode — a loop with no plan
-====================================
+22 · A stop condition the harness can verify
+============================================
 
 A plan is a bet that you know the steps up front. Sometimes you don't: the next
-action depends on what the last one returned. That is what ``mode="goal"`` is
-for — you give an objective and a **done condition**, and the agent decides one
-action at a time.
+action depends on what the last one returned. The loop needs no plan for that —
+it decides one action at a time, which is what it does by default.
+
+What this example is really about is **how the run ends**. Most of the time an
+agent stops because it says it is finished; that is the model's word for it.
+``check()`` is the other kind: a Python callable the harness evaluates itself,
+and a run that ends on it succeeded for a reason nobody has to take on trust.
 
 The task here makes the difference obvious. A hidden number is locked in a safe;
 the only way in is a ``probe`` tool that answers "higher", "lower" or "correct".
@@ -18,11 +22,13 @@ Run it::
 
 What to check in the output
 ---------------------------
-* The agent never plans — it goes straight to iteration 1.
+* The agent never plans — it goes straight to the first action.
 * Each guess narrows the range: a binary search should land in ~10 probes,
   a linear scan would not finish inside the budget.
-* The run ends on a **check**, not on the model's word: ``done_when`` is a
-  Python callable the harness evaluates itself.
+* ``result.stopped_by`` reads ``check:safe_open`` — the harness verified it.
+  Had the model given up and answered instead, it would read ``answered``; had
+  it run out, ``step_count``. Those are three different outcomes and the field
+  keeps them apart.
 * The journal at the end is the record of what was actually attempted.
 
 The loop is only as good as the orchestrator driving it. Measured on this task
@@ -38,6 +44,7 @@ import random
 MODEL = "claude-sonnet-4-6"      # any orchestrator model you have a key for
 
 from yait_aichain import Agent, Model
+from yait_aichain.agent import check, step_count, token_budget
 from yait_aichain.agent import Journal
 from yait_aichain.tools import Tool
 
@@ -46,6 +53,7 @@ from yait_aichain.tools import Tool
 # the probe tool below.
 SECRET   = random.randint(1, 1000)
 attempts: list[int] = []
+recorded: list[int] = []      # what record_answer actually wrote
 
 
 class Probe(Tool):
@@ -81,32 +89,36 @@ class RecordAnswer(Tool):
     }
 
     def run(self, combination, options=None):
+        recorded.append(int(combination))
         return f"recorded: {combination}"
 
 
-# ── The done condition ─────────────────────────────────────────────────────────
-# A callable, not a sentence. The harness runs it against memory, so the run can
-# only finish on a fact — the model cannot talk its way to success.
+# ── The stop condition ─────────────────────────────────────────────────────────
+# A callable, not a sentence. The harness runs it itself, so the run can only
+# finish on a fact — the model cannot talk its way to success.
+#
+# It reads what the tool actually did, not what the agent says it did. That is
+# the difference between `check` and `model_claim`: one is verified, the other
+# is reported.
 
-def safe_is_open(memory: dict) -> bool:
+def safe_is_open(_state: dict) -> bool:
     """the recorded combination actually opens the safe"""
-    for value in memory.values():
-        digits = "".join(c for c in str(value) if c.isdigit())
-        if digits and int(digits) == SECRET:
-            return True
-    return False
+    return bool(recorded) and recorded[-1] == SECRET
 
 
 # ── The agent ──────────────────────────────────────────────────────────────────
 
 agent = Agent(
-    orchestrator = Model(MODEL),
-    tools        = [Probe(), RecordAnswer()],
-    mode         = "goal",
-    done_when    = safe_is_open,
-    max_steps    = 15,          # a binary search needs ~10; a linear scan can't
-    max_tokens   = 60_000,
-    verbose      = 1,
+    Model(MODEL),
+    tools     = [Probe(), RecordAnswer()],
+    stop_when = [
+        # Success, and the only kind the harness can confirm itself.
+        check(safe_is_open, name="safe_open"),
+        # Ceilings. Reaching one is a failure, and it says which.
+        step_count(15),          # a binary search needs ~10; a linear scan can't
+        token_budget(60_000),
+    ],
+    verbose   = 1,
 )
 
 result = agent.run(
@@ -121,8 +133,10 @@ print("\n" + "═" * 72)
 print(f"secret was     : {SECRET}")
 print(f"probes used    : {len(attempts)}  →  {attempts}")
 print(f"success        : {result.success}")
+print(f"stopped by     : {result.stopped_by}"
+      "   ← check:safe_open is verified; 'answered' is only the model's word")
 print(f"output         : {result.output}")
-print(f"tokens         : {result.tokens_used:,}")
+print(f"tokens         : {result.tokens_used:,}   ${result.cost or 0:.4f}")
 
 print("\nJournal — what the agent actually did:")
 for e in result.journal:

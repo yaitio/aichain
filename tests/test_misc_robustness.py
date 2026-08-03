@@ -17,25 +17,6 @@ from models import Model
 from clients._families.openai import _is_deepseek_reasoner
 
 
-class TestExtractTokensRobust(unittest.TestCase):
-
-    def _agent(self):
-        return Agent(orchestrator=Model("gpt-4o", api_key="k"))
-
-    def test_usage_null(self):
-        self.assertEqual(self._agent()._extract_tokens({"usage": None}), 0)
-
-    def test_usage_not_a_dict(self):
-        self.assertEqual(self._agent()._extract_tokens({"usage": []}), 0)
-
-    def test_usage_non_numeric(self):
-        self.assertEqual(
-            self._agent()._extract_tokens({"usage": {"prompt_tokens": "x"}}), 0)
-
-    def test_usage_normal(self):
-        self.assertEqual(
-            self._agent()._extract_tokens(
-                {"usage": {"input_tokens": 10, "output_tokens": 5}}), 15)
 
 
 class TestDeepSeekReasonerGate(unittest.TestCase):

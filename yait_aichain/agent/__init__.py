@@ -2,139 +2,100 @@
 agent
 =====
 
-Public API for the aichain 2.0 agent layer.
+``Agent`` — a conversation that can act.
 
-An ``Agent`` is an autonomous execution engine that plans and executes
-complex tasks by combining :class:`~tools.Tool` instances (for external
-actions) and dynamically-constructed LLM skills (for reasoning and
-generation).  It requires only a task description at run time — it figures
-out the steps itself.
-
-Two execution modes
--------------------
-``"waterfall"``
-    The orchestrator creates a fixed plan upfront.  Steps run in order.
-    Reflection after each step can trigger a retry or a hard stop on fatal
-    failure, but the plan itself never changes.
-
-``"agile"``
-    Same structure, but the reflection phase can also replan — revising
-    remaining steps or jumping back to an earlier one.  Best for open-ended
-    or exploratory tasks where the path isn't fully knowable in advance.
+The model is asked what to do, the world answers, the answer is appended, and
+the loop goes round. It ends when the model replies without asking for an
+action; everything else that can end it is a stop condition you pass in.
 
 Quick start
 -----------
 ::
 
-    from models import Model
-    from tools  import BraveSearchTool, MarkItDownTool
-    from agent  import Agent
+    from yait_aichain.models import Model
+    from yait_aichain.tools  import BraveSearchTool, MarkItDownTool
+    from yait_aichain.agent  import Agent, step_count, cost_budget
 
     agent = Agent(
-        orchestrator = Model("claude-opus-4-6"),
-        tools        = [BraveSearchTool(), MarkItDownTool()],
-        mode         = "waterfall",
-        max_steps    = 6,
-        max_tokens   = 40_000,
-        name         = "research_agent",
+        Model("claude-opus-5"),
+        tools     = [BraveSearchTool(), MarkItDownTool()],
+        stop_when = [step_count(20), cost_budget(0.50)],
     )
 
-    result = agent.run(
-        task = "Find the latest breakthroughs in fusion energy and write "
-               "a 3-paragraph summary in English.",
-    )
+    result = agent.run("Find the latest breakthroughs in fusion energy "
+                       "and write a three-paragraph summary.")
 
-    if result:
-        print(result.output)
-        print(f"\\nUsed {result.tokens_used:,} tokens across {result.steps_taken} steps.")
-    else:
-        print("Agent failed:", result.error)
+    print(result.output)
+    print(result.stopped_by)          # "answered" — or the ceiling that fired
+    print(f"{result.tokens_used:,} tokens · ${result.cost:.4f}")
 
-Agent with a custom persona
-----------------------------
+Two parameters
+--------------
+``mode`` — is the sequence frozen?
+
+* ``"agile"`` (default): the next step is decided from what just happened.
+* ``"waterfall"``: the model writes a plan first and holds to it. The freeze
+  is what makes the plan cacheable and the bill predictable.
+
+``team`` — who does the work?
+
+* ``None`` (default): nobody else; the ``agent`` action does not exist.
+* ``[agents]``: delegate, but only to these named workers.
+* ``"auto"``: describe and spawn workers as the task needs them.
+
+Six combinations, each a distinct requirement::
+
+    Agent(model, tools)                                  # the loop
+    Agent(model, tools, mode="waterfall")                # plan, then hold to it
+    Agent(model, tools, team=[researcher, analyst])      # route across a cast
+    Agent(model, tools, mode="waterfall", team=[...])    # plan across a cast
+    Agent(model, tools, team="auto")                     # spawn as needed
+    Agent(model, tools, mode="waterfall", team="auto")   # design a team, run it
+
+Stopping
+--------
+The ordinary exit needs no condition — the model answers. ``stop_when`` holds
+everything else, and the two kinds must not be confused: a ``check`` that
+passes is a **success** with harness-verified evidence, a ceiling that is
+reached is a **failure**. Whichever fired is named in ``result.stopped_by``, so
+"finished" and "gave out" never look alike from the outside.
+
 ::
 
-    agent = Agent(
-        orchestrator = Model("gpt-4o"),
-        persona      = (
-            "You are a senior financial analyst specialising in tech equities. "
-            "Always cite data sources and flag information older than 30 days."
-        ),
-        tools        = [BraveSearchTool()],
-        mode         = "waterfall",
-    )
+    stop_when = [
+        step_count(30),                                  # ceiling
+        token_budget(150_000),                           # ceiling
+        cost_budget(0.50),                               # ceiling
+        check(lambda s: s["steps"] > 2, name="enough"),  # success, verified
+    ]
 
-Separate orchestrator and executor models
------------------------------------------
-The orchestrator handles all planning and reflection.  Executor models
-handle the actual LLM skill steps.  Using a cheaper/faster model for
-execution saves tokens::
-
-    agent = Agent(
-        orchestrator = Model("claude-opus-4-6"),       # strong reasoner
-        executors    = [Model("gpt-4o"), Model("gemini-2.0-flash")],
-        tools        = [BraveSearchTool()],
-        mode         = "agile",
-        max_tokens   = 80_000,
-    )
-
-Initial variables
------------------
-Pass seed data into the agent's memory before the first step::
-
-    result = agent.run(
-        task      = "Translate the latest AI news into the target language.",
-        variables = {"language": "Ukrainian", "topic": "artificial intelligence"},
-    )
-
-Persistent memory across runs
-------------------------------
-Use :class:`FileBackend` to checkpoint state between separate ``run()``
-calls::
-
-    from agent import AgentMemory, FileBackend
-
-    memory = AgentMemory(backend=FileBackend("~/.my_agent_state.json"))
-    agent  = Agent(..., memory=memory)
-
-    result = agent.run(task="Step 1 of multi-run workflow…")
-    memory.flush()     # persist the final state to disk
-
-    # On the next invocation, load the saved state:
-    memory2 = AgentMemory(backend=FileBackend("~/.my_agent_state.json"))
-    agent2  = Agent(..., memory=memory2)
-    result2 = agent2.run(task="Step 2, with access to previous results…")
-
-Inspecting results
+What it is made of
 ------------------
-::
-
-    result = agent.run("Summarise the top 3 results for 'quantum computing 2025'")
-
-    # Full step trace
-    for rec in result.history:
-        print(f"Step {rec['step']+1} [{rec['action_type']}] {rec['step_goal']}")
-        print(f"  Assessment : {rec['reflection']['assessment']}")
-        print(f"  Stored as  : {rec['stored_as']}")
-        print(f"  Tokens     : {rec['tokens']:,}")
-
-    # Final memory state
-    print(result.memory)
+``Skill`` is the conversation, ``Tool`` is what gets called, ``Pool`` is one
+action repeated over a list, and a delegated sub-task is another ``Agent``. The
+agent composes the library rather than reimplementing it.
 """
 
-from ._agent   import Agent
+from ._agent   import (Agent, step_count, token_budget, cost_budget, check)
 from ._journal import Journal, JournalEntry, evidence
 from ._memory  import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
 from ._result  import AgentResult
 
 __all__ = [
     "Agent",
-    "AgentMemory",
     "AgentResult",
+    # Stop conditions
+    "step_count",
+    "token_budget",
+    "cost_budget",
+    "check",
+    # Journal
     "Journal",
     "JournalEntry",
     "evidence",
-    # Memory backends
+    # Memory — no longer wired into the loop by default; kept for eviction,
+    # which is where it earns its place once a conversation outgrows the window.
+    "AgentMemory",
     "MemoryBackend",
     "InMemoryBackend",
     "FileBackend",

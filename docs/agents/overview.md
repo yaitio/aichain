@@ -1,10 +1,11 @@
 # Agent
 
-An **Agent** is an autonomous execution engine. You describe a task in natural
-language; the agent plans the steps, calls the right tools, reflects on each
-result, and stops when it has the answer. Use it when the *sequence* of steps
-isn't known upfront — research, multi-source reasoning, exploratory work. For a
-fixed pipeline, use a [Chain](../primitives/chain.md).
+An **Agent** is a conversation that can act. You give it a task; it is asked
+what to do, the world answers, the answer is appended, and the loop goes round
+until it replies without asking for anything more. Use it when the *sequence*
+of steps is not known upfront. For a fixed pipeline, use a
+[Chain](../primitives/chain.md) — it spends no model call deciding an order you
+already know.
 
 ---
 
@@ -13,26 +14,26 @@ fixed pipeline, use a [Chain](../primitives/chain.md).
 ```python
 import os
 from yait_aichain.models import Model
-from yait_aichain.agent  import Agent
+from yait_aichain.agent  import Agent, step_count, cost_budget
 from yait_aichain.tools  import PerplexitySearchTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-8", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    tools        = [PerplexitySearchTool()],
-    max_steps    = 8,
+    Model("claude-opus-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    tools     = [PerplexitySearchTool()],
+    stop_when = [step_count(8), cost_budget(0.50)],
 )
 
 result = agent.run("Compare the top 3 managed vector databases and return a Markdown table.")
-if result:
-    print(result.output, "·", result.steps_taken, "steps ·", result.tokens_used, "tokens")
-else:
-    print("Failed:", result.error)
+print(result.output)
+print(result.stopped_by,                       # "answered" — or the ceiling that fired
+      result.steps_taken, "steps",
+      f"{result.tokens_used:,} tokens", f"${result.cost or 0:.4f}")
 ```
 
 ▶ One tool: [`examples/13_agent.py`](../../examples/13_agent.py) ·
 Multiple tools: [`examples/14_agent_tools.py`](../../examples/14_agent_tools.py) ·
-Sub-agents: [`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
-Deep dive ↓
+Delegation: [`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
+A verified stop condition: [`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)
 
 ---
 
@@ -40,13 +41,16 @@ Deep dive ↓
 
 - **`run()` never raises.** It returns an `AgentResult`; check `result.success`
   (and `bool(result)` *is* `success`). On failure, read `result.error`.
-- **It can also pause.** With a `Wait`/`Gate` tool, `run()` returns a
-  `SuspendedResult` instead — resume with `agent.resume(run_id, signal)`. See
-  [Suspend & resume](#suspend--resume).
-- **Budgets stop runaway loops.** `max_steps`, `max_attempts`, and `max_tokens`
-  each cap a different axis; the agent stops cleanly when any is hit.
-- **`agile` mode can replan.** Use it for exploratory tasks; `waterfall` (the
-  default) keeps the original plan and only retries.
+- **Answering is the absence of an action.** The ordinary exit is the model
+  replying without asking for a tool. There is no separate "finish" action.
+- **A ceiling reached is not success.** `stop_when` holds everything else that
+  can end a run, and `result.stopped_by` says which fired — `"answered"`,
+  `"check:<name>"`, `"step_count"`, `"cost_budget"`. Without that field a run
+  that finished and a run that ran out look identical from the outside.
+- **`check()` is the strong one.** A callable the harness evaluates itself, so
+  the run ends on a fact rather than on the model's word for it.
+- **Repeating work over a list needs `pool`.** Every other action is exactly one
+  call, so "read every document" without it reads one — silently.
 
 ---
 
@@ -55,55 +59,69 @@ Deep dive ↓
 ### Constructor
 
 ```python
-Agent(orchestrator, tools=None, executors=None, mode="waterfall",
-      max_steps=10, max_attempts=3, max_tokens=50_000, memory=None,
-      verbose=0, name=None, description=None, persona=None,
-      allow_spawn=False, store=None)
+Agent(model, tools=None, instructions="", mode="agile", team=None,
+      stop_when=None, hooks=None, permissions=None,
+      name=None, description=None, verbose=0)
 ```
 
 | Parameter | Default | Description |
 |---|---|---|
-| `orchestrator` | — | The `Model` that plans, decides actions, and reflects. |
-| `tools` | `None` | Tools the agent may call. |
-| `executors` | `[orchestrator]` | Models available to run "skill"-type steps (the orchestrator picks one). |
-| `mode` | `"waterfall"` | `"waterfall"` or `"agile"` (see [Modes](#modes)). |
-| `max_steps` | `10` | Hard cap on executed plan steps. |
-| `max_attempts` | `3` | Retries per step. |
-| `max_tokens` | `50_000` | Total token budget across all LLM calls. |
-| `memory` | `AgentMemory()` | Working memory; pass a persistent one to carry state across runs ([Memory](memory.md)). |
-| `persona` | `None` | System persona steering tone/role. |
-| `allow_spawn` | `False` | Let the agent spawn sub-agents via a `spawn_agent` tool. |
-| `store` | `InMemoryStore()` | Where suspended runs are parked ([Suspend & resume](#suspend--resume)). |
-| `verbose` | `0` | `0` silent · `1` per-step status · `2` full payloads + token breakdowns. |
+| `model` | — | The `Model` that drives the loop. |
+| `tools` | `None` | Tools it may call. |
+| `instructions` | `""` | The standing brief. Goes in the stable prefix, so it is cached from the second call onward. |
+| `mode` | `"agile"` | `"agile"` decides at every step; `"waterfall"` writes a plan at step 0 and holds to it. |
+| `team` | `None` | `None` — nobody else. `[agents]` — delegate only to these. `"auto"` — describe and spawn workers as needed. |
+| `stop_when` | `[step_count(30)]` | Everything that can end a run other than answering. |
+| `hooks` | `None` | Observability sinks ([Observability](observability.md)). |
+| `permissions` | `None` | Tool governance. |
+| `verbose` | `0` | `0` silent · `1` per-action status · `2` token breakdowns. |
 
-`agent.run(task, variables=None)` executes; `agent.resume(run_id, signal=None)`
-continues a suspended run. Both return an `AgentResult` (or a `SuspendedResult`
-on pause).
+`agent.run(task, variables=None)` executes and returns an `AgentResult`.
+`variables` seeds the conversation with data the caller already holds — this is
+how a `Chain` or `Pool` step hands its accumulated values down.
 
-### The loop: plan → act → reflect
-
-The orchestrator plans **once**, then for each step makes structured calls:
+### The loop
 
 ```
-1. PLAN     (once)   task + tools + memory → ordered steps, each tagged tool|skill
-   for each step:
-2. ACTION            step goal + context → concrete tool kwargs OR a skill prompt
-3. EXECUTE           run the tool / call the skill
-4. REFLECT           assess → continue | retry | replan | stop | final_answer
+messages = [system, task]
+loop:
+    reply = ask the model
+    if the reply has no action  → done, the reply is the answer
+    result = execute(reply.action)
+    messages += [reply, result]
+    if a stop condition fires   → stop
 ```
 
-Every orchestrator call is structured JSON; the agent parses it robustly (plain
-JSON, fenced ```` ```json ````, or the first `{...}` block).
+That is all of it. The conversation is held with **the world**, not with
+itself: every second turn is a fact the model did not have, which is why the
+loop converges instead of circling.
 
-### Reflection decisions
+The conversation only ever **appends** — nothing is rebuilt — so the cacheable
+prefix grows and prompt caching works without being configured.
 
-| Decision | Effect |
+### Actions
+
+The model either replies in plain text, which ends the run, or asks for exactly
+one action:
+
+| Action | What it does |
 |---|---|
-| `continue` | Success — move to the next step. |
-| `retry` | Retry the same step (capped by `max_attempts`). |
-| `replan` | *(agile only)* Produce a revised plan; optionally jump to an earlier step. |
-| `stop` | Fatal — return `success=False`. |
-| `final_answer` | Done — return the answer now, skipping remaining steps. |
+| `tool` | Call one tool with arguments. |
+| `pool` | Repeat one runner over a list, in parallel. The only action that is more than one call. |
+| `agent` | Delegate a scoped sub-task. Offered only when `team` is set. |
+
+### Externally driven
+
+`run()` owns the loop. When something else needs to — a serverless invocation
+that must be one step, or a harness that executes the tools itself — the same
+machinery is exposed:
+
+```python
+messages = agent.opening(task)
+state    = agent.new_state()
+decision = agent.step(messages, state)      # decide, do not execute
+result, error = agent.execute(decision["action"], state)
+```
 
 Reflection also assigns a `store_as` key: a snake_case name where the step
 output lands in memory for later steps to reference.
@@ -186,6 +204,7 @@ window, so an early failure never ends a run that was about to recover.
 | `output` | The final answer (`None` on failure). |
 | `steps_taken: int` | Plan steps executed. |
 | `tokens_used: int` | Total tokens across all LLM calls. |
+| `cost: float \| None` | Estimated USD for those calls, priced per model. `None` when nothing is priceable — a self-hosted model has no price per token, and this says so rather than reporting `0.0`. Not derivable from `tokens_used`, which sums input and output while output costs several times more. Covers this invocation; a `resume()` reports only the resumed leg. |
 | `plan: list[dict]` | The final plan (may differ from the first in agile mode). |
 | `history: list[dict]` | Per-attempt trace: action, output, reflection, tokens. |
 | `memory: dict` | Memory snapshot at the end. |
