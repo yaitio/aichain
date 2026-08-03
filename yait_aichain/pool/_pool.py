@@ -79,6 +79,48 @@ def _build_tool_kwargs(tool, variables: dict) -> dict:
     return {k: variables[k] for k in props if k in variables}
 
 
+def _check_tool_kwargs(tool, variables: dict) -> None:
+    """
+    Refuse a fan-out that could not pass the runner anything it needs.
+
+    A Tool that declares no matching ``parameters`` gets called with nothing —
+    and if its ``run()`` requires arguments, that is a TypeError per item, which
+    the default ``on_error="collect"`` turns straight back into ``None``. The
+    caller receives a full-length list of ``None`` with no exception and no
+    warning, indistinguishable from "every item legitimately returned nothing".
+    That shipped: a cookbook recipe's first two stages silently did nothing.
+
+    This is a misdeclared tool, not a per-item runtime failure — it fails
+    identically for every item, before any work happens. So it is checked in
+    the caller's thread, ahead of the fan-out, where no error policy can
+    swallow it. Raising it from inside a worker only changed which exception
+    was being turned into ``None``.
+    """
+    if not variables or _build_tool_kwargs(tool, variables):
+        return                                 # nothing to pass, or it fits
+    import inspect
+    try:
+        sig = inspect.signature(tool.run)
+    except (TypeError, ValueError):            # builtins, C-implemented run
+        return
+    needed = [n for n, p in sig.parameters.items()
+              if p.default is inspect.Parameter.empty
+              and p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+              and n != "self"]
+    if not needed:
+        return
+    name = getattr(tool, "name", None) or type(tool).__name__
+    raise TypeError(
+        f"Pool cannot call {name!r}: its run() requires {needed}, but the tool "
+        f"declares no matching `parameters`, so nothing can be passed to it. "
+        f"Item keys available: {sorted(variables)}.\n"
+        f"Declare them on the tool, e.g.:\n"
+        f"    parameters = {{'type': 'object', 'properties': {{"
+        + ", ".join(f"'{n}': {{'type': 'string'}}" for n in needed)
+        + "}}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pool
 # ---------------------------------------------------------------------------
@@ -203,6 +245,13 @@ class Pool:
             The first task exception when ``on_error="raise"``.
         """
         shared = variables or {}
+
+        # Pre-flight, in this thread: a runner that cannot be handed what the
+        # items carry fails for every item, so say so once and now rather than
+        # letting on_error turn it into a list of None.
+        if _is_tool(self._runner):
+            for item in self._items:
+                _check_tool_kwargs(self._runner, {**shared, **item})
 
         # Reset history before each run
         self._history = self._init_history()
