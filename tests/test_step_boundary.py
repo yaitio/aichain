@@ -1,9 +1,15 @@
 """
-Tests for the 1.4.4 step boundary: events/hooks, logging routing, the tool
-permission matrix, approval via suspend/resume, and tool-call repair.
+Tests for the step boundary: events/hooks, logging routing, the tool
+permission matrix, and how a bad call is corrected.
 
 Self-contained: a scripted ``FakeModel`` drives the Agent through the real
 ``to_request → client.send → from_response`` seam without any network.
+
+Two 1.4.4 behaviours are gone with the 2.0 agent and are no longer tested
+here: approval via suspend/resume (there is no suspended run — state lives
+in the conversation) and a dedicated repair pass (a rejected call now comes
+back to the model as a tool result, which is the same contract through the
+ordinary channel).
 """
 
 import json
@@ -17,10 +23,10 @@ from yait_aichain.agent import Agent
 from yait_aichain.skills import Skill
 from yait_aichain.chain import Chain
 from yait_aichain.tools import Tool
+from yait_aichain.models._calls import ToolCall, ToolCallRequest
 from yait_aichain.tools._permissions import (
     FINANCIAL, DESTRUCTIVE, WRITE, READ, APPROVE, DENY, ALLOW,
 )
-from yait_aichain.state import SuspendedResult
 
 
 # ── Scripted fake model (Model interface) ──────────────────────────────────────
@@ -34,10 +40,13 @@ class _FakeClient:
         return {}
 
     def send(self, path, body, headers):
-        out = self._scripted[min(self.i, len(self._scripted) - 1)]
+        # The transport carries bytes, so the scripted reply travels by index:
+        # a typed ToolCallRequest is not JSON, and pretending otherwise would
+        # test a wire this fake does not have.
+        i = min(self.i, len(self._scripted) - 1)
         self.i += 1
         return json.dumps(
-            {"_content": out, "usage": {"input_tokens": 3, "output_tokens": 4}}
+            {"_i": i, "usage": {"input_tokens": 3, "output_tokens": 4}}
         )
 
 
@@ -46,11 +55,11 @@ class _FakeModel:
         self.name = name
         self.client = _FakeClient(scripted)
 
-    def to_request(self, messages, output):
+    def to_request(self, messages, output, tools=None):
         return ("/x", {})
 
     def from_response(self, response, output):
-        return response["_content"]
+        return self.client._scripted[response["_i"]]
 
 
 # ── Tools ──────────────────────────────────────────────────────────────────────
@@ -77,17 +86,10 @@ class Refund(Tool):
         return f"refunded {amount}"
 
 
-def _plan(tool, goal="do"):
-    return json.dumps({"steps": [{"id": 1, "type": "tool",
-                                  "tool_name": tool, "goal": goal}]})
-
-
-def _act(tool, kwargs):
-    return json.dumps({"type": "tool", "tool_name": tool, "kwargs": kwargs})
-
-
-def _refl(decision="final_answer", **kw):
-    return json.dumps({"decision": decision, "assessment": "ok", **kw})
+def _call(tool, arguments, call_id="c1"):
+    """One native tool call, as the model layer hands it to the Agent."""
+    return ToolCallRequest(calls=(ToolCall(id=call_id, name=tool,
+                                           arguments=arguments),))
 
 
 # ── Event / Hook / Tracer unit tests ────────────────────────────────────────────
@@ -161,83 +163,64 @@ class TestToolContract:
 class TestAgentEvents:
     def test_lifecycle_and_tool_events(self):
         tr = Tracer()
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("echo"), _act("echo", {"text": "hi"}),
-             _refl("final_answer", final_answer="DONE")]),
-            tools=[Echo()], hooks=[tr])
+        ag = Agent(_FakeModel([_call("echo", {"text": "hi"}), "DONE"]),
+                   tools=[Echo()], hooks=[tr])
         r = ag.run("hi")
         types = {e.type for e in tr.events}
         assert r.success and r.output == "DONE"
-        assert {"run.started", "step.started", "tool_call.started",
-                "tool_call.ended", "llm_call.started", "run.finished"} <= types
+        assert {"run.started", "step.started", "step.ended",
+                "llm_call.started", "run.finished"} <= types
 
     def test_run_finished_carries_usage(self):
         tr = Tracer()
-        Agent(orchestrator=_FakeModel(
-            [_plan("echo"), _act("echo", {"text": "x"}),
-             _refl("final_answer", final_answer="d")]),
-            tools=[Echo()], hooks=[tr]).run("x")
+        Agent(_FakeModel([_call("echo", {"text": "x"}), "d"]),
+              tools=[Echo()], hooks=[tr]).run("x")
         fin = next(e for e in tr.events if e.type == "run.finished")
         assert fin.usage and fin.usage > 0
 
 
 class TestAgentPermissions:
-    def test_deny_returns_result_without_executing(self):
-        tr = Tracer()
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("issue_refund"), _act("issue_refund", {"amount": 50}),
-             _refl("final_answer", final_answer="d")]),
-            tools=[Refund()], hooks=[tr],
-            permissions=PermissionPolicy({"financial": "deny"}))
-        ag.run("refund")
-        assert any(e.payload.get("decision") == DENY for e in tr.events)
+    def test_deny_blocks_the_tool_and_tells_the_model(self):
+        # A denied call is reported back through the tool channel, so the
+        # model can choose something else — it is not a crash and not a
+        # silent no-op.
+        ran = []
 
-    def test_approve_suspends_then_resumes(self):
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("issue_refund"), _act("issue_refund", {"amount": 99}),
-             _refl("final_answer", final_answer="refund done")]),
-            tools=[Refund()],
-            permissions=PermissionPolicy({"financial": "approve"}))
-        r = ag.run("refund 99")
-        assert isinstance(r, SuspendedResult)
-        assert "Approval required" in r.awaiting["reason"]
-        r2 = ag.resume(r.run_id, signal={"approved": True})
-        assert r2.success
-        assert any("refunded 99" in str(h.get("output")) for h in r2.history)
+        class Watched(Refund):
+            def run(self, amount, options=None):
+                ran.append(amount)
+                return super().run(amount)
 
-    def test_rejected_approval_skips_tool(self):
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("issue_refund"), _act("issue_refund", {"amount": 99}),
-             _refl("final_answer", final_answer="ok")]),
-            tools=[Refund()],
-            permissions=PermissionPolicy({"financial": "approve"}))
-        r = ag.run("refund")
-        r2 = ag.resume(r.run_id, signal={"approved": False})
-        assert any(isinstance(h.get("output"), dict)
-                   and h["output"].get("skipped") for h in r2.history)
-
-    def test_no_policy_runs_unchanged(self):
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("issue_refund"), _act("issue_refund", {"amount": 7}),
-             _refl("final_answer", final_answer="done")]),
-            tools=[Refund()])               # no permissions= → no gating
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[Watched()],
+                   permissions=PermissionPolicy({"financial": "deny"}))
         r = ag.run("refund")
         assert r.success
+        assert ran == []                                  # never executed
+        failed = [e for e in r.journal if e["outcome"] == "failed"]
+        assert failed and "denied by policy" in failed[0]["reason"]
+
+    def test_no_policy_runs_unchanged(self):
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 7}), "done"]),
+                   tools=[Refund()])          # no permissions= → no gating
+        r = ag.run("refund")
+        assert r.success and r.output == "done"
+        assert [e["outcome"] for e in r.journal] == ["done"]
 
 
-class TestToolCallRepair:
-    def test_missing_arg_triggers_repair_then_succeeds(self):
-        ag = Agent(orchestrator=_FakeModel(
-            [_plan("echo"),
-             _act("echo", {}),                       # invalid → remediation
-             _refl("retry"),
-             _act("echo", {"text": "fixed"}),        # corrected
-             _refl("final_answer", final_answer="repaired")]),
-            tools=[Echo()])
+class TestBadCallCorrection:
+    def test_a_rejected_call_comes_back_as_a_result_and_the_model_retries(self):
+        # 1.4.4 ran a dedicated repair pass. Now the schema complaint travels
+        # the ordinary tool channel: same contract, one mechanism instead of
+        # two, and the model sees exactly what the caller would.
+        ag = Agent(_FakeModel([_call("echo", {}),                  # invalid
+                               _call("echo", {"text": "fixed"}, "c2"),
+                               "repaired"]),
+                   tools=[Echo()])
         r = ag.run("repair")
         assert r.success and r.output == "repaired"
-        errs = [h.get("exec_error") for h in r.history if h.get("exec_error")]
-        assert any("missing required" in (e or "") for e in errs)
+        reasons = [e["reason"] for e in r.journal if e["outcome"] == "failed"]
+        assert any("missing required" in x for x in reasons)
 
 
 # ── Skill & Chain hooks ─────────────────────────────────────────────────────────
@@ -284,12 +267,12 @@ class TestLoggingRouting:
         old_level = pkg.level
         pkg.setLevel(logging.INFO)
         try:
-            Agent(orchestrator=_FakeModel(
-                [_plan("echo"), _act("echo", {"text": "hi"}),
-                 _refl("final_answer", final_answer="d")]),
-                tools=[Echo()], verbose=0).run("hi")
+            Agent(_FakeModel([_call("echo", {"text": "hi"}), "d"]),
+                  tools=[Echo()], verbose=0).run("hi")
         finally:
             pkg.removeHandler(cap)
             pkg.setLevel(old_level)
-        assert any("Agent:" in m for m in records)
+        # The library never configures a sink; it emits through named loggers
+        # and the application decides where that goes.
+        assert any("echo" in m for m in records)
         assert any("[Done]" in m for m in records)
