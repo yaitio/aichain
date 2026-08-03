@@ -128,7 +128,11 @@ class TestPrivateLive(unittest.TestCase):
         """
         for url in (BASE_URL.removesuffix("/v1"), BASE_URL.removesuffix("/v1") + "/v1"):
             with self.subTest(url=url):
-                m = Model(f"private/{_MODEL}", options={"max_tokens": 16},
+                # 256, not 16: a reasoning model spends its budget thinking
+                # before it answers, and 16 tokens of thinking is an empty
+                # content field — which would fail this test for the model's
+                # habits when it is only about URL plumbing.
+                m = Model(f"private/{_MODEL}", options={"max_tokens": 256},
                           client_options={"url": url})
                 skill = Skill(model=m, input={"messages": [
                     {"role": "user", "parts": ["Say ok."]}]})

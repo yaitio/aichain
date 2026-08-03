@@ -61,12 +61,19 @@ def _part_to_openai(part: dict) -> "dict | None":
     return None
 
 
+def _text_of(msg: dict) -> str:
+    """The concatenated text parts of a universal message ("" when none)."""
+    return "\n".join(p.get("text", "") for p in msg.get("parts") or []
+                     if p.get("type") == "text")
+
+
 def _build_openai_compat_request(
     model,
     messages: list,
     output:   dict,
     path:     str,
     max_tokens_field: str = "max_completion_tokens",
+    tools:    "list | None" = None,
 ) -> "tuple[str, dict]":
     """
     Build an OpenAI-compatible ``(path, body)`` pair.
@@ -83,7 +90,34 @@ def _build_openai_compat_request(
     """
     openai_messages: list[dict] = []
     for msg in messages:
-        role  = msg["role"]
+        role = msg["role"]
+
+        # A tool turn is one call's result — chat format keys it by id.
+        if role == "tool":
+            openai_messages.append({
+                "role":         "tool",
+                "tool_call_id": msg.get("call_id", ""),
+                "content":      _text_of(msg),
+            })
+            continue
+
+        # An assistant turn that asked for calls. ``arguments`` goes out as a
+        # JSON string — that is the chat wire format, not a convenience.
+        if role == "assistant" and msg.get("tool_calls"):
+            entry: dict = {
+                "role": "assistant",
+                "content": _text_of(msg) or None,
+                "tool_calls": [
+                    {"id": c.get("id", ""), "type": "function",
+                     "function": {"name": c["name"],
+                                  "arguments": json.dumps(c.get("arguments", {}),
+                                                          ensure_ascii=False)}}
+                    for c in msg["tool_calls"]
+                ],
+            }
+            openai_messages.append(entry)
+            continue
+
         items = [_part_to_openai(p) for p in msg["parts"]]
         items = [it for it in items if it is not None]
         if not items:
@@ -100,6 +134,11 @@ def _build_openai_compat_request(
         max_tokens_field: model.max_tokens,
         "temperature":    model.temperature,
     }
+
+    if tools:
+        # Canonical input is what Tool.schema() returns —
+        # {"type": "function", "function": {...}} — passed through verbatim.
+        body["tools"] = list(tools)
 
     if model.top_p is not None:
         body["top_p"] = model.top_p
@@ -120,6 +159,28 @@ def _build_openai_compat_request(
         }
 
     return path, body
+
+
+def _tool_call_request(triples, text: str = "") -> "ToolCallRequest":
+    """
+    Build a :class:`ToolCallRequest` from ``(name, arguments, id)`` triples.
+
+    ``arguments`` arrives as a JSON **string** on the wire; a dict is accepted
+    too (some compatible servers send one), and unparseable arguments become an
+    empty dict rather than an exception — the executor's schema check is the
+    right place to complain, with the tool named.
+    """
+    from ...models._calls import ToolCall, ToolCallRequest
+    calls = []
+    for name, args, call_id in triples:
+        if isinstance(args, str):
+            try:
+                args = json.loads(args) if args.strip() else {}
+            except json.JSONDecodeError:
+                args = {}
+        calls.append(ToolCall(id=call_id or "", name=name,
+                              arguments=args if isinstance(args, dict) else {}))
+    return ToolCallRequest(calls=tuple(calls), text=text)
 
 
 def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
@@ -152,6 +213,19 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
     refusal = message.get("refusal")
     if refusal:
         raise ValueError(f"Model refused to answer: {refusal}")
+
+    # The model asked to act. This outranks any accompanying text: a reply
+    # that both says something and calls a tool is a call, with the text
+    # carried alongside — collapsing it to the text would silently drop the
+    # action, which is the exact failure this channel exists to remove.
+    if message.get("tool_calls"):
+        return _tool_call_request(
+            ((c.get("function", {}).get("name", ""),
+              c.get("function", {}).get("arguments"),
+              c.get("id", ""))
+             for c in message["tool_calls"]),
+            text=message.get("content") or "",
+        )
 
     text  = message.get("content") or ""
     ftype = output.get("format", {}).get("type", "text")
@@ -457,6 +531,7 @@ def _build_responses_api_request(
     model,
     messages: list,
     output:   dict,
+    tools:    "list | None" = None,
 ) -> "tuple[str, dict]":
     """
     Build an OpenAI ``/v1/responses`` ``(path, body)`` pair.
@@ -471,7 +546,28 @@ def _build_responses_api_request(
     input_messages: list[dict] = []
 
     for msg in messages:
-        role  = msg["role"]
+        role = msg["role"]
+
+        # Tool traffic uses top-level input items, not role messages — the
+        # Responses API's own shape, different from chat completions.
+        if role == "tool":
+            input_messages.append({
+                "type":    "function_call_output",
+                "call_id": msg.get("call_id", ""),
+                "output":  _text_of(msg),
+            })
+            continue
+        if role == "assistant" and msg.get("tool_calls"):
+            for c in msg["tool_calls"]:
+                input_messages.append({
+                    "type":      "function_call",
+                    "call_id":   c.get("id", ""),
+                    "name":      c["name"],
+                    "arguments": json.dumps(c.get("arguments", {}),
+                                            ensure_ascii=False),
+                })
+            continue
+
         items = [_part_to_openai(p) for p in msg["parts"]]
         items = [it for it in items if it is not None]
         if not items:
@@ -498,6 +594,15 @@ def _build_responses_api_request(
 
     if instructions:
         body["instructions"] = instructions
+
+    if tools:
+        # The Responses API takes the FLAT schema — name/description/parameters
+        # at top level — where chat completions nests them under "function".
+        # Canonical input here is the chat form (Tool.schema()); unwrap it.
+        body["tools"] = [
+            {"type": "function", **t["function"]} if "function" in t else t
+            for t in tools
+        ]
 
     if model.reasoning:
         effort = model._REASONING_MAP.get(model.reasoning)
@@ -538,15 +643,28 @@ def _parse_responses_api_response(response: dict, output: dict) -> "str | dict":
           ]
         }
     """
+    # Calls first: a reply that both says something and asks to act is a call,
+    # with the text carried alongside. The output array mixes item kinds
+    # (reasoning, message, function_call) — collect across all of them.
+    calls = [it for it in response.get("output", [])
+             if it.get("type") == "function_call"]
+    text  = ""
     for item in response.get("output", []):
         if item.get("type") == "message":
             for part in item.get("content", []):
                 if part.get("type") == "output_text":
-                    text  = part["text"]
-                    ftype = output.get("format", {}).get("type", "text")
-                    if ftype in ("json", "json_schema"):
-                        return json.loads(text)
-                    return text
+                    text = part["text"]
+    if calls:
+        return _tool_call_request(
+            ((c.get("name", ""), c.get("arguments"), c.get("call_id", ""))
+             for c in calls),
+            text=text,
+        )
+    if text:
+        ftype = output.get("format", {}).get("type", "text")
+        if ftype in ("json", "json_schema"):
+            return json.loads(text)
+        return text
     return ""
 
 

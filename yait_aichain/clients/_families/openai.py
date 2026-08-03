@@ -120,19 +120,27 @@ class OpenAIClient(BaseClient):
             _DEFAULT_MAX_TOKENS = prov["defaults"]["max_tokens"],
         )
 
-    def build_request(self, messages, output, params) -> "tuple[str, dict]":
+    #: Native tool calling is implemented for this family — both wire
+    #: shapes: chat completions and the Responses API.
+    supports_tools = True
+
+    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         m   = self._wrap(params)
         p   = self._provider
 
         if p == "openai":
             if _should_use_responses_api(m.name):
-                return _build_responses_api_request(m, messages, output)
+                return _build_responses_api_request(m, messages, output, tools=tools)
             if _is_openai_image_model(m.name):
+                if tools:
+                    raise ValueError(
+                        f"model {m.name!r} is an image model — it cannot "
+                        "take tool declarations")
                 # An input image + an editable image model ⇒ edit, else generate.
                 if _is_openai_editable_image_model(m.name) and _messages_have_image(messages):
                     return _build_image_edits_request(m, messages, output, self._images_edits_path)
                 return _build_image_generations_request(m, messages, output, self._images_path)
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             # reasoning_effort is only valid on the o-series reasoning models;
             # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
             # routes through the Responses API branch above).
@@ -151,7 +159,7 @@ class OpenAIClient(BaseClient):
                 prompt = _last_user_text(messages)
                 return self._images_path, {"model": m.name, "prompt": prompt,
                                            "n": 1, "response_format": "b64_json"}
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
             # grok models reject it (grok-4 reasoners think natively).
             if m.reasoning and m.name.startswith("grok-3-mini"):
@@ -167,17 +175,17 @@ class OpenAIClient(BaseClient):
             # here would be guessing about six different servers at once. The
             # model name is passed through verbatim; the server either serves
             # it or says it doesn't.
-            return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
 
         if p == "kimi":
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if m.reasoning is not None and m._REASONING_MAP.get(m.reasoning) == "enabled":
                 body["temperature"] = 1.0
                 body["thinking"] = {"type": "enabled"}
             return path, body
 
         if p == "deepseek":
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if m.reasoning is not None:
                 body["model"] = m._REASONING_MAP[m.reasoning]
             if _is_deepseek_reasoner(body["model"]):
@@ -201,7 +209,7 @@ class OpenAIClient(BaseClient):
         if p == "qwen":
             # wanx text-to-image is async and handled by QwenClient (the only
             # client used for this provider); here we only do chat / vision.
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf)
+            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if _is_qwq(m.name):
                 body["enable_thinking"] = True
             elif _is_qwen3(m.name) and m.reasoning:

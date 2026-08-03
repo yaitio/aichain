@@ -75,8 +75,16 @@ class TestFamilyEquivalence(unittest.TestCase):
 
     def test_build_reasoning(self):
         for prov, name in _SAMPLE.items():
-            self._equiv_build(name, prov, _MSG, _OUT_T, options={"reasoning": "high"})
-            self._equiv_build(name, prov, _MSG, _OUT_T, options={"reasoning": "low"})
+            try:
+                self._equiv_build(name, prov, _MSG, _OUT_T,
+                                  options={"reasoning": "high"})
+                self._equiv_build(name, prov, _MSG, _OUT_T,
+                                  options={"reasoning": "low"})
+            except ValueError as exc:
+                # A provider without a reasoning_map now refuses the option
+                # loudly instead of swallowing it — that refusal must name the
+                # provider; anything else is a real equivalence failure.
+                self.assertIn(prov, str(exc))
 
     def test_build_vision(self):
         msg = [{"role": "user", "parts": [

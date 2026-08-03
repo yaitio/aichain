@@ -437,15 +437,34 @@ class TestAnthropicFromResponse(unittest.TestCase):
         result = self.model.from_response({"content": []}, _TEXT_OUTPUT)
         self.assertEqual(result, "")
 
-    def test_skips_non_text_blocks(self):
+    def test_skips_non_tool_blocks(self):
+        # thinking/redacted blocks are presentation and are skipped; the text
+        # is the answer.
         response = {
             "content": [
-                {"type": "tool_use", "name": "search", "input": {}},
+                {"type": "thinking", "thinking": "…"},
                 {"type": "text", "text": "Final answer"},
             ]
         }
         result = self.model.from_response(response, _TEXT_OUTPUT)
         self.assertEqual(result, "Final answer")
+
+    def test_a_tool_use_block_is_a_call_not_noise(self):
+        # This test used to assert the opposite — that a tool_use block is
+        # silently skipped and the text returned. That silence is an action
+        # dropped with no error anywhere, the exact failure native calling
+        # exists to remove.
+        from models._calls import ToolCallRequest
+        response = {
+            "content": [
+                {"type": "tool_use", "id": "u1", "name": "search", "input": {}},
+                {"type": "text", "text": "checking"},
+            ]
+        }
+        result = self.model.from_response(response, _TEXT_OUTPUT)
+        self.assertIsInstance(result, ToolCallRequest)
+        self.assertEqual(result.calls[0].name, "search")
+        self.assertEqual(result.text, "checking")
 
 
 # ---------------------------------------------------------------------------

@@ -139,7 +139,12 @@ class GoogleClient(BaseClient):
         return [m["name"].removeprefix("models/") for m in json.loads(data)["models"]]
 
     # ── format ───────────────────────────────────────────────────────
-    def build_request(self, messages, output, params) -> "tuple[str, dict]":
+    #: Native tool calling implemented: functionCall / functionResponse
+    #: parts. Gemini keys results by NAME, not id — there are no call ids
+    #: on this wire, so ToolCall.id degrades to the function name.
+    supports_tools = True
+
+    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         prov = self._data["provider"]
         rmap = prov.get("reasoning_map", {})
         name = params["name"]
@@ -147,6 +152,28 @@ class GoogleClient(BaseClient):
         system_parts: list[dict] = []
         contents: list[dict] = []
         for msg in messages:
+            # One call's result: a functionResponse part in a USER turn.
+            if msg["role"] == "tool":
+                text = "\n".join(p.get("text", "")
+                                  for p in msg.get("parts") or []
+                                  if p.get("type") == "text")
+                contents.append({"role": "user", "parts": [{
+                    "functionResponse": {
+                        # call_id here carries the function NAME (see class
+                        # comment): Gemini has no ids on this wire.
+                        "name": msg.get("call_id", ""),
+                        "response": {"result": text},
+                    }}]})
+                continue
+            # The model's request to act: functionCall parts on a model turn.
+            if msg["role"] == "assistant" and msg.get("tool_calls"):
+                gparts = [_part_to_google(p) for p in msg.get("parts") or []]
+                gparts = [g for g in gparts if g is not None]
+                gparts += [{"functionCall": {"name": c["name"],
+                                             "args": c.get("arguments", {})}}
+                           for c in msg["tool_calls"]]
+                contents.append({"role": "model", "parts": gparts})
+                continue
             gparts = [_part_to_google(p) for p in msg["parts"]]
             gparts = [g for g in gparts if g is not None]
             if not gparts:
@@ -181,6 +208,15 @@ class GoogleClient(BaseClient):
             gc["responseSchema"] = _sanitize_google_schema(fmt["schema"])
 
         body: dict = {"contents": contents, "generationConfig": gc}
+        if tools:
+            body["tools"] = [{"functionDeclarations": [
+                {"name": t["function"]["name"],
+                 "description": t["function"].get("description", ""),
+                 "parameters": _sanitize_google_schema(
+                     t["function"].get("parameters", {"type": "object"}))}
+                if "function" in t else t
+                for t in tools
+            ]}]
         if system_parts:
             body["system_instruction"] = {"parts": system_parts}
         return f"/models/{name}:generateContent", body
@@ -209,10 +245,20 @@ class GoogleClient(BaseClient):
                 "of an image, or the request was blocked"
                 + (f" (finish_reason={reason})" if reason else ".")
             )
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
         try:
             text = next(p["text"] for p in parts if "text" in p)
         except StopIteration:
             text = ""
+        if calls:
+            from ...models._calls import ToolCall, ToolCallRequest
+            return ToolCallRequest(
+                calls=tuple(ToolCall(id=c.get("name", ""),
+                                     name=c.get("name", ""),
+                                     arguments=c.get("args") or {})
+                            for c in calls),
+                text=text,
+            )
         if ftype in ("json", "json_schema"):
             t = text.strip()
             if t.startswith("```"):

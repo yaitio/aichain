@@ -177,6 +177,7 @@ class Skill:
         max_retries:  int           = 0,
         retry_delay:  float         = 2.0,
         hooks:        list  | None  = None,
+        _tools:       list  | None  = None,
     ) -> None:
         input  = adapters.normalize_input(input)
         output = adapters.normalize_output(output)
@@ -192,6 +193,13 @@ class Skill:
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
+        # Internal seam, not public API — the leading underscore is the
+        # contract. The Agent declares its tools here so the provider receives
+        # them natively; Skill only *transports* declarations and returns the
+        # model's calls, it never executes anything. Callers who reach for
+        # this directly are walking on internals and have signed for it; the
+        # public way to get a raw decision without execution is Agent.step().
+        self._tools      = list(_tools) if _tools else None
         self.variables   = variables or {}
         self.options     = options   or {}
         self.name        = name
@@ -355,7 +363,14 @@ class Skill:
         retry_delay: float,
     ) -> "tuple[str | dict, Usage]":
         """One model call with transient retries; returns ``(result, usage)``."""
-        path, body = model.to_request(messages, output)
+        # Pass tools only when declared: this boundary accepts anything
+        # model-shaped (tests stub bare duck types), and a kwarg the double
+        # never heard of would break every caller that wants no tools at all.
+        _tools = getattr(self, "_tools", None)
+        if _tools:
+            path, body = model.to_request(messages, output, tools=_tools)
+        else:
+            path, body = model.to_request(messages, output)
 
         for attempt in range(max(0, max_retries) + 1):
             if attempt > 0:

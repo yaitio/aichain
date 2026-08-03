@@ -330,11 +330,18 @@ class Model:
             )
         self.cache_ttl = ttl
 
+        # Valid levels come from the provider's own reasoning_map — that map is
+        # the single source of truth for what this provider can express. The
+        # previous hardcoded (low, medium, high) was a second copy of it, and
+        # the day openai gained "none" the copy rejected a value the provider
+        # itself accepts.
         reasoning = opts.get("reasoning", None)
-        if reasoning not in (None, "low", "medium", "high"):
+        rmap      = prov.get("reasoning_map", {})
+        if reasoning is not None and reasoning not in rmap:
+            allowed = ", ".join(repr(k) for k in rmap) or "(none for this provider)"
             raise ValueError(
-                f"reasoning must be None, 'low', 'medium', or 'high'; "
-                f"got {reasoning!r}"
+                f"reasoning for the {self._provider!r} provider must be None "
+                f"or one of: {allowed}; got {reasoning!r}"
             )
         self.reasoning = reasoning
 
@@ -358,12 +365,28 @@ class Model:
             "cache_ttl":     self.cache_ttl,
         }
 
-    def to_request(self, messages: list, output: dict) -> "tuple[str, dict]":
+    def to_request(self, messages: list, output: dict,
+                   tools: "list | None" = None) -> "tuple[str, dict]":
         """
         Translate substituted universal *messages* + *output* spec into the
         provider's native ``(path, body)`` pair, by delegating to the family
         client that owns this provider's wire format.
+
+        *tools* is a list of function-calling schemas (what ``Tool.schema()``
+        returns) declared to the provider natively. Families that have not
+        implemented the tool wire format refuse loudly here — silently sending
+        a request without the declared tools would produce a model that simply
+        never calls anything, with no error anywhere.
         """
+        if tools:
+            if not getattr(self.client, "supports_tools", False):
+                raise ValueError(
+                    f"provider family {type(self.client).__name__!r} does not "
+                    f"support native tool calling yet; model {self.name!r} "
+                    "cannot be given tools"
+                )
+            return self.client.build_request(messages, output, self._params(),
+                                             tools=tools)
         return self.client.build_request(messages, output, self._params())
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
