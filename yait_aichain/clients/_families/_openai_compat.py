@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 
 
 def _part_to_openai(part: dict) -> "dict | None":
@@ -183,6 +184,77 @@ def _tool_call_request(triples, text: str = "") -> "ToolCallRequest":
     return ToolCallRequest(calls=tuple(calls), text=text)
 
 
+#: Marker that a reply is written in OpenAI's *harmony* format rather than
+#: plain text. gpt-oss models emit it, and servers that do not implement the
+#: format (mlx_lm, llama.cpp, plain vLLM without a tool-call parser) pass it
+#: through verbatim — the tool call arrives as prose in ``content`` and is
+#: lost, which is the exact silent failure the native channel exists to remove.
+_HARMONY_MARK = "<|channel|>"
+
+#: One harmony segment: a channel name, an optional ``to=`` recipient, then the
+#: body up to the next control token.
+_HARMONY_SEGMENT = re.compile(
+    r"<\|channel\|>(?P<channel>\w+)"
+    # The header holds the recipient and may carry further control tokens of
+    # its own — ``<|constrain|>json`` is routine on a call. Stopping at the
+    # first "<" would end the segment inside its own header and drop the call.
+    r"(?P<header>(?:(?!<\|message\|>).)*?)"
+    r"<\|message\|>(?P<body>.*?)"
+    r"(?=<\|end\|>|<\|call\|>|<\|return\|>|<\|start\|>|<\|channel\|>|\Z)",
+    re.DOTALL,
+)
+
+#: The recipient of a tool call inside a commentary channel:
+#: ``to=functions.get_weather``.
+_HARMONY_RECIPIENT = re.compile(r"to=functions\.(?P<name>[\w-]+)")
+
+
+def _is_harmony(text: str) -> bool:
+    return isinstance(text, str) and _HARMONY_MARK in text
+
+
+def _parse_harmony(text: str):
+    """
+    Split a harmony reply into its channels and return either a
+    :class:`ToolCallRequest` (when it asks to act) or the user-facing text.
+
+    Three channels matter. ``analysis`` is the model thinking aloud and is
+    **dropped** — surfacing it as the answer is how a reasoning model ends up
+    "replying" with its own notes. ``commentary`` carries tool calls, one per
+    segment, addressed with ``to=functions.NAME``. ``final`` is what the user
+    should see.
+
+    A truncated reply (max_tokens cut mid-call) yields a segment whose body is
+    not valid JSON; those become empty arguments rather than an exception, so
+    the executor can complain by name instead of the turn dying here.
+    """
+    calls, final_parts = [], []
+    for m in _HARMONY_SEGMENT.finditer(text):
+        channel = m.group("channel")
+        body    = m.group("body").strip()
+        if channel == "analysis":
+            continue                       # deliberation, not an answer
+        if channel == "commentary":
+            recipient = _HARMONY_RECIPIENT.search(m.group("header") or "")
+            if recipient:
+                try:
+                    args = json.loads(body) if body else {}
+                except json.JSONDecodeError:
+                    args = {}
+                calls.append((recipient.group("name"),
+                              args if isinstance(args, dict) else {}, ""))
+            elif body:
+                final_parts.append(body)   # commentary addressed to nobody
+        elif channel == "final":
+            final_parts.append(body)
+
+    text_out = "\n".join(p for p in final_parts if p)
+    if calls:
+        # ids are absent on this wire — the executor falls back to the name
+        return _tool_call_request(iter(calls), text=text_out)
+    return text_out
+
+
 def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
     """
     Extract the clean result from an OpenAI-compatible chat completion
@@ -228,6 +300,16 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
         )
 
     text  = message.get("content") or ""
+
+    # A server that does not implement harmony passes it through as prose.
+    # Parsing it here is what turns a lost tool call into a real one — and
+    # what keeps a reasoning model's notes out of the user-facing answer.
+    if _is_harmony(text):
+        parsed = _parse_harmony(text)
+        if not isinstance(parsed, str):
+            return parsed
+        text = parsed
+
     ftype = output.get("format", {}).get("type", "text")
     if ftype in ("json", "json_schema"):
         try:
