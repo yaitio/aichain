@@ -13,18 +13,23 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PKG_VERSION=$(python3 -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+# The version lives in exactly one place. pyproject.toml declares
+# `dynamic = ["version"]` and reads it from the package, so there is no
+# `project.version` key to compare against — reading one used to be step 1
+# here and had been failing with a KeyError since that change landed.
+PKG_VERSION=$(python3 -c "import re,pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('yait_aichain/__init__.py').read_text()).group(1))")
 VERSION="${1:-$PKG_VERSION}"
 TAG="v$VERSION"
 
-# 1. version consistency: argument == pyproject == __init__
+# 1. the argument, when given, must match the one source of truth
 if [ "$VERSION" != "$PKG_VERSION" ]; then
-    echo "✗ requested $VERSION but pyproject.toml says $PKG_VERSION — bump it first." >&2
+    echo "✗ requested $VERSION but yait_aichain/__init__.py says $PKG_VERSION — bump it first." >&2
     exit 1
 fi
-INIT_VERSION=$(python3 -c "import re,pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('yait_aichain/__init__.py').read_text()).group(1))")
-if [ "$INIT_VERSION" != "$PKG_VERSION" ]; then
-    echo "✗ yait_aichain/__init__.py ($INIT_VERSION) != pyproject.toml ($PKG_VERSION)." >&2
+# ...and pyproject must still be reading it from there, or the wheel would
+# carry a version nobody chose.
+if ! grep -q 'attr = "yait_aichain.__version__"' pyproject.toml; then
+    echo "✗ pyproject.toml no longer reads the version from the package." >&2
     exit 1
 fi
 
