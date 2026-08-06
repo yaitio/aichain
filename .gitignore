@@ -26,3 +26,9 @@ venv/
 
 # Cloned reference repo (karpathy/llm-council) — not part of the package
 /llm-council-master/
+
+# Research artefacts: raw logs are large and regenerable from bench/
+researches/
+
+# Scratch artefacts kept between sessions, never shipped
+temp/
