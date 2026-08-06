@@ -103,6 +103,8 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 **[State](primitives/state.md)** — suspend a Chain or Agent until an external signal (human, webhook, cron) and resume later, even in another process.
 
+**[Eval](primitives/eval.md)** — run the same cases through several models, prompts or modes, several times each, and get accuracy, reliability and cost side by side. Reports on other benchmarks' data too.
+
 ---
 
 ## What's in the box
