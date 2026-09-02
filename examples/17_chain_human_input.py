@@ -10,6 +10,12 @@ parked in the chain's store. A human reads the draft, types the final text,
 and `chain.resume(run_id, signal=...)` continues from exactly where it paused —
 step 1 is NOT re-run (its output is already in the saved variables).
 
+The store is a FileStore, not the default. A pause for a human is answered in
+another process — `resume()` is usually a separate command, sometimes the next
+day — and the default store is process-local, so the parked run would be gone
+by then and `resume()` would raise "No suspended run ... in the store". This
+example keeps both halves in one process only to stay readable.
+
 Required env vars:
     OPENAI_API_KEY
 """
@@ -18,6 +24,7 @@ import os
 from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
+from yait_aichain.state  import FileStore
 from yait_aichain.tools  import Tool, Wait
 from yait_aichain.state  import SuspendedResult
 
@@ -45,12 +52,15 @@ draft = Skill(
     name  = "draft",
 )
 
-chain = Chain(steps=[
-    (draft, "draft"),
-    Wait(reason="A human must approve or edit the draft before sending.",
-         resume_with={"reply": "str"}),
-    (SendReply(), "confirmation"),
-])
+chain = Chain(
+    steps=[
+        (draft, "draft"),
+        Wait(reason="A human must approve or edit the draft before sending.",
+             resume_with={"reply": "str"}),
+        (SendReply(), "confirmation"),
+    ],
+    store=FileStore("runs/"),      # survives the process; see the note above
+)
 
 # ── Run until it pauses for the human ───────────────────────────────────────
 result = chain.run(variables={

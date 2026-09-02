@@ -154,12 +154,91 @@ def _build_openai_compat_request(
             "type": "json_schema",
             "json_schema": {
                 "name":   fmt.get("name", "response"),
-                "schema": fmt["schema"],
+                "schema": (_sanitize_openai_schema(fmt["schema"])
+                           if fmt.get("strict", True) else fmt["schema"]),
                 "strict": fmt.get("strict", True),
             },
         }
 
     return path, body
+
+
+class SchemaNotExpressible(ValueError):
+    """A schema that strict mode cannot represent, named at the point of use.
+
+    Raised instead of letting the provider answer, because the provider's
+    message points at the wire format rather than at the schema the caller
+    wrote.
+    """
+
+
+def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
+    """
+    Convert a JSON Schema dict to the form OpenAI's ``strict`` mode accepts.
+
+    The mirror of ``_sanitize_google_schema``. Google forbids
+    ``additionalProperties`` and union types; strict mode requires the exact
+    opposite — every object closed with ``additionalProperties: false`` and
+    every property listed in ``required``. A schema written for one family
+    therefore fails on the other, and the caller ends up deriving a portable
+    form by hand. The library already normalises for one family; leaving the
+    other alone is what makes swapping providers break working code.
+
+    Fixed recursively:
+
+    * every object with ``properties`` gets ``additionalProperties: false``;
+    * every property is moved into ``required`` — an optional one keeps its
+      optionality as ``"type": ["X", "null"]``, which is how strict mode
+      spells it;
+    * ``$defs``/``definitions``, ``items`` and ``anyOf``/``oneOf``/``allOf``
+      are followed.
+
+    One shape has no strict equivalent and is reported rather than mangled:
+    a map with arbitrary keys (``additionalProperties`` given a schema, no
+    ``properties``). Strict mode cannot express it at all; the value has to
+    be modelled as an array of pairs.
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    ap = schema.get("additionalProperties")
+    if isinstance(ap, dict) and not schema.get("properties"):
+        raise SchemaNotExpressible(
+            f"{path}: a map with arbitrary keys cannot be expressed in "
+            "OpenAI strict mode. Model it as an array of {key, value} "
+            "objects, or pass strict=False."
+        )
+
+    result: dict = {}
+    for key, value in schema.items():
+        if key == "properties" and isinstance(value, dict):
+            result[key] = {k: _sanitize_openai_schema(v, f"{path}.{k}")
+                           for k, v in value.items()}
+        elif key == "items":
+            result[key] = _sanitize_openai_schema(value, f"{path}[]")
+        elif key in ("$defs", "definitions") and isinstance(value, dict):
+            result[key] = {k: _sanitize_openai_schema(v, f"{path}.{k}")
+                           for k, v in value.items()}
+        elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
+            result[key] = [_sanitize_openai_schema(v, f"{path}<{i}>")
+                           for i, v in enumerate(value)]
+        else:
+            result[key] = value
+
+    props = result.get("properties")
+    if isinstance(props, dict):
+        result["additionalProperties"] = False
+        was_required = set(result.get("required") or [])
+        for name, sub in props.items():
+            if name in was_required or not isinstance(sub, dict):
+                continue
+            t = sub.get("type")
+            if isinstance(t, str) and t != "null":
+                sub["type"] = [t, "null"]        # optional, strict spelling
+            elif isinstance(t, list) and "null" not in t:
+                sub["type"] = [*t, "null"]
+        result["required"] = list(props.keys())
+    return result
 
 
 def _tool_call_request(triples, text: str = "") -> "ToolCallRequest":
@@ -701,7 +780,8 @@ def _build_responses_api_request(
             "format": {
                 "type":   "json_schema",
                 "name":   fmt.get("name", "response"),
-                "schema": fmt["schema"],
+                "schema": (_sanitize_openai_schema(fmt["schema"])
+                           if fmt.get("strict", True) else fmt["schema"]),
                 "strict": fmt.get("strict", True),
             }
         }

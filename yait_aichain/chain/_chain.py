@@ -290,6 +290,25 @@ class Chain:
         # S3, …). It holds suspended runs for resume.
         from ..state import InMemoryStore
         self._store = store or InMemoryStore()
+        # A Wait is a pause for a human, and a human answers in another
+        # process — `resume()` is typically a separate command, sometimes the
+        # next day. The default store is process-local, so that pause is
+        # unresumable and only says so at resume time, as
+        # "No suspended run ... in the store". Warn where the mistake is made
+        # rather than where it surfaces. The default is left alone: a chain
+        # with no Wait has nothing to persist.
+        # A normalised step is (runner, output_key, input_map, kind, options).
+        if store is None and any(
+            type(st[0]).__name__ == "Wait" for st in self._steps
+        ):
+            import warnings
+            warnings.warn(
+                "This chain has a Wait step but no store, so the run is kept "
+                "in memory and cannot be resumed from another process. Pass "
+                "store=FileStore('runs/') (or another persistent store) if "
+                "resume() runs outside this process.",
+                RuntimeWarning, stacklevel=2,
+            )
         self._history: list[dict] = []
         self._accumulated: dict   = {}     # snapshot of accumulated vars after last run()
         # Summed token usage of the last run() across Skill steps; None until

@@ -305,6 +305,18 @@ class Pool:
             return [dict(r) for r in self._history]
 
     @property
+    def usage(self):
+        """Summed usage across items, or ``None`` when nothing reported any.
+
+        Items that cannot report — a plain ``Tool`` — contribute nothing
+        rather than a zero, so the sum stays the bill for the calls that
+        actually happened.
+        """
+        with self._lock:
+            parts = [r["usage"] for r in self._history if r.get("usage")]
+        return sum(parts) if parts else None
+
+    @property
     def status(self) -> dict:
         """
         Count of tasks per status code.
@@ -338,6 +350,7 @@ class Pool:
                 "output":    None,
                 "error":     None,
                 "duration":  None,
+                "usage":     None,
             }
             for i, item in enumerate(self._items)
         ]
@@ -355,7 +368,7 @@ class Pool:
 
         start = time.monotonic()
         try:
-            output = self._dispatch(merged)
+            output, usage = self._dispatch(merged)
             duration = round(time.monotonic() - start, 3)
 
             with self._lock:
@@ -363,6 +376,7 @@ class Pool:
                     "status":   DONE,
                     "output":   output,
                     "duration": duration,
+                    "usage":    usage,
                 })
             return output
 
@@ -376,13 +390,21 @@ class Pool:
                 })
             raise
 
-    def _dispatch(self, variables: dict) -> Any:
-        """Route the call to the correct runner interface."""
+    def _dispatch(self, variables: dict) -> "tuple[Any, Any]":
+        """Route the call to the correct runner interface.
+
+        Returns ``(output, usage)``. Usage is per item because that is the
+        only place it can be attributed: one shared runner serves every item,
+        and ``last_usage`` on it is overwritten by whichever thread finishes
+        next. Reading it after ``run()`` races; the runner is copied instead,
+        so each item reads its own counter.
+        """
+        from ..models._usage import Usage
         runner = self._runner
 
         if _is_tool(runner):
             kwargs = _build_tool_kwargs(runner, variables)
-            return runner.run(**kwargs)
+            return runner.run(**kwargs), None
 
         if _is_agent(runner):
             task = variables.get("task", "")
@@ -395,10 +417,20 @@ class Pool:
                 raise RuntimeError(
                     f"Agent failed: {getattr(result, 'error', 'unknown error')}"
                 )
-            return result.output
+            # An Agent reports on its result, not through ``last_usage``; only
+            # the total is available, so the split is left at zero rather than
+            # invented. Same treatment as Chain gives an Agent step.
+            tokens = getattr(result, "tokens_used", 0) or 0
+            cost   = getattr(result, "cost", None)
+            usage  = Usage(total_tokens=tokens, cost=cost) if (tokens or cost) else None
+            return result.output, usage
 
-        # Skill or Chain — both expose run(variables=...)
-        return runner.run(variables=variables)
+        # Skill or Chain — both expose run(variables=...) and report on
+        # ``last_usage``. The copy is shallow: configuration is shared, the
+        # usage counter is not.
+        import copy
+        own = copy.copy(runner)
+        return own.run(variables=variables), getattr(own, "last_usage", None)
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 
