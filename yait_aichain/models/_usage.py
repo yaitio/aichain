@@ -78,6 +78,11 @@ def extract_usage(response: dict) -> Usage:
 
     Recognises the OpenAI-compatible, Anthropic, and Google shapes; returns
     a zero ``Usage`` when no usage block is present (never raises).
+
+    Cached-prefix tokens are reported separately by all three, and are always
+    left disjoint from ``input_tokens`` here whatever the provider's own
+    convention — Anthropic reports the cache beside the input count, OpenAI
+    and Google inside it.
     """
     if not isinstance(response, dict):
         return Usage()
@@ -114,8 +119,16 @@ def extract_usage(response: dict) -> Usage:
     if isinstance(g, dict):
         inp = g.get("promptTokenCount", 0) or 0
         out = g.get("candidatesTokenCount", 0) or 0
-        total = g.get("totalTokenCount") or (inp + out)
-        return Usage(input_tokens=inp, output_tokens=out, total_tokens=total)
+        # Google follows OpenAI's convention, not Anthropic's: the cached
+        # prefix is counted *inside* promptTokenCount, so it is subtracted
+        # here to leave three disjoint counts, exactly as the OpenAI branch
+        # above does. Left folded in, a reused prefix reads as full-price
+        # input and the report says the cache never happened.
+        read = g.get("cachedContentTokenCount") or 0
+        inp  = max(0, inp - read)
+        total = g.get("totalTokenCount") or (inp + out + read)
+        return Usage(input_tokens=inp, output_tokens=out, total_tokens=total,
+                     cache_read_tokens=read)
 
     return Usage()
 

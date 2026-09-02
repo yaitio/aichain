@@ -381,8 +381,27 @@ class TestOpenAIToRequest(unittest.TestCase):
         rf = body["response_format"]
         self.assertEqual(rf["type"], "json_schema")
         self.assertEqual(rf["json_schema"]["name"],   "res")
+        # strict mode has requirements of its own — every object closed and
+        # every property required — so the schema is normalised on the way
+        # out rather than handed to the provider to reject.
+        sent = rf["json_schema"]["schema"]
+        self.assertIs(sent["additionalProperties"], False)
+        self.assertEqual(sent["required"], ["x"])
+        self.assertEqual(sent["properties"]["x"]["type"], ["integer", "null"])
+        self.assertEqual(schema["properties"]["x"]["type"], "integer",
+                         "the caller's schema must not be mutated")
+
+    def test_json_schema_not_strict_passes_through(self):
+        schema = {"type": "object", "properties": {"x": {"type": "integer"}}}
+        output = {
+            "modalities": ["text"],
+            "format": {"type": "json_schema", "name": "res", "schema": schema,
+                       "strict": False},
+        }
+        _, body = self._model().to_request([], output)
+        rf = body["response_format"]
         self.assertEqual(rf["json_schema"]["schema"], schema)
-        self.assertTrue(rf["json_schema"]["strict"])
+        self.assertFalse(rf["json_schema"]["strict"])
 
     def test_text_output_no_response_format(self):
         _, body = self._model().to_request([], _text_output())

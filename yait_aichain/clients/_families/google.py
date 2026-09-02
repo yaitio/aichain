@@ -22,11 +22,16 @@ def _sanitize_google_schema(schema: object) -> object:
     Convert a JSON Schema dict to a form accepted by Google's ``responseSchema``
     proto field.
 
-    Two incompatibilities are fixed recursively:
+    Three incompatibilities are fixed recursively:
 
     * ``additionalProperties``          — not supported; stripped silently.
     * ``"type": ["X", "null"]``         — union types are not supported;
       converted to ``"type": "X", "nullable": true``.
+    * ``"type": "array"`` with no ``items`` — Google requires the element
+      schema and rejects the whole request without it, before the first step.
+      A permissive default is filled in rather than failing: every other
+      provider accepts the loose form, so a tool that works elsewhere must
+      not be the reason a run cannot start here.
     """
     if not isinstance(schema, dict):
         return schema
@@ -46,6 +51,8 @@ def _sanitize_google_schema(schema: object) -> object:
             result[key] = _sanitize_google_schema(value)
         else:
             result[key] = value
+    if result.get("type") == "array" and "items" not in result:
+        result["items"] = {"type": "string"}
     return result
 
 
@@ -232,18 +239,18 @@ class GoogleClient(BaseClient):
                     + (f": {block}" if block else ".")
                 )
             return ""
-        parts = cands[0].get("content", {}).get("parts", [])
+        finish = cands[0].get("finishReason")
+        parts  = cands[0].get("content", {}).get("parts", [])
         if ftype == "image":
             ip = next((p for p in parts if "inlineData" in p), None)
             if ip:
                 return {"url": None, "base64": ip["inlineData"]["data"],
                         "mime_type": ip["inlineData"].get("mimeType", "image/png"),
                         "revised_prompt": ""}
-            reason = cands[0].get("finishReason")
             raise ValueError(
                 "Google returned no image part — the model emitted text instead "
                 "of an image, or the request was blocked"
-                + (f" (finish_reason={reason})" if reason else ".")
+                + (f" (finish_reason={finish})" if finish else ".")
             )
         calls = [p["functionCall"] for p in parts if "functionCall" in p]
         try:
@@ -263,5 +270,20 @@ class GoogleClient(BaseClient):
             t = text.strip()
             if t.startswith("```"):
                 t = t.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            return json.loads(t)
+            try:
+                return json.loads(t)
+            except json.JSONDecodeError as exc:
+                # A response cut off at the token ceiling arrives as HTTP 200
+                # with valid-looking JSON that simply stops. Without this the
+                # caller sees a bare JSONDecodeError at some column and has to
+                # read the client to learn it was a length limit — the
+                # OpenAI family has said so explicitly since it was written,
+                # and one family answering a question the other ignores is an
+                # inconsistency, not a setting.
+                if finish == "MAX_TOKENS":
+                    raise ValueError(
+                        "Response was truncated (finishReason='MAX_TOKENS') "
+                        "before the JSON completed — increase max_tokens."
+                    ) from exc
+                raise ValueError(f"Model returned invalid JSON: {exc}") from exc
         return text

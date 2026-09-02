@@ -122,7 +122,13 @@ _POOL_SCHEMA = {
         "parameters": {
             "type": "object",
             "properties": {
+                # An array parameter must say what its elements are: Google
+                # rejects the whole request when `items` is missing, before
+                # the first step. Declared as objects because that is the
+                # form that carries named arguments; a plain value still
+                # works at runtime and fills `arg`.
                 "items": {"type": "array",
+                          "items": {"type": "object"},
                           "description": "one entry per call; an object entry "
                                          "is spread as the tool's named "
                                          "arguments, a plain value fills `arg`"},

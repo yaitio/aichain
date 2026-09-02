@@ -158,6 +158,37 @@ class TestUsageAccounting(unittest.TestCase):
         self.assertEqual(u.cache_read_tokens, 4608)
         self.assertEqual(u.input_tokens, 392)
 
+    def test_google_cached_content_is_taken_out_of_the_input_count(self):
+        """
+        Google follows OpenAI's convention: ``cachedContentTokenCount`` is
+        counted inside ``promptTokenCount``. Until this was read the field was
+        dropped entirely and every Gemini run reported a cache read of zero,
+        whether or not the cache had been used.
+        """
+        u = extract_usage({"usageMetadata": {
+            "promptTokenCount": 5000, "candidatesTokenCount": 50,
+            "cachedContentTokenCount": 4608, "totalTokenCount": 5050,
+        }})
+        self.assertEqual(u.cache_read_tokens, 4608)
+        self.assertEqual(u.input_tokens, 392)
+
+    def test_the_three_families_report_one_situation_identically(self):
+        """One reused prefix, three provider conventions, one set of numbers."""
+        anthropic = extract_usage({"usage": {
+            "input_tokens": 392, "output_tokens": 50,
+            "cache_read_input_tokens": 4608}})
+        openai = extract_usage({"usage": {
+            "prompt_tokens": 5000, "completion_tokens": 50,
+            "prompt_tokens_details": {"cached_tokens": 4608}}})
+        google = extract_usage({"usageMetadata": {
+            "promptTokenCount": 5000, "candidatesTokenCount": 50,
+            "cachedContentTokenCount": 4608}})
+        for u in (openai, google):
+            self.assertEqual(
+                (u.input_tokens, u.output_tokens, u.cache_read_tokens),
+                (anthropic.input_tokens, anthropic.output_tokens,
+                 anthropic.cache_read_tokens))
+
     def test_a_read_costs_a_tenth_of_a_fresh_token(self):
         fresh = estimate_cost(Usage(input_tokens=1_000_000), "gpt-4o")
         cached = estimate_cost(Usage(cache_read_tokens=1_000_000), "gpt-4o")
