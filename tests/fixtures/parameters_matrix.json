@@ -500,10 +500,10 @@
    "said": []
   },
   "aspect_ratio": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "size",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "quality": {
@@ -548,10 +548,10 @@
    "said": []
   },
   "aspect_ratio": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "size",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "quality": {

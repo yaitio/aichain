@@ -84,9 +84,21 @@ class TestTheReportTellsThemApart(unittest.TestCase):
         """They were briefly reported as unknown names: a second vocabulary,
         asked per call rather than per model, and it has to be declared as
         well or every image option reads as a typo."""
-        made = _adapt("gpt-image-2.5-flare", fmt={"aspect_ratio": "16:9"})
-        self.assertEqual(made["aspect_ratio"].kind, "declined")
-        self.assertIn("size", made["aspect_ratio"].why)
+        made = _adapt("gpt-image-2.5-flare", fmt={"seed": 42})
+        self.assertEqual(made["seed"].kind, "declined")
+        self.assertIn("openai", made["seed"].why)
+
+    def test_a_shape_asked_for_either_way_is_honoured_either_way(self):
+        """Providers split down the middle on this — some take pixels and
+        ignore a ratio, some refuse pixels outright — and a caller writing one
+        request for both used to get half of it silently dropped."""
+        by_ratio = _adapt("gpt-image-2.5-flare", fmt={"aspect_ratio": "16:9"})
+        self.assertEqual(by_ratio["aspect_ratio"].kind, "adapted")
+        self.assertIn("size=", str(by_ratio["aspect_ratio"].sent))
+
+        by_pixels = _adapt("gemini-2.5-flash-image", fmt={"size": "1024x1536"})
+        self.assertEqual(by_pixels["size"].kind, "adapted")
+        self.assertIn("aspectRatio", str(by_pixels["size"].sent))
 
 
 class TestFlagsCannotBeTracedByValue(unittest.TestCase):
