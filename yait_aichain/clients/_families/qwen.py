@@ -73,15 +73,31 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str
     prompt = _last_user_text(messages)
     fmt: dict = output.get("format", {})
 
+    from ...models._adaptation import Adaptation, ADAPTED, record
     parameters: dict = {"n": 1}
     size = fmt.get("size")
     if size:
         parameters["size"] = size.replace("x", "*")
-        from ...models._adaptation import Adaptation, ADAPTED, record
         record(Adaptation(
             kind=ADAPTED, option="size", asked=size,
             sent=parameters["size"], model=model.name,
             why="this provider separates the edges with '*', not 'x'"))
+    elif fmt.get("aspect_ratio"):
+        # Pixels only here: a ratio has no field, so it becomes a size at a
+        # 1024 short edge. `seed` is not offered — the same value twice gave
+        # two different pictures, measured 2026-09-09.
+        ratio = fmt["aspect_ratio"]
+        a, _, b = str(ratio).partition(":")
+        if a.isdigit() and b.isdigit() and int(a) and int(b):
+            w, h = int(a), int(b)
+            size = (f"{round(1024 * w / h)}*1024" if w >= h
+                    else f"1024*{round(1024 * h / w)}")
+            parameters["size"] = size
+            record(Adaptation(
+                kind=ADAPTED, option="aspect_ratio", asked=ratio,
+                sent=f"size={size}", model=model.name,
+                why="this provider takes pixels, not a ratio; the shape was "
+                    "kept at a 1024 short edge"))
 
     body = {
         "model": model.name,

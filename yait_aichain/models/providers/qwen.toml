@@ -16,8 +16,10 @@ images_path      = "/compatible-mode/v1/images/generations"
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
 # Reasoning is declared because the provider maps it, though the chat models here ignore it.
-# Image keys: pixel size only, written with '*' instead of 'x'.
-format_accepts = ["size"]
+# Pixel size only, written with '*' instead of 'x'; an aspect ratio has no
+# field and is converted to a size at a 1024 short edge. No seed: the same
+# value twice gave two different pictures, measured 2026-09-09.
+format_accepts = ["size", "aspect_ratio"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
 [provider.defaults]

@@ -18,6 +18,11 @@ records what happened to the option. Two things are enforced here:
    matches what actually happened, and one that names the replacement when
    there is one.
 
+3. **Nothing the provider data claims goes undelivered.** A provider
+   declaring a control that none of its models honours means either the
+   declaration is wrong or the option was never wired — the matrix cannot say
+   which, only that they disagree, and that is enough to look.
+
 Regenerate with `python scripts/parameters.py`, then lower SILENT_CEILING to
 the number it prints.
 """
@@ -34,7 +39,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import parameters as matrix                                       # noqa: E402
 
 #: 69 of 116 the day the matrix was first built; 0 once the notice channel
-#: landed the same day. Lower it as cells are fixed. Never raise it.
+#: landed, and still 0 across 174 cells after the probe was widened to the
+#: edits path. Lower it as cells are fixed. Never raise it.
 SILENT_CEILING = 0
 
 
@@ -68,6 +74,11 @@ class TestMatrix(unittest.TestCase):
             f"{len(silent)} silent cells, ceiling is {SILENT_CEILING}. A new "
             "option is being adapted without saying so:\n"
             + "\n".join(f"  {m} · {p}" for m, p in silent))
+
+    def test_nothing_claimed_goes_undelivered(self):
+        gaps = matrix.unfulfilled(self.live)
+        self.assertEqual(gaps, [], "\n".join(
+            f"{p} claims {o} and no probed model delivers it" for p, o in gaps))
 
     def test_the_ceiling_is_not_slack(self):
         """When cells get fixed the ceiling must come down with them, or the

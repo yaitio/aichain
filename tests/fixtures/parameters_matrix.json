@@ -408,7 +408,45 @@
    "outcome": "dropped",
    "detail": "",
    "said": [
+    "declined+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
     "declined"
+   ]
+  }
+ },
+ "qwen3-32b": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "converted",
+   "detail": "enable_thinking",
+   "said": [
+    "adapted+named"
    ]
   },
   "cache_control": {
@@ -839,6 +877,220 @@
    "detail": "size",
    "said": [
     "adapted+named"
+   ]
+  },
+  "aspect_ratio": {
+   "outcome": "converted",
+   "detail": "size",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "gpt-image-2.5-flare (edit)": {
+  "size": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "quality": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "background": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_format": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_compression": {
+   "outcome": "passed",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "gpt-image-1.5 (edit)": {
+  "size": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "quality": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "background": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_format": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_compression": {
+   "outcome": "passed",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "input_fidelity": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  }
+ },
+ "grok-imagine-image (edit)": {
+  "size": {
+   "outcome": "converted",
+   "detail": "aspect_ratio",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "aspect_ratio": {
+   "outcome": "passed",
+   "detail": "",
+   "said": [
+    "translated+named"
+   ]
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "recraftv3 (edit)": {
+  "size": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
    ]
   },
   "aspect_ratio": {

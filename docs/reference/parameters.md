@@ -35,6 +35,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `grok-3-mini` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `QwQ-32B` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `qwen3-32b` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `enable_thinking` | — |
 | `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — |
 
 ## Output format (image)
@@ -48,14 +49,16 @@ without saying so. It may adapt; it may not do it quietly.
 | `reve-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — |
 | `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
-| `wan2.2-t2i-flash` | ≈ `size` | — | — | — | — | — | — | — |
+| `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — |
 
-## Claimed but not delivered
+## Output format (image edits)
 
-The provider data says this provider has the control; the request says nothing arrived. Either the declaration is wrong or the option was never wired — the matrix cannot tell which, only that they disagree.
-
-- `openai` · `input_fidelity` — claimed by the provider, delivered by none of its probed models
-- `qwen` · `reasoning` — claimed by the provider, delivered by none of its probed models
+| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` |
+|---|---|---|---|---|---|---|---|---|
+| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
+| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | ✓ |
+| `grok-imagine-image (edit)` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
+| `recraftv3 (edit)` | — | — | — | — | — | — | — | — |
 
 ## Defects
 
