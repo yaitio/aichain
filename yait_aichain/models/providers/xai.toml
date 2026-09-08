@@ -12,6 +12,15 @@ models_path      = "/v1/models"
 chat_path        = "/v1/chat/completions"
 images_path      = "/v1/images/generations"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# Reasoning only on grok-3-mini; other grok models think natively and take no setting.
+# No image keys reach this provider's image model yet — measured, not decided.
+format_accepts = []
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
 [provider.defaults]
 temperature = 1.0
 max_tokens  = 16384

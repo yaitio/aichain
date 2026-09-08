@@ -32,7 +32,9 @@ without saying so. It may adapt; it may not do it quietly.
 | `deepseek-reasoner` | — | — | — | ✓ | — | — |
 | `kimi-k2-turbo-preview` | ✓ | ✓ | — | ✓ | ≈ `type` | — |
 | `grok-3` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `grok-3-mini` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `QwQ-32B` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — |
 
 ## Output format (image)
@@ -40,12 +42,20 @@ without saying so. It may adapt; it may not do it quietly.
 | model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` |
 |---|---|---|---|---|---|---|---|---|
 | `gpt-image-2.5-flare` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
+| `gpt-image-1.5` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
 | `gemini-2.5-flash-image` | — | — | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
 | `reve-image` | — | ✓ | — | — | — | — | — | — |
 | `recraftv3` | ✓ | — | — | — | — | — | — | — |
 | `grok-imagine-image` | — | — | — | — | — | — | — | — |
 | `wan2.2-t2i-flash` | ≈ `size` | — | — | — | — | — | — | — |
+
+## Claimed but not delivered
+
+The provider data says this provider has the control; the request says nothing arrived. Either the declaration is wrong or the option was never wired — the matrix cannot tell which, only that they disagree.
+
+- `openai` · `input_fidelity` — claimed by the provider, delivered by none of its probed models
+- `qwen` · `reasoning` — claimed by the provider, delivered by none of its probed models
 
 ## Defects
 

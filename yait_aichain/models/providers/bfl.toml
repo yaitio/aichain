@@ -13,6 +13,15 @@ base_url = "https://api.bfl.ai"
 env_key  = "BFL_API_KEY"
 auth     = "x-key"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# An image provider: none of the text options apply.
+# Image keys: size is split into the two edges, and aspect_ratio is what the Kontext models take instead.
+format_accepts = ["size", "aspect_ratio", "output_format", "seed"]
+accepts = []
+
 [provider.defaults]
 temperature = 1.0
 max_tokens  = 4096

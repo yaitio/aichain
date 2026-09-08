@@ -10,6 +10,13 @@ max_tokens_field = "max_completion_tokens"
 
 chat_path        = "/chat/completions"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# No reasoning control: the value is refused at construction rather than dropped later.
+accepts = ["temperature", "top_p", "max_tokens"]
+
 [provider.defaults]
 temperature = 0.2
 max_tokens  = 8192

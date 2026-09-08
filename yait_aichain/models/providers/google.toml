@@ -8,6 +8,15 @@ env_key  = "GOOGLE_AI_API_KEY"
 auth     = "x-goog-api-key"
 max_tokens_field = "maxOutputTokens"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# No explicit caching: this provider caches on its own and reports the saving in usage.
+# No image keys reach this provider's image models yet — measured, not decided. See stage 2 in PLAN.md.
+format_accepts = []
+accepts = ["temperature", "top_p", "top_k", "max_tokens", "reasoning"]
+
 [provider.defaults]
 temperature = 1.0
 max_tokens  = 8192

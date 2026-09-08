@@ -40,6 +40,7 @@ wire format.  There are no per-provider Model subclasses.
 
 from types import SimpleNamespace
 
+from ._options import UNIVERSAL_OPTIONS, accepted_by as _q_accepts
 from ._base import (
     Model,
     models       as _q_models,
@@ -60,6 +61,12 @@ registry = SimpleNamespace(
     refresh      = _q_refresh,
     TASKS        = _TASKS,
     PROVIDERS    = tuple(_q_providers()),
+    # Which universal options a provider has a control for, so a caller can
+    # ask before making the call rather than reading a warning after it.
+    # ``None`` means the provider declares nothing, which is not the same as
+    # accepting nothing.
+    accepts      = _q_accepts,
+    OPTIONS      = tuple(UNIVERSAL_OPTIONS),
 )
 
 from ._schema import portable_schema, check_structure
@@ -69,4 +76,5 @@ __all__ = [
     "registry",
     "portable_schema",
     "check_structure",
+    "UNIVERSAL_OPTIONS",
 ]
