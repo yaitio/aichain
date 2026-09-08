@@ -13,8 +13,11 @@ max_tokens_field = "maxOutputTokens"
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
 # No explicit caching: this provider caches on its own and reports the saving in usage.
-# No image keys reach this provider's image models yet — measured, not decided. See stage 2 in PLAN.md.
-format_accepts = []
+# Shape only: this provider takes a ratio and picks the pixel count itself,
+# so `size` is kept as a shape and the pixels are left to it. Wired 2026-09-09
+# after the matrix measured "reads nothing" and the API turned out to accept
+# imageConfig.aspectRatio perfectly well — a gap, not a limitation.
+format_accepts = ["size", "aspect_ratio"]
 accepts = ["temperature", "top_p", "top_k", "max_tokens", "reasoning"]
 
 [provider.defaults]

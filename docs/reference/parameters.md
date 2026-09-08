@@ -43,7 +43,7 @@ without saying so. It may adapt; it may not do it quietly.
 |---|---|---|---|---|---|---|---|---|
 | `gpt-image-2.5-flare` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
 | `gpt-image-1.5` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
-| `gemini-2.5-flash-image` | — | — | — | — | — | — | — | — |
+| `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
 | `reve-image` | — | ✓ | — | — | — | — | — | — |
 | `recraftv3` | ✓ | — | — | — | — | — | — | — |

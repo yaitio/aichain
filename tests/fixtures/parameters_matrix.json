@@ -553,17 +553,17 @@
  },
  "gemini-2.5-flash-image": {
   "size": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "aspectRatio",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "aspect_ratio": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "renamed",
+   "detail": "aspectRatio",
    "said": [
-    "declined"
+    "translated+named"
    ]
   },
   "quality": {
