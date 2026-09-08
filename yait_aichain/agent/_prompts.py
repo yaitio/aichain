@@ -54,10 +54,34 @@ def system_message(instructions: str, mode: str,
     return "\n\n".join(parts)
 
 
-def result_message(result, error: "str | None" = None) -> str:
-    """One call's result, rendered for its ``tool`` turn. Untruncated."""
+def result_message(result, error: "str | None" = None):
+    """
+    One call's result, rendered for its ``tool`` turn. Untruncated.
+
+    Media is returned unchanged rather than rendered: a tool that hands back
+    an image was having it serialised here, one layer above the code that
+    knows how to carry it, so the agent sent a base64 blob as prose and the
+    model answered about an image it had never been shown.
+    """
     if error:
         return f"ERROR: {error}"
+    from ..models._calls import carries_media
+    if carries_media(result):
+        return result
     if isinstance(result, (dict, list)):
         return json.dumps(result, indent=1, ensure_ascii=False, default=str)
     return str(result)
+
+
+def observation_text(result, error: "str | None" = None) -> str:
+    """Always a string: what the journal records about one call's result."""
+    from ..models._calls import carries_media, MEDIA_PARTS
+    if not error and carries_media(result):
+        items = result if isinstance(result, (list, tuple)) else [result]
+        kinds = [v.get("type") for v in items
+                 if isinstance(v, dict) and v.get("type") in MEDIA_PARTS]
+        rest = " ".join(str(v) for v in items if not (
+            isinstance(v, dict) and v.get("type") in MEDIA_PARTS))
+        return (f"[returned {len(kinds)} {'/'.join(sorted(set(kinds)))}]"
+                + (f" {rest}" if rest else ""))
+    return result_message(result, error)

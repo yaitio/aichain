@@ -38,7 +38,7 @@ from clients._families.qwen import (
 from models._data import PROVIDERS as _PROVIDERS
 from models import Model, registry
 from skills import Skill
-from skills._adapters import normalize_input
+from skills._adapters import normalize_input, resolve_media, substitute
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 _B64 = base64.b64encode(_PNG).decode("ascii")
@@ -267,17 +267,39 @@ class TestParserReuse(unittest.TestCase):
 class TestFileSourceHelper(unittest.TestCase):
 
     def test_file_path_loaded_to_base64_with_mime(self):
+        """Resolution happens on send, not at construction."""
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             f.write(_PNG)
             path = f.name
         try:
             norm = normalize_input({"messages": [{"role": "user", "parts": [
                 _img("file", path=path)]}]})
-            src = norm["messages"][0]["parts"][0]["source"]
+            self.assertNotIn("data", norm["messages"][0]["parts"][0]["source"])
+
+            sent = resolve_media(norm["messages"])
+            src = sent[0]["parts"][0]["source"]
             self.assertEqual(src["data"], _B64)
             self.assertEqual(src["mime"], "image/png")
         finally:
             os.unlink(path)
+
+    def test_a_placeholder_in_the_path_points_at_a_different_file_per_call(self):
+        """The reason resolution moved: one Skill, a whole pool of images.
+
+        Resolving inside the constructor pinned a vision Skill to one file for
+        its lifetime, because substitute() only ever reached text parts."""
+        directory = tempfile.mkdtemp()
+        for name, tail in (("a.png", b"AAA"), ("b.png", b"BBB")):
+            with open(os.path.join(directory, name), "wb") as f:
+                f.write(_PNG + tail)
+
+        norm = normalize_input({"messages": [{"role": "user", "parts": [
+            _img("file", path=os.path.join(directory, "{which}"))]}]})
+
+        for name, tail in (("a.png", b"AAA"), ("b.png", b"BBB")):
+            sent = resolve_media(substitute(norm["messages"], {"which": name}))
+            data = base64.b64decode(sent[0]["parts"][0]["source"]["data"])
+            self.assertEqual(data, _PNG + tail)
 
     def test_existing_data_untouched(self):
         norm = normalize_input({"messages": [{"role": "user", "parts": [

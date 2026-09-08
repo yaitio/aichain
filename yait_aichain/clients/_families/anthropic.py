@@ -136,11 +136,19 @@ class AnthropicClient(BaseClient):
             # Anthropic's wire shape. Consecutive results merge into one user
             # message, because the API requires strict role alternation.
             if role == "tool":
+                parts = msg.get("parts") or []
+                # Anthropic is the one family that takes an image inside the
+                # result, so a tool that renders something can be looked at
+                # without a second turn.
+                if any(p.get("type") != "text" for p in parts):
+                    blocks = [_part_to_anthropic(p) for p in parts]
+                    content = [b for b in blocks if b is not None]
+                else:
+                    content = "\n".join(p.get("text", "") for p in parts
+                                        if p.get("type") == "text")
                 block = {"type": "tool_result",
                          "tool_use_id": msg.get("call_id", ""),
-                         "content": "\n".join(p.get("text", "")
-                                               for p in msg.get("parts") or []
-                                               if p.get("type") == "text")}
+                         "content": content}
                 if amsgs and amsgs[-1]["role"] == "user" and \
                    all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
                     amsgs[-1]["content"].append(block)

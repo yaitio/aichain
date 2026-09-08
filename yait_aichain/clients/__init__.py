@@ -28,6 +28,8 @@ from ._errors import (
     NotFoundError,
     ServerError,
     TaskFailedError,
+    TruncatedResponseError,
+    InvalidStructuredOutputError,
 )
 from ._families.openai     import OpenAIClient
 from ._families.perplexity import PerplexityClient
@@ -42,6 +44,8 @@ __all__ = [
     "RateLimitError",
     "AuthenticationError",
     "InsufficientCreditsError",
+    "TruncatedResponseError",
+    "InvalidStructuredOutputError",
     "InvalidRequestError",
     "NotFoundError",
     "ServerError",

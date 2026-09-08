@@ -41,6 +41,9 @@ _logging.getLogger("yait_aichain").addHandler(_logging.NullHandler())
 # ── Convenience re-exports ─────────────────────────────────────────────────────
 
 from .models import Model                                          # noqa: F401
+# Schema portability, public because every caller was writing it by hand:
+# the two provider families demand opposite forms of the same schema.
+from .models import portable_schema, check_structure               # noqa: F401
 from .models._usage import Usage                                   # noqa: F401
 from .skills import Skill                                          # noqa: F401
 from .chain  import Chain                                          # noqa: F401
@@ -61,6 +64,8 @@ from .clients import (                                             # noqa: F401
     AuthenticationError,
     InsufficientCreditsError,
     InvalidRequestError,
+    TruncatedResponseError,
+    InvalidStructuredOutputError,
     NotFoundError,
     ServerError,
     TaskFailedError,

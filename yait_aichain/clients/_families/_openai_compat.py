@@ -93,13 +93,22 @@ def _build_openai_compat_request(
     for msg in messages:
         role = msg["role"]
 
-        # A tool turn is one call's result — chat format keys it by id.
+        # A tool turn is one call's result — chat format keys it by id, and
+        # that content must be text. Media a tool produced is moved into a
+        # user message straight after, so the model sees it on this turn.
         if role == "tool":
+            from ...models._calls import split_media_result
+            msg, follow_up = split_media_result(msg)
             openai_messages.append({
                 "role":         "tool",
                 "tool_call_id": msg.get("call_id", ""),
                 "content":      _text_of(msg),
             })
+            if follow_up:
+                openai_messages.append({
+                    "role": "user",
+                    "content": [_part_to_openai(p) for p in follow_up["parts"]],
+                })
             continue
 
         # An assistant turn that asked for calls. ``arguments`` goes out as a
@@ -391,17 +400,13 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
 
     ftype = output.get("format", {}).get("type", "text")
     if ftype in ("json", "json_schema"):
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as exc:
-            if choice.get("finish_reason") == "length":
-                raise ValueError(
-                    "Response was truncated (finish_reason='length') before "
-                    "the JSON completed — increase max_tokens."
-                ) from exc
-            raise ValueError(
-                f"Model returned invalid JSON: {exc}"
-            ) from exc
+        from ._structured import parse_structured
+        usage = response.get("usage") or {}
+        return parse_structured(
+            text, output.get("format", {}).get("schema"),
+            finish_reason=choice.get("finish_reason") or "",
+            output_tokens=usage.get("completion_tokens"),
+        )
     return text
 
 
@@ -712,11 +717,19 @@ def _build_responses_api_request(
         # Tool traffic uses top-level input items, not role messages — the
         # Responses API's own shape, different from chat completions.
         if role == "tool":
+            from ...models._calls import split_media_result
+            msg, follow_up = split_media_result(msg)
             input_messages.append({
                 "type":    "function_call_output",
                 "call_id": msg.get("call_id", ""),
                 "output":  _text_of(msg),
             })
+            if follow_up:
+                input_messages.append({
+                    "role": "user",
+                    "content": [_part_to_openai(p)
+                                for p in follow_up["parts"]],
+                })
             continue
         if role == "assistant" and msg.get("tool_calls"):
             for c in msg["tool_calls"]:
@@ -825,7 +838,20 @@ def _parse_responses_api_response(response: dict, output: dict) -> "str | dict":
     if text:
         ftype = output.get("format", {}).get("type", "text")
         if ftype in ("json", "json_schema"):
-            return json.loads(text)
+            # The Responses API reports the ceiling as `incomplete_details`
+            # rather than a finish_reason, and this path had no truncation
+            # handling at all — a cut-off plan surfaced as a JSONDecodeError
+            # with nothing to attribute it to.
+            from ._structured import parse_structured
+            reason = ((response.get("incomplete_details") or {}).get("reason")
+                      or response.get("status_details", {}).get("reason", ""))
+            usage = response.get("usage") or {}
+            return parse_structured(
+                text, output.get("format", {}).get("schema"),
+                finish_reason=("max_tokens" if reason == "max_output_tokens"
+                               else reason or ""),
+                output_tokens=usage.get("output_tokens"),
+            )
         return text
     return ""
 

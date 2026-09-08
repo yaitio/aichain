@@ -17,6 +17,11 @@ import json
 from .._base import BaseClient
 
 
+#: One warning per process is enough to be seen and few enough to be ignored
+#: inside a loop; the run would otherwise print it once per call.
+_WARNED_STRIP = False
+
+
 def _sanitize_google_schema(schema: object) -> object:
     """
     Convert a JSON Schema dict to a form accepted by Google's ``responseSchema``
@@ -24,7 +29,13 @@ def _sanitize_google_schema(schema: object) -> object:
 
     Three incompatibilities are fixed recursively:
 
-    * ``additionalProperties``          — not supported; stripped silently.
+    * ``additionalProperties``          — not supported; stripped, with one
+      warning per process. It is not cosmetic: ``additionalProperties: false``
+      is how a schema says "no fields beyond these", so removing it inverts
+      the instruction. The model then returns extra fields and nothing
+      notices — the failure is only visible by diffing two providers' output
+      against the same schema. ``check_structure`` catches it on the way
+      back; the warning is so it is caught before the run.
     * ``"type": ["X", "null"]``         — union types are not supported;
       converted to ``"type": "X", "nullable": true``.
     * ``"type": "array"`` with no ``items`` — Google requires the element
@@ -39,6 +50,20 @@ def _sanitize_google_schema(schema: object) -> object:
     result: dict = {}
     for key, value in schema.items():
         if key == "additionalProperties":
+            global _WARNED_STRIP
+            if value is False and not _WARNED_STRIP:
+                _WARNED_STRIP = True
+                import warnings
+                warnings.warn(
+                    "Google does not accept 'additionalProperties', so it was "
+                    "removed from the schema — the model may return fields "
+                    "the schema does not declare. Structured replies are "
+                    "checked on the way back and will raise "
+                    "InvalidStructuredOutputError if it does. Use "
+                    "yait_aichain.portable_schema(schema, 'google') to see "
+                    "the form actually sent.",
+                    RuntimeWarning, stacklevel=3,
+                )
             continue                              # strip
         if key == "type" and isinstance(value, list):
             non_null = [t for t in value if t != "null"]
@@ -161,6 +186,12 @@ class GoogleClient(BaseClient):
         for msg in messages:
             # One call's result: a functionResponse part in a USER turn.
             if msg["role"] == "tool":
+                # A functionResponse carries JSON, not media. Anything a tool
+                # rendered is moved into a user message right after it, so the
+                # model still sees it on this turn instead of reading a
+                # description of it.
+                from ...models._calls import split_media_result
+                msg, follow_up = split_media_result(msg)
                 text = "\n".join(p.get("text", "")
                                   for p in msg.get("parts") or []
                                   if p.get("type") == "text")
@@ -171,6 +202,11 @@ class GoogleClient(BaseClient):
                         "name": msg.get("call_id", ""),
                         "response": {"result": text},
                     }}]})
+                if follow_up:
+                    gparts = [_part_to_google(p) for p in follow_up["parts"]]
+                    gparts = [g for g in gparts if g is not None]
+                    if gparts:
+                        contents.append({"role": "user", "parts": gparts})
                 continue
             # The model's request to act: functionCall parts on a model turn.
             if msg["role"] == "assistant" and msg.get("tool_calls"):
@@ -267,23 +303,17 @@ class GoogleClient(BaseClient):
                 text=text,
             )
         if ftype in ("json", "json_schema"):
-            t = text.strip()
-            if t.startswith("```"):
-                t = t.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            try:
-                return json.loads(t)
-            except json.JSONDecodeError as exc:
-                # A response cut off at the token ceiling arrives as HTTP 200
-                # with valid-looking JSON that simply stops. Without this the
-                # caller sees a bare JSONDecodeError at some column and has to
-                # read the client to learn it was a length limit — the
-                # OpenAI family has said so explicitly since it was written,
-                # and one family answering a question the other ignores is an
-                # inconsistency, not a setting.
-                if finish == "MAX_TOKENS":
-                    raise ValueError(
-                        "Response was truncated (finishReason='MAX_TOKENS') "
-                        "before the JSON completed — increase max_tokens."
-                    ) from exc
-                raise ValueError(f"Model returned invalid JSON: {exc}") from exc
+            # A response cut off at the token ceiling arrives as HTTP 200 with
+            # valid-looking JSON that simply stops; a schema this client had to
+            # strip `additionalProperties` from comes back whole and wrong.
+            # Both are HTTP 200 and the fixes are opposite, so they are
+            # separated here rather than left to the caller's JSONDecodeError.
+            from ._structured import parse_structured
+            meta = response.get("usageMetadata") or {}
+            return parse_structured(
+                text, output.get("format", {}).get("schema"),
+                finish_reason=finish or "",
+                output_tokens=meta.get("candidatesTokenCount"),
+                strip_fences=True,
+            )
         return text
