@@ -775,17 +775,17 @@
  },
  "grok-imagine-image": {
   "size": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "aspect_ratio",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "aspect_ratio": {
-   "outcome": "dropped",
+   "outcome": "passed",
    "detail": "",
    "said": [
-    "declined"
+    "translated+named"
    ]
   },
   "quality": {
