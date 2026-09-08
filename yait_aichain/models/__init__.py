@@ -62,7 +62,11 @@ registry = SimpleNamespace(
     PROVIDERS    = tuple(_q_providers()),
 )
 
+from ._schema import portable_schema, check_structure
+
 __all__ = [
     "Model",
     "registry",
+    "portable_schema",
+    "check_structure",
 ]

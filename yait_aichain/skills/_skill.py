@@ -274,8 +274,11 @@ class Skill:
         # Merge variables: instance defaults ← call-time overrides
         merged = {**self.variables, **(variables or {})}
 
-        # Substitute {placeholders} in a deep copy of the messages list
+        # Substitute {placeholders} in a deep copy of the messages list, then
+        # read any file the parts point at. Order matters: the path is itself
+        # a template, so one Skill can serve a whole Pool of images.
         messages = adapters.substitute(self._input["messages"], merged)
+        messages = adapters.resolve_media(messages)
 
         # Reset usage/history so that, if this call fails, they are None rather
         # than a stale value left over from a previous successful run().

@@ -153,6 +153,25 @@ class Tool:
         tool   = ReverseTextTool()
         result = tool(input="hello")    # ToolResult(success=True, output='olleh')
         raw    = tool.run(input="hi")   # 'ih'  (raises on error)
+
+    Returning a dict inside a Chain
+    -------------------------------
+    A step's output key names a **string** result. When ``run`` returns a
+    dict, the keys are spread into the run's variables instead and the step
+    name is not used::
+
+        Chain(steps=[(CollectFacts(), "facts")])   # returns {"brand", "decks"}
+        # accumulated: {"brand": ..., "decks": ...}   — no "facts" key
+
+    Spreading is deliberate: it is what lets one step feed several named
+    inputs downstream. What it costs is that two steps returning the same key
+    overwrite each other silently, and a later step asking for ``facts`` gets
+    a missing-argument error rather than a dict.
+
+    Wrap the payload when the step name is what the next step expects::
+
+        def run(self, ...) -> dict:
+            return {"facts": {"brand": ..., "decks": ...}}
     """
 
     name:        str  = ""

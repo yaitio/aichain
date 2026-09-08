@@ -158,6 +158,27 @@ def _resolve_file_source(part: dict) -> None:
         src["mime"] = _guess_mime(path, raw[:16])
 
 
+def resolve_media(messages: list) -> list:
+    """
+    Return *messages* with every ``kind:"file"`` source read into base64.
+
+    Called on send, after :func:`substitute`, so a media path may contain a
+    ``{placeholder}`` and be pointed at a different file per call. Parts that
+    already carry ``data`` are untouched, and a message list with no file
+    sources is returned unchanged rather than copied.
+    """
+    if not any(isinstance(p, dict) and isinstance(p.get("source"), dict)
+               and p["source"].get("kind") == "file" and not p["source"].get("data")
+               for m in messages for p in m.get("parts", [])):
+        return messages
+    out = copy.deepcopy(messages)
+    for msg in out:
+        for part in msg.get("parts", []):
+            if isinstance(part, dict):
+                _resolve_file_source(part)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Normalisation
 # ---------------------------------------------------------------------------
@@ -219,9 +240,11 @@ def normalize_input(input_: dict) -> dict:
                 # Dict with "text" but no "type" → default type to "text"
                 normalised_parts.append({"type": "text", **part})
             else:
-                # Media part: load a local-file source into inline base64.
-                if isinstance(part, dict):
-                    _resolve_file_source(part)
+                # A media part is left as written. Reading the file here — at
+                # construction — pinned a vision Skill to one file for its
+                # whole life, because substitute() only ever reached text
+                # parts. Resolution happens on send instead, so a path may
+                # carry a {placeholder} and one Skill can serve a whole Pool.
                 normalised_parts.append(part)
         msg["parts"] = normalised_parts
     return result
@@ -498,7 +521,16 @@ def substitute(messages: list, variables: dict) -> list:
                 )
                 new_parts.append(new_part)
             else:
-                new_parts.append(copy.deepcopy(part))
+                new_part = copy.deepcopy(part)
+                src = new_part.get("source")
+                if isinstance(src, dict):
+                    # The path is as much a template as the prompt is; without
+                    # this a media Skill can only ever point at one file.
+                    for field in ("path", "url"):
+                        if isinstance(src.get(field), str):
+                            src[field] = substitute_placeholders(
+                                src[field], variables)
+                new_parts.append(new_part)
         new_msg = dict(msg)
         new_msg["parts"] = new_parts
         result.append(new_msg)

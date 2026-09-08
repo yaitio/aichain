@@ -379,7 +379,9 @@ class Agent:
                     outcome     = _J_FAILED if error else _J_DONE,
                     evidence    = _evidence(CHECK, error or "executed"),
                     reason      = error or "",
-                    observation = prompts.result_message(result, error),
+                    # The journal is a written record; an image cannot go in
+                    # it, so media is named rather than embedded.
+                    observation = prompts.observation_text(result, error),
                     step        = state["steps"],
                 )
                 messages.append(tool_result_turn(

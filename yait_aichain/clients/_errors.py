@@ -92,6 +92,59 @@ class ServerError(APIError):
     """HTTP 5xx — provider-side outage or transient failure."""
 
 
+class TruncatedResponseError(APIError, ValueError):
+    """
+    A structured response was cut off at the output-token ceiling.
+
+    It arrives as HTTP 200 carrying JSON that simply stops, so without this
+    class the caller sees a bare ``JSONDecodeError`` at some column and has to
+    read the client source to learn it was a length limit. The tell that it is
+    a ceiling and not a fluctuation: **three attempts break at the same
+    position**, because a constant is not noise.
+
+    Also a ``ValueError``: before these classes existed both failures were
+    raised as one, and code catching ``ValueError`` must keep working.
+
+    Attributes
+    ----------
+    finish_reason  : the provider's own word for why it stopped
+                     (``"length"``, ``"MAX_TOKENS"``, ``"max_tokens"``).
+    output_tokens  : how many output tokens were produced, when the response
+                     reported it. That number *is* the ceiling that was hit,
+                     so it is what ``max_tokens`` has to be raised above.
+    """
+
+    def __init__(self, message: str, finish_reason: str = "",
+                 output_tokens: "int | None" = None) -> None:
+        self.finish_reason = finish_reason
+        self.output_tokens = output_tokens
+        super().__init__(200, message)
+
+
+class InvalidStructuredOutputError(APIError, ValueError):
+    """
+    A structured response came back whole and does not match the schema.
+
+    Separate from ``TruncatedResponseError`` on purpose: one is fixed by
+    raising ``max_tokens``, the other by changing the schema or the prompt,
+    and a caller that cannot tell them apart retries the wrong one.
+
+    Also a ``ValueError``, for the same backward-compatibility reason.
+
+    Attributes
+    ----------
+    problems : one string per violation found, in the order they were found.
+    value    : what the provider actually returned, so the caller can log it
+               without re-parsing.
+    """
+
+    def __init__(self, message: str, problems: "list[str] | None" = None,
+                 value: object = None) -> None:
+        self.problems = list(problems or [])
+        self.value = value
+        super().__init__(200, message)
+
+
 class TaskFailedError(APIError):
     """
     A provider's asynchronous job reached a terminal failure.
