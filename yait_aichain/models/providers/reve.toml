@@ -21,8 +21,10 @@ images_path = "/v1/image/create"
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
 # An image provider: none of the text options apply.
-# Image keys: shape only, by ratio.
-format_accepts = ["aspect_ratio"]
+# Shape only, by ratio: a pixel size is refused outright
+# (width/height come back UNRECOGNIZED_PARAMETER), so `size` is reduced to a
+# ratio. No seed for the same reason — the API rejects the parameter.
+format_accepts = ["size", "aspect_ratio"]
 accepts = []
 
 [provider.defaults]

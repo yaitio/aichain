@@ -38,6 +38,19 @@ _EDIT_PASSTHROUGH = ("style", "style_id", "negative_prompt")
 _DEFAULT_STRENGTH = 0.2
 
 
+def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
+    """'16:9' → '1820x1024'. The short edge is pinned and the long one
+    follows, which is the shape the caller asked for at this provider's
+    working resolution."""
+    a, _, b = ratio.partition(":")
+    if not (a.isdigit() and b.isdigit() and int(a) and int(b)):
+        return None
+    w, h = int(a), int(b)
+    if w >= h:
+        return f"{round(short * w / h)}x{short}"
+    return f"{short}x{round(short * h / w)}"
+
+
 def _build_recraft_generation_request(name, messages, output, path):
     """OpenAI-shaped text-to-image body (Recraft returns ``{"data": [...]}``)."""
     fmt = output.get("format", {})
@@ -47,8 +60,23 @@ def _build_recraft_generation_request(name, messages, output, path):
         "n":               1,
         "response_format": "b64_json",
     }
+    from ...models._adaptation import Adaptation, ADAPTED, record
     if fmt.get("size"):
         body["size"] = fmt["size"]
+    elif fmt.get("aspect_ratio"):
+        # This API takes pixels only — an aspect ratio is accepted and
+        # ignored, measured 2026-09-09: "16:9" came back 1024x1024. So the
+        # ratio is turned into a size at a 1024 short edge and the provider
+        # snaps it to its own nearest (1707x1024 was returned as 1820x1024).
+        size = _size_from_ratio(fmt["aspect_ratio"])
+        if size:
+            body["size"] = size
+            record(Adaptation(
+                kind=ADAPTED, option="aspect_ratio",
+                asked=fmt["aspect_ratio"], sent=f"size={size}", model=name,
+                why="this provider takes pixels, not a ratio; the shape was "
+                    "kept at a 1024 short edge and it picks the nearest it "
+                    "renders"))
     for k in _GEN_PASSTHROUGH:
         if fmt.get(k) is not None:
             body[k] = fmt[k]

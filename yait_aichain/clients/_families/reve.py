@@ -141,9 +141,30 @@ class ReveClient(BaseClient):
         prompt  = _prompt_from_messages(messages)
         sources = _image_sources(messages)
 
+        from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
+                                            record)
         common: dict = {"version": version}
         if fmt.get("aspect_ratio"):
             common["aspect_ratio"] = fmt["aspect_ratio"]
+            record(Adaptation(
+                kind=TRANSLATED, option="aspect_ratio",
+                asked=fmt["aspect_ratio"], sent="aspect_ratio",
+                model=params["name"], why="passed through"))
+        elif fmt.get("size"):
+            # This API rejects a pixel size outright — `width`/`height` come
+            # back UNRECOGNIZED_PARAMETER — so the shape is kept and the
+            # pixels left to it.
+            from math import gcd
+            w, _, h = str(fmt["size"]).partition("x")
+            if w.isdigit() and h.isdigit() and int(h):
+                g = gcd(int(w), int(h)) or 1
+                ratio = f"{int(w)//g}:{int(h)//g}"
+                common["aspect_ratio"] = ratio
+                record(Adaptation(
+                    kind=ADAPTED, option="size", asked=fmt["size"],
+                    sent=f"aspect_ratio={ratio}", model=params["name"],
+                    why="this API refuses a pixel size; the shape was kept "
+                        "and the pixels left to the provider"))
         # Optional quality controls, forwarded only when supplied.
         if fmt.get("postprocessing"):
             common["postprocessing"] = fmt["postprocessing"]

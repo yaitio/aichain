@@ -19,8 +19,11 @@ images_vectorize_path = "/v1/images/vectorize"
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
 # An image provider: none of the text options apply.
-# Image keys: pixel size only.
-format_accepts = ["size"]
+# Pixel size only: an aspect ratio is accepted by the API and ignored
+# (measured 2026-09-09, "16:9" came back 1024x1024), so it is converted to a
+# size at a 1024 short edge and the provider snaps to its own nearest.
+# No seed: random_seed twice gave two different pictures.
+format_accepts = ["size", "aspect_ratio"]
 accepts = []
 
 [provider.defaults]
