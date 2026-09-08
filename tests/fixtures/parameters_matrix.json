@@ -663,16 +663,18 @@
  },
  "reve-image": {
   "size": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "aspect_ratio",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "aspect_ratio": {
    "outcome": "passed",
    "detail": "",
-   "said": []
+   "said": [
+    "translated+named"
+   ]
   },
   "quality": {
    "outcome": "dropped",
@@ -724,10 +726,10 @@
    "said": []
   },
   "aspect_ratio": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "size",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "quality": {
