@@ -105,6 +105,13 @@ class AgentResult:
     #: could not tell apart.
     stopped_by:  "str | None" = None
     plan:        list[dict]     = field(default_factory=list)
+    #: Everything the library changed about this run's requests to fit the
+    #: provider — reasoning expressed as a thinking budget, sampling a
+    #: reasoner refuses, a model swapped underneath. Empty when nothing was
+    #: changed. Kept on the result because a warning does not survive into a
+    #: run record, and a comparison that cannot say what its arms sent is not
+    #: a comparison.
+    adaptations: list           = field(default_factory=list)
     history:     list[dict]     = field(default_factory=list)
     memory:      dict           = field(default_factory=dict)
     error:       str | None     = None

@@ -24,99 +24,30 @@ without saying so. It may adapt; it may not do it quietly.
 
 | model | `temperature` | `top_p` | `top_k` | `max_tokens` | `reasoning` | `cache_control` |
 |---|---|---|---|---|---|---|
-| `gpt-4o` | ✓ | ✓ | — **silent** | → `max_completion_tokens` | — **silent** | — **silent** |
-| `gpt-5.5` | — **silent** | — **silent** | — **silent** | → `max_output_tokens` | → `effort` | — **silent** |
+| `gpt-4o` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `gpt-5.5` | — | — | — | → `max_output_tokens` | → `effort` | — |
 | `claude-sonnet-4-6` | ✓ | ✓ | ✓ | ✓ | ≈ `budget_tokens, max_tokens, type` | ≈ `text, type` |
-| `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `thinkingBudget` | — **silent** |
-| `deepseek-chat` | ✓ | ✓ | — **silent** | ✓ | ⇄ `deepseek-chat → deepseek-reasoner` **silent** | — **silent** |
-| `deepseek-reasoner` | — **silent** | — **silent** | — **silent** | ✓ | — **silent** | — **silent** |
-| `kimi-k2-turbo-preview` | ✓ | ✓ | — **silent** | ✓ | ≈ `type` | — **silent** |
-| `grok-3` | ✓ | ✓ | — **silent** | → `max_completion_tokens` | — **silent** | — **silent** |
-| `qwen-max` | ✓ | ✓ | — **silent** | → `max_completion_tokens` | — **silent** | — **silent** |
-| `sonar` | ✓ | ✓ | — **silent** | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — **silent** |
+| `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `thinkingBudget` | — |
+| `deepseek-chat` | ✓ | ✓ | — | ✓ | ⇄ `deepseek-chat → deepseek-reasoner` | — |
+| `deepseek-reasoner` | — | — | — | ✓ | — | — |
+| `kimi-k2-turbo-preview` | ✓ | ✓ | — | ✓ | ≈ `type` | — |
+| `grok-3` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
+| `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — |
 
 ## Output format (image)
 
 | model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` |
 |---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare` | ✓ | — **silent** | ✓ | ✓ | ✓ | ✓ | — **silent** | — |
-| `gemini-2.5-flash-image` | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** |
-| `flux-2-pro` | ≈ `height, width` | ✓ | — **silent** | — **silent** | ✓ | — **silent** | ✓ | — **silent** |
-| `reve-image` | — **silent** | ✓ | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** |
-| `recraftv3` | ✓ | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** |
-| `grok-imagine-image` | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** |
-| `wan2.2-t2i-flash` | ≈ `size` | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** | — **silent** |
+| `gpt-image-2.5-flare` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
+| `gemini-2.5-flash-image` | — | — | — | — | — | — | — | — |
+| `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
+| `reve-image` | — | ✓ | — | — | — | — | — | — |
+| `recraftv3` | ✓ | — | — | — | — | — | — | — |
+| `grok-imagine-image` | — | — | — | — | — | — | — | — |
+| `wan2.2-t2i-flash` | ≈ `size` | — | — | — | — | — | — | — |
 
 ## Defects
 
-69 silent cells. Each is an option a caller set and did not get, with nothing said.
+0 cell(s) where the library changed the request without saying so, or described the change wrongly.
 
-- `gpt-4o` · `top_k` — dropped
-- `gpt-4o` · `reasoning` — dropped
-- `gpt-4o` · `cache_control` — dropped
-- `gpt-5.5` · `temperature` — dropped
-- `gpt-5.5` · `top_p` — dropped
-- `gpt-5.5` · `top_k` — dropped
-- `gpt-5.5` · `cache_control` — dropped
-- `gemini-2.5-flash` · `cache_control` — dropped
-- `deepseek-chat` · `top_k` — dropped
-- `deepseek-chat` · `reasoning` — swapped (deepseek-chat → deepseek-reasoner)
-- `deepseek-chat` · `cache_control` — dropped
-- `deepseek-reasoner` · `temperature` — dropped
-- `deepseek-reasoner` · `top_p` — dropped
-- `deepseek-reasoner` · `top_k` — dropped
-- `deepseek-reasoner` · `reasoning` — dropped
-- `deepseek-reasoner` · `cache_control` — dropped
-- `kimi-k2-turbo-preview` · `top_k` — dropped
-- `kimi-k2-turbo-preview` · `cache_control` — dropped
-- `grok-3` · `top_k` — dropped
-- `grok-3` · `reasoning` — dropped
-- `grok-3` · `cache_control` — dropped
-- `qwen-max` · `top_k` — dropped
-- `qwen-max` · `reasoning` — dropped
-- `qwen-max` · `cache_control` — dropped
-- `sonar` · `top_k` — dropped
-- `sonar` · `cache_control` — dropped
-- `gpt-image-2.5-flare` · `aspect_ratio` — dropped
-- `gpt-image-2.5-flare` · `seed` — dropped
-- `gemini-2.5-flash-image` · `size` — dropped
-- `gemini-2.5-flash-image` · `aspect_ratio` — dropped
-- `gemini-2.5-flash-image` · `quality` — dropped
-- `gemini-2.5-flash-image` · `background` — dropped
-- `gemini-2.5-flash-image` · `output_format` — dropped
-- `gemini-2.5-flash-image` · `output_compression` — dropped
-- `gemini-2.5-flash-image` · `seed` — dropped
-- `gemini-2.5-flash-image` · `input_fidelity` — dropped
-- `flux-2-pro` · `quality` — dropped
-- `flux-2-pro` · `background` — dropped
-- `flux-2-pro` · `output_compression` — dropped
-- `flux-2-pro` · `input_fidelity` — dropped
-- `reve-image` · `size` — dropped
-- `reve-image` · `quality` — dropped
-- `reve-image` · `background` — dropped
-- `reve-image` · `output_format` — dropped
-- `reve-image` · `output_compression` — dropped
-- `reve-image` · `seed` — dropped
-- `reve-image` · `input_fidelity` — dropped
-- `recraftv3` · `aspect_ratio` — dropped
-- `recraftv3` · `quality` — dropped
-- `recraftv3` · `background` — dropped
-- `recraftv3` · `output_format` — dropped
-- `recraftv3` · `output_compression` — dropped
-- `recraftv3` · `seed` — dropped
-- `recraftv3` · `input_fidelity` — dropped
-- `grok-imagine-image` · `size` — dropped
-- `grok-imagine-image` · `aspect_ratio` — dropped
-- `grok-imagine-image` · `quality` — dropped
-- `grok-imagine-image` · `background` — dropped
-- `grok-imagine-image` · `output_format` — dropped
-- `grok-imagine-image` · `output_compression` — dropped
-- `grok-imagine-image` · `seed` — dropped
-- `grok-imagine-image` · `input_fidelity` — dropped
-- `wan2.2-t2i-flash` · `aspect_ratio` — dropped
-- `wan2.2-t2i-flash` · `quality` — dropped
-- `wan2.2-t2i-flash` · `background` — dropped
-- `wan2.2-t2i-flash` · `output_format` — dropped
-- `wan2.2-t2i-flash` · `output_compression` — dropped
-- `wan2.2-t2i-flash` · `seed` — dropped
-- `wan2.2-t2i-flash` · `input_fidelity` — dropped

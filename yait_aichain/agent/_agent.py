@@ -306,7 +306,8 @@ class Agent:
 
     def new_state(self) -> dict:
         """Fresh run state — the counters ``stop_when`` conditions read."""
-        return {"steps": 0, "tokens": 0, "cost": None, "plan": None}
+        return {"steps": 0, "tokens": 0, "cost": None, "plan": None,
+                "adaptations": []}
 
     def opening(self, task: str, variables: "dict | None" = None,
                 *, ground_rules: bool = False) -> list:
@@ -446,6 +447,11 @@ class Agent:
             max_retries = 2,
         )
         reply = skill.run()
+        # Kept per run, deduplicated: a loop asks the same thing of the same
+        # model every turn, so without this the list grows by a copy a step.
+        for a in skill.last_adaptations:
+            if a not in state["adaptations"]:
+                state["adaptations"].append(a)
         usage = skill.last_usage
         state["tokens"] += getattr(usage, "total_tokens", 0) or 0
         if (c := getattr(usage, "cost", None)) is not None:
@@ -586,6 +592,7 @@ class Agent:
             steps_taken=state["steps"], tokens_used=state["tokens"],
             cost=state["cost"], stopped_by=stopped_by, error=error,
             plan=[{"goal": g} for g in (state["plan"] or [])],
+            adaptations=list(state.get("adaptations") or []),
         )
 
     def _note_unfinished(self, journal, state, why: str) -> None:

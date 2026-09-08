@@ -3,310 +3,368 @@
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "max_completion_tokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "gpt-5.5": {
   "temperature": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "top_p": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "max_output_tokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "renamed",
    "detail": "effort",
-   "warned": false
+   "said": []
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "claude-sonnet-4-6": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "max_tokens": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "converted",
    "detail": "budget_tokens, max_tokens, type",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "cache_control": {
    "outcome": "converted",
    "detail": "text, type",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   }
  },
  "gemini-2.5-flash": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "renamed",
    "detail": "topP",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "renamed",
    "detail": "topK",
-   "warned": false
+   "said": []
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "maxOutputTokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "converted",
    "detail": "thinkingBudget",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "deepseek-chat": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "swapped",
    "detail": "deepseek-chat → deepseek-reasoner",
-   "warned": false
+   "said": [
+    "swapped+named"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "deepseek-reasoner": {
   "temperature": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "top_p": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "kimi-k2-turbo-preview": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "converted",
    "detail": "type",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "grok-3": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "max_completion_tokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "qwen-max": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "max_completion_tokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "sonar": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_p": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "top_k": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "max_tokens": {
    "outcome": "renamed",
    "detail": "max_completion_tokens",
-   "warned": false
+   "said": []
   },
   "reasoning": {
    "outcome": "refused",
@@ -316,301 +374,395 @@
   "cache_control": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "gpt-image-2.5-flare": {
   "size": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "aspect_ratio": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "quality": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "background": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "output_format": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "output_compression": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": true
+   "said": [
+    "declined"
+   ]
   }
  },
  "gemini-2.5-flash-image": {
   "size": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "aspect_ratio": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "flux-2-pro": {
   "size": {
    "outcome": "converted",
    "detail": "height, width",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "aspect_ratio": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "reve-image": {
   "size": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "aspect_ratio": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "recraftv3": {
   "size": {
    "outcome": "passed",
    "detail": "",
-   "warned": false
+   "said": []
   },
   "aspect_ratio": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "grok-imagine-image": {
   "size": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "aspect_ratio": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  },
  "wan2.2-t2i-flash": {
   "size": {
    "outcome": "converted",
    "detail": "size",
-   "warned": false
+   "said": [
+    "adapted+named"
+   ]
   },
   "aspect_ratio": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "quality": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "background": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_format": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "output_compression": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "seed": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   },
   "input_fidelity": {
    "outcome": "dropped",
    "detail": "",
-   "warned": false
+   "said": [
+    "declined"
+   ]
   }
  }
 }

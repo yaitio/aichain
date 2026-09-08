@@ -304,6 +304,10 @@ class Model:
 
         # ── merge options with provider defaults (from data) ──────────
         opts = options or {}
+        # What the caller asked for, apart from what the defaults supply. Only
+        # these are reported when an option does not survive to the wire: a
+        # default that a provider ignores is not something anybody chose.
+        self._asked = dict(opts)
         self.temperature   = opts.get("temperature",   defaults.get("temperature"))
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
         self.top_p         = opts.get("top_p",         defaults.get("top_p"))
@@ -345,6 +349,10 @@ class Model:
             )
         self.reasoning = reasoning
 
+        #: What the last :meth:`to_request` had to change to fit the provider.
+        #: Empty when the request went out as asked.
+        self.last_adaptations: list = []
+
         # ── build the family client (format + transport) ──────────────
         self.client = _build_client(self._provider, resolved_key, client_options or {})
 
@@ -385,9 +393,39 @@ class Model:
                     f"support native tool calling yet; model {self.name!r} "
                     "cannot be given tools"
                 )
-            return self.client.build_request(messages, output, self._params(),
-                                             tools=tools)
-        return self.client.build_request(messages, output, self._params())
+            path, body = self._built(messages, output, tools=tools)
+        else:
+            path, body = self._built(messages, output)
+        return path, body
+
+    def _built(self, messages: list, output: dict, tools=None):
+        """Build, then say what building changed.
+
+        Everything a provider cannot take unchanged is adapted here or in the
+        family client; this is the one place all of it passes through, so it
+        is where the adaptations are gathered and announced. See
+        ``models._adaptation``: the library may adapt a request, it may not do
+        so in silence.
+        """
+        from ._adaptation import announce, collect, note_absent
+
+        with collect() as made:
+            if tools is not None:
+                path, body = self.client.build_request(
+                    messages, output, self._params(), tools=tools)
+            else:
+                path, body = self.client.build_request(
+                    messages, output, self._params())
+
+        # Options set in the output format travel beside the model's own, and
+        # are asked for per call rather than per model.
+        asked = {**self._asked,
+                 **{k: v for k, v in (output.get("format") or {}).items()
+                    if k not in ("type", "schema", "name", "strict")}}
+        note_absent(made, asked, body, self.name)
+        announce(made)
+        self.last_adaptations = list(made)
+        return path, body
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
         """

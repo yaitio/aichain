@@ -10,10 +10,13 @@ records what happened to the option. Two things are enforced here:
    has to be regenerated and reviewed as a diff in the snapshot — it cannot
    happen by accident in a family client nobody was looking at.
 
-2. **The number of silent cells only goes down.** A silent cell is an option
-   the caller set and did not get, with nothing said. The library may adapt a
-   request to a provider; it may not do so quietly. The ceiling below is
-   lowered as cells are fixed and is never raised.
+2. **The number of unreported cells only goes down.** A cell counts against
+   the ceiling when the library changed the request and said nothing — or
+   said the wrong thing, which is worse. Describing a conversion as "this
+   provider has no such control" was briefly happening to the three providers
+   that honour `reasoning` best, so the check requires a notice whose kind
+   matches what actually happened, and one that names the replacement when
+   there is one.
 
 Regenerate with `python scripts/parameters.py`, then lower SILENT_CEILING to
 the number it prints.
@@ -30,9 +33,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import parameters as matrix                                       # noqa: E402
 
-#: Measured 2026-09-10, the day the matrix was first built: 69 of 116 cells.
-#: Lower it as they are fixed. Never raise it.
-SILENT_CEILING = 69
+#: 69 of 116 the day the matrix was first built; 0 once the notice channel
+#: landed the same day. Lower it as cells are fixed. Never raise it.
+SILENT_CEILING = 0
 
 
 class TestMatrix(unittest.TestCase):
