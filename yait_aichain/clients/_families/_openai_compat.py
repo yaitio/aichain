@@ -105,6 +105,68 @@ def _part_to_openai(part: dict) -> "dict | None":
     return None
 
 
+def _part_to_responses(part: dict, role: str = "user") -> "dict | None":
+    """
+    Convert one universal part to a **Responses API** content item.
+
+    The two OpenAI wire formats name their content types differently, and the
+    difference is not cosmetic: chat completions take ``text``/``image_url``
+    with the image as an object, the Responses API takes
+    ``input_text``/``input_image`` with the image URL as a bare string, and
+    refuses the other spelling outright —
+
+        Invalid value: 'text'. Supported values are: 'input_text',
+        'input_image', 'input_audio', 'output_text', 'refusal', 'input_file'
+
+    Reusing the chat encoder here meant vision never worked on any model that
+    routes through the Responses API. It stayed invisible because a message
+    with exactly one text part was collapsed to a plain string, which is the
+    overwhelmingly common case; the moment a second part appeared — an image,
+    or a tool handing one back — the list went out in the wrong names.
+
+    An assistant turn spells its text ``output_text``: the same content in the
+    other direction has its own name here.
+    """
+    ptype = part["type"]
+
+    if ptype == "text":
+        kind = "output_text" if role == "assistant" else "input_text"
+        return {"type": kind, "text": part["text"]}
+
+    if ptype == "image":
+        src    = part["source"]
+        detail = part.get("meta", {}).get("detail", "auto")
+        kind   = src["kind"]
+        if kind == "url":
+            url = src["url"]
+        elif kind in ("base64", "file"):
+            url = f"data:{src.get('mime', 'image/png')};base64,{src['data']}"
+        else:
+            return None
+        # A string, not an object — the object form is the chat spelling.
+        return {"type": "input_image", "image_url": url, "detail": detail}
+
+    if ptype == "document":
+        src = part["source"]
+        if src.get("kind") in ("base64", "file"):
+            mime = src.get("mime", "application/pdf")
+            return {"type": "input_file",
+                    "filename": src.get("filename", "document"),
+                    "file_data": f"data:{mime};base64,{src['data']}"}
+        return None
+
+    if ptype == "audio":
+        src = part["source"]
+        if src.get("kind") == "base64":
+            mime = src.get("mime", "audio/wav")
+            return {"type": "input_audio",
+                    "input_audio": {"data": src["data"],
+                                    "format": mime.split("/")[-1]}}
+        return None
+
+    return None                                   # video: unsupported
+
+
 def _text_of(msg: dict) -> str:
     """The concatenated text parts of a universal message ("" when none)."""
     return "\n".join(p.get("text", "") for p in msg.get("parts") or []
@@ -777,7 +839,7 @@ def _build_responses_api_request(
             if follow_up:
                 input_messages.append({
                     "role": "user",
-                    "content": [_part_to_openai(p)
+                    "content": [_part_to_responses(p)
                                 for p in follow_up["parts"]],
                 })
             continue
@@ -792,20 +854,22 @@ def _build_responses_api_request(
                 })
             continue
 
-        items = [_part_to_openai(p) for p in msg["parts"]]
+        items = [_part_to_responses(p, role) for p in msg["parts"]]
         items = [it for it in items if it is not None]
         if not items:
             continue
 
         if role == "system":
             # Responses API takes the system prompt as a top-level field.
-            text_parts   = [it["text"] for it in items if it["type"] == "text"]
+            text_parts   = [it["text"] for it in items
+                            if it["type"] in ("input_text", "output_text")]
             instructions = "\n".join(text_parts)
         else:
-            if len(items) == 1 and items[0]["type"] == "text":
-                input_messages.append({"role": role, "content": items[0]["text"]})
-            else:
-                input_messages.append({"role": role, "content": items})
+            # No collapsing a lone text part to a bare string. It is the
+            # commonest shape by far, and while it took that shortcut every
+            # single-part run passed while every multi-part one failed — the
+            # defect hid behind the case nobody could miss.
+            input_messages.append({"role": role, "content": items})
 
     # gpt-5-family models are reasoning models: the Responses API rejects
     # ``temperature``/``top_p`` for them ("Unsupported parameter"), so the
