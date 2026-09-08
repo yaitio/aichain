@@ -63,7 +63,13 @@ UNIVERSAL_OPTIONS: dict = {
 
 
 #: Keys of ``output["format"]``. A second vocabulary because it is asked for
-#: per call rather than per model — the same Model renders one picture square
+#: per call rather than per model — and an **open** one, unlike the options
+#: above: providers legitimately extend it with names of their own (Recraft's
+#: ``style``, Reve's ``version`` and ``postprocessing``), which their clients
+#: read. So an unrecognised key here is reported and the request still goes,
+#: while an unrecognised model option raises at construction. The difference
+#: is not tidiness: a closed vocabulary can refuse a typo outright, an open
+#: one cannot tell a typo from a provider's own word — the same Model renders one picture square
 #: and the next one wide. Several of these names are still one provider's own
 #: word (`output_format` and `background` are OpenAI's, `aspect_ratio` is
 #: BFL's); choosing a neutral set is its own decision, and the matrix shows

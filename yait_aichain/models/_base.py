@@ -308,6 +308,20 @@ class Model:
         # these are reported when an option does not survive to the wire: a
         # default that a provider ignores is not something anybody chose.
         self._asked = dict(opts)
+
+        # An option this library has no word for is a mistake, not a request,
+        # and the place to say so is here — where it was written — rather than
+        # at the wire or, as before, nowhere at all. A misspelt `temperatur`
+        # used to be accepted, ignored, and cost a whole run to notice.
+        from ._options import UNIVERSAL_OPTIONS
+        unknown = [k for k in opts if k not in UNIVERSAL_OPTIONS]
+        if unknown:
+            raise ValueError(
+                f"unknown model option(s): {', '.join(map(repr, sorted(unknown)))}. "
+                f"Known options are: {', '.join(sorted(UNIVERSAL_OPTIONS))}. "
+                "Per-call settings such as image size or quality belong in "
+                "output={'format': {...}}, not here."
+            )
         self.temperature   = opts.get("temperature",   defaults.get("temperature"))
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
         self.top_p         = opts.get("top_p",         defaults.get("top_p"))
