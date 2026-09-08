@@ -305,7 +305,83 @@
    ]
   }
  },
+ "grok-3-mini": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
  "qwen-max": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "QwQ-32B": {
   "temperature": {
    "outcome": "passed",
    "detail": "",
@@ -380,6 +456,54 @@
   }
  },
  "gpt-image-2.5-flare": {
+  "size": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "quality": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "background": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_format": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "output_compression": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "gpt-image-1.5": {
   "size": {
    "outcome": "passed",
    "detail": "",

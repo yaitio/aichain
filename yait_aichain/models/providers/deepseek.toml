@@ -11,6 +11,13 @@ models_path      = "/models"
 
 chat_path        = "/v1/chat/completions"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# No top_k. Reasoning is a separate model here, so asking for it swaps the model.
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
 [provider.defaults]
 temperature = 0.0
 max_tokens  = 4096

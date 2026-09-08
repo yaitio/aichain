@@ -11,6 +11,15 @@ models_path      = "/compatible-mode/v1/models"
 chat_path        = "/compatible-mode/v1/chat/completions"
 images_path      = "/compatible-mode/v1/images/generations"
 
+[provider.options]
+# Which universal options this provider has a control for at
+# all — not which a given model takes on a given call, which is
+# a runtime adaptation and is reported when it happens.
+# Reasoning is declared because the provider maps it, though the chat models here ignore it.
+# Image keys: pixel size only, written with '*' instead of 'x'.
+format_accepts = ["size"]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
 [provider.defaults]
 temperature = 0.7
 max_tokens  = 2048

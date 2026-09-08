@@ -422,7 +422,7 @@ class Model:
         asked = {**self._asked,
                  **{k: v for k, v in (output.get("format") or {}).items()
                     if k not in ("type", "schema", "name", "strict")}}
-        note_absent(made, asked, body, self.name)
+        note_absent(made, asked, body, self.name, provider=self._provider)
         announce(made)
         self.last_adaptations = list(made)
         return path, body

@@ -170,7 +170,7 @@ def _leaves(obj, path=()) -> dict:
 
 
 def note_absent(made: list, asked: dict, body, model_name: str,
-                why: str = "") -> None:
+                why: str = "", provider: str = "") -> None:
     """
     Append a ``declined`` for every option in *asked* that left no trace.
 
@@ -198,13 +198,26 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     for option, value in asked.items():
         if option in spoken or value is None:
             continue
-        try:
-            arrived = _mark(value) in values
-        except TypeError:
+        if isinstance(value, bool):
+            # A flag cannot be traced by its value: every `True` in a body
+            # looks alike, and `cache_control=True` was matching an unrelated
+            # `enable_thinking=True`. A boolean counts as arrived only when
+            # the site that consumed it said so.
             arrived = False
+        else:
+            try:
+                arrived = _mark(value) in values
+            except TypeError:
+                arrived = False
         if not arrived:
+            from ._options import is_universal, why_absent
+            reason = why or (why_absent(option, provider) if provider else
+                             "this provider has no such control; the request "
+                             "was sent without it")
+            # A name the library does not know is a different thing from an
+            # option this provider lacks, and the reader reacts differently:
+            # one is a typo to fix, the other a capability to work around.
+            kind = DECLINED if (not provider or is_universal(option)) else REFUSED
             made.append(Adaptation(
-                kind=DECLINED, option=option, asked=value, sent=None,
-                model=model_name,
-                why=why or "this provider has no such control; the request "
-                           "was sent without it"))
+                kind=kind, option=option, asked=value, sent=None,
+                model=model_name, why=reason))

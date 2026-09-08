@@ -68,22 +68,27 @@ IMAGE_FORMAT = {
     "input_fidelity":     "high",
 }
 
-#: One representative per provider, and a second where the same provider
-#: routes models differently (OpenAI chat vs Responses; DeepSeek chat vs
-#: reasoner). Behaviour is recorded per model, not per provider, because it
-#: differs within a provider.
+#: One representative per provider, and a second wherever the same provider
+#: routes models differently (OpenAI chat vs Responses, DeepSeek chat vs
+#: reasoner, grok-3 vs grok-3-mini). Behaviour is recorded per model, not per
+#: provider, because it differs within one.
+#:
+#: The set has to be wide enough to exercise what the data claims: three
+#: providers first showed as "claims an option no model delivers", and in all
+#: three the declaration was right and this list was short — grok-3-mini,
+#: QwQ-32B and gpt-image-1.5 were the models that take them.
 TEXT_MODELS = [
     "gpt-4o", "gpt-5.5",
     "claude-sonnet-4-6",
     "gemini-2.5-flash",
     "deepseek-chat", "deepseek-reasoner",
     "kimi-k2-turbo-preview",
-    "grok-3",
-    "qwen-max",
+    "grok-3", "grok-3-mini",
+    "qwen-max", "QwQ-32B",
     "sonar",
 ]
 IMAGE_MODELS = [
-    "gpt-image-2.5-flare",
+    "gpt-image-2.5-flare", "gpt-image-1.5",
     "gemini-2.5-flash-image",
     "flux-2-pro",
     "reve-image",
@@ -210,6 +215,44 @@ _EXPECTED = {
 }
 
 
+def unfulfilled(matrix: dict) -> list:
+    """Cells a provider claims and does not deliver.
+
+    The declaration in the provider data says what a provider has a control
+    for; the probe says what actually reached the request. Where the two
+    disagree the library is promising something it does not do — the gap the
+    matrix alone could never see, because measurement can only report what is,
+    never what was meant.
+    """
+    import yait_aichain.models._base as base
+    from yait_aichain.models._options import accepted_by
+
+    # Compared per provider, not per model. A model narrowing an option its
+    # provider does have — gpt-4o does not reason, a reasoner refuses
+    # temperature — is expected and is reported at the time. What is worth
+    # flagging is an option a provider claims and *none* of its models
+    # delivers: then either the declaration is wrong or nothing was ever
+    # wired to it.
+    delivered, claimed = {}, {}
+    for model, cells in matrix.items():
+        prov = base._resolve_provider(model)
+        accepts = accepted_by(prov)
+        if accepts is None:
+            continue
+        claimed[prov] = accepts
+        for option, cell in cells.items():
+            if cell["outcome"] != "dropped":
+                delivered.setdefault(prov, set()).add(option)
+
+    out = []
+    for prov, accepts in sorted(claimed.items()):
+        probed = {o for cells in matrix.values() for o in cells}
+        for option in sorted(accepts & probed):
+            if option not in delivered.get(prov, set()):
+                out.append((prov, option))
+    return out
+
+
 def verdict(cell: dict) -> str:
     need = _EXPECTED[cell["outcome"]]
     said = cell.get("said") or []
@@ -291,6 +334,20 @@ def render_doc(matrix: dict) -> str:
     table("Model options (text)", TEXT_MODELS, list(TEXT_OPTIONS))
     table("Output format (image)", IMAGE_MODELS, list(IMAGE_FORMAT))
 
+    claimed = unfulfilled(matrix)
+    if claimed:
+        lines.append("## Claimed but not delivered")
+        lines.append("")
+        lines.append("The provider data says this provider has the control; "
+                     "the request says nothing arrived. Either the "
+                     "declaration is wrong or the option was never wired — "
+                     "the matrix cannot tell which, only that they disagree.")
+        lines.append("")
+        for m, p in claimed:
+            lines.append(f"- `{m}` · `{p}` — claimed by the provider, "
+                         "delivered by none of its probed models")
+        lines.append("")
+
     silent = [(m, p) for m in matrix for p, c in matrix[m].items()
               if verdict(c) != "ok"]
     lines.append("## Defects")
@@ -326,7 +383,9 @@ def main(argv) -> int:
     DOC.write_text(render_doc(matrix))
     silent = sum(1 for m in matrix for c in matrix[m].values() if verdict(c) != "ok")
     total = sum(len(v) for v in matrix.values())
-    print(f"{total} cells, {silent} silent; wrote {SNAPSHOT.name} and {DOC.name}")
+    gaps = len(unfulfilled(matrix))
+    print(f"{total} cells, {silent} unreported, {gaps} claimed-not-delivered; "
+          f"wrote {SNAPSHOT.name} and {DOC.name}")
     return 0
 
 
