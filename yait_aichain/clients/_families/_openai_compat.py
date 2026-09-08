@@ -14,6 +14,49 @@ import json
 import re
 
 
+#: One warning per (model, parameter): enough to be noticed, few enough to
+#: survive a loop.
+_WARNED_REJECTS: set = set()
+
+
+def _drop_rejected(model, fmt: dict) -> dict:
+    """
+    Remove parameters the model's API refuses, warning once for each.
+
+    The list lives in the provider data (``rejects``) rather than in a set of
+    prefixes here, because it was established by asking the API and not by
+    reading the guide: the guide names only ``gpt-image-2``, while both GPT
+    Image 2.5 models and ``gpt-image-1-mini`` refuse ``input_fidelity`` too.
+
+    Dropping rather than forwarding turns a hard 400 into a working call. It
+    is not silent: a parameter the caller set and did not get is worth a line,
+    since for some models the setting is a no-op and for others it is a
+    request the API will not honour.
+    """
+    rejects = getattr(model, "_REJECTS", None)
+    if rejects is None:                    # a real Model, not a request wrapper
+        from ...models._data import PROVIDERS
+        rejects = ((PROVIDERS.get(getattr(model, "_provider", "")) or {})
+                   .get("models", {}).get(model.name, {}).get("rejects", ()))
+    if not rejects:
+        return fmt
+    dropped = [k for k in rejects if fmt.get(k) is not None]
+    if not dropped:
+        return fmt
+    import warnings
+    for key in dropped:
+        mark = (model.name, key)
+        if mark not in _WARNED_REJECTS:
+            _WARNED_REJECTS.add(mark)
+            warnings.warn(
+                f"{model.name} does not accept {key!r}; it was dropped so the "
+                "request could be sent. The model applies its own handling "
+                "for this setting.",
+                RuntimeWarning, stacklevel=3,
+            )
+    return {k: v for k, v in fmt.items() if k not in dropped}
+
+
 def _part_to_openai(part: dict) -> "dict | None":
     """
     Convert one universal part dict to an OpenAI content item.
@@ -474,7 +517,7 @@ def _build_image_generations_request(
                 prompt = "\n".join(texts)
                 break
 
-    fmt: dict  = output.get("format", {})
+    fmt: dict  = _drop_rejected(model, output.get("format", {}))
     body: dict = {"model": model.name, "prompt": prompt, "n": 1}
 
     if fmt.get("size"):
@@ -636,7 +679,7 @@ def _build_image_edits_request(
     field_name   = "image[]" if is_gpt_image else "image"
 
     fields: list = [("model", model.name), ("prompt", _prompt_from_messages(messages))]
-    fmt = output.get("format", {})
+    fmt = _drop_rejected(model, output.get("format", {}))
     for key in ("size", "quality", "background", "output_format",
                 "input_fidelity"):
         if fmt.get(key):

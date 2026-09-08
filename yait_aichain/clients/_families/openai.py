@@ -118,6 +118,10 @@ class OpenAIClient(BaseClient):
             reasoning        = params.get("reasoning"),
             _REASONING_MAP   = prov.get("reasoning_map", {}),
             _DEFAULT_MAX_TOKENS = prov["defaults"]["max_tokens"],
+            # Parameters this model's API refuses. Carried on the wrapper
+            # because that is all a request builder receives.
+            _REJECTS = tuple(self._data.get("models", {})
+                             .get(params["name"], {}).get("rejects", ())),
         )
 
     #: Native tool calling is implemented for this family — both wire

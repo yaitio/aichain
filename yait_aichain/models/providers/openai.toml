@@ -94,14 +94,22 @@ price = { input = 0.15, output = 0.6 }
 [models."gpt-image-2.5-flare"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
+rejects = ["input_fidelity"]
 
 [models."gpt-image-2.5-sunburst"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
+rejects = ["input_fidelity"]
 
+# `rejects` lists parameters the API refuses for this model, measured against
+# it rather than read off the guide — which names only gpt-image-2, while both
+# 2.5 models and gpt-image-1-mini refuse it too. gpt-image-2 processes every
+# image input at high fidelity by itself, so dropping the parameter asks for
+# what it would have done anyway.
 [models."gpt-image-2"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0 }
+rejects = ["input_fidelity"]
 
 # Always-current image model used by ChatGPT (alias to the latest snapshot).
 [models."chatgpt-image-latest"]
@@ -115,6 +123,7 @@ price = { input = 5.0, output = 32.0 }
 [models."gpt-image-1-mini"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 2.0, output = 8.0 }
+rejects = ["input_fidelity"]
 
 [models."gpt-image-1"]
 caps  = ["text-to-image", "image-to-image"]
