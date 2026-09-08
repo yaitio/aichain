@@ -487,6 +487,10 @@ def _build_image_generations_request(
         body["background"] = fmt["background"]
     if fmt.get("output_format"):
         body["output_format"] = fmt["output_format"]
+    # Only meaningful with jpeg/webp; 0 is a legal value, so the presence of
+    # the key decides, not its truth.
+    if fmt.get("output_compression") is not None:
+        body["output_compression"] = fmt["output_compression"]
 
     # Request base64 output on every model that accepts the parameter.
     # gpt-image-* / chatgpt-image-* always return b64_json natively and reject
@@ -633,9 +637,12 @@ def _build_image_edits_request(
 
     fields: list = [("model", model.name), ("prompt", _prompt_from_messages(messages))]
     fmt = output.get("format", {})
-    for key in ("size", "quality", "background", "output_format", "input_fidelity"):
+    for key in ("size", "quality", "background", "output_format",
+                "input_fidelity"):
         if fmt.get(key):
             fields.append((key, str(fmt[key])))
+    if fmt.get("output_compression") is not None:
+        fields.append(("output_compression", str(fmt["output_compression"])))
 
     for i, src in enumerate(sources):
         if src.get("kind") == "url":

@@ -46,6 +46,12 @@ class Usage:
     # measured at roughly tenfold on Anthropic.
     cache_write_tokens: int = 0    # prefix stored this call (billed above 1x)
     cache_read_tokens:  int = 0    # prefix reused from an earlier call
+    # Image tokens sent *in*, kept out of ``input_tokens`` because they are
+    # not billed at the same rate: an edit carrying reference images costs
+    # $8/M against text's $5/M on the GPT Image 2.5 family. Measured on a real
+    # edit call — 1024 image tokens beside 19 of text — folding them together
+    # under-states the input line by 37% and the whole call by 22%.
+    image_input_tokens: int = 0
 
     def __add__(self, other: "Usage") -> "Usage":
         if not isinstance(other, Usage):
@@ -60,6 +66,7 @@ class Usage:
             cost          = merged_cost,
             cache_write_tokens = self.cache_write_tokens + other.cache_write_tokens,
             cache_read_tokens  = self.cache_read_tokens  + other.cache_read_tokens,
+            image_input_tokens = self.image_input_tokens + other.image_input_tokens,
         )
 
     def __radd__(self, other):
@@ -110,9 +117,17 @@ def extract_usage(response: dict) -> Usage:
         if isinstance(details, dict) and not read:
             read = details.get("cached_tokens") or 0
             inp  = max(0, inp - read)
-        total = u.get("total_tokens") or (inp + out + write + read)
+        # The images API reports the modality split of its input. Image tokens
+        # are dearer than text, so they are taken out here and priced apart.
+        img_in = 0
+        idet = u.get("input_tokens_details")
+        if isinstance(idet, dict):
+            img_in = idet.get("image_tokens") or 0
+            inp    = max(0, inp - img_in)
+        total = u.get("total_tokens") or (inp + out + write + read + img_in)
         return Usage(input_tokens=inp, output_tokens=out, total_tokens=total,
-                     cache_write_tokens=write, cache_read_tokens=read)
+                     cache_write_tokens=write, cache_read_tokens=read,
+                     image_input_tokens=img_in)
 
     # Google: "usageMetadata".
     g = response.get("usageMetadata")
@@ -126,9 +141,20 @@ def extract_usage(response: dict) -> Usage:
         # input and the report says the cache never happened.
         read = g.get("cachedContentTokenCount") or 0
         inp  = max(0, inp - read)
-        total = g.get("totalTokenCount") or (inp + out + read)
+        # Thinking tokens are billed, and are not in candidatesTokenCount:
+        # "When thinking is turned on, response pricing is the sum of output
+        # tokens and thinking tokens." Dropped, they under-state a reasoning
+        # call enormously — measured at 1 output token beside 235 of thought.
+        out += g.get("thoughtsTokenCount") or 0
+        # Google reports the input split by modality, same reasoning as above.
+        img_in = 0
+        for entry in g.get("promptTokensDetails") or []:
+            if isinstance(entry, dict) and entry.get("modality") == "IMAGE":
+                img_in += entry.get("tokenCount") or 0
+        inp = max(0, inp - img_in)
+        total = g.get("totalTokenCount") or (inp + out + read + img_in)
         return Usage(input_tokens=inp, output_tokens=out, total_tokens=total,
-                     cache_read_tokens=read)
+                     cache_read_tokens=read, image_input_tokens=img_in)
 
     return Usage()
 
@@ -173,15 +199,23 @@ def estimate_cost(usage: Usage, model_name: str,
     were stored but not for how long, so the lifetime has to come from the
     caller that asked for it; an unknown value is priced as the cheaper 5m
     rather than raising, since a cost estimate should never break a call.
+
+    Image input has its own rate where the provider charges one — ``price``
+    carries ``image_input`` then. Without it, an edit sending reference images
+    is billed at the text rate: measured on a real call, 22% under.
     """
     price = _price_of(model_name)
     if price is None:
         return None
     rate_in    = price["input"] / 1_000_000
+    # Falls back to the text rate: most models bill an image input at the
+    # same price, and only those that do not carry the field.
+    rate_img   = price.get("image_input", price["input"]) / 1_000_000
     write_mult = CACHE_WRITE_MULTIPLIERS.get(cache_ttl,
                                              CACHE_WRITE_MULTIPLIERS["5m"])
     return (
         usage.input_tokens  * rate_in
+        + usage.image_input_tokens * rate_img
         + usage.cache_write_tokens * rate_in * write_mult
         + usage.cache_read_tokens  * rate_in * CACHE_READ_MULTIPLIER
         + usage.output_tokens / 1_000_000 * price["output"]

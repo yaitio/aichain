@@ -77,6 +77,28 @@ price = { input = 0.15, output = 0.6 }
 
 # Image-generation models. Token-priced: input = text prompt tokens,
 # output = generated image tokens (USD per 1M tokens).
+#
+# `input` is the TEXT input rate; `image_input` is what an image sent *in*
+# costs, which is dearer — $8/M against $5/M on the 2.5 family. The provider
+# reports the split in `usage.input_tokens_details`, and a model without the
+# field is billed at the text rate.
+#
+# Within the 2.5 family the rates are identical by design. OpenAI states it
+# outright: "Equal token rates don't mean equal cost per image: token
+# consumption can differ by model and quality setting." A cheaper model is
+# cheaper per picture at the same price per token.
+# Flare is the one to reach for by default: OpenAI's own announcement calls it
+# "the default choice for most applications", higher quality than gpt-image-2
+# at half the latency. Sunburst is the premium end — it earns its place where
+# edits need tight control, not where a picture is merely wanted.
+[models."gpt-image-2.5-flare"]
+caps  = ["text-to-image", "image-to-image"]
+price = { input = 5.0, output = 30.0, image_input = 8.0 }
+
+[models."gpt-image-2.5-sunburst"]
+caps  = ["text-to-image", "image-to-image"]
+price = { input = 5.0, output = 30.0, image_input = 8.0 }
+
 [models."gpt-image-2"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0 }
