@@ -1,0 +1,616 @@
+{
+ "gpt-4o": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "gpt-5.5": {
+  "temperature": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_output_tokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "effort",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "claude-sonnet-4-6": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "converted",
+   "detail": "budget_tokens, max_tokens, type",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "converted",
+   "detail": "text, type",
+   "warned": false
+  }
+ },
+ "gemini-2.5-flash": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "renamed",
+   "detail": "topP",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "renamed",
+   "detail": "topK",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "maxOutputTokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "converted",
+   "detail": "thinkingBudget",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "deepseek-chat": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "swapped",
+   "detail": "deepseek-chat → deepseek-reasoner",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "deepseek-reasoner": {
+  "temperature": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "kimi-k2-turbo-preview": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "converted",
+   "detail": "type",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "grok-3": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "qwen-max": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "sonar": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "warned": false
+  },
+  "reasoning": {
+   "outcome": "refused",
+   "detail": "reasoning for the 'perplexity' provider must be None or one of: (none for this provider); got 'high'",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "gpt-image-2.5-flare": {
+  "size": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": true
+  }
+ },
+ "gemini-2.5-flash-image": {
+  "size": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "flux-2-pro": {
+  "size": {
+   "outcome": "converted",
+   "detail": "height, width",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "reve-image": {
+  "size": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "recraftv3": {
+  "size": {
+   "outcome": "passed",
+   "detail": "",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "grok-imagine-image": {
+  "size": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ },
+ "wan2.2-t2i-flash": {
+  "size": {
+   "outcome": "converted",
+   "detail": "size",
+   "warned": false
+  },
+  "aspect_ratio": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "output_compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "seed": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  },
+  "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "warned": false
+  }
+ }
+}
