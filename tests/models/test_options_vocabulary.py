@@ -60,16 +60,26 @@ class TestTheVocabularyIsDeclared(unittest.TestCase):
 
 class TestTheReportTellsThemApart(unittest.TestCase):
 
-    def test_an_unknown_name_is_refused_not_declined(self):
-        made = _adapt("gpt-4o", {"temperatur": 0.5})
-        self.assertEqual(made["temperatur"].kind, "refused")
-        self.assertIn("not an option this library knows",
-                      made["temperatur"].why)
+    def test_an_unknown_name_is_refused_where_it_was_written(self):
+        """Not at the wire, and not — as before — nowhere at all. A misspelt
+        option used to be accepted, ignored, and cost a whole run to notice."""
+        with self.assertRaises(ValueError) as ctx:
+            Model("gpt-4o", api_key="k", options={"temperatur": 0.5})
+        self.assertIn("temperatur", str(ctx.exception))
 
     def test_the_refusal_lists_what_does_exist(self):
         """A typo is fixed by seeing the right spelling, not by being told no."""
-        made = _adapt("gpt-4o", {"temperatur": 0.5})
-        self.assertIn("temperature", made["temperatur"].why)
+        with self.assertRaises(ValueError) as ctx:
+            Model("gpt-4o", api_key="k", options={"temperatur": 0.5})
+        self.assertIn("temperature", str(ctx.exception))
+
+    def test_it_points_at_the_other_vocabulary(self):
+        """`quality` is a real option — of the other kind. Saying only "not
+        known" would send a reader looking for a misspelling that is not
+        there."""
+        with self.assertRaises(ValueError) as ctx:
+            Model("gpt-4o", api_key="k", options={"quality": "high"})
+        self.assertIn("output=", str(ctx.exception))
 
     def test_a_real_option_the_provider_lacks_is_declined_with_a_way_round(self):
         made = _adapt("gpt-4o", {"top_k": 37})

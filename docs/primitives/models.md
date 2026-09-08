@@ -96,12 +96,22 @@ use.
 
 | Key | Type | Notes |
 |---|---|---|
-| `temperature` | `float` | Sampling temperature. |
+| `temperature` | `float` | Sampling temperature. Reasoning models set their own and refuse it; when that happens the library says so rather than dropping it quietly. |
 | `max_tokens` | `int` | Maximum output tokens. |
 | `top_p` | `float` | Nucleus sampling mass. |
-| `top_k` | `int` | Top-K sampling (provider-dependent). |
-| `cache_control` | `bool` | Enable provider-level prompt caching. |
+| `top_k` | `int` | Top-K sampling. Anthropic and Google take it; the OpenAI-compatible wire has no such field and it is declined with a notice — see [Parameters, per provider](../reference/parameters.md). |
+| `cache_control` | `bool` | Enable provider-level prompt caching. Anthropic is the one provider with an explicit breakpoint; the others cache implicitly and the saving shows in the usage report instead. |
 | `reasoning` | `None`\|`"low"`\|`"medium"`\|`"high"` | Universal reasoning depth (below). |
+
+An option this library has no word for **raises at construction**, naming the
+ones that exist — a misspelt `temperatur` used to be accepted, ignored, and
+cost a whole run to notice. What each option actually does on each provider,
+built by making the requests rather than by writing prose, is in
+[Parameters, per provider](../reference/parameters.md).
+
+Whatever the library has to change to fit a provider, it says: a warning once
+per (model, option), and a record on `Skill.last_adaptations` and
+`AgentResult.adaptations` that a run can keep.
 
 ### Universal reasoning
 
