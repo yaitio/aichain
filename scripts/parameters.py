@@ -84,7 +84,7 @@ TEXT_MODELS = [
     "deepseek-chat", "deepseek-reasoner",
     "kimi-k2-turbo-preview",
     "grok-3", "grok-3-mini",
-    "qwen-max", "QwQ-32B",
+    "qwen-max", "QwQ-32B", "qwen3-32b",
     "sonar",
 ]
 IMAGE_MODELS = [
@@ -103,6 +103,19 @@ IMAGE_MODELS = [
 TEXT_MSGS  = [{"role": "system", "parts": [{"type": "text", "text": "be brief"}]},
               {"role": "user",   "parts": [{"type": "text", "text": "hi"}]}]
 TEXT_OUT   = {"format": {"type": "text"}}
+
+#: Models probed a second time with an input image, because several format
+#: keys exist only on the edits path — `input_fidelity` is read there and
+#: nowhere else, and probing generation alone reported it as claimed and
+#: never delivered.
+EDIT_MODELS = ["gpt-image-2.5-flare", "gpt-image-1.5", "grok-imagine-image",
+               "recraftv3"]
+_PNG = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+        "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+EDIT_MSGS = [{"role": "user", "parts": [
+    {"type": "text", "text": "make it darker"},
+    {"type": "image", "source": {"kind": "base64", "mime": "image/png",
+                                 "data": _PNG}}]}]
 #: `modalities` as well as the format type: Google enters its image path on
 #: the modality, not the format, so a probe without it was not touching the
 #: branch at all — which is why that provider first measured as reading none
@@ -119,10 +132,18 @@ def _leaves(obj, path=()) -> dict:
         for k, v in obj.items():
             out.update(_leaves(v, path + (str(k),)))
         return out
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple)):
         out = {}
         for i, v in enumerate(obj):
-            out.update(_leaves(v, path + (f"[{i}]",)))
+            # A multipart body is a list of (name, value) pairs. Keyed by
+            # position, adding one field shifts every later one and the diff
+            # reports unrelated parameters as changed — every edit row read
+            # as "converted" when the option had simply been appended.
+            if (isinstance(v, (list, tuple)) and len(v) == 2
+                    and isinstance(v[0], str)):
+                out.update(_leaves(v[1], path + (v[0],)))
+            else:
+                out.update(_leaves(v, path + (f"[{i}]",)))
         return out
     return {path: obj}
 
@@ -138,12 +159,12 @@ def _reset_once_per_process_warnings():
     _adaptation.reset_warnings()
 
 
-def _build(model_name, options, out):
+def _build(model_name, options, out, messages=None):
     _reset_once_per_process_warnings()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         m = Model(model_name, api_key="k", options=options or None)
-        path, body = m.to_request(TEXT_MSGS, out)
+        path, body = m.to_request(messages or TEXT_MSGS, out)
     # The model actually named on the wire: in the body for most providers,
     # in the URL for Google.
     sent = body.get("model") if isinstance(body, dict) else None
@@ -154,6 +175,7 @@ def _build(model_name, options, out):
 
 def probe(model_name, param, value, *, where) -> dict:
     """One cell: what happened to *param* on *model_name*."""
+    msgs = EDIT_MSGS if where == "edit" else None
     if where == "options":
         base_args = ({}, TEXT_OUT)
         probe_args = ({param: value}, TEXT_OUT)
@@ -163,12 +185,13 @@ def probe(model_name, param, value, *, where) -> dict:
                            "format": {**IMAGE_OUT["format"], param: value}})
 
     try:
-        base_body, base_model, _ = _build(model_name, *base_args)
+        base_body, base_model, _ = _build(model_name, *base_args, messages=msgs)
     except Exception as exc:
         return {"outcome": "error", "detail": f"baseline: {type(exc).__name__}: {exc}"[:160],
                 "warned": False}
     try:
-        body, sent_model, warned = _build(model_name, *probe_args)
+        body, sent_model, warned = _build(model_name, *probe_args,
+                                          messages=msgs)
     except ValueError as exc:
         # Raised by the library before anything was sent: the fourth fate.
         return {"outcome": "refused", "detail": str(exc)[:160], "warned": False}
@@ -196,7 +219,11 @@ def probe(model_name, param, value, *, where) -> dict:
         return {"outcome": "dropped", "detail": "", "said": said}
 
     names = sorted({p[-1] for p in added})
-    same_value = [p for p, v in added.items() if v == value]
+    # A multipart field is always a string on the wire, so 50 arrives as
+    # "50". Comparing strictly reported a delivered option as converted and
+    # then demanded a notice naming a replacement that never happened.
+    same_value = [p for p, v in added.items()
+                  if v == value or str(v) == str(value)]
     if any(p[-1] == param for p in same_value):
         return {"outcome": "passed", "detail": "", "said": said}
     if same_value:
@@ -216,7 +243,10 @@ _EXPECTED = {
     # Nothing went out. Either notice is honest; neither needs a replacement.
     "dropped":   ("declined", "declined+named", "adapted", "adapted+named"),
     "refused":   (),
-    "error":     (),
+    # An error is not a pass. Every edit cell was raising NameError while the
+    # summary reported zero defects, because a cell that could not be built
+    # counted as nothing rather than as unknown.
+    "error":     ("__never__",),
 }
 
 
@@ -278,6 +308,9 @@ def build_matrix() -> dict:
     for model in IMAGE_MODELS:
         rows[model] = {p: probe(model, p, v, where="format")
                        for p, v in IMAGE_FORMAT.items()}
+    for model in EDIT_MODELS:
+        rows[f"{model} (edit)"] = {p: probe(model, p, v, where="edit")
+                                   for p, v in IMAGE_FORMAT.items()}
     return rows
 
 
@@ -338,6 +371,8 @@ def render_doc(matrix: dict) -> str:
 
     table("Model options (text)", TEXT_MODELS, list(TEXT_OPTIONS))
     table("Output format (image)", IMAGE_MODELS, list(IMAGE_FORMAT))
+    table("Output format (image edits)", [f"{m} (edit)" for m in EDIT_MODELS],
+          list(IMAGE_FORMAT))
 
     claimed = unfulfilled(matrix)
     if claimed:

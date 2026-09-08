@@ -300,9 +300,28 @@ class OpenAIClient(BaseClient):
             # client used for this provider); here we only do chat / vision.
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if _is_qwq(m.name):
+                # QwQ reasons on every call whatever it is asked; the level
+                # has nowhere to go. Saying so beats leaving a caller to
+                # believe "low" bought them anything.
                 body["enable_thinking"] = True
+                if m.reasoning:
+                    record(Adaptation(
+                        kind=DECLINED, option="reasoning", asked=m.reasoning,
+                        sent="enable_thinking=true", model=m.name,
+                        why="this model reasons on every call and takes no "
+                            "level; the setting changes nothing"))
             elif _is_qwen3(m.name) and m.reasoning:
                 body["enable_thinking"] = True
+                record(Adaptation(
+                    kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                    sent="enable_thinking", model=m.name,
+                    why="this provider has a thinking switch, not a level, so "
+                        "any level turns it on"))
+            elif m.reasoning:
+                record(Adaptation(
+                    kind=DECLINED, option="reasoning", asked=m.reasoning,
+                    sent=None, model=m.name,
+                    why="this model has no thinking switch"))
             return path, body
 
         raise ValueError(f"Unknown openai-family provider {p!r}")

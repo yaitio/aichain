@@ -784,6 +784,22 @@ def _build_xai_image_edit_request(
             for s in sources[:3]]                      # xAI Imagine: up to 3 source images
     body = {"model": model.name, "prompt": _prompt_from_messages(messages),
             "response_format": "b64_json"}
+    # Shape control works on this path too — measured 2026-09-09, an edit with
+    # aspect_ratio "16:9" came back 1280x720 — and was read by neither the
+    # generation nor the edit branch until now.
+    fmt = output.get("format", {})
+    from .openai import _ratio_of
+    _ratio = fmt.get("aspect_ratio") or (
+        _ratio_of(fmt["size"]) if fmt.get("size") else None)
+    if _ratio:
+        from ...models._adaptation import Adaptation, ADAPTED, TRANSLATED, record
+        body["aspect_ratio"] = _ratio
+        record(Adaptation(
+            kind=TRANSLATED if fmt.get("aspect_ratio") else ADAPTED,
+            option="aspect_ratio" if fmt.get("aspect_ratio") else "size",
+            asked=fmt.get("aspect_ratio") or fmt.get("size"),
+            sent=f"aspect_ratio={_ratio}", model=model.name,
+            why="this API takes a ratio, not a pixel size"))
     # Single image → `image`; multiple → `images` array (both confirmed by live probe).
     if len(imgs) == 1:
         body["image"] = imgs[0]
