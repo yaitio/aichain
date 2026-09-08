@@ -22,6 +22,26 @@ from .._base import BaseClient
 _WARNED_STRIP = False
 
 
+#: The shapes this provider will render. It chooses the pixel count itself,
+#: so a caller who names pixels gets the nearest of these — measured
+#: 2026-09-09: `aspectRatio` "16:9" returns 1344x768 and "9:16" 768x1344,
+#: while `imageSize` had no effect on gemini-2.5-flash-image.
+_ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
+                  "9:16", "16:9", "21:9")
+
+
+def _nearest_ratio(size: str) -> "str | None":
+    """The supported aspect ratio closest to a 'WIDTHxHEIGHT' string."""
+    w, _, h = size.partition("x")
+    if not (w.isdigit() and h.isdigit() and int(h)):
+        return None
+    want = int(w) / int(h)
+    def _of(r):
+        a, _, b = r.partition(":")
+        return int(a) / int(b)
+    return min(_ASPECT_RATIOS, key=lambda r: abs(_of(r) - want))
+
+
 def _sanitize_google_schema(schema: object) -> object:
     """
     Convert a JSON Schema dict to a form accepted by Google's ``responseSchema``
@@ -247,8 +267,31 @@ class GoogleClient(BaseClient):
         ftype = fmt.get("type", "text")
         modalities = output.get("modalities", ["text"])
         if "image" in modalities:
+            from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
+                                               record)
             mods = ["IMAGE"] + (["TEXT"] if "text" in modalities else [])
             gc["responseModalities"] = mods
+
+            # Shape control. This provider takes a ratio and picks the pixels;
+            # it was reading none of our image keys at all until now, which
+            # measured as "reads nothing" and was in fact "never wired".
+            ratio = fmt.get("aspect_ratio")
+            if ratio:
+                record(Adaptation(
+                    kind=TRANSLATED, option="aspect_ratio", asked=ratio,
+                    sent="imageConfig.aspectRatio", model=params["name"],
+                    why="this provider's own name for the same thing"))
+            elif fmt.get("size"):
+                ratio = _nearest_ratio(fmt["size"])
+                if ratio:
+                    record(Adaptation(
+                        kind=ADAPTED, option="size", asked=fmt["size"],
+                        sent=f"imageConfig.aspectRatio={ratio}",
+                        model=params["name"],
+                        why="this provider chooses the pixel count itself, so "
+                            "the shape was kept and the size left to it"))
+            if ratio:
+                gc["imageConfig"] = {"aspectRatio": ratio}
         elif ftype == "json":
             gc["responseMimeType"] = "application/json"
         elif ftype == "json_schema":

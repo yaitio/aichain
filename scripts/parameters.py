@@ -103,7 +103,11 @@ IMAGE_MODELS = [
 TEXT_MSGS  = [{"role": "system", "parts": [{"type": "text", "text": "be brief"}]},
               {"role": "user",   "parts": [{"type": "text", "text": "hi"}]}]
 TEXT_OUT   = {"format": {"type": "text"}}
-IMAGE_OUT  = {"format": {"type": "image"}}
+#: `modalities` as well as the format type: Google enters its image path on
+#: the modality, not the format, so a probe without it was not touching the
+#: branch at all — which is why that provider first measured as reading none
+#: of the image keys.
+IMAGE_OUT  = {"format": {"type": "image"}, "modalities": ["image"]}
 
 
 # ── Probing ──────────────────────────────────────────────────────────────────
@@ -155,7 +159,8 @@ def probe(model_name, param, value, *, where) -> dict:
         probe_args = ({param: value}, TEXT_OUT)
     else:
         base_args = ({}, IMAGE_OUT)
-        probe_args = ({}, {"format": {**IMAGE_OUT["format"], param: value}})
+        probe_args = ({}, {**IMAGE_OUT,
+                           "format": {**IMAGE_OUT["format"], param: value}})
 
     try:
         base_body, base_model, _ = _build(model_name, *base_args)
