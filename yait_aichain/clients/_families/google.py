@@ -234,6 +234,11 @@ class GoogleClient(BaseClient):
         if params.get("top_k") is not None:
             gc["topK"] = params["top_k"]
         if params.get("reasoning"):
+            from ...models._adaptation import Adaptation, ADAPTED, record
+            record(Adaptation(
+                kind=ADAPTED, option="reasoning", asked=params["reasoning"],
+                sent="thinkingConfig.thinkingBudget", model=params["name"],
+                why="sent as a thinking budget, this provider's own control"))
             budget = rmap.get(params["reasoning"])
             if budget is not None:
                 gc["thinkingConfig"] = {"thinkingBudget": budget}

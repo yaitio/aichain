@@ -212,6 +212,11 @@ class Skill:
         # Reading it is optional; it never affects run()'s inputs or output.
         # For a multi-turn run it is the sum across turns.
         self.last_usage: "Usage | None" = None
+        #: What the library had to change about the last call to fit the
+        #: provider — empty when it went out as asked. A warning is easy to
+        #: miss in a log; this is what a run record can keep, so a comparison
+        #: between two models can state what its arms actually sent.
+        self.last_adaptations: list = []
         # Generated replies of the most recent run(), in order (multi-turn
         # directed reasoning); ``history[-1]`` is the returned value. A single-
         # shot run leaves a one-element list. ``None`` until the first call.
@@ -283,6 +288,7 @@ class Skill:
         # Reset usage/history so that, if this call fails, they are None rather
         # than a stale value left over from a previous successful run().
         self.last_usage = None
+        self.last_adaptations = []
         self.history    = None
 
         # Try each model in the fallback chain.  Transient failures
@@ -321,6 +327,11 @@ class Skill:
             result, usage = self._call_once(
                 model, messages, self._output, max_retries, retry_delay)
             self.last_usage = usage
+            # A Model-like object from outside the library need not have
+            # grown this attribute; a new field of ours must not break code
+            # that was working.
+            self.last_adaptations = list(
+                getattr(model, "last_adaptations", ()) or ())
             self.history    = [result]
             return result
 
@@ -354,6 +365,8 @@ class Skill:
                             "parts": [{"type": "text", "text": text}]})
 
         self.last_usage = total_usage
+        self.last_adaptations = list(
+            getattr(model, "last_adaptations", ()) or ())
         self.history    = history
         return final
 

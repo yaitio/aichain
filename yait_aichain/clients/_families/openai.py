@@ -20,6 +20,9 @@ import json as _json
 import os as _os
 from types import SimpleNamespace
 
+from ...models._adaptation import (Adaptation, ADAPTED, DECLINED, SWAPPED,
+                                   record)
+
 from .._base import BaseClient
 from ._openai_compat import (
     _part_to_openai,                       # noqa: F401  (kept for parity)
@@ -149,10 +152,21 @@ class OpenAIClient(BaseClient):
             # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
             # routes through the Responses API branch above).
             if _is_o_series_model(m.name):
-                body.pop("temperature", None); body.pop("top_p", None)
+                for knob in ("temperature", "top_p"):
+                    if body.pop(knob, None) is not None:
+                        record(Adaptation(
+                            kind=DECLINED, option=knob,
+                            asked=getattr(m, knob), model=m.name,
+                            why="a reasoning model sets its own sampling; "
+                                "this provider rejects the field"))
                 if m.reasoning:
                     eff = m._REASONING_MAP.get(m.reasoning)
-                    if eff: body["reasoning_effort"] = eff
+                    if eff:
+                        body["reasoning_effort"] = eff
+                        record(Adaptation(
+                            kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                            sent="reasoning_effort", model=m.name,
+                            why="sent as reasoning_effort"))
             return path, body
 
         if p == "xai":
@@ -168,7 +182,12 @@ class OpenAIClient(BaseClient):
             # grok models reject it (grok-4 reasoners think natively).
             if m.reasoning and m.name.startswith("grok-3-mini"):
                 eff = m._REASONING_MAP.get(m.reasoning)
-                if eff: body["reasoning_effort"] = eff
+                if eff:
+                    body["reasoning_effort"] = eff
+                    record(Adaptation(
+                        kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                        sent="reasoning_effort", model=m.name,
+                        why="sent as reasoning_effort"))
             return path, body
 
         if p in ("perplexity", "private"):
@@ -184,16 +203,46 @@ class OpenAIClient(BaseClient):
         if p == "kimi":
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if m.reasoning is not None and m._REASONING_MAP.get(m.reasoning) == "enabled":
+                if body.get("temperature") not in (None, 1.0):
+                    record(Adaptation(
+                        kind=DECLINED, option="temperature",
+                        asked=body["temperature"], sent=1.0, model=m.name,
+                        why="this provider requires temperature 1.0 while "
+                            "thinking is enabled"))
                 body["temperature"] = 1.0
                 body["thinking"] = {"type": "enabled"}
+                record(Adaptation(
+                    kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                    sent="thinking", model=m.name,
+                    why="sent as this provider's thinking switch"))
             return path, body
 
         if p == "deepseek":
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             if m.reasoning is not None:
                 body["model"] = m._REASONING_MAP[m.reasoning]
+                if body["model"] != m.name:
+                    # The loudest kind: a different model answers, at a
+                    # different price, and a comparison that believes both
+                    # arms ran the same model is already invalid.
+                    record(Adaptation(
+                        kind=SWAPPED, option="reasoning", asked=m.reasoning,
+                        sent=body["model"], model=m.name,
+                        why="this provider expresses reasoning as a separate "
+                            "model, so the request goes to that one instead"))
+                else:
+                    record(Adaptation(
+                        kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                        sent=body["model"], model=m.name,
+                        why="this level is served by this same model"))
             if _is_deepseek_reasoner(body["model"]):
-                body.pop("temperature", None); body.pop("top_p", None)
+                for knob in ("temperature", "top_p"):
+                    if body.pop(knob, None) is not None:
+                        record(Adaptation(
+                            kind=DECLINED, option=knob,
+                            asked=getattr(m, knob), model=m.name,
+                            why="a reasoning model sets its own sampling; "
+                                "this provider rejects the field"))
             fmt = output.get("format", {}); ft = fmt.get("type", "text")
             if ft in ("json", "json_schema"):
                 body["response_format"] = {"type": "json_object"}

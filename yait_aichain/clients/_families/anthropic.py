@@ -122,6 +122,8 @@ class AnthropicClient(BaseClient):
 
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         prov = self._data["provider"]
+        from ...models._adaptation import (Adaptation, ADAPTED, DECLINED,
+                                            record)
         rmap = prov.get("reasoning_map", {})
         default_max = prov["defaults"]["max_tokens"]
         name        = params["name"]
@@ -242,6 +244,12 @@ class AnthropicClient(BaseClient):
                 for blk in reversed(target):
                     if isinstance(blk, dict) and blk.get("type") == "text":
                         blk["cache_control"] = control
+                        record(Adaptation(
+                            kind=ADAPTED, option="cache_control", asked=mark,
+                            sent="cache_control breakpoint",
+                            model=params["name"],
+                            why="marked the end of the stable prefix; this "
+                                "provider caches on an explicit breakpoint"))
                         break
 
         if params.get("top_p") is not None:
@@ -250,11 +258,31 @@ class AnthropicClient(BaseClient):
             body["top_k"] = params["top_k"]
 
         if reasoning:
+            record(Adaptation(
+                kind=ADAPTED, option="reasoning", asked=reasoning,
+                sent="thinking", model=params["name"],
+                why="sent as a thinking budget, this provider's own control"))
             budget = rmap.get(reasoning)
             if budget is not None:
                 body["thinking"]    = {"type": "enabled", "budget_tokens": budget}
+                if body.get("temperature") not in (None, 1.0):
+                    record(Adaptation(
+                        kind=DECLINED, option="temperature",
+                        asked=body["temperature"], sent=1.0,
+                        model=params["name"],
+                        why="this provider requires temperature 1.0 while "
+                            "thinking is enabled"))
                 body["temperature"] = 1.0
                 if body["max_tokens"] <= budget:
+                    # The budget has to fit inside the answer's ceiling, so a
+                    # max_tokens smaller than it is raised rather than left to
+                    # fail at the provider.
+                    record(Adaptation(
+                        kind=ADAPTED, option="max_tokens",
+                        asked=body["max_tokens"], sent=budget + default_max,
+                        model=params["name"],
+                        why="raised above the thinking budget, which the "
+                            "answer ceiling has to contain"))
                     body["max_tokens"] = budget + default_max
 
         fmt = output.get("format", {})

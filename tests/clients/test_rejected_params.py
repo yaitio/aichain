@@ -57,19 +57,26 @@ class TestRejectedParameters(unittest.TestCase):
 
     def test_models_that_accept_it_still_get_it(self):
         """The cure must not be worse: dropping it everywhere would remove a
-        working feature from three models to spare four."""
+        working feature from three models to spare four.
+
+        Counted per option, not in total: the library now reports every
+        option it had to change, so a bare warning count here would measure
+        whatever else was in the request."""
         for name in ACCEPTS:
             with self.subTest(model=name):
                 body, caught = _body(name)
                 self.assertIn("input_fidelity", body)
-                self.assertEqual(len(caught), 0)
+                self.assertEqual(
+                    [w for w in caught if "input_fidelity" in str(w.message)],
+                    [])
 
     def test_a_parameter_that_was_never_set_warns_about_nothing(self):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             Model("gpt-image-2", api_key="k").to_request(
                 EDIT, {"format": {"type": "image", "quality": "low"}})
-        self.assertEqual(len(caught), 0)
+        self.assertEqual(
+            [w for w in caught if "input_fidelity" in str(w.message)], [])
 
 
 if __name__ == "__main__":

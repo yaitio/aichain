@@ -123,8 +123,10 @@ def _reset_once_per_process_warnings():
     parameter. The matrix asks "does this call say so?", which must not depend
     on whether some earlier call in the same process already did."""
     from yait_aichain.clients._families import _openai_compat, google
+    from yait_aichain.models import _adaptation
     _openai_compat._WARNED_REJECTS.clear()
     google._WARNED_STRIP = False
+    _adaptation.reset_warnings()
 
 
 def _build(model_name, options, out):
@@ -138,7 +140,7 @@ def _build(model_name, options, out):
     sent = body.get("model") if isinstance(body, dict) else None
     if not sent and isinstance(path, str) and "/models/" in path:
         sent = path.split("/models/")[1].split(":")[0]
-    return body, sent, [str(w.message) for w in caught]
+    return body, sent, list(m.last_adaptations)
 
 
 def probe(model_name, param, value, *, where) -> dict:
@@ -167,26 +169,56 @@ def probe(model_name, param, value, *, where) -> dict:
     before, after = _leaves(base_body), _leaves(body)
     added = {p: v for p, v in after.items() if before.get(p) != v}
     swapped = sent_model != base_model
-    warned = any(param in w for w in warned)
+    # What the library said about THIS option, not merely that it said
+    # something: a notice of the wrong kind is its own defect — three
+    # providers that honour `reasoning` were briefly being told they had no
+    # such control.
+    # Kind plus whether the notice names a replacement. The generic "this
+    # provider has no such control" carries no replacement, and saying that
+    # about an option the provider did honour is its own defect.
+    said = sorted({f"{a.kind}+named" if a.sent is not None else a.kind
+                   for a in warned if a.option == param})
 
     if swapped:
         return {"outcome": "swapped", "detail": f"{base_model} → {sent_model}",
-                "warned": warned}
+                "said": said}
     if not added:
-        return {"outcome": "dropped", "detail": "", "warned": warned}
+        return {"outcome": "dropped", "detail": "", "said": said}
 
     names = sorted({p[-1] for p in added})
     same_value = [p for p, v in added.items() if v == value]
     if any(p[-1] == param for p in same_value):
-        return {"outcome": "passed", "detail": "", "warned": warned}
+        return {"outcome": "passed", "detail": "", "said": said}
     if same_value:
-        return {"outcome": "renamed", "detail": ", ".join(names), "warned": warned}
-    return {"outcome": "converted", "detail": ", ".join(names), "warned": warned}
+        return {"outcome": "renamed", "detail": ", ".join(names), "said": said}
+    return {"outcome": "converted", "detail": ", ".join(names), "said": said}
+
+
+#: What each outcome must be reported as. A rename needs no notice — the value
+#: the caller set is the value that went out.
+_EXPECTED = {
+    "passed":    (),
+    "renamed":   (),
+    # Something went out in the option's place, so the notice has to say what.
+    # A bare "no such control" here is a lie: it was honoured, differently.
+    "converted": ("adapted+named", "declined+named", "swapped+named"),
+    "swapped":   ("swapped+named",),
+    # Nothing went out. Either notice is honest; neither needs a replacement.
+    "dropped":   ("declined", "declined+named", "adapted", "adapted+named"),
+    "refused":   (),
+    "error":     (),
+}
 
 
 def verdict(cell: dict) -> str:
-    if cell["outcome"] in ("dropped", "swapped") and not cell["warned"]:
+    need = _EXPECTED[cell["outcome"]]
+    said = cell.get("said") or []
+    if not need:
+        return "ok"
+    if not said:
         return "defect: silent"
+    if not set(said) & set(need):
+        return f"defect: called it {'/'.join(said)}, it was {cell['outcome']}"
     return "ok"
 
 
@@ -246,8 +278,10 @@ def render_doc(matrix: dict) -> str:
                 text = mark
                 if c["detail"] and c["outcome"] in ("renamed", "converted", "swapped"):
                     text += f" `{c['detail']}`"
-                if verdict(c) != "ok":
-                    text += " **silent**"
+                v = verdict(c)
+                if v != "ok":
+                    text += " **" + ("silent" if v.endswith("silent")
+                                     else "mis-said") + "**"
                 if c["outcome"] in ("error", "refused"):
                     text += f" <sub>{c['detail'][:60]}</sub>"
                 cells.append(text)
@@ -261,13 +295,14 @@ def render_doc(matrix: dict) -> str:
               if verdict(c) != "ok"]
     lines.append("## Defects")
     lines.append("")
-    lines.append(f"{len(silent)} silent cells. Each is an option a caller set "
-                 "and did not get, with nothing said.")
+    lines.append(f"{len(silent)} cell(s) where the library changed the request "
+                 "without saying so, or described the change wrongly.")
     lines.append("")
     for m, p in silent:
         c = matrix[m][p]
         lines.append(f"- `{m}` · `{p}` — {c['outcome']}"
-                     + (f" ({c['detail']})" if c["detail"] else ""))
+                     + (f" ({c['detail']})" if c["detail"] else "")
+                     + f" — {verdict(c)}")
     lines.append("")
     return "\n".join(lines)
 

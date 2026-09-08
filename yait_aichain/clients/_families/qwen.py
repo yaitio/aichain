@@ -77,6 +77,11 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str
     size = fmt.get("size")
     if size:
         parameters["size"] = size.replace("x", "*")
+        from ...models._adaptation import Adaptation, ADAPTED, record
+        record(Adaptation(
+            kind=ADAPTED, option="size", asked=size,
+            sent=parameters["size"], model=model.name,
+            why="this provider separates the edges with '*', not 'x'"))
 
     body = {
         "model": model.name,

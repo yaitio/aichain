@@ -85,6 +85,11 @@ class BFLClient(BaseClient):
             w, _, h = size.partition("x")
             if w.isdigit() and h.isdigit():
                 body["width"], body["height"] = int(w), int(h)
+                from ...models._adaptation import Adaptation, ADAPTED, record
+                record(Adaptation(
+                    kind=ADAPTED, option="size", asked=size,
+                    sent=f"width={w}, height={h}", model=name,
+                    why="this provider takes the two edges separately"))
         if fmt.get("aspect_ratio"):
             body["aspect_ratio"] = fmt["aspect_ratio"]
         if fmt.get("output_format"):
