@@ -42,8 +42,8 @@ without saying so. It may adapt; it may not do it quietly.
 
 | model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` |
 |---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
-| `gpt-image-1.5` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — |
+| `gpt-image-2.5-flare` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | ✓ | — | — |
+| `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | ✓ | — | — |
 | `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
 | `reve-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |

@@ -116,10 +116,10 @@ EDIT_MSGS = [{"role": "user", "parts": [
     {"type": "text", "text": "make it darker"},
     {"type": "image", "source": {"kind": "base64", "mime": "image/png",
                                  "data": _PNG}}]}]
-#: `modalities` as well as the format type: Google enters its image path on
-#: the modality, not the format, so a probe without it was not touching the
-#: branch at all — which is why that provider first measured as reading none
-#: of the image keys.
+#: The format type alone is how a picture is asked for. `modalities` is sent
+#: as well because a caller may write either, and both have to keep working —
+#: Google once read only the second, which is why it first measured as
+#: reading none of the image keys: the probe was not touching the branch.
 IMAGE_OUT  = {"format": {"type": "image"}, "modalities": ["image"]}
 
 

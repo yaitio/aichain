@@ -57,6 +57,19 @@ def _drop_rejected(model, fmt: dict) -> dict:
     return {k: v for k, v in fmt.items() if k not in dropped}
 
 
+def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
+    """'16:9' → '1824x1024'. Edges are rounded to multiples of 16, which is
+    what this provider requires of a custom size."""
+    a, _, b = str(ratio).partition(":")
+    if not (a.isdigit() and b.isdigit() and int(a) and int(b)):
+        return None
+    w, h = int(a), int(b)
+    def _round16(n): return max(16, int(round(n / 16)) * 16)
+    if w >= h:
+        return f"{_round16(short * w / h)}x{_round16(short)}"
+    return f"{_round16(short)}x{_round16(short * h / w)}"
+
+
 def _part_to_openai(part: dict) -> "dict | None":
     """
     Convert one universal part dict to an OpenAI content item.
@@ -581,6 +594,22 @@ def _build_image_generations_request(
 
     fmt: dict  = _drop_rejected(model, output.get("format", {}))
     body: dict = {"model": model.name, "prompt": prompt, "n": 1}
+
+    # This API takes pixels; a ratio has no field. Every other image provider
+    # in the library now understands both, so the ratio is turned into a size
+    # rather than dropped. GPT Image 2.5 accepts any WIDTHxHEIGHT whose edges
+    # are multiples of 16 and whose ratio is between 1:3 and 3:1, which a
+    # 1024 short edge satisfies for every shape worth asking for.
+    if fmt.get("aspect_ratio") and not fmt.get("size"):
+        fmt = {**fmt, "size": _size_from_ratio(fmt["aspect_ratio"])}
+        if fmt["size"]:
+            from ...models._adaptation import Adaptation, ADAPTED, record
+            record(Adaptation(
+                kind=ADAPTED, option="aspect_ratio",
+                asked=output["format"]["aspect_ratio"],
+                sent=f"size={fmt['size']}", model=model.name,
+                why="this provider takes pixels, not a ratio; the shape was "
+                    "kept at a 1024 short edge"))
 
     if fmt.get("size"):
         body["size"] = fmt["size"]

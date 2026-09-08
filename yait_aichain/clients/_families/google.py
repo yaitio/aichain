@@ -266,7 +266,10 @@ class GoogleClient(BaseClient):
         fmt = output.get("format", {})
         ftype = fmt.get("type", "text")
         modalities = output.get("modalities", ["text"])
-        if "image" in modalities:
+        # `format.type == "image"` is how every other provider is asked for a
+        # picture; requiring `modalities` as well made one provider need a
+        # second word for the same request. Both are accepted.
+        if "image" in modalities or ftype == "image":
             from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
                                                record)
             mods = ["IMAGE"] + (["TEXT"] if "text" in modalities else [])
