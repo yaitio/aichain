@@ -21,7 +21,19 @@ import os as _os
 from types import SimpleNamespace
 
 from ...models._adaptation import (Adaptation, ADAPTED, DECLINED, SWAPPED,
-                                   record)
+                                   TRANSLATED, record)
+
+
+def _ratio_of(size: str) -> "str | None":
+    """'1024x1536' → '2:3'. Reduced, because a provider that honours any
+    ratio exactly has no list to snap to."""
+    from math import gcd
+    w, _, h = size.partition("x")
+    if not (w.isdigit() and h.isdigit() and int(h)):
+        return None
+    w, h = int(w), int(h)
+    g = gcd(w, h) or 1
+    return f"{w // g}:{h // g}"
 
 from .._base import BaseClient
 from ._openai_compat import (
@@ -175,8 +187,32 @@ class OpenAIClient(BaseClient):
                 if _messages_have_image(messages):
                     return _build_xai_image_edit_request(m, messages, output, self._images_edits_path)
                 prompt = _last_user_text(messages)
-                return self._images_path, {"model": m.name, "prompt": prompt,
-                                           "n": 1, "response_format": "b64_json"}
+                body = {"model": m.name, "prompt": prompt,
+                        "n": 1, "response_format": "b64_json"}
+                # Shape control, wired 2026-09-09. This branch was sending
+                # four fixed fields and reading no format key at all, which
+                # measured as "reads nothing" and was in fact "never wired":
+                # aspect_ratio returns 1280x720 for 16:9 and honours every
+                # ratio tried exactly. `size` is refused outright by this API
+                # (HTTP 400 "Argument not supported"), so it becomes a ratio.
+                fmt = output.get("format", {})
+                ratio = fmt.get("aspect_ratio")
+                if ratio:
+                    body["aspect_ratio"] = ratio
+                    record(Adaptation(
+                        kind=TRANSLATED, option="aspect_ratio", asked=ratio,
+                        sent="aspect_ratio", model=m.name,
+                        why="passed through"))
+                elif fmt.get("size"):
+                    ratio = _ratio_of(fmt["size"])
+                    if ratio:
+                        body["aspect_ratio"] = ratio
+                        record(Adaptation(
+                            kind=ADAPTED, option="size", asked=fmt["size"],
+                            sent=f"aspect_ratio={ratio}", model=m.name,
+                            why="this API refuses a pixel size; the shape was "
+                                "kept and the pixels left to the provider"))
+                return self._images_path, body
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
             # grok models reject it (grok-4 reasoners think natively).

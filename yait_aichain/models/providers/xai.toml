@@ -17,8 +17,12 @@ images_path      = "/v1/images/generations"
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
 # Reasoning only on grok-3-mini; other grok models think natively and take no setting.
-# No image keys reach this provider's image model yet — measured, not decided.
-format_accepts = []
+# Shape only. `size` is refused by the API outright and becomes a ratio;
+# `seed` is accepted and does nothing — the same seed twice produced two
+# different pictures, measured 2026-09-09 — so it is not claimed. The API
+# silently swallows unknown keys, which is why an HTTP 200 was not taken as
+# evidence of support here.
+format_accepts = ["size", "aspect_ratio"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
 [provider.defaults]

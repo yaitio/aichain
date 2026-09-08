@@ -47,7 +47,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
 | `reve-image` | — | ✓ | — | — | — | — | — | — |
 | `recraftv3` | ✓ | — | — | — | — | — | — | — |
-| `grok-imagine-image` | — | — | — | — | — | — | — | — |
+| `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `wan2.2-t2i-flash` | ≈ `size` | — | — | — | — | — | — | — |
 
 ## Claimed but not delivered
