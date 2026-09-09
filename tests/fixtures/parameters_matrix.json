@@ -521,9 +521,9 @@
    "detail": "",
    "said": []
   },
-  "output_compression": {
-   "outcome": "passed",
-   "detail": "",
+  "compression": {
+   "outcome": "renamed",
+   "detail": "output_compression",
    "said": []
   },
   "seed": {
@@ -533,7 +533,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -576,9 +576,9 @@
    "detail": "",
    "said": []
   },
-  "output_compression": {
-   "outcome": "passed",
-   "detail": "",
+  "compression": {
+   "outcome": "renamed",
+   "detail": "output_compression",
    "said": []
   },
   "seed": {
@@ -588,7 +588,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -639,7 +639,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -653,7 +653,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -700,7 +700,7 @@
    "detail": "",
    "said": []
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -712,7 +712,7 @@
    "detail": "",
    "said": []
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -763,7 +763,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -777,7 +777,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -826,7 +826,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -840,7 +840,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -891,7 +891,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -905,7 +905,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -956,7 +956,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -970,7 +970,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1013,9 +1013,9 @@
    "detail": "",
    "said": []
   },
-  "output_compression": {
-   "outcome": "passed",
-   "detail": "",
+  "compression": {
+   "outcome": "renamed",
+   "detail": "output_compression",
    "said": []
   },
   "seed": {
@@ -1025,7 +1025,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1068,9 +1068,9 @@
    "detail": "",
    "said": []
   },
-  "output_compression": {
-   "outcome": "passed",
-   "detail": "",
+  "compression": {
+   "outcome": "renamed",
+   "detail": "output_compression",
    "said": []
   },
   "seed": {
@@ -1080,9 +1080,9 @@
     "declined"
    ]
   },
-  "input_fidelity": {
-   "outcome": "passed",
-   "detail": "",
+  "reference_fidelity": {
+   "outcome": "renamed",
+   "detail": "input_fidelity",
    "said": []
   },
   "strength": {
@@ -1129,7 +1129,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1143,7 +1143,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1194,7 +1194,7 @@
     "declined"
    ]
   },
-  "output_compression": {
+  "compression": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1208,7 +1208,7 @@
     "declined"
    ]
   },
-  "input_fidelity": {
+  "reference_fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [

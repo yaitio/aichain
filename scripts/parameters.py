@@ -63,9 +63,9 @@ IMAGE_FORMAT = {
     "quality":            "high",
     "background":         "transparent",
     "output_format":      "png",
-    "output_compression": 50,
+    "compression":        50,
     "seed":               42,
-    "input_fidelity":     "high",
+    "reference_fidelity": "high",
     "strength":           0.4,
 }
 

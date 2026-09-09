@@ -70,21 +70,21 @@ class TestANumberOutsideTheRange(unittest.TestCase):
 
     def test_is_clamped_not_refused(self):
         m, body = _build("gpt-image-2.5-flare", output_format="webp",
-                         output_compression=150)
+                         compression=150)
         self.assertEqual(body["output_compression"], 100)
 
     def test_and_the_clamp_is_reported(self):
         m, _ = _build("gpt-image-2.5-flare", output_format="webp",
-                      output_compression=150)
-        note, = [a for a in m.last_adaptations if a.option == "output_compression"]
+                      compression=150)
+        note, = [a for a in m.last_adaptations if a.option == "compression"]
         self.assertEqual((note.kind, note.asked, note.sent), ("adapted", 150, 100))
 
     def test_a_number_inside_the_range_is_left_alone(self):
         m, body = _build("gpt-image-2.5-flare", output_format="webp",
-                         output_compression=50)
+                         compression=50)
         self.assertEqual(body["output_compression"], 50)
         self.assertEqual([a for a in m.last_adaptations
-                          if a.option == "output_compression"], [])
+                          if a.option == "compression"], [])
 
 
 class TestAMultipartBodyCarriesEverythingAsText(unittest.TestCase):

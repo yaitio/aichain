@@ -95,7 +95,7 @@ UNIVERSAL_FORMAT: dict = {
         "what": "the file format to return: png, jpeg, webp",
         "instead": None,
     },
-    "output_compression": {
+    "compression": {
         "what": "compression level for jpeg and webp, 0-100",
         "instead": None,
     },
@@ -103,7 +103,7 @@ UNIVERSAL_FORMAT: dict = {
         "what": "fix the randomness so the same prompt renders the same way",
         "instead": None,
     },
-    "input_fidelity": {
+    "reference_fidelity": {
         "what": "how strongly to preserve detail from a reference image",
         "instead": None,
     },
@@ -112,6 +112,28 @@ UNIVERSAL_FORMAT: dict = {
         "instead": None,
     },
 }
+
+
+#: Names that used to be ours, and what they are called now. Kept rather than
+#: removed: renaming a public option breaks working code, and the library's
+#: own rule is that a caller is told what changed, not left to find out.
+#:
+#: Only two names were replaced, and the measurement is why. Most of the
+#: vocabulary turned out to be the field's shared lexicon rather than one
+#: vendor's: `aspect_ratio` goes on the wire under that name at four
+#: providers, `size` at three, `output_format` at two. `output_compression`
+#: and `input_fidelity` were OpenAI's alone — the first carrying a redundant
+#: "output" inside a dict already called `output["format"]`, the second
+#: ambiguous about what the input is fidelity *to*.
+ALIASES: dict = {
+    "output_compression": "compression",
+    "input_fidelity":     "reference_fidelity",
+}
+
+
+def canonical(option: str) -> str:
+    """The current name for *option*, which may be its own."""
+    return ALIASES.get(option, option)
 
 
 def is_universal(option: str) -> bool:

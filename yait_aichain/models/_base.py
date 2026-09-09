@@ -412,6 +412,30 @@ class Model:
             path, body = self._built(messages, output)
         return path, body
 
+    def _canonical_format(self, output: dict) -> dict:
+        """Rename an option that has been renamed, and say so once.
+
+        Removing the old name would break working code; accepting it in
+        silence would leave a caller writing a name that no longer exists in
+        the documentation. So it is translated and reported, which is what
+        the channel is for."""
+        from ._adaptation import Adaptation, TRANSLATED, record
+        from ._options import ALIASES
+
+        fmt = output.get("format") or {}
+        renamed = {k: v for k, v in fmt.items() if k in ALIASES}
+        if not renamed:
+            return output
+        fixed = {k: v for k, v in fmt.items() if k not in ALIASES}
+        for old, value in renamed.items():
+            new = ALIASES[old]
+            fixed.setdefault(new, value)
+            record(Adaptation(
+                kind=TRANSLATED, option=old, asked=value, sent=new,
+                model=self.name,
+                why=f"{old!r} is now called {new!r}; both are accepted"))
+        return {**output, "format": fixed}
+
     def _check_values(self, output: dict) -> dict:
         """Refuse a value this model does not take, before the wire.
 
@@ -446,7 +470,7 @@ class Model:
         from ._adaptation import announce, collect, note_absent
 
         with collect() as made:
-            output = self._check_values(output)
+            output = self._check_values(self._canonical_format(output))
             if tools is not None:
                 path, body = self.client.build_request(
                     messages, output, self._params(), tools=tools)

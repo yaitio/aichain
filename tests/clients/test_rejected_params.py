@@ -25,7 +25,7 @@ EDIT = [{"role": "user", "parts": [
     {"type": "image", "source": {"kind": "base64", "mime": "image/png",
                                  "data": PNG}}]}]
 FMT = {"format": {"type": "image", "quality": "low",
-                  "input_fidelity": "high"}}
+                  "reference_fidelity": "high"}}
 
 REFUSES = ("gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst",
            "gpt-image-1-mini")
@@ -33,9 +33,12 @@ ACCEPTS = ("gpt-image-1.5", "gpt-image-1", "chatgpt-image-latest")
 
 
 def _body(name):
+    from yait_aichain.models import _adaptation
+    _adaptation.reset_warnings()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        _, body = Model(name, api_key="k").to_request(EDIT, FMT)
+        m = Model(name, api_key="k")
+        _, body = m.to_request(EDIT, FMT)
     return repr(body), caught
 
 
@@ -52,7 +55,7 @@ class TestRejectedParameters(unittest.TestCase):
         for name in REFUSES:
             with self.subTest(model=name):
                 _, caught = _body(name)
-                self.assertTrue(any("input_fidelity" in str(w.message)
+                self.assertTrue(any("reference_fidelity" in str(w.message)
                                     for w in caught))
 
     def test_models_that_accept_it_still_get_it(self):

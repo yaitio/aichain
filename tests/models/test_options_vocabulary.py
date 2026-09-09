@@ -147,3 +147,54 @@ class TestAskingBeforeCalling(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRenamedNames(unittest.TestCase):
+    """Two names were replaced; the old ones still work.
+
+    Which two, and why only two, came out of measuring rather than opinion:
+    `aspect_ratio` goes on the wire under that name at four providers, `size`
+    at three, `output_format` at two — the field's shared lexicon, not one
+    vendor's. `output_compression` and `input_fidelity` were OpenAI's alone,
+    the first carrying a redundant "output" inside a dict already called
+    `output["format"]`, the second ambiguous about what the input is fidelity
+    to.
+    """
+
+    def _fmt(self, name, **fmt):
+        from yait_aichain.models import _adaptation
+        _adaptation.reset_warnings()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            m = Model(name, api_key="k")
+            _, body = m.to_request(
+                [{"role": "user", "parts": [{"type": "text", "text": "a cat"}]}],
+                {"format": {"type": "image", **fmt}})
+        return m, body
+
+    def test_the_old_name_still_reaches_the_wire(self):
+        """Removing it would break working code."""
+        _, body = self._fmt("gpt-image-2.5-flare", output_format="webp",
+                            output_compression=50)
+        self.assertEqual(body["output_compression"], 50)
+
+    def test_and_the_caller_is_told_it_has_a_new_name(self):
+        """Accepting it in silence would leave somebody writing a name that
+        is no longer in the documentation."""
+        m, _ = self._fmt("gpt-image-2.5-flare", output_format="webp",
+                         output_compression=50)
+        note, = [a for a in m.last_adaptations if a.option == "output_compression"]
+        self.assertEqual((note.kind, note.sent), ("translated", "compression"))
+
+    def test_the_new_name_says_nothing(self):
+        m, body = self._fmt("gpt-image-2.5-flare", output_format="webp",
+                            compression=50)
+        self.assertEqual(body["output_compression"], 50)
+        self.assertEqual(m.last_adaptations, [])
+
+    def test_a_name_shared_across_providers_was_left_alone(self):
+        """`output_format` is BFL's word as much as OpenAI's — renaming a
+        shared term would have made the vocabulary less neutral, not more."""
+        from yait_aichain.models._options import ALIASES, UNIVERSAL_FORMAT
+        self.assertNotIn("output_format", ALIASES)
+        self.assertIn("output_format", UNIVERSAL_FORMAT)
