@@ -159,6 +159,30 @@ def canonical_value(option: str, value):
     return value, None
 
 
+#: Which kinds of output each format key means anything for. Everything here
+#: describes a picture, so the set is the same today; the field exists because
+#: the rule it enforces is not about images but about *when to be strict*.
+#:
+#: The test is whether a request is wrong everywhere or only here. `top_k` on
+#: Perplexity is wrong only there — it works on Anthropic and Google — and
+#: raising would force a caller to branch per provider, which is the promise
+#: this library exists to keep. `background` on a text request is wrong at
+#: every provider that will ever exist, because text has no background. The
+#: first is declined with a notice; the second is a mistake and stops here.
+APPLIES_TO: dict = {key: frozenset({"image"}) for key in UNIVERSAL_FORMAT}
+
+
+def check_applies(option: str, output_type: str) -> None:
+    """Raise when *option* cannot mean anything for this kind of output."""
+    kinds = APPLIES_TO.get(option)
+    if kinds and output_type not in kinds:
+        raise ValueError(
+            f"{option!r} has no meaning for a {output_type!r} result; it "
+            f"applies to: {', '.join(sorted(kinds))}. Nothing was sent — this "
+            "is wrong for every provider, not just this one."
+        )
+
+
 def is_universal(option: str) -> bool:
     """True when *option* is a name the library knows, of either vocabulary."""
     return option in UNIVERSAL_OPTIONS or option in UNIVERSAL_FORMAT
