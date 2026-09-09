@@ -715,17 +715,17 @@
    ]
   },
   "quality": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "test_time_scaling",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "background": {
-   "outcome": "dropped",
-   "detail": "",
+   "outcome": "converted",
+   "detail": "[0]",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   },
   "output_format": {
