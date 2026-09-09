@@ -107,6 +107,10 @@ UNIVERSAL_FORMAT: dict = {
         "what": "how strongly to preserve detail from a reference image",
         "instead": None,
     },
+    "strength": {
+        "what": "how far an edit may move from the original, 0 to 1",
+        "instead": None,
+    },
 }
 
 

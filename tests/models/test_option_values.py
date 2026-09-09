@@ -87,6 +87,41 @@ class TestANumberOutsideTheRange(unittest.TestCase):
                           if a.option == "output_compression"], [])
 
 
+class TestAMultipartBodyCarriesEverythingAsText(unittest.TestCase):
+    """A number sent through multipart arrives as a string.
+
+    Compared type-exactly, `strength=0.4` looked absent while it was
+    travelling in the request, and the library reported its own delivered
+    option as declined. The looser comparison is confined to multipart, so on
+    a JSON body an unrelated "1" cannot stand in for an asked 1.
+    """
+
+    def _edit(self, **fmt):
+        import base64
+        png = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode()
+        msgs = [{"role": "user", "parts": [
+            {"type": "text", "text": "darker"},
+            {"type": "image", "source": {"kind": "base64",
+                                         "mime": "image/png", "data": png}}]}]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            m = Model("recraftv3", api_key="k")
+            _, body = m.to_request(msgs, {"format": {"type": "image", **fmt}})
+        return m, dict(body["fields"])
+
+    def test_a_number_that_arrived_is_not_reported_as_declined(self):
+        m, fields = self._edit(strength=0.4)
+        self.assertEqual(fields["strength"], "0.4")
+        self.assertEqual([a for a in m.last_adaptations
+                          if a.option == "strength"], [])
+
+    def test_and_one_that_was_clamped_still_is(self):
+        m, fields = self._edit(strength=1.7)
+        self.assertEqual(fields["strength"], "1.0")
+        note, = [a for a in m.last_adaptations if a.option == "strength"]
+        self.assertEqual(note.kind, "adapted")
+
+
 class TestAProviderThatDeclaresNothing(unittest.TestCase):
 
     def test_leaves_the_value_alone(self):
