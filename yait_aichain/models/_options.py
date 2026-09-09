@@ -113,6 +113,38 @@ UNIVERSAL_FORMAT: dict = {
 }
 
 
+
+#: Options whose absence changes **what** you get, not merely how good it is.
+#:
+#: The distinction decides what a decline costs, and it is not a matter of
+#: taste. Drop ``temperature``, ``top_p``, ``top_k``, ``reasoning`` or
+#: ``cache_control`` and the answer is a different answer — possibly a worse
+#: one, possibly a dearer one — but it is still an answer to the question that
+#: was asked, and a reader looking at it can see what they got.
+#:
+#: Drop ``seed`` and the pictures differ every run while the caller believes
+#: they are reproducible. Drop ``size`` and a 1024x1024 arrives where a banner
+#: was wanted. Drop ``background`` and an opaque rectangle lands in a
+#: composite that expected transparency. Drop ``fidelity`` and the edit goes
+#: to the wrong depth. Drop ``output_format`` or ``compression`` and the file
+#: is not the file the pipeline downstream is going to open. In every one of
+#: those the result **looks** correct and silently is not, which is the exact
+#: failure a warning in a log is worst at catching.
+#:
+#: So the library reports both, and says which kind it is; what it will not do
+#: is decide on the caller's behalf that a wrong-shaped image is acceptable.
+#: That decision is ``Model(on_unsupported=...)``.
+REQUIREMENT: frozenset = frozenset({
+    "seed", "size", "aspect_ratio", "background", "fidelity",
+    "output_format", "compression",
+})
+
+
+def is_requirement(option: str) -> bool:
+    """True when dropping *option* changes what comes back, not how good it
+    is — see :data:`REQUIREMENT`."""
+    return canonical(option) in REQUIREMENT
+
 #: Names that used to be ours, and what they are called now. Kept rather than
 #: removed: renaming a public option breaks working code, and the library's
 #: own rule is that a caller is told what changed, not left to find out.

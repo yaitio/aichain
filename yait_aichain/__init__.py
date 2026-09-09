@@ -46,7 +46,7 @@ from .models import Model                                          # noqa: F401
 from .models import portable_schema, check_structure               # noqa: F401
 # What the library had to change about a request to fit a provider. Reachable
 # so a caller can log it, not only read the warning.
-from .models._adaptation import Adaptation                         # noqa: F401
+from .models._adaptation import Adaptation, UnsupportedOption      # noqa: F401
 from .models._usage import Usage                                   # noqa: F401
 from .skills import Skill                                          # noqa: F401
 from .chain  import Chain                                          # noqa: F401
