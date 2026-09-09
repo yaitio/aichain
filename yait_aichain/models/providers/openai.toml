@@ -20,7 +20,7 @@ images_path      = "/v1/images/generations"
 # Image keys too: no seed. `reference_fidelity` (this API's own
 # `input_fidelity`) is refused by several of the models — see `rejects` on
 # each. An aspect ratio is converted to pixels, which is what this API takes.
-format_accepts = ["size", "quality", "background", "output_format", "compression", "reference_fidelity"]
+format_accepts = ["size", "aspect_ratio", "quality", "background", "output_format", "compression", "reference_fidelity"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
 # What a value may be, where the API constrains it. A two-number entry is a

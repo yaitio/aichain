@@ -277,15 +277,26 @@ def unfulfilled(matrix: dict) -> list:
             continue
         claimed[prov] = accepts
         for option, cell in cells.items():
-            if cell["outcome"] != "dropped":
+            # Delivered means something of the caller's reached the request.
+            # A refusal is the opposite of a delivery, and counting it as one
+            # reported Perplexity as delivering the `reasoning` it raises on.
+            if cell["outcome"] in ("passed", "renamed", "converted", "swapped"):
                 delivered.setdefault(prov, set()).add(option)
 
     out = []
+    probed = {o for cells in matrix.values() for o in cells}
     for prov, accepts in sorted(claimed.items()):
-        probed = {o for cells in matrix.values() for o in cells}
         for option in sorted(accepts & probed):
             if option not in delivered.get(prov, set()):
-                out.append((prov, option))
+                out.append((prov, option, "claimed, delivered by no model"))
+        # And the other direction, which went unchecked until a rename
+        # silently dropped `aspect_ratio` from OpenAI's declaration while the
+        # client went on converting it: the library then does more than the
+        # documentation says, and a reader is told a working option does not
+        # work.
+        for option in sorted(delivered.get(prov, set()) & probed):
+            if option not in accepts:
+                out.append((prov, option, "delivered, declared by nobody"))
     return out
 
 
@@ -357,7 +368,8 @@ def _vocabulary_section(matrix: dict) -> list:
     for title, vocab in (("Model options", UNIVERSAL_OPTIONS),
                          ("Format keys", UNIVERSAL_FORMAT)):
         lines += [f"### {title}", "",
-                  "| option | what it does | values |", "|---|---|---|"]
+                  "| option | what it does | values | who takes it |",
+                  "|---|---|---|---|"]
         for option, meta in vocab.items():
             # Allowed sets differ by model where a provider says so; show the
             # union and name the exception rather than pretending one set.
@@ -395,7 +407,18 @@ def _vocabulary_section(matrix: dict) -> list:
                 values = "; ".join(
                     _show(vals) + f" ({', '.join(sorted(set(ms)))})"
                     for vals, ms in seen.items())
-            lines.append(f"| `{option}` | {meta['what']} | {values} |")
+            # The column the reader actually needs: not "what does this
+            # provider take" but "where may I set this". The other direction
+            # is section 2; both are the same data and neither replaces the
+            # other.
+            takers = sorted(
+                prov for prov in models_by_provider
+                if (accepted_by(prov) or frozenset()) >= {option}
+                and (vocab is UNIVERSAL_OPTIONS
+                     or any(_draws(prov, m) for m in models_by_provider[prov])))
+            where = ", ".join(f"`{t}`" for t in takers) or "**nobody**"
+            lines.append(
+                f"| `{option}` | {meta['what']} | {values} | {where} |")
         lines.append("")
 
     lines += ["## 2. What each provider declares it takes", "",
@@ -491,16 +514,17 @@ def render_doc(matrix: dict) -> str:
 
     claimed = unfulfilled(matrix)
     if claimed:
-        lines.append("## Claimed but not delivered")
+        lines.append("## Where the declaration and the code disagree")
         lines.append("")
-        lines.append("The provider data says this provider has the control; "
-                     "the request says nothing arrived. Either the "
-                     "declaration is wrong or the option was never wired — "
-                     "the matrix cannot tell which, only that they disagree.")
+        lines.append("Both directions. *Claimed and not delivered* means the "
+                     "data promises a control no model honours. *Delivered "
+                     "and not declared* means the library does more than this "
+                     "page says, so a reader is told a working option does "
+                     "not work. The matrix cannot say which side is wrong, "
+                     "only that they disagree — which is enough to look.")
         lines.append("")
-        for m, p in claimed:
-            lines.append(f"- `{m}` · `{p}` — claimed by the provider, "
-                         "delivered by none of its probed models")
+        for m, p, why in claimed:
+            lines.append(f"- `{m}` · `{p}` — {why}")
         lines.append("")
 
     silent = [(m, p) for m in matrix for p, c in matrix[m].items()
