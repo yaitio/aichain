@@ -461,13 +461,17 @@ class Model:
         library knows the same thing and knows it earlier.
         """
         from ._adaptation import Adaptation, ADAPTED, record
-        from ._options import check_value
+        from ._options import check_applies, check_value
 
         fmt = (output.get("format") or {})
+        kind = fmt.get("type", "text")
         fixed = None
         for key, value in fmt.items():
             if key in ("type", "schema", "name", "strict") or value is None:
                 continue
+            # Wrong everywhere, so it stops here rather than being dropped
+            # and reported: a caller cannot fix this by changing provider.
+            check_applies(key, kind)
             sent, note = check_value(key, value, self._provider, self.name)
             if note is not None:
                 fixed = {**(fixed or fmt), key: sent}
