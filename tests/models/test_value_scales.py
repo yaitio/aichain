@@ -96,3 +96,57 @@ class TestTheMechanism(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOneAxisRunBothWays(unittest.TestCase):
+    """`input_fidelity` and `strength` were the same axis, inverted.
+
+    OpenAI asks how much of the original to preserve; Recraft asks how much to
+    change. Measured on Recraft 2026-09-09 with a blue square and the prompt
+    "a red circle": strength 0.05 came back blue, strength 0.95 came back a
+    red circle — which is what fixes the direction rather than inferring it
+    from the word.
+
+    They are one option now, `fidelity`, meaning what survives. The canonical
+    type is a number; `low`/`high` are shorthands resolved on the way in, so a
+    range declared for one provider does not reject a word another requires.
+    """
+
+    def _edit(self, name, **fmt):
+        import base64
+        png = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode()
+        msgs = [{"role": "user", "parts": [
+            {"type": "text", "text": "darker"},
+            {"type": "image", "source": {"kind": "base64",
+                                         "mime": "image/png", "data": png}}]}]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            m = Model(name, api_key="k")
+            _, body = m.to_request(msgs, {"format": {"type": "image", **fmt}})
+        return dict(body["fields"])
+
+    def test_keeping_the_original_means_a_small_change_on_recraft(self):
+        self.assertEqual(self._edit("recraftv3", fidelity=0.9)["strength"], "0.1")
+
+    def test_and_a_large_one_when_little_is_kept(self):
+        self.assertEqual(self._edit("recraftv3", fidelity=0.1)["strength"], "0.9")
+
+    def test_the_same_number_becomes_a_word_on_openai(self):
+        """Two levels there, a scale here."""
+        self.assertEqual(
+            self._edit("gpt-image-1.5", fidelity=0.9)["input_fidelity"], "high")
+        self.assertEqual(
+            self._edit("gpt-image-1.5", fidelity=0.1)["input_fidelity"], "low")
+
+    def test_a_word_works_on_both(self):
+        self.assertEqual(self._edit("recraftv3", fidelity="high")["strength"],
+                         "0.1")
+        self.assertEqual(
+            self._edit("gpt-image-1.5", fidelity="high")["input_fidelity"],
+            "high")
+
+    def test_the_old_name_still_arrives(self):
+        """`input_fidelity` shipped in 2.2.x and cannot stop working."""
+        self.assertEqual(
+            self._edit("gpt-image-1.5", input_fidelity="high")["input_fidelity"],
+            "high")

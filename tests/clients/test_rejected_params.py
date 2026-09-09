@@ -25,7 +25,7 @@ EDIT = [{"role": "user", "parts": [
     {"type": "image", "source": {"kind": "base64", "mime": "image/png",
                                  "data": PNG}}]}]
 FMT = {"format": {"type": "image", "quality": "low",
-                  "reference_fidelity": "high"}}
+                  "fidelity": "high"}}
 
 REFUSES = ("gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst",
            "gpt-image-1-mini")
@@ -55,7 +55,7 @@ class TestRejectedParameters(unittest.TestCase):
         for name in REFUSES:
             with self.subTest(model=name):
                 _, caught = _body(name)
-                self.assertTrue(any("reference_fidelity" in str(w.message)
+                self.assertTrue(any("fidelity" in str(w.message)
                                     for w in caught))
 
     def test_models_that_accept_it_still_get_it(self):

@@ -31,8 +31,7 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 | `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` | `bfl`, `openai` |
 | `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` | `openai` |
 | `seed` | fix the randomness so the same prompt renders the same way | any | `bfl` |
-| `reference_fidelity` | how strongly to preserve detail from a reference image | `low`, `high` | `openai` |
-| `strength` | how far an edit may move from the original, 0 to 1 | `0.0`–`1.0` | `recraft` |
+| `fidelity` | how much of the original survives an edit: 0 to 1, or 'low'/'high'. One axis, and providers run it both ways — OpenAI asks how much to preserve, Recraft how much to change, so the number is inverted for the latter | `0.0`–`1.0` | `openai`, `recraft` |
 
 ## 2. What each provider declares it takes
 
@@ -45,10 +44,10 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `deepseek` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
-| `openai` | `aspect_ratio`, `background`, `compression`, `max_tokens`, `output_format`, `quality`, `reasoning`, `reference_fidelity`, `size`, `temperature`, `top_p` |
+| `openai` | `aspect_ratio`, `background`, `compression`, `fidelity`, `max_tokens`, `output_format`, `quality`, `reasoning`, `size`, `temperature`, `top_p` |
 | `perplexity` | `max_tokens`, `temperature`, `top_p` |
 | `qwen` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
-| `recraft` | `aspect_ratio`, `size`, `strength` |
+| `recraft` | `aspect_ratio`, `fidelity`, `size` |
 | `reve` | `aspect_ratio`, `background`, `quality`, `size` |
 | `xai` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 
@@ -103,25 +102,25 @@ without saying so. It may adapt; it may not do it quietly.
 
 ### Output format (image)
 
-| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `reference_fidelity` | `strength` |
-|---|---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
-| `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
-| `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — | — |
-| `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — | — |
-| `reve-image` | ≈ `aspect_ratio` | ✓ | ≈ `test_time_scaling` | ≈ `[0]` | — | — | — | — | — |
-| `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — | — |
-| `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — | — |
-| `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — | — |
+| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `fidelity` |
+|---|---|---|---|---|---|---|---|---|
+| `gpt-image-2.5-flare` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — |
+| `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — |
+| `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — |
+| `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
+| `reve-image` | ≈ `aspect_ratio` | ✓ | ≈ `test_time_scaling` | ≈ `[0]` | — | — | — | — |
+| `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — |
+| `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
+| `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — |
 
 ### Output format (image edits)
 
-| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `reference_fidelity` | `strength` |
-|---|---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
-| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | → `input_fidelity` | — |
-| `grok-imagine-image (edit)` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — | — |
-| `recraftv3 (edit)` | — | — | — | — | — | — | — | — | ✓ |
+| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `fidelity` |
+|---|---|---|---|---|---|---|---|---|
+| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | — |
+| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | → `input_fidelity` |
+| `grok-imagine-image (edit)` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
+| `recraftv3 (edit)` | — | — | — | — | — | — | — | ≈ `strength` |
 
 ## Defects
 

@@ -65,8 +65,7 @@ IMAGE_FORMAT = {
     "output_format":      "png",
     "compression":        50,
     "seed":               42,
-    "reference_fidelity": "high",
-    "strength":           0.4,
+    "fidelity":           "high",
 }
 
 #: One representative per provider, and a second wherever the same provider

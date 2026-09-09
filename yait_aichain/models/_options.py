@@ -103,12 +103,11 @@ UNIVERSAL_FORMAT: dict = {
         "what": "fix the randomness so the same prompt renders the same way",
         "instead": None,
     },
-    "reference_fidelity": {
-        "what": "how strongly to preserve detail from a reference image",
-        "instead": None,
-    },
-    "strength": {
-        "what": "how far an edit may move from the original, 0 to 1",
+    "fidelity": {
+        "what": "how much of the original survives an edit: 0 to 1, or "
+                "'low'/'high'. One axis, and providers run it both ways — "
+                "OpenAI asks how much to preserve, Recraft how much to "
+                "change, so the number is inverted for the latter",
         "instead": None,
     },
 }
@@ -127,13 +126,37 @@ UNIVERSAL_FORMAT: dict = {
 #: ambiguous about what the input is fidelity *to*.
 ALIASES: dict = {
     "output_compression": "compression",
-    "input_fidelity":     "reference_fidelity",
+    # `input_fidelity` and `strength` named the same axis from opposite ends:
+    # measured on Recraft 2026-09-09, strength=0.05 left a blue square blue
+    # and strength=0.95 replaced it with the prompt, while OpenAI's
+    # input_fidelity asks how much of the original to keep. One intent, one
+    # name — the direction a caller cares about is what survives.
+    "input_fidelity":     "fidelity",
+    "reference_fidelity": "fidelity",
 }
 
 
 def canonical(option: str) -> str:
     """The current name for *option*, which may be its own."""
     return ALIASES.get(option, option)
+
+
+#: Words a caller may write instead of a number. The canonical type is the
+#: number — one type inside the library, whatever the caller wrote and
+#: whatever each provider takes — and each client converts from it. Without a
+#: single internal form, a range declared for one provider rejects the word
+#: another provider requires.
+SHORTHANDS: dict = {
+    "fidelity": {"low": 0.3, "high": 0.9, "auto": 0.5},
+}
+
+
+def canonical_value(option: str, value):
+    """Return ``(value, note)`` with a shorthand resolved to its number."""
+    table = SHORTHANDS.get(option) or {}
+    if isinstance(value, str) and value in table:
+        return table[value], f"{value!r} is {table[value]} on this scale"
+    return value, None
 
 
 def is_universal(option: str) -> bool:

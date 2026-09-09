@@ -776,9 +776,19 @@ def _build_image_edits_request(
     for ours, theirs in (("size", "size"), ("quality", "quality"),
                          ("background", "background"),
                          ("output_format", "output_format"),
-                         ("reference_fidelity", "input_fidelity")):
-        if fmt.get(ours):
-            fields.append((theirs, str(fmt[ours])))
+                         ("fidelity", "input_fidelity")):
+        if fmt.get(ours) is None:
+            continue
+        value = fmt[ours]
+        if ours == "fidelity" and isinstance(value, (int, float)):
+            from ...models._adaptation import Adaptation, ADAPTED, record
+            # This API takes two words where the vocabulary takes a number.
+            value = "high" if value >= 0.5 else "low"
+            record(Adaptation(
+                kind=ADAPTED, option="fidelity", asked=fmt[ours], sent=value,
+                model=model.name,
+                why="this API has two levels, not a scale"))
+        fields.append((theirs, str(value)))
     if fmt.get("compression") is not None:
         fields.append(("output_compression", str(fmt["compression"])))
 

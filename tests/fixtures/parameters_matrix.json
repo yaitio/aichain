@@ -533,14 +533,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -588,14 +581,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -653,14 +639,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -712,14 +691,7 @@
    "detail": "",
    "said": []
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -777,14 +749,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -840,14 +805,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -905,14 +863,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -970,14 +921,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1025,14 +969,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1080,16 +1017,11 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
+  "fidelity": {
    "outcome": "renamed",
    "detail": "input_fidelity",
-   "said": []
-  },
-  "strength": {
-   "outcome": "dropped",
-   "detail": "",
    "said": [
-    "declined"
+    "adapted+named"
    ]
   }
  },
@@ -1143,14 +1075,7 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "strength": {
+  "fidelity": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1208,17 +1133,12 @@
     "declined"
    ]
   },
-  "reference_fidelity": {
-   "outcome": "dropped",
-   "detail": "",
+  "fidelity": {
+   "outcome": "converted",
+   "detail": "strength",
    "said": [
-    "declined"
+    "adapted+named"
    ]
-  },
-  "strength": {
-   "outcome": "passed",
-   "detail": "",
-   "said": []
   }
  }
 }
