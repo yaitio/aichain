@@ -222,6 +222,10 @@ class Skill:
         # shot run leaves a one-element list. ``None`` until the first call.
         self.history: "list | None" = None
 
+        #: The whole answer from the last :meth:`stream`, assembled and
+        #: parsed. None until a stream completes.
+        self.last_result: "str | dict | None" = None
+
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch an observability :class:`Event` to registered hooks (1.4.4)."""
         if self.hooks:
@@ -304,6 +308,83 @@ class Skill:
                 if i < len(self.models) - 1:
                     continue   # try the next model in the chain
                 raise          # last model exhausted
+
+    def stream(self, variables: "dict | None" = None):
+        """
+        Run the skill and yield the answer as it arrives.
+
+        ``run()`` is untouched — this is a second way to spend the same
+        request, not a replacement — and the differences from it are real
+        rather than incidental, so they are stated instead of discovered:
+
+        * **No retries and no fallback chain.** Both work by throwing the
+          attempt away and starting again, which a stream cannot do once the
+          caller has seen the first piece. A failure before the first piece
+          could be retried; a failure after it could not, so the rule would
+          hold only sometimes, and a rule that holds sometimes is worse than
+          none. The first model in the chain is used, and an error is raised.
+        * **The result is assembled as well as yielded.** ``last_result``
+          holds the whole text at the end, parsed when the output format
+          asks for JSON, so a caller does not have to choose between showing
+          progress and having the value.
+        * **Usage is whatever the provider reported**, on ``last_usage``, and
+          None when it reported nothing.
+
+        A provider that cannot stream yields the whole answer as one piece
+        and says so through the adaptation channel — see ``Model.stream``.
+        """
+        import json as _json
+        import time as _time
+
+        merged = {**self.variables, **(variables or {})}
+        messages = adapters.substitute(self._input["messages"], merged)
+        messages = adapters.resolve_media(messages)
+
+        self.last_usage = None
+        self.last_adaptations = []
+        self.history = None
+        self.last_result = None
+
+        model  = self.models[0]
+        _tools = getattr(self, "_tools", None)
+        pieces = []
+
+        self._emit("llm_call.started", name=model.name)
+        _t0 = _time.monotonic()
+        try:
+            for piece in model.stream(messages, self._output, tools=_tools):
+                pieces.append(piece)
+                yield piece
+        except Exception as exc:
+            self._emit("llm_call.ended", name=model.name,
+                       duration=_time.monotonic() - _t0, error=str(exc))
+            raise
+
+        self.last_adaptations = list(getattr(model, "last_adaptations", []))
+        raw_usage = getattr(model, "last_stream_usage", None)
+        if raw_usage:
+            self.last_usage = attach_cost(
+                extract_usage({"usage": raw_usage}), model.name,
+                getattr(model, "cache_ttl", "5m"))
+
+        text = "".join(pieces)
+        kind = ((self._output or {}).get("format") or {}).get("type", "text")
+        if kind in ("json", "json_schema"):
+            try:
+                self.last_result = _json.loads(text)
+            except _json.JSONDecodeError:
+                # The pieces are handed over as they came; a truncated or
+                # non-JSON answer is not silently turned into None, because
+                # the caller has already seen the text and can say what
+                # arrived better than a swallowed exception can.
+                self.last_result = text
+        else:
+            self.last_result = text
+        self.history = [self.last_result]
+        self._emit("llm_call.ended", name=model.name,
+                   usage=getattr(self.last_usage, "total_tokens", None),
+                   cost=getattr(self.last_usage, "cost", None),
+                   duration=_time.monotonic() - _t0)
 
     def _run_on_model(
         self,

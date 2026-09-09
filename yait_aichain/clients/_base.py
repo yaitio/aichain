@@ -190,6 +190,101 @@ class BaseClient:
         return self._post(path, body, headers)
 
     # ------------------------------------------------------------------
+    # Streaming
+    # ------------------------------------------------------------------
+    #
+    # Three seams, and only the middle one is per-family. The transport below
+    # is the same server-sent-events reader for everybody; what differs is the
+    # flag that turns streaming on in the body and the shape of one delta.
+    #
+    # A family that does not override these is not broken — it is a provider
+    # that cannot stream, and the caller is told so rather than left waiting
+    # for chunks that never come. See `Model.stream`.
+
+    #: Whether this family can deliver an answer progressively. False here so
+    #: a new family is honest by default: a provider is declared able to
+    #: stream by someone who implemented and tested it, not by inheritance.
+    supports_streaming: bool = False
+
+    def build_stream_request(self, messages: list, output: dict, params: dict,
+                             tools: "list | None" = None) -> "tuple[str, dict]":
+        """``(path, body)`` for a streaming call — the ordinary request plus
+        whatever this provider's word for "stream" is."""
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot stream")
+
+    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+        """The text carried by one event, or ``None`` for an event that
+        carries none — a role announcement, a heartbeat, a usage report."""
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot stream")
+
+    def stream_usage(self, event: dict) -> "dict | None":
+        """The usage report, when an event is one. Providers put it in the
+        last event of the stream; a family that does not send one returns
+        None throughout and the caller gets no usage, which is honest —
+        inventing a token count from the text we happened to see would be
+        worse than admitting the provider did not say."""
+        return None
+
+    def _post_sse(self, path: str, data: dict, headers: dict):
+        """
+        POST *data* and yield each server-sent event as a decoded object.
+
+        Deliberately not a generic line reader. Three details are what make
+        the difference between this working and appearing to work:
+
+        * ``preload_content=False`` — without it urllib3 buffers the whole
+          response and every chunk arrives at once, at the end. The code
+          reads as streaming and the user sees none of it.
+        * an event is terminated by a blank line and its data may span
+          several ``data:`` lines, which have to be joined before decoding.
+        * ``[DONE]`` is a sentinel, not JSON. Feeding it to a decoder is the
+          commonest way an SSE reader ends its stream with an exception
+          instead of a return.
+        """
+        try:
+            response = self._http.request(
+                "POST",
+                self._base_url + path,
+                body=json.dumps(data).encode("utf-8"),
+                headers={**headers, "Accept": "text/event-stream"},
+                preload_content=False,
+            )
+        except Exception as exc:
+            raise NetworkError(0, str(exc)) from exc
+
+        if not (200 <= response.status < 300):
+            body = response.read().decode("utf-8", errors="replace")
+            response.release_conn()
+            raise error_from_status(response.status, body, response.headers)
+
+        try:
+            buffer = ""
+            for raw in response.stream(amt=None, decode_content=True):
+                buffer += raw.decode("utf-8", errors="replace")
+                while "\n\n" in buffer or "\r\n\r\n" in buffer:
+                    sep = "\r\n\r\n" if "\r\n\r\n" in buffer and (
+                        "\n\n" not in buffer
+                        or buffer.index("\r\n\r\n") < buffer.index("\n\n")
+                    ) else "\n\n"
+                    chunk, buffer = buffer.split(sep, 1)
+                    payload = "".join(
+                        line[5:].lstrip() if line.startswith("data:") else ""
+                        for line in chunk.splitlines()
+                        if line.startswith("data:"))
+                    if not payload or payload == "[DONE]":
+                        continue
+                    try:
+                        yield json.loads(payload)
+                    except json.JSONDecodeError:
+                        # A provider that sends a non-JSON comment or keeps
+                        # the connection warm with junk must not end the run.
+                        continue
+        finally:
+            response.release_conn()
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
