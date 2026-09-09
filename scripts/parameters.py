@@ -395,12 +395,22 @@ def _defaults_section() -> list:
         "**Why they differ — three separate reasons, and only the first is "
         "the providers' fault.** Some are genuinely each vendor's own default "
         "and disagree because the vendors disagree. Some are the vendor's "
-        "*recommendation for a task* rather than their default, adopted here "
-        "as a house choice — DeepSeek's API defaults to `1.0` and we send "
-        "`0.0`, which is their advice for code and maths, not their default. "
-        "And `max_tokens` is almost entirely ours: most of these APIs do not "
-        "default it at all (Anthropic requires the field), so the library had "
-        "to pick, and picked per provider rather than once.",
+        "*advice for a task* rather than their default, adopted here as a "
+        "house choice: Perplexity documents no default at all and recommends "
+        "a low temperature for search, so `0.2` is ours. And `max_tokens` is "
+        "almost entirely ours, because most of these APIs do not default it "
+        "either (Anthropic requires the field), so the library had to pick — "
+        "and picked per provider rather than once.",
+        "",
+        "Two of those house choices were withdrawn on 2026-09-09, both for "
+        "the same reason: they were the library disagreeing with a provider "
+        "quietly. DeepSeek was sent `temperature=0.0` — their advice for code "
+        "and maths — which left one provider deterministic while no other one "
+        "was, and made it the odd arm in any comparison that set nothing. "
+        "Qwen was capped at `max_tokens=2048`, a quarter of what qwen-max "
+        "produces, so a long answer was cut off by us and not by the "
+        "provider. Both now carry the provider's own number; the advice is "
+        "still good and is the caller's to take.",
         "",
         "They are deliberately **not** converged: a library-wide default "
         "would override a number each provider picked for its own models, "

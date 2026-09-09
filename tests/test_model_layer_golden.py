@@ -63,11 +63,16 @@ _GOLDEN = {
                     "temperature": 1.0, "top_p": 0.95},
         "system_in_messages": True, "json_adds": "response_format"},
     "deepseek": {"name": "deepseek-chat", "path": "/v1/chat/completions",
+        # 1.0 is DeepSeek's own default. It was 0.0 here until 2026-09-09:
+        # their recommendation for code and maths, taken as a house choice,
+        # which made one provider deterministic while none of the others was.
         "scalars": {"model": "deepseek-chat", "max_tokens": 4096,
-                    "temperature": 0.0, "top_p": 1.0},
+                    "temperature": 1.0, "top_p": 1.0},
         "system_in_messages": True, "json_adds": "response_format"},
     "qwen": {"name": "qwen-max", "path": "/compatible-mode/v1/chat/completions",
-        "scalars": {"model": "qwen-max", "max_completion_tokens": 2048,
+        # 8192 is qwen-max's own ceiling; 2048, the value until 2026-09-09,
+        # cut long answers off at a quarter of what the model can produce.
+        "scalars": {"model": "qwen-max", "max_completion_tokens": 8192,
                     "temperature": 0.7, "top_p": 0.8},
         "system_in_messages": True, "json_adds": "response_format"},
 }

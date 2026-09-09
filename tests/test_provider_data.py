@@ -44,7 +44,7 @@ class TestProviderDataConsistency(unittest.TestCase):
         # Pin a representative spread so the data can't silently drift.
         self.assertEqual(PROVIDERS["openai"]["provider"]["defaults"]["max_tokens"], 16384)
         self.assertEqual(PROVIDERS["anthropic"]["provider"]["defaults"]["max_tokens"], 8192)
-        self.assertEqual(PROVIDERS["deepseek"]["provider"]["defaults"]["temperature"], 0.0)
+        self.assertEqual(PROVIDERS["deepseek"]["provider"]["defaults"]["temperature"], 1.0)
         self.assertEqual(PROVIDERS["qwen"]["provider"]["defaults"]["top_p"], 0.8)
 
     def test_env_key_pinned(self):
