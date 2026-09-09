@@ -151,3 +151,68 @@ def why_absent(option: str, provider: str) -> str:
     # certain rather than guessing which.
     return (f"{provider} has a {option} control, but it did not reach this "
             "request — this model or this call does not take it")
+
+
+# ── What a value may be ──────────────────────────────────────────────────────
+#
+# Three different things can be wrong with an option, and they want three
+# different answers:
+#
+#   the name is not one we know        → refuse where it was written
+#   the provider has no such control   → decline, say so, name the way round
+#   the value is not one this model
+#   accepts                            → refuse before the wire, list what is
+#
+# The third is the one a provider answers for us otherwise, and badly: OpenAI
+# says "Invalid value: 'ultra-max-supreme'" after the request has been paid
+# for and the round trip spent. The allowed set belongs to the **model**, not
+# the provider — `quality="xhigh"` is fine on gpt-image-2.5-flare and refused
+# by gpt-image-1.5, measured 2026-09-09.
+
+
+def allowed_values(option: str, provider: str, model: str) -> "list | None":
+    """The values *model* accepts for *option*, or ``None`` when unconstrained.
+
+    A per-model entry wins over the provider-wide one, because within one
+    provider the newer models take values the older ones refuse.
+    """
+    from ._data import PROVIDERS
+    data = PROVIDERS.get(provider) or {}
+    per_model = (data.get("models", {}).get(model, {}).get("values") or {})
+    if option in per_model:
+        return list(per_model[option])
+    provider_wide = ((data.get("provider") or {}).get("options") or {}
+                     ).get("values") or {}
+    return list(provider_wide[option]) if option in provider_wide else None
+
+
+def check_value(option: str, value, provider: str, model: str):
+    """
+    Return ``(value_to_send, note)``.
+
+    A value outside a declared set raises: substituting a guess for what the
+    caller asked is worse than stopping, because "high" is not what somebody
+    who wrote "xhigh" wanted. A number outside a declared range is clamped
+    instead — there the intent is unambiguous, and *note* says it happened.
+    """
+    allowed = allowed_values(option, provider, model)
+    if allowed is None:
+        return value, None
+
+    # A two-number range, written [min, max], means clamp rather than refuse.
+    if (len(allowed) == 2 and all(isinstance(v, (int, float)) for v in allowed)
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)):
+        low, high = allowed
+        if value < low or value > high:
+            fixed = min(max(value, low), high)
+            return fixed, (f"{value} is outside {low}-{high} for {model}; "
+                           f"sent {fixed}")
+        return value, None
+
+    if value not in allowed:
+        raise ValueError(
+            f"{model} does not accept {option}={value!r}. "
+            f"Allowed: {', '.join(map(repr, allowed))}."
+        )
+    return value, None

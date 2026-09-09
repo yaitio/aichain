@@ -412,6 +412,28 @@ class Model:
             path, body = self._built(messages, output)
         return path, body
 
+    def _check_values(self, output: dict) -> dict:
+        """Refuse a value this model does not take, before the wire.
+
+        Otherwise the provider answers for us, after the round trip is spent:
+        "Invalid value: 'ultra-max-supreme'. Supported values are: …". The
+        library knows the same thing and knows it earlier.
+        """
+        from ._adaptation import Adaptation, ADAPTED, record
+        from ._options import check_value
+
+        fmt = (output.get("format") or {})
+        fixed = None
+        for key, value in fmt.items():
+            if key in ("type", "schema", "name", "strict") or value is None:
+                continue
+            sent, note = check_value(key, value, self._provider, self.name)
+            if note is not None:
+                fixed = {**(fixed or fmt), key: sent}
+                record(Adaptation(kind=ADAPTED, option=key, asked=value,
+                                  sent=sent, model=self.name, why=note))
+        return {**output, "format": fixed} if fixed else output
+
     def _built(self, messages: list, output: dict, tools=None):
         """Build, then say what building changed.
 
@@ -424,6 +446,7 @@ class Model:
         from ._adaptation import announce, collect, note_absent
 
         with collect() as made:
+            output = self._check_values(output)
             if tools is not None:
                 path, body = self.client.build_request(
                     messages, output, self._params(), tools=tools)
