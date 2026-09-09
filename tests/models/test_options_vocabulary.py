@@ -198,3 +198,46 @@ class TestRenamedNames(unittest.TestCase):
         from yait_aichain.models._options import ALIASES, UNIVERSAL_FORMAT
         self.assertNotIn("output_format", ALIASES)
         self.assertIn("output_format", UNIVERSAL_FORMAT)
+
+
+class TestAskingTheWrongKindOfModel(unittest.TestCase):
+    """An image key on a text model is a category mistake, not a gap.
+
+    Both used to read the same — "openai has a background control, but it did
+    not reach this request" is true of gpt-4o and tells a reader nothing they
+    can act on, because the control exists and the model simply does not draw.
+    """
+
+    def _why(self, name, **fmt):
+        from yait_aichain.models import _adaptation
+        _adaptation.reset_warnings()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            m = Model(name, api_key="k")
+            m.to_request(MSGS, {"format": {"type": "text", **fmt}})
+        return {a.option: a for a in m.last_adaptations}
+
+    def test_it_names_the_modality_rather_than_the_provider(self):
+        made = self._why("gpt-4o", background="transparent")
+        self.assertIn("does not produce images", made["background"].why)
+
+    def test_and_does_so_for_a_provider_with_no_image_models_at_all(self):
+        made = self._why("claude-sonnet-4-6", size="1024x1024")
+        self.assertIn("does not produce images", made["size"].why)
+
+    def test_the_request_still_goes(self):
+        """A format key meant for another kind of model is worth a word, not
+        a refusal: one format dict reused across models is ordinary."""
+        made = self._why("gpt-4o", background="transparent")
+        self.assertEqual(made["background"].kind, "declined")
+
+    def test_a_model_that_draws_gets_the_capability_answer_instead(self):
+        from yait_aichain.models import _adaptation
+        _adaptation.reset_warnings()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            m = Model("gpt-image-2.5-flare", api_key="k")
+            m.to_request(MSGS, {"format": {"type": "image", "seed": 42}})
+        why, = [a.why for a in m.last_adaptations if a.option == "seed"]
+        self.assertIn("no seed", why)
+        self.assertNotIn("does not produce images", why)

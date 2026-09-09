@@ -220,7 +220,7 @@ def note_absent(made: list, asked: dict, body, model_name: str,
                 arrived = False
         if not arrived:
             from ._options import is_universal, why_absent
-            reason = why or (why_absent(option, provider) if provider else
+            reason = why or (why_absent(option, provider, model_name) if provider else
                              "this provider has no such control; the request "
                              "was sent without it")
             # A name the library does not know is a different thing from an
