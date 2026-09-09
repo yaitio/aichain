@@ -10,29 +10,29 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 
 ### Model options
 
-| option | what it does | values |
-|---|---|---|
-| `temperature` | how much randomness the model is allowed | any |
-| `top_p` | nucleus sampling: the probability mass to sample from | any |
-| `top_k` | sample only from the k most likely tokens | any |
-| `max_tokens` | ceiling on the answer's length | any |
-| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` |
-| `cache_control` | cache the stable prefix so a repeated one is not re-billed | any |
-| `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | any |
+| option | what it does | values | who takes it |
+|---|---|---|---|
+| `temperature` | how much randomness the model is allowed | any | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `xai` |
+| `top_p` | nucleus sampling: the probability mass to sample from | any | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `xai` |
+| `top_k` | sample only from the k most likely tokens | any | `anthropic`, `google` |
+| `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `xai` |
+| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `qwen`, `xai` |
+| `cache_control` | cache the stable prefix so a repeated one is not re-billed | any | `anthropic` |
+| `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | any | `anthropic` |
 
 ### Format keys
 
-| option | what it does | values |
-|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any |
-| `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) |
-| `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` |
-| `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` |
-| `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` |
-| `seed` | fix the randomness so the same prompt renders the same way | any |
-| `reference_fidelity` | how strongly to preserve detail from a reference image | `low`, `high` |
-| `strength` | how far an edit may move from the original, 0 to 1 | `0.0`–`1.0` |
+| option | what it does | values | who takes it |
+|---|---|---|---|
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `reve`, `xai` |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `reve`, `xai` |
+| `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) | `openai`, `reve` |
+| `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` | `openai`, `reve` |
+| `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` | `bfl`, `openai` |
+| `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` | `openai` |
+| `seed` | fix the randomness so the same prompt renders the same way | any | `bfl` |
+| `reference_fidelity` | how strongly to preserve detail from a reference image | `low`, `high` | `openai` |
+| `strength` | how far an edit may move from the original, 0 to 1 | `0.0`–`1.0` | `recraft` |
 
 ## 2. What each provider declares it takes
 
@@ -45,7 +45,7 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `deepseek` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
-| `openai` | `background`, `compression`, `max_tokens`, `output_format`, `quality`, `reasoning`, `reference_fidelity`, `size`, `temperature`, `top_p` |
+| `openai` | `aspect_ratio`, `background`, `compression`, `max_tokens`, `output_format`, `quality`, `reasoning`, `reference_fidelity`, `size`, `temperature`, `top_p` |
 | `perplexity` | `max_tokens`, `temperature`, `top_p` |
 | `qwen` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 | `recraft` | `aspect_ratio`, `size`, `strength` |
