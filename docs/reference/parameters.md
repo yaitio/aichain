@@ -8,26 +8,103 @@ Four questions, one source. **What you get without asking**, **what you may ask 
 
 ## 0. What you get when you ask for nothing
 
-These are sent on every call, chosen or not. They come from each provider's own documented default, which is why they disagree — and a caller who sets nothing is therefore **not** holding sampling constant across providers.
+These are sent on every call, chosen or not — so a caller who sets nothing is **not** holding sampling constant across providers.
+
+A `*` marks a number the library picked rather than the provider. The two are not the same kind of thing: a vendor default is a fact about the API, ours is an opinion you are entitled to disagree with.
 
 | provider | `temperature` | `top_p` | `top_k` | `max_tokens` |
 |---|---|---|---|---|
-| `anthropic` | `1.0` | — | — | `8192` |
-| `bfl` | `1.0` | — | — | `4096` |
-| `deepseek` | `0.0` | `1.0` | — | `4096` |
-| `google` | `1.0` | `0.95` | `40` | `8192` |
+| `anthropic` | `1.0` | — | — | `8192`\* |
+| `bfl` | `1.0`\* | — | — | `4096`\* |
+| `deepseek` | `0.0`\* | `1.0` | — | `4096`\* |
+| `google` | `1.0` | `0.95` | `40` | `8192`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
-| `openai` | `1.0` | `1.0` | — | `16384` |
-| `perplexity` | `0.2` | `0.9` | — | `8192` |
-| `private` | `1.0` | — | — | `4096` |
-| `qwen` | `0.7` | `0.8` | — | `2048` |
-| `recraft` | `1.0` | — | — | `4096` |
-| `reve` | `1.0` | — | — | `4096` |
-| `xai` | `1.0` | `1.0` | — | `16384` |
+| `openai` | `1.0` | `1.0` | — | `16384`\* |
+| `perplexity` | `0.2`\* | `0.9` | — | `8192`\* |
+| `private` | `1.0`\* | — | — | `4096`\* |
+| `qwen` | `0.7` | `0.8` | — | `2048`\* |
+| `recraft` | `1.0`\* | — | — | `4096`\* |
+| `reve` | `1.0`\* | — | — | `4096`\* |
+| `xai` | `1.0` | `1.0` | — | `16384`\* |
 
 `temperature` alone takes `0.0`, `0.2`, `0.7`, `1.0` depending on where the request goes; `max_tokens` spans `2048`–`32768`.
 
+**Why they differ — three separate reasons, and only the first is the providers' fault.** Some are genuinely each vendor's own default and disagree because the vendors disagree. Some are the vendor's *recommendation for a task* rather than their default, adopted here as a house choice — DeepSeek's API defaults to `1.0` and we send `0.0`, which is their advice for code and maths, not their default. And `max_tokens` is almost entirely ours: most of these APIs do not default it at all (Anthropic requires the field), so the library had to pick, and picked per provider rather than once.
+
 They are deliberately **not** converged: a library-wide default would override a number each provider picked for its own models, and would change the output of every existing caller in order to fix a comparison only some of them are making. What the library owes is the fact, not a decision — `Model.effective_options` returns exactly what this model will run with, asked for or not, so a measurement run records it beside its results and its arms are comparable or visibly not.
+
+<details><summary>Who chose each number</summary>
+
+
+**`anthropic`**
+
+- `temperature` — vendor · Anthropic's API default. The range here is 0.0-1.0, not 0-2
+- `max_tokens` — ours · the API *requires* the field, so a number had to be picked; 8192 is safe across the family and Claude 4 takes up to 64000
+
+**`bfl`**
+
+- `temperature` — unused · this provider renders images and reads neither of these
+- `max_tokens` — unused · this provider renders images and reads neither of these
+
+**`deepseek`**
+
+- `temperature` — ours · DeepSeek's own API default is 1.0. 0.0 is their recommendation for coding and maths, taken here as the conservative choice — so this number is an opinion, not a default
+- `top_p` — vendor · DeepSeek's default
+- `max_tokens` — ours · practical for deepseek-chat; deepseek-reasoner needs 32768 for its CoT
+
+**`google`**
+
+- `temperature` — vendor · the Gemini 2.x default (1.5 used 0.9)
+- `top_p` — vendor · Google's recommended default for controlled generation
+- `top_k` — vendor · Google's default for Gemini 2.x Flash; 1.5 Pro used 64
+- `max_tokens` — ours · applies to every current Gemini; 2.5-pro takes up to 65536 with thinking off
+
+**`kimi`**
+
+- `temperature` — vendor · Kimi's default, and the API *enforces* 1.0 while thinking is on. The non-thinking recommendation of 0.6 has to be asked for explicitly
+- `top_p` — vendor · Kimi's default
+- `max_tokens` — vendor · Kimi's own default, which is why this one is the largest in the table
+
+**`openai`**
+
+- `temperature` — vendor · OpenAI's API default; the o-series ignores it
+- `top_p` — vendor · OpenAI's default. They advise altering this or temperature, not both
+- `max_tokens` — ours · safe for GPT-4o and GPT-4.1; goes out as max_completion_tokens
+
+**`perplexity`**
+
+- `temperature` — ours · Perplexity advises a low temperature for search and factual work; 0.2 keeps answers focused without going fully deterministic — an opinion, not their default
+- `top_p` — vendor · Perplexity's recommended value for nucleus sampling
+- `max_tokens` — ours · practical across the Sonar family; sonar-deep-research returns far more
+
+**`private`**
+
+- `temperature` — ours · a self-hosted server's own defaults are not knowable from here
+- `max_tokens` — ours · a self-hosted server's own defaults are not knowable from here
+
+**`qwen`**
+
+- `temperature` — vendor · DashScope's default for chat models
+- `top_p` — vendor · DashScope's default
+- `max_tokens` — ours · conservative, and the smallest here; qwen-max takes up to 8192
+
+**`recraft`**
+
+- `temperature` — unused · this provider renders images and reads neither of these
+- `max_tokens` — unused · this provider renders images and reads neither of these
+
+**`reve`**
+
+- `temperature` — unused · this provider renders images and reads neither of these
+- `max_tokens` — unused · this provider renders images and reads neither of these
+
+**`xai`**
+
+- `temperature` — vendor · the OpenAI-compatible default
+- `top_p` — vendor · the OpenAI-compatible default
+- `max_tokens` — ours · practical; grok-3 carries 131072 of context and grok-4 256000
+
+</details>
 
 ## 1. What you can ask for
 

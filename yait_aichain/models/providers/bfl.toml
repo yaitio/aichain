@@ -27,6 +27,17 @@ temperature = 1.0
 max_tokens  = 4096
 
 # Generation
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "unused · this provider renders images and reads neither of these"
+max_tokens  = "unused · this provider renders images and reads neither of these"
 [models."flux-2-pro"]
 caps  = ["text-to-image"]
 

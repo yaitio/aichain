@@ -40,6 +40,18 @@ temperature = 1.0
 max_tokens  = 16384
 top_p = 1.0
 
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "vendor · OpenAI's API default; the o-series ignores it"
+top_p       = "vendor · OpenAI's default. They advise altering this or temperature, not both"
+max_tokens  = "ours · safe for GPT-4o and GPT-4.1; goes out as max_completion_tokens"
 [provider.reasoning_map]
 # "none" switches deliberation off entirely on the Responses API (gpt-5.x).
 # Without it the server default is "medium" — an agent that reasons on every
