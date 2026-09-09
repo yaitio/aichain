@@ -29,9 +29,9 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 | `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) |
 | `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` |
 | `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` |
-| `output_compression` | compression level for jpeg and webp, 0-100 | `0`–`100` |
+| `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` |
 | `seed` | fix the randomness so the same prompt renders the same way | any |
-| `input_fidelity` | how strongly to preserve detail from a reference image | `low`, `high` |
+| `reference_fidelity` | how strongly to preserve detail from a reference image | `low`, `high` |
 | `strength` | how far an edit may move from the original, 0 to 1 | `0.0`–`1.0` |
 
 ## 2. What each provider declares it takes
@@ -45,7 +45,7 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `deepseek` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
-| `openai` | `background`, `input_fidelity`, `max_tokens`, `output_compression`, `output_format`, `quality`, `reasoning`, `size`, `temperature`, `top_p` |
+| `openai` | `background`, `compression`, `max_tokens`, `output_format`, `quality`, `reasoning`, `reference_fidelity`, `size`, `temperature`, `top_p` |
 | `perplexity` | `max_tokens`, `temperature`, `top_p` |
 | `qwen` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 | `recraft` | `aspect_ratio`, `size`, `strength` |
@@ -103,10 +103,10 @@ without saying so. It may adapt; it may not do it quietly.
 
 ### Output format (image)
 
-| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` | `strength` |
+| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `reference_fidelity` | `strength` |
 |---|---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| `gpt-image-2.5-flare` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
+| `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
 | `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — | — |
 | `reve-image` | ≈ `aspect_ratio` | ✓ | ≈ `test_time_scaling` | ≈ `[0]` | — | — | — | — | — |
@@ -116,10 +116,10 @@ without saying so. It may adapt; it may not do it quietly.
 
 ### Output format (image edits)
 
-| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `output_compression` | `seed` | `input_fidelity` | `strength` |
+| model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `reference_fidelity` | `strength` |
 |---|---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | ✓ | — |
+| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | — | — |
+| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | → `input_fidelity` | — |
 | `grok-imagine-image (edit)` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — | — |
 | `recraftv3 (edit)` | — | — | — | — | — | — | — | — | ✓ |
 

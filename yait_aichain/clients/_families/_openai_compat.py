@@ -43,17 +43,18 @@ def _drop_rejected(model, fmt: dict) -> dict:
     dropped = [k for k in rejects if fmt.get(k) is not None]
     if not dropped:
         return fmt
-    import warnings
+    # Reported through the adaptation channel rather than warned here: this
+    # site used to raise its own warning while note_absent added a second for
+    # the same option, so one dropped parameter was announced twice and only
+    # one of the two reached the run record.
+    from ...models._adaptation import Adaptation, DECLINED, record
     for key in dropped:
-        mark = (model.name, key)
-        if mark not in _WARNED_REJECTS:
-            _WARNED_REJECTS.add(mark)
-            warnings.warn(
-                f"{model.name} does not accept {key!r}; it was dropped so the "
-                "request could be sent. The model applies its own handling "
-                "for this setting.",
-                RuntimeWarning, stacklevel=3,
-            )
+        record(Adaptation(
+            kind=DECLINED, option=key, asked=fmt[key], sent=None,
+            model=model.name,
+            why=f"{model.name} does not accept this parameter, so it was "
+                "dropped and the request sent; the model applies its own "
+                "handling for the setting"))
     return {k: v for k, v in fmt.items() if k not in dropped}
 
 
@@ -623,8 +624,8 @@ def _build_image_generations_request(
         body["output_format"] = fmt["output_format"]
     # Only meaningful with jpeg/webp; 0 is a legal value, so the presence of
     # the key decides, not its truth.
-    if fmt.get("output_compression") is not None:
-        body["output_compression"] = fmt["output_compression"]
+    if fmt.get("compression") is not None:
+        body["output_compression"] = fmt["compression"]
 
     # Request base64 output on every model that accepts the parameter.
     # gpt-image-* / chatgpt-image-* always return b64_json natively and reject
@@ -771,12 +772,15 @@ def _build_image_edits_request(
 
     fields: list = [("model", model.name), ("prompt", _prompt_from_messages(messages))]
     fmt = _drop_rejected(model, output.get("format", {}))
-    for key in ("size", "quality", "background", "output_format",
-                "input_fidelity"):
-        if fmt.get(key):
-            fields.append((key, str(fmt[key])))
-    if fmt.get("output_compression") is not None:
-        fields.append(("output_compression", str(fmt["output_compression"])))
+    # Our name on the left, the provider's on the wire.
+    for ours, theirs in (("size", "size"), ("quality", "quality"),
+                         ("background", "background"),
+                         ("output_format", "output_format"),
+                         ("reference_fidelity", "input_fidelity")):
+        if fmt.get(ours):
+            fields.append((theirs, str(fmt[ours])))
+    if fmt.get("compression") is not None:
+        fields.append(("output_compression", str(fmt["compression"])))
 
     for i, src in enumerate(sources):
         if src.get("kind") == "url":
