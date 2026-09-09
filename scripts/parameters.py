@@ -320,16 +320,130 @@ _MARK = {"passed": "✓", "renamed": "→", "converted": "≈",
          "swapped": "⇄", "dropped": "—", "refused": "⊘", "error": "✗"}
 
 
+def _vocabulary_section(matrix: dict) -> list:
+    """What a caller may ask for, and what values are allowed.
+
+    Generated rather than written: the vocabulary, the per-provider
+    declarations and the value scales all come out of the same data the
+    conformance test reads, so a page that disagrees with the code cannot be
+    produced.
+    """
+    import yait_aichain.models._base as base
+    from yait_aichain.models._options import (UNIVERSAL_OPTIONS,
+                                              UNIVERSAL_FORMAT, accepted_by,
+                                              allowed_values, value_map)
+
+    lines = ["## 1. What you can ask for", "",
+             "The universal vocabulary. **Model options** are set once on the "
+             "`Model` and are a closed set — an unknown name raises at "
+             "construction. **Format keys** are set per call in "
+             "`output={\"format\": …}` and are open: a provider may read "
+             "names of its own, so an unknown one is reported and the request "
+             "still goes.", ""]
+
+    models_by_provider: dict = {}
+    for name in matrix:
+        clean = name.replace(" (edit)", "")
+        models_by_provider.setdefault(base._resolve_provider(clean), []).append(clean)
+
+    def _draws(provider: str, model: str) -> bool:
+        """Whether this model renders images at all."""
+        from yait_aichain.models._data import PROVIDERS
+        caps = ((PROVIDERS.get(provider) or {}).get("models", {})
+                .get(model, {}).get("caps") or ())
+        return any("image" in c.split("-to-")[-1] for c in caps)
+
+    for title, vocab in (("Model options", UNIVERSAL_OPTIONS),
+                         ("Format keys", UNIVERSAL_FORMAT)):
+        lines += [f"### {title}", "",
+                  "| option | what it does | values |", "|---|---|---|"]
+        for option, meta in vocab.items():
+            # Allowed sets differ by model where a provider says so; show the
+            # union and name the exception rather than pretending one set.
+            seen = {}
+            for prov, models in models_by_provider.items():
+                # Only models that have the control at all: a provider-wide
+                # value list otherwise reads as if gpt-4o took `quality`.
+                declared = accepted_by(prov)
+                if declared is not None and option not in declared:
+                    continue
+                for m in models:
+                    # A format key belongs to a model that draws; the
+                    # declaration is per provider, and openai's text models
+                    # were being listed as taking `quality`.
+                    if vocab is UNIVERSAL_FORMAT and not _draws(prov, m):
+                        continue
+                    v = allowed_values(option, prov, m)
+                    if v:
+                        seen.setdefault(tuple(v), []).append(m)
+
+            def _show(vals):
+                # Two numbers are the range convention, not a pair of choices.
+                if len(vals) == 2 and all(isinstance(v, (int, float))
+                                          and not isinstance(v, bool)
+                                          for v in vals):
+                    return f"`{vals[0]}`–`{vals[1]}`"
+                return ", ".join(f"`{v}`" for v in vals)
+
+            if not seen:
+                values = "any"
+            elif len(seen) == 1:
+                vals, = seen
+                values = _show(vals)
+            else:
+                values = "; ".join(
+                    _show(vals) + f" ({', '.join(sorted(set(ms)))})"
+                    for vals, ms in seen.items())
+            lines.append(f"| `{option}` | {meta['what']} | {values} |")
+        lines.append("")
+
+    lines += ["## 2. What each provider declares it takes", "",
+              "From the provider data, not from the code — `accepts` and "
+              "`format_accepts`. A provider that declares nothing is not a "
+              "provider that takes nothing: absence of a claim is not a claim.",
+              "", "| provider | takes |", "|---|---|"]
+    for prov in sorted(models_by_provider):
+        declared = accepted_by(prov)
+        lines.append(f"| `{prov}` | " +
+                     (", ".join(f"`{o}`" for o in sorted(declared)) if declared
+                      else "*declares nothing*") + " |")
+    lines.append("")
+
+    scales = []
+    for prov in sorted(models_by_provider):
+        for option in list(UNIVERSAL_OPTIONS) + list(UNIVERSAL_FORMAT):
+            table = value_map(option, prov)
+            if table:
+                scales.append((prov, option, table))
+    if scales:
+        lines += ["### The same level on each provider's own scale", "",
+                  "A universal name is only half the promise. These are the "
+                  "tables the value is put through — declared in the provider "
+                  "data, never in a client.", "",
+                  "| provider | option | our value → theirs |", "|---|---|---|"]
+        for prov, option, table in scales:
+            pairs = ", ".join(f"`{k}`→`{v}`" for k, v in table.items())
+            lines.append(f"| `{prov}` | `{option}` | {pairs} |")
+        lines.append("")
+    return lines
+
+
 def render_doc(matrix: dict) -> str:
     lines = [
         "# Parameters, per provider",
         "",
         "<!-- GENERATED by scripts/parameters.py — do not edit; rerun it. -->",
         "",
-        "What each universal option actually does on each model, established by",
-        "building the request and diffing it against one built without the",
-        "option. The same run feeds the conformance test, so this page cannot",
-        "say one thing while the code does another.",
+        "Three questions, one source. **What you may ask for**, **what each "
+        "provider takes**, and **what actually happens when you ask** — the "
+        "last established by building the request and diffing it against one "
+        "built without the option. The same run feeds the conformance test, "
+        "so this page cannot say one thing while the code does another.",
+        "",
+    ]
+    lines += _vocabulary_section(matrix)
+    lines += [
+        "## 3. What happens when you ask",
         "",
         "| mark | meaning |",
         "|---|---|",
@@ -347,7 +461,7 @@ def render_doc(matrix: dict) -> str:
     ]
 
     def table(title, models, params):
-        lines.append(f"## {title}")
+        lines.append(f"### {title}")
         lines.append("")
         lines.append("| model | " + " | ".join(f"`{p}`" for p in params) + " |")
         lines.append("|---|" + "---|" * len(params))
