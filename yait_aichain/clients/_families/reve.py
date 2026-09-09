@@ -165,9 +165,34 @@ class ReveClient(BaseClient):
                     sent=f"aspect_ratio={ratio}", model=params["name"],
                     why="this API refuses a pixel size; the shape was kept "
                         "and the pixels left to the provider"))
+        # Universal quality and background, brought to this provider's own
+        # scale: a number from 1 to 15, and an entry in the postprocessing
+        # list. The tables live in reve.toml, not here, so the translation can
+        # be read without reading the client.
+        from ...models._options import to_provider_value
+        if fmt.get("quality"):
+            sent, note = to_provider_value("quality", fmt["quality"], "reve")
+            if isinstance(sent, int):
+                common["test_time_scaling"] = sent
+                record(Adaptation(
+                    kind=ADAPTED, option="quality", asked=fmt["quality"],
+                    sent=f"test_time_scaling={sent}", model=params["name"],
+                    why=note or "this provider measures quality as compute"))
+        if fmt.get("background"):
+            sent, _ = to_provider_value("background", fmt["background"], "reve")
+            if sent != fmt["background"]:
+                common["postprocessing"] = list(
+                    common.get("postprocessing", [])) + [sent]
+                record(Adaptation(
+                    kind=ADAPTED, option="background", asked=fmt["background"],
+                    sent=f"postprocessing={sent}", model=params["name"],
+                    why="this provider has no background setting; it is a "
+                        "post-processing step here"))
+
         # Optional quality controls, forwarded only when supplied.
         if fmt.get("postprocessing"):
-            common["postprocessing"] = fmt["postprocessing"]
+            common["postprocessing"] = list(
+                common.get("postprocessing", [])) + list(fmt["postprocessing"])
         if fmt.get("test_time_scaling") is not None:
             common["test_time_scaling"] = fmt["test_time_scaling"]
 

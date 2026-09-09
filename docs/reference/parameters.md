@@ -46,7 +46,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | ✓ | — | — |
 | `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
-| `reve-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
+| `reve-image` | ≈ `aspect_ratio` | ✓ | ≈ `test_time_scaling` | ≈ `[0]` | — | — | — | — |
 | `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — |
 | `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — |

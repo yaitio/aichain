@@ -216,3 +216,55 @@ def check_value(option: str, value, provider: str, model: str):
             f"Allowed: {', '.join(map(repr, allowed))}."
         )
     return value, None
+
+
+# ── Bringing a value to the provider's own scale ─────────────────────────────
+#
+# A universal name is only half the promise. `reasoning="medium"` has to
+# become 10000 budget tokens on Anthropic, 8192 on Google, the string
+# "medium" on OpenAI, `true` on Qwen and a different model on DeepSeek — one
+# word, seven shapes, and the caller writes it once.
+#
+# That mapping existed for `reasoning` alone, as `[provider.reasoning_map]`.
+# It is the same need everywhere: Reve expresses render quality as
+# `test_time_scaling`, a number from 1 to 15, and a transparent background as
+# an entry in a `postprocessing` list. Declaring those in data rather than
+# writing them into a client keeps the translation where it can be read.
+
+
+def value_map(option: str, provider: str) -> "dict | None":
+    """
+    How *provider* spells each universal value of *option*.
+
+    Declared as ``[provider.options.map.<option>]``. ``reasoning`` also reads
+    the older ``[provider.reasoning_map]``, which predates this and stays
+    valid — a provider file written before the generalisation must keep
+    working unchanged.
+    """
+    from ._data import PROVIDERS
+    data = (PROVIDERS.get(provider) or {}).get("provider") or {}
+    maps = (data.get("options") or {}).get("map") or {}
+    if option in maps:
+        return dict(maps[option])
+    if option == "reasoning" and data.get("reasoning_map"):
+        return dict(data["reasoning_map"])
+    return None
+
+
+def to_provider_value(option: str, value, provider: str):
+    """
+    Return ``(sent, note)`` — *value* in this provider's own scale.
+
+    ``note`` is a sentence for the adaptation record when the value changed
+    shape, and ``None`` when it went out as written. An unmapped value passes
+    through: the map names the levels a caller may ask for, not everything a
+    provider will take.
+    """
+    table = value_map(option, provider)
+    if not table or value not in table:
+        return value, None
+    sent = table[value]
+    if sent == value:
+        return value, None
+    return sent, (f"{value!r} is {sent!r} on {provider} — the same level in "
+                  "this provider's own scale")

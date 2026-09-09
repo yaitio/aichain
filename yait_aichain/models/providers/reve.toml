@@ -24,7 +24,20 @@ images_path = "/v1/image/create"
 # Shape only, by ratio: a pixel size is refused outright
 # (width/height come back UNRECOGNIZED_PARAMETER), so `size` is reduced to a
 # ratio. No seed for the same reason — the API rejects the parameter.
-format_accepts = ["size", "aspect_ratio"]
+format_accepts = ["size", "aspect_ratio", "quality", "background"]
+
+# The same intent in this provider's own scale. Render quality is a number
+# from 1 to 15 here (`test_time_scaling`), and a transparent background is an
+# entry in a `postprocessing` list rather than a setting of its own — so a
+# caller writes quality="high" once and it becomes 12 here and "high" on
+# OpenAI.
+[provider.options.map.quality]
+low    = 3
+medium = 7
+high   = 12
+
+[provider.options.map.background]
+transparent = "remove_background"
 accepts = []
 
 [provider.defaults]
