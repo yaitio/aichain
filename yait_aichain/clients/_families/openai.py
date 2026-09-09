@@ -143,6 +143,46 @@ class OpenAIClient(BaseClient):
     #: shapes: chat completions and the Responses API.
     supports_tools = True
 
+    #: Chat completions streams; the image endpoints do not, and the
+    #: Responses API streams under a different event vocabulary that is not
+    #: wired yet. `build_stream_request` refuses those two by name rather
+    #: than letting the flag stand for the whole family — a provider that
+    #: claims to stream and then does not is the defect this library spent
+    #: 2.3.0 removing from the option layer.
+    supports_streaming = True
+
+    def build_stream_request(self, messages, output, params, tools=None):
+        m = self._wrap(params)
+        if self._provider == "openai" and (
+                _should_use_responses_api(m.name) or _is_openai_image_model(m.name)):
+            raise NotImplementedError(
+                f"{m.name!r} does not stream through this client")
+        fmt = ((output or {}).get("format") or {}).get("type", "text")
+        if fmt == "image":
+            raise NotImplementedError("an image is not delivered progressively")
+        path, body = self.build_request(messages, output, params, tools=tools)
+        # `include_usage` is what makes the provider send a final event with
+        # the token counts in it. Without it a streamed call reports no usage
+        # at all, and a run that cannot price itself is the one thing this
+        # library refuses to ship.
+        body["stream"] = True
+        body["stream_options"] = {"include_usage": True}
+        return path, body
+
+    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+        choices = event.get("choices") or []
+        if not choices:
+            return None
+        delta = choices[0].get("delta") or {}
+        text = delta.get("content")
+        # A tool-call delta carries no content and must not be mistaken for
+        # the end of the answer; it is simply not text.
+        return text if isinstance(text, str) and text else None
+
+    def stream_usage(self, event: dict) -> "dict | None":
+        usage = event.get("usage")
+        return usage if isinstance(usage, dict) and usage else None
+
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         m   = self._wrap(params)
         p   = self._provider

@@ -382,6 +382,11 @@ class Model:
         #: Empty when the request went out as asked.
         self.last_adaptations: list = []
 
+        #: Token counts from the last :meth:`stream`, when the provider sent
+        #: them. None rather than a guess: counting the text we happened to
+        #: see would be a number with no provider behind it.
+        self.last_stream_usage: "dict | None" = None
+
         # ── build the family client (format + transport) ──────────────
         self.client = _build_client(self._provider, resolved_key, client_options or {})
 
@@ -557,6 +562,80 @@ class Model:
         # evidence unwritten is the silence this whole channel exists against.
         enforce(made, self.on_unsupported)
         return path, body
+
+    # ------------------------------------------------------------------
+    # Streaming
+    # ------------------------------------------------------------------
+
+    def stream(self, messages: list, output: dict,
+               tools: "list | None" = None):
+        """
+        Yield the answer in pieces as the provider produces it.
+
+        Not every provider can. An image endpoint has nothing to deliver
+        progressively, and two of OpenAI's own paths speak a different event
+        vocabulary that is not wired yet. The question that decides the
+        design is what to do then, and it is the same question 2.3.0 answered
+        for options: **the request still goes, and the caller is told.** So a
+        provider that cannot stream returns the whole answer as one piece and
+        records a ``declined`` — because a caller who asked to stream and got
+        one chunk at the end has something that looks like it worked, and
+        that is precisely the class of loss `on_unsupported="requirements"`
+        exists to raise on.
+
+        Usage lands on ``last_stream_usage`` when the provider reports it.
+        """
+        from ._adaptation import (Adaptation, DECLINED, announce, collect,
+                                  enforce, note_absent)
+
+        self.last_stream_usage = None
+        with collect() as made:
+            output = self._check_values(self._canonical_format(output))
+            try:
+                path, body = self.client.build_stream_request(
+                    messages, output, self._params(), tools=tools)
+            except NotImplementedError as why:
+                made.append(Adaptation(
+                    kind=DECLINED, option="stream", asked=True, sent=None,
+                    model=self.name,
+                    why=f"{why}; the answer arrives in one piece at the end"))
+                path = body = None
+
+        asked = {**self._asked,
+                 **{k: v for k, v in (output.get("format") or {}).items()
+                    if k not in ("type", "schema", "name", "strict")}}
+        if body is not None:
+            note_absent(made, asked, body, self.name, provider=self._provider)
+        announce(made)
+        self.last_adaptations = list(made)
+        enforce(made, self.on_unsupported)
+
+        if body is None:
+            # `_built` reports on its own build and overwrites the record,
+            # which would drop the `declined` just made — the notice about
+            # streaming would be warned about and then vanish from the
+            # machine-readable half, which is the half that matters.
+            spoken = list(made)
+            path, body = self._built(messages, output, tools=tools)
+            self.last_adaptations = spoken + list(self.last_adaptations)
+            import json as _json
+            raw = self.client.send(path, body, self.client._auth_headers())
+            response = _json.loads(raw)
+            self.last_stream_usage = response.get("usage")
+            result = self.from_response(response, output)
+            yield result if isinstance(result, str) else _json.dumps(result)
+            return
+
+        for event in self.client._post_sse(
+                path, body, self.client._auth_headers()):
+            usage = self.client.stream_usage(event)
+            if usage:
+                # Not `break`: a provider may report usage in an event that
+                # also carries text, and several send it before the last one.
+                self.last_stream_usage = usage
+            piece = self.client.parse_stream_event(event, output)
+            if piece:
+                yield piece
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
         """
