@@ -9,7 +9,7 @@ Low-level specifications you'll reach for when building with the library.
 | [Environment variables](environment-variables.md) | All required and optional env vars, grouped by provider and tool. |
 | [YAML schema](yaml-schema.md) | The YAML format for persisting and loading Skills and Chains. |
 
-For version history, see the Changelog section in the project README.
+For version history, see [CHANGELOG.md](../../CHANGELOG.md).
 
 ---
 
