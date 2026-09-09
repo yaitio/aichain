@@ -153,6 +153,16 @@ class TestBothDirections(unittest.TestCase):
             ("perplexity", "reasoning", "delivered, declared by nobody"),
             matrix.unfulfilled(live))
 
-    def test_the_page_names_both_kinds(self):
-        doc = matrix.DOC.read_text()
-        self.assertIn("Where the declaration and the code disagree", doc)
+    def test_the_page_names_both_kinds_when_there_are_any(self):
+        """The section is rendered only when something disagrees, so the
+        page is asserted against a matrix that has a disagreement in it
+        rather than against today's clean one."""
+        # render_doc walks the full option set per model, so the disagreement
+        # is injected into a real row rather than a stub one.
+        live = matrix.build_matrix()
+        live["gpt-4o"] = {**live["gpt-4o"],
+                          "top_k": {"outcome": "passed", "said": [],
+                                    "detail": ""}}
+        rendered = matrix.render_doc(live)
+        self.assertIn("Where the declaration and the code disagree", rendered)
+        self.assertIn("delivered, declared by nobody", rendered)
