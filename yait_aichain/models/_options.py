@@ -182,8 +182,25 @@ def accepted_by(provider: str) -> "frozenset[str] | None":
         opts.get("format_accepts") or ())
 
 
-def why_absent(option: str, provider: str) -> str:
+def _renders_images(provider: str, model: str) -> bool:
+    from ._data import PROVIDERS
+    caps = ((PROVIDERS.get(provider) or {}).get("models", {})
+            .get(model, {}).get("caps") or ())
+    return any(c.split("-to-")[-1] == "image" for c in caps)
+
+
+def why_absent(option: str, provider: str, model: str = "") -> str:
     """One sentence explaining why *option* left no trace on the request."""
+    # A format key asked of a model that does not draw is a category
+    # mistake, not a capability gap, and the two read alike unless said
+    # apart: "openai has a background control but it did not reach this
+    # request" is true of gpt-4o and tells the reader nothing they can act
+    # on.
+    if (option in UNIVERSAL_FORMAT and model
+            and not _renders_images(provider, model)):
+        return (f"{model} does not produce images, and {option!r} only means "
+                "something for one that does")
+
     if not is_universal(option):
         known = ", ".join(sorted({**UNIVERSAL_OPTIONS, **UNIVERSAL_FORMAT}))
         return (f"{option!r} is not an option this library knows — a typo, or "
