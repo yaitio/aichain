@@ -230,3 +230,60 @@ def note_absent(made: list, asked: dict, body, model_name: str,
             made.append(Adaptation(
                 kind=kind, option=option, asked=value, sent=None,
                 model=model_name, why=reason))
+
+
+# ── The caller's own strictness ──────────────────────────────────────────────
+
+
+class UnsupportedOption(ValueError):
+    """An option the caller set could not be honoured, and they asked to be
+    stopped rather than warned. Carries the adaptations that caused it."""
+
+    def __init__(self, message: str, adaptations: list) -> None:
+        super().__init__(message)
+        self.adaptations = list(adaptations)
+
+
+#: What ``Model(on_unsupported=...)`` accepts.
+#:
+#: The library cannot make this call alone, and the reason is in the data
+#: rather than in taste. Dropping `temperature` costs a different answer;
+#: dropping `seed` or `size` costs a result that **looks** right and is not
+#: (``_options.REQUIREMENT``). But whether that is fatal is a property of the
+#: caller, not of the option: one caller renders a thumbnail and shrugs at the
+#: shape, the next feeds a fixed-size slot in a layout, and a measurement run
+#: is invalidated outright by an arm that quietly sampled differently.
+#:
+#: So the default stays "warn" — a library that raises on a provider gap is a
+#: library you cannot swap providers under, which is the whole promise — and
+#: the caller who needs the guarantee opts in.
+STRICTNESS = ("warn", "requirements", "raise")
+
+#: Fates that mean the option did not travel. `adapted` is not among them: the
+#: intent arrived in another shape, which is the library doing its job.
+_DID_NOT_TRAVEL = (DECLINED, REFUSED)
+
+
+def enforce(made: list, on_unsupported: str) -> None:
+    """Raise when *made* holds a loss the caller said they cannot accept.
+
+    "warn" never raises; "requirements" raises only for the options whose
+    absence is invisible in the result; "raise" for any option that did not
+    reach the wire.
+    """
+    if on_unsupported == "warn":
+        return
+    from ._options import is_requirement
+
+    lost = [a for a in made if a.kind in _DID_NOT_TRAVEL]
+    if on_unsupported == "requirements":
+        lost = [a for a in lost if is_requirement(a.option)]
+    if not lost:
+        return
+    names = ", ".join(sorted({a.option for a in lost}))
+    raise UnsupportedOption(
+        f"{names} cannot be honoured here and on_unsupported="
+        f"{on_unsupported!r} was set:\n"
+        + "\n".join(f"  {a}" for a in lost)
+        + "\n\nSet on_unsupported='warn' to send the request without them.",
+        lost)

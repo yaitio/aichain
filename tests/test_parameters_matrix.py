@@ -98,7 +98,7 @@ if __name__ == "__main__":
 class TestTheDocumentAnswersAllThree(unittest.TestCase):
     """The page has to carry three things, not one.
 
-    It began as "what happens when you ask", which is only the third
+    It began as "what happens when you ask", which is only the last
     question. A reader also needs to know what there is to ask for and what
     each provider claims to take — and all three have to come out of the same
     run, or the page drifts from the code exactly as the hand-written one did
@@ -108,6 +108,14 @@ class TestTheDocumentAnswersAllThree(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.doc = matrix.DOC.read_text()
+
+    def test_it_says_what_is_sent_when_nothing_is_asked_for(self):
+        """The divergence is the point of the section: a reader comparing two
+        providers with no options set is not holding sampling constant, and
+        the page has to say so where they are looking."""
+        self.assertIn("## 0. What you get when you ask for nothing", self.doc)
+        for value in ("`0.0`", "`0.2`", "`0.7`", "`2048`", "`32768`"):
+            self.assertIn(value, self.doc)
 
     def test_it_lists_what_can_be_asked_for(self):
         self.assertIn("## 1. What you can ask for", self.doc)

@@ -275,6 +275,7 @@ class Model:
         options:        dict | None = None,
         client_options: dict | None = None,
         api_key:        str  | None = None,
+        on_unsupported: str = "warn",
     ) -> None:
         # The provider is resolved from the (possibly prefixed) name; the wire
         # name has any "provider/" prefix stripped (it only steers selection).
@@ -363,6 +364,20 @@ class Model:
             )
         self.reasoning = reasoning
 
+        # What to do when an option cannot be honoured here. The library
+        # will not decide this: dropping `temperature` yields a different
+        # answer, dropping `seed` or `size` yields one that looks right and
+        # is not, and whether that is fatal depends on the caller and not on
+        # the option. 'warn' sends the request without it, 'requirements'
+        # raises for the second class only, 'raise' for any loss. See
+        # models._adaptation.STRICTNESS.
+        from ._adaptation import STRICTNESS
+        if on_unsupported not in STRICTNESS:
+            raise ValueError(
+                f"on_unsupported must be one of {', '.join(map(repr, STRICTNESS))}; "
+                f"got {on_unsupported!r}")
+        self.on_unsupported = on_unsupported
+
         #: What the last :meth:`to_request` had to change to fit the provider.
         #: Empty when the request went out as asked.
         self.last_adaptations: list = []
@@ -373,6 +388,36 @@ class Model:
     # ------------------------------------------------------------------
     # Format — thin delegation to the family client
     # ------------------------------------------------------------------
+
+    @property
+    def effective_options(self) -> dict:
+        """What sampling this model actually runs with, asked for or not.
+
+        Provider defaults are not a shared baseline and never were:
+        ``temperature`` starts at 0.0 on DeepSeek, 0.2 on Perplexity, 0.7 on
+        Qwen and 1.0 on OpenAI, Google, Kimi and xAI; ``max_tokens`` spans
+        2048 to 32768; ``top_k`` has a value on Google alone. Two models
+        compared with no options set are therefore not one variable apart,
+        which is exactly the mistake this library tells its users not to make.
+
+        Converging them was considered and rejected: a library-wide default
+        overrides a number each provider chose for its own model, and it
+        would change every existing caller's output to fix a comparison only
+        some of them are making. Publishing the fact is the honest half —
+        ``defaults`` in the provider data, this property at runtime, and a
+        table in ``docs/reference/parameters.md``. A measurement run records
+        this beside its results and its arms are comparable or visibly not.
+        """
+        return {
+            "temperature":   self.temperature,
+            "max_tokens":    self.max_tokens,
+            "top_p":         self.top_p,
+            "top_k":         self.top_k,
+            "reasoning":     self.reasoning,
+            "cache_control": self.cache_control,
+            "cache_ttl":     self.cache_ttl,
+            "_asked":        dict(self._asked),
+        }
 
     def _params(self) -> dict:
         """Per-call model settings handed to the client's ``build_request``."""
@@ -488,7 +533,7 @@ class Model:
         ``models._adaptation``: the library may adapt a request, it may not do
         so in silence.
         """
-        from ._adaptation import announce, collect, note_absent
+        from ._adaptation import announce, collect, enforce, note_absent
 
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
@@ -507,6 +552,10 @@ class Model:
         note_absent(made, asked, body, self.name, provider=self._provider)
         announce(made)
         self.last_adaptations = list(made)
+        # After the record is stored, not before: a caller catching this needs
+        # `last_adaptations` to say what happened, and a raise that leaves the
+        # evidence unwritten is the silence this whole channel exists against.
+        enforce(made, self.on_unsupported)
         return path, body
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
