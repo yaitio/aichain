@@ -21,6 +21,18 @@ images_path      = "/v1/images/generations"
 format_accepts = ["size", "quality", "background", "output_format", "output_compression", "input_fidelity"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
+# What a value may be, where the API constrains it. A two-number entry is a
+# range and is clamped; anything else is a set and is refused, with the list
+# named — better than paying for a round trip to be told
+# "Invalid value: 'ultra-max-supreme'".
+[provider.options.values]
+quality            = ["low", "medium", "high", "auto"]
+background         = ["transparent", "opaque", "auto"]
+output_format      = ["png", "jpeg", "webp"]
+output_compression = [0, 100]
+input_fidelity     = ["low", "high"]
+reasoning          = ["none", "low", "medium", "high"]
+
 [provider.defaults]
 temperature = 1.0
 max_tokens  = 16384
@@ -101,11 +113,15 @@ price = { input = 0.15, output = 0.6 }
 # at half the latency. Sunburst is the premium end — it earns its place where
 # edits need tight control, not where a picture is merely wanted.
 [models."gpt-image-2.5-flare"]
+# xhigh and max are this generation's alone: gpt-image-1.5 refuses them.
+values = { quality = ["low", "medium", "high", "xhigh", "max", "auto"] }
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
 rejects = ["input_fidelity"]
 
 [models."gpt-image-2.5-sunburst"]
+# xhigh and max are this generation's alone: gpt-image-1.5 refuses them.
+values = { quality = ["low", "medium", "high", "xhigh", "max", "auto"] }
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
 rejects = ["input_fidelity"]
