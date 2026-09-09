@@ -332,39 +332,58 @@ _MARK = {"passed": "✓", "renamed": "→", "converted": "≈",
 
 
 def _defaults_section() -> list:
-    """What goes on the wire when the caller sets nothing.
+    """What goes on the wire when the caller sets nothing, and who chose it.
 
     Not a footnote. Every option below is sent on every call whether or not
     anybody chose it, and the numbers are not the same from one provider to
     the next — so two models compared with no options set differ by more than
     the model. The page has to say so where a reader comparing providers will
     look, which is here and not in a docstring.
+
+    The second half — who chose each number — was written once, in the
+    per-provider modules, and lost when 1.2.3 dissolved them into data. It
+    is back in `[provider.default_notes]`, and rendered from there, because
+    the difference between "this is the vendor's default" and "this is our
+    opinion" is the whole of what a reader can act on.
     """
     from yait_aichain.models._data import PROVIDERS
 
     keys = ("temperature", "top_p", "top_k", "max_tokens")
-    rows = []
+    rows, notes = [], []
     for name in sorted(PROVIDERS):
-        d = (PROVIDERS[name].get("provider") or {}).get("defaults") or {}
+        prov = PROVIDERS[name].get("provider") or {}
+        d = prov.get("defaults") or {}
+        n = prov.get("default_notes") or {}
         if not any(d.get(k) is not None for k in keys):
             continue
-        rows.append((name, [d.get(k) for k in keys]))
+        rows.append((name, [d.get(k) for k in keys], n))
+        for k in keys:
+            if d.get(k) is not None and n.get(k):
+                notes.append((name, k, n[k]))
 
     spread = {k: sorted({r[1][i] for r in rows if r[1][i] is not None})
               for i, k in enumerate(keys)}
     lines = [
         "## 0. What you get when you ask for nothing",
         "",
-        "These are sent on every call, chosen or not. They come from each "
-        "provider's own documented default, which is why they disagree — "
-        "and a caller who sets nothing is therefore **not** holding sampling "
-        "constant across providers.",
+        "These are sent on every call, chosen or not — so a caller who sets "
+        "nothing is **not** holding sampling constant across providers.",
+        "",
+        "A `*` marks a number the library picked rather than the provider. "
+        "The two are not the same kind of thing: a vendor default is a fact "
+        "about the API, ours is an opinion you are entitled to disagree with.",
         "",
         "| provider | " + " | ".join(f"`{k}`" for k in keys) + " |",
         "|---|" + "---|" * len(keys),
     ]
-    for name, vals in rows:
-        cells = ["—" if v is None else f"`{v}`" for v in vals]
+    for name, vals, n in rows:
+        cells = []
+        for k, v in zip(keys, vals):
+            if v is None:
+                cells.append("—")
+            else:
+                ours = not str(n.get(k, "")).startswith("vendor")
+                cells.append(f"`{v}`" + ("\\*" if ours else ""))
         lines.append(f"| `{name}` | " + " | ".join(cells) + " |")
     lines += [
         "",
@@ -372,6 +391,16 @@ def _defaults_section() -> list:
         ", ".join(f"`{v}`" for v in spread["temperature"]) +
         " depending on where the request goes; `max_tokens` spans `" +
         f"{min(spread['max_tokens'])}`–`{max(spread['max_tokens'])}`.",
+        "",
+        "**Why they differ — three separate reasons, and only the first is "
+        "the providers' fault.** Some are genuinely each vendor's own default "
+        "and disagree because the vendors disagree. Some are the vendor's "
+        "*recommendation for a task* rather than their default, adopted here "
+        "as a house choice — DeepSeek's API defaults to `1.0` and we send "
+        "`0.0`, which is their advice for code and maths, not their default. "
+        "And `max_tokens` is almost entirely ours: most of these APIs do not "
+        "default it at all (Anthropic requires the field), so the library had "
+        "to pick, and picked per provider rather than once.",
         "",
         "They are deliberately **not** converged: a library-wide default "
         "would override a number each provider picked for its own models, "
@@ -382,7 +411,16 @@ def _defaults_section() -> list:
         "run records it beside its results and its arms are comparable or "
         "visibly not.",
         "",
+        "<details><summary>Who chose each number</summary>",
+        "",
     ]
+    current = None
+    for name, key, note in notes:
+        if name != current:
+            lines += ["", f"**`{name}`**", ""]
+            current = name
+        lines.append(f"- `{key}` — {note}")
+    lines += ["", "</details>", ""]
     return lines
 
 

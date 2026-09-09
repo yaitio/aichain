@@ -174,3 +174,53 @@ class TestBothDirections(unittest.TestCase):
         rendered = matrix.render_doc(live)
         self.assertIn("Where the declaration and the code disagree", rendered)
         self.assertIn("delivered, declared by nobody", rendered)
+
+
+class TestEveryDefaultHasAnAuthor(unittest.TestCase):
+    """A number sent on every call must say who chose it.
+
+    The repository's own rule — every parameter has a named author — was
+    being kept in the per-provider modules and lost the day 1.2.3 dissolved
+    them into TOML. That commit said "behaviour is byte-for-byte unchanged",
+    which was true of the values and false of the reasons, and the numbers
+    sat unexplained for three months. This is the check that would have
+    caught it: a default arriving without a note fails here rather than
+    three months later.
+    """
+
+    KEYS = ("temperature", "top_p", "top_k", "max_tokens")
+    AUTHORS = ("vendor", "ours", "unused")
+
+    @classmethod
+    def setUpClass(cls):
+        from yait_aichain.models._data import PROVIDERS
+        cls.providers = PROVIDERS
+
+    def test_no_default_is_unexplained(self):
+        naked = []
+        for name, data in self.providers.items():
+            prov = data.get("provider") or {}
+            notes = prov.get("default_notes") or {}
+            for key in self.KEYS:
+                if (prov.get("defaults") or {}).get(key) is None:
+                    continue
+                if not notes.get(key):
+                    naked.append(f"{name}.{key}")
+        self.assertEqual(naked, [], "sent on every call with nothing saying "
+                                    "who chose it: " + ", ".join(naked))
+
+    def test_each_note_says_whose_number_it_is(self):
+        """The distinction is the point: a vendor default is a fact about
+        the API, ours is an opinion a caller may disagree with."""
+        for name, data in self.providers.items():
+            for key, note in ((data.get("provider") or {})
+                              .get("default_notes") or {}).items():
+                self.assertTrue(
+                    note.startswith(self.AUTHORS),
+                    f"{name}.{key} must open with one of {self.AUTHORS}: {note!r}")
+
+    def test_the_page_marks_the_ones_that_are_ours(self):
+        doc = matrix.DOC.read_text()
+        self.assertIn("Who chose each number", doc)
+        # DeepSeek's 0.0 is the clearest case: their API defaults to 1.0.
+        self.assertIn("`0.0`\\*", doc)

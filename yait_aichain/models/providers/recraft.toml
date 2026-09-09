@@ -42,6 +42,17 @@ max_tokens  = 4096
 # imageToImage is a strength-controlled whole-image *variation* (img2img),
 # NOT a subject-preserving edit — for "place this product in a scene" use an
 # instruction editor (gpt-image / gemini image / qwen-image-edit / flux-kontext).
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "unused · this provider renders images and reads neither of these"
+max_tokens  = "unused · this provider renders images and reads neither of these"
 [models."recraftv4_1"]
 caps  = ["text-to-image"]
 

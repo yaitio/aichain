@@ -20,6 +20,18 @@ accepts = ["temperature", "top_p", "top_k", "max_tokens", "reasoning", "cache_co
 temperature = 1.0
 max_tokens  = 8192
 
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "vendor · Anthropic's API default. The range here is 0.0-1.0, not 0-2"
+max_tokens  = "ours · the API *requires* the field, so a number had to be picked; 8192 is safe across the family and Claude 4 takes up to 64000"
+top_p       = "ours · left unset on purpose: Anthropic asks for temperature or top_p, not both"
 [provider.reasoning_map]
 low = 4000
 medium = 10000

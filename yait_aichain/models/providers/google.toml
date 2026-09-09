@@ -29,6 +29,19 @@ max_tokens  = 8192
 top_p = 0.95
 top_k = 40
 
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "vendor · the Gemini 2.x default (1.5 used 0.9)"
+top_p       = "vendor · Google's recommended default for controlled generation"
+top_k       = "vendor · Google's default for Gemini 2.x Flash; 1.5 Pro used 64"
+max_tokens  = "ours · applies to every current Gemini; 2.5-pro takes up to 65536 with thinking off"
 [provider.reasoning_map]
 low = 2048
 medium = 8192

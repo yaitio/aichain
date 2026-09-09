@@ -27,6 +27,18 @@ temperature = 0.7
 max_tokens  = 2048
 top_p = 0.8
 
+
+# Where these numbers come from, and who chose them. Recovered 2026-09-09
+# from the per-provider modules that the 1.2.3 migration dissolved: that
+# commit said "behaviour is byte-for-byte unchanged", which was true of the
+# values and false of the reasons — the docstrings carrying them were deleted
+# and the numbers arrived here naked. "vendor" marks this provider's own
+# documented default; "ours" marks a choice the library made, which is a
+# thing a caller is entitled to disagree with.
+[provider.default_notes]
+temperature = "vendor · DashScope's default for chat models"
+top_p       = "vendor · DashScope's default"
+max_tokens  = "ours · conservative, and the smallest here; qwen-max takes up to 8192"
 [provider.reasoning_map]
 low = true
 medium = true
