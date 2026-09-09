@@ -114,8 +114,12 @@ class TestTheDocumentAnswersAllThree(unittest.TestCase):
         providers with no options set is not holding sampling constant, and
         the page has to say so where they are looking."""
         self.assertIn("## 0. What you get when you ask for nothing", self.doc)
-        for value in ("`0.0`", "`0.2`", "`0.7`", "`2048`", "`32768`"):
-            self.assertIn(value, self.doc)
+        # Matched inside the section rather than anywhere on the page: the
+        # first version of this test passed on a `0.0` that had moved out of
+        # the table and was being read from elsewhere in the document.
+        section = self.doc.split("## 0. ")[1].split("\n## ")[0]
+        for value in ("`0.2`", "`0.7`", "`1.0`", "`4096`", "`32768`"):
+            self.assertIn(value, section)
 
     def test_it_lists_what_can_be_asked_for(self):
         self.assertIn("## 1. What you can ask for", self.doc)
@@ -222,5 +226,7 @@ class TestEveryDefaultHasAnAuthor(unittest.TestCase):
     def test_the_page_marks_the_ones_that_are_ours(self):
         doc = matrix.DOC.read_text()
         self.assertIn("Who chose each number", doc)
-        # DeepSeek's 0.0 is the clearest case: their API defaults to 1.0.
-        self.assertIn("`0.0`\\*", doc)
+        # Perplexity's 0.2 is the clearest surviving case: their API
+        # documents no default for temperature at all, so the number is the
+        # library's reading of their advice for search.
+        self.assertIn("`0.2`\\*", doc)
