@@ -70,12 +70,22 @@ class TestRecraftEdit(unittest.TestCase):
         file_field = next(f for f in body["fields"] if f[0] == "image")
         self.assertEqual(file_field[1][1], _PNG)
 
-    def test_strength_default_and_override(self):
+    def test_strength_default_and_fidelity_inverted(self):
+        """This API asks how much to change; the vocabulary asks how much to
+        keep, so `fidelity` arrives here as its complement. Measured
+        2026-09-09: strength 0.05 left a blue square blue and 0.95 replaced
+        it with the prompt, which is what fixes the direction."""
         m = Model("recraftv3", api_key="k")
         _, body = m.to_request(_edit_msgs(), {"format": {"type": "image"}})
         self.assertEqual(dict(body["fields"])["strength"], "0.2")
-        _, body2 = m.to_request(_edit_msgs(), {"format": {"type": "image", "strength": 0.7}})
-        self.assertEqual(dict(body2["fields"])["strength"], "0.7")
+
+        _, kept = m.to_request(_edit_msgs(),
+                               {"format": {"type": "image", "fidelity": 0.9}})
+        self.assertEqual(dict(kept["fields"])["strength"], "0.1")
+
+        _, changed = m.to_request(_edit_msgs(),
+                                  {"format": {"type": "image", "fidelity": 0.1}})
+        self.assertEqual(dict(changed["fields"])["strength"], "0.9")
 
     def test_url_source_rejected(self):
         m = Model("recraftv3", api_key="k")

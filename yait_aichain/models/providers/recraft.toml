@@ -24,14 +24,13 @@ images_vectorize_path = "/v1/images/vectorize"
 # (measured 2026-09-09, "16:9" came back 1024x1024), so it is converted to a
 # size at a 1024 short edge and the provider snaps to its own nearest.
 # No seed: random_seed twice gave two different pictures.
-format_accepts = ["size", "aspect_ratio", "strength"]
+format_accepts = ["size", "aspect_ratio", "fidelity"]
 
-# How far an edit may move from the original. Required by this API on the
-# edit path, which is why the client already supplied a default; declaring it
-# is what makes the value checked and the name part of the vocabulary rather
-# than one provider's word passed through.
+# How much of the original survives. This API asks the opposite question —
+# `strength`, how much to change — so the value is inverted on the way out.
+# Measured: strength 0.05 left a blue square blue, 0.95 replaced it.
 [provider.options.values]
-strength = [0.0, 1.0]
+fidelity = [0.0, 1.0]
 accepts = []
 
 [provider.defaults]

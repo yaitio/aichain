@@ -420,15 +420,32 @@ class Model:
         the documentation. So it is translated and reported, which is what
         the channel is for."""
         from ._adaptation import Adaptation, TRANSLATED, record
-        from ._options import ALIASES
+        from ._options import ALIASES, canonical_value
 
         fmt = output.get("format") or {}
         renamed = {k: v for k, v in fmt.items() if k in ALIASES}
-        if not renamed:
+        # A shorthand is resolved to the canonical type before anything else
+        # looks at it, so a range declared for one provider does not reject a
+        # word another provider needs.
+        shorthand = {}
+        for key, value in fmt.items():
+            fixed_value, note = canonical_value(ALIASES.get(key, key), value)
+            if note:
+                shorthand[key] = (fixed_value, note)
+        if not renamed and not shorthand:
             return output
         fixed = {k: v for k, v in fmt.items() if k not in ALIASES}
+        # Not recorded as an adaptation: resolving 'high' to 0.9 is
+        # normalising the caller's own input to the vocabulary's one type,
+        # not something a provider did. Recording it made every provider that
+        # then drops the option report "translated" for an option that never
+        # left.
+        for key, (value, _note) in shorthand.items():
+            if key not in ALIASES:
+                fixed[key] = value
         for old, value in renamed.items():
             new = ALIASES[old]
+            value = shorthand.get(old, (value, None))[0]
             fixed.setdefault(new, value)
             record(Adaptation(
                 kind=TRANSLATED, option=old, asked=value, sent=new,

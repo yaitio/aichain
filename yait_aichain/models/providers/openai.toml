@@ -20,7 +20,7 @@ images_path      = "/v1/images/generations"
 # Image keys too: no seed. `reference_fidelity` (this API's own
 # `input_fidelity`) is refused by several of the models — see `rejects` on
 # each. An aspect ratio is converted to pixels, which is what this API takes.
-format_accepts = ["size", "aspect_ratio", "quality", "background", "output_format", "compression", "reference_fidelity"]
+format_accepts = ["size", "aspect_ratio", "quality", "background", "output_format", "compression", "fidelity"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
 # What a value may be, where the API constrains it. A two-number entry is a
@@ -32,7 +32,7 @@ quality            = ["low", "medium", "high", "auto"]
 background         = ["transparent", "opaque", "auto"]
 output_format      = ["png", "jpeg", "webp"]
 compression        = [0, 100]
-reference_fidelity = ["low", "high"]
+fidelity           = [0.0, 1.0]
 reasoning          = ["none", "low", "medium", "high"]
 
 [provider.defaults]
@@ -119,14 +119,14 @@ price = { input = 0.15, output = 0.6 }
 values = { quality = ["low", "medium", "high", "xhigh", "max", "auto"] }
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
-rejects = ["reference_fidelity"]
+rejects = ["fidelity"]
 
 [models."gpt-image-2.5-sunburst"]
 # xhigh and max are this generation's alone: gpt-image-1.5 refuses them.
 values = { quality = ["low", "medium", "high", "xhigh", "max", "auto"] }
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0, image_input = 8.0 }
-rejects = ["reference_fidelity"]
+rejects = ["fidelity"]
 
 # `rejects` lists parameters the API refuses for this model, measured against
 # it rather than read off the guide — which names only gpt-image-2, while both
@@ -136,7 +136,7 @@ rejects = ["reference_fidelity"]
 [models."gpt-image-2"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 5.0, output = 30.0 }
-rejects = ["reference_fidelity"]
+rejects = ["fidelity"]
 
 # Always-current image model used by ChatGPT (alias to the latest snapshot).
 [models."chatgpt-image-latest"]
@@ -150,7 +150,7 @@ price = { input = 5.0, output = 32.0 }
 [models."gpt-image-1-mini"]
 caps  = ["text-to-image", "image-to-image"]
 price = { input = 2.0, output = 8.0 }
-rejects = ["reference_fidelity"]
+rejects = ["fidelity"]
 
 [models."gpt-image-1"]
 caps  = ["text-to-image", "image-to-image"]

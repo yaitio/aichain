@@ -38,6 +38,28 @@ _EDIT_PASSTHROUGH = ("style", "style_id", "negative_prompt")
 _DEFAULT_STRENGTH = 0.2
 
 
+def _strength_from_fidelity(fmt: dict, model: str) -> float:
+    """This API asks how much to change; the vocabulary asks how much to keep.
+
+    Measured 2026-09-09: strength 0.05 left a blue square blue, strength 0.95
+    replaced it with the prompt. So the two run opposite ways and the number
+    is inverted here rather than in the caller's head.
+    """
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    value = fmt.get("fidelity")
+    if value is None:
+        return _DEFAULT_STRENGTH
+    if isinstance(value, str):
+        value = {"high": 0.9, "low": 0.3}.get(value, 0.5)
+    strength = round(1.0 - float(value), 3)
+    record(Adaptation(
+        kind=ADAPTED, option="fidelity", asked=fmt["fidelity"],
+        sent=f"strength={strength}", model=model,
+        why="this API asks how much to change rather than how much to keep, "
+            "so the value is inverted"))
+    return strength
+
+
 def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
     """'16:9' → '1820x1024'. The short edge is pinned and the long one
     follows, which is the shape the caller asked for at this provider's
@@ -102,7 +124,7 @@ def _build_recraft_edit_request(name, messages, output, path):
     fields = [
         ("model",           name),
         ("prompt",          _prompt_from_messages(messages)),
-        ("strength",        str(fmt.get("strength", _DEFAULT_STRENGTH))),
+        ("strength",        str(_strength_from_fidelity(fmt, name))),
         ("response_format", "b64_json"),
     ]
     for k in _EDIT_PASSTHROUGH:

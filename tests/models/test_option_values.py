@@ -110,16 +110,19 @@ class TestAMultipartBodyCarriesEverythingAsText(unittest.TestCase):
         return m, dict(body["fields"])
 
     def test_a_number_that_arrived_is_not_reported_as_declined(self):
-        m, fields = self._edit(strength=0.4)
-        self.assertEqual(fields["strength"], "0.4")
-        self.assertEqual([a for a in m.last_adaptations
-                          if a.option == "strength"], [])
+        """It arrives inverted and under another name, so the site records it
+        — what must not happen is a second, contradicting notice saying it
+        never arrived."""
+        m, fields = self._edit(fidelity=0.4)
+        self.assertEqual(fields["strength"], "0.6")
+        kinds = [a.kind for a in m.last_adaptations if a.option == "fidelity"]
+        self.assertEqual(kinds, ["adapted"])
 
     def test_and_one_that_was_clamped_still_is(self):
-        m, fields = self._edit(strength=1.7)
-        self.assertEqual(fields["strength"], "1.0")
-        note, = [a for a in m.last_adaptations if a.option == "strength"]
-        self.assertEqual(note.kind, "adapted")
+        m, fields = self._edit(fidelity=1.7)
+        self.assertEqual(fields["strength"], "0.0")   # clamped to 1.0, inverted
+        self.assertTrue(any("outside" in a.why for a in m.last_adaptations
+                            if a.option == "fidelity"))
 
 
 class TestAProviderThatDeclaresNothing(unittest.TestCase):
