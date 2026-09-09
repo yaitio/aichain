@@ -66,6 +66,7 @@ IMAGE_FORMAT = {
     "output_compression": 50,
     "seed":               42,
     "input_fidelity":     "high",
+    "strength":           0.4,
 }
 
 #: One representative per provider, and a second wherever the same provider

@@ -539,6 +539,13 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "gpt-image-1.5": {
@@ -582,6 +589,13 @@
    ]
   },
   "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "strength": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -645,6 +659,13 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "flux-2-pro": {
@@ -692,6 +713,13 @@
    "said": []
   },
   "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "strength": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -755,6 +783,13 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "recraftv3": {
@@ -806,6 +841,13 @@
    ]
   },
   "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "strength": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -869,6 +911,13 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "wan2.2-t2i-flash": {
@@ -927,6 +976,13 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "gpt-image-2.5-flare (edit)": {
@@ -960,9 +1016,7 @@
   "output_compression": {
    "outcome": "passed",
    "detail": "",
-   "said": [
-    "declined"
-   ]
+   "said": []
   },
   "seed": {
    "outcome": "dropped",
@@ -972,6 +1026,13 @@
    ]
   },
   "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "strength": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1010,9 +1071,7 @@
   "output_compression": {
    "outcome": "passed",
    "detail": "",
-   "said": [
-    "declined"
-   ]
+   "said": []
   },
   "seed": {
    "outcome": "dropped",
@@ -1025,6 +1084,13 @@
    "outcome": "passed",
    "detail": "",
    "said": []
+  },
+  "strength": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   }
  },
  "grok-imagine-image (edit)": {
@@ -1078,6 +1144,13 @@
    ]
   },
   "input_fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "strength": {
    "outcome": "dropped",
    "detail": "",
    "said": [
@@ -1141,6 +1214,11 @@
    "said": [
     "declined"
    ]
+  },
+  "strength": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
   }
  }
 }

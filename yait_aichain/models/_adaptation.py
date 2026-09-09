@@ -188,10 +188,18 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     def _mark(v):
         return (type(v).__name__, v)
 
+    # A multipart body carries every field as a string, so 0.4 arrives as
+    # "0.4" and a type-exact match reports a delivered option as declined.
+    # The looser comparison is confined to that shape: on a JSON body an
+    # unrelated "1" must not stand in for an asked 1.
+    multipart = isinstance(body, dict) and bool(body.get("_multipart"))
+
     values = set()
     for v in _leaves(body).values():
         try:
             values.add(_mark(v))
+            if multipart and isinstance(v, str):
+                values.add(("as-text", v))
         except TypeError:               # unhashable leaf; cannot have been ours
             pass
 
@@ -206,7 +214,8 @@ def note_absent(made: list, asked: dict, body, model_name: str,
             arrived = False
         else:
             try:
-                arrived = _mark(value) in values
+                arrived = _mark(value) in values or (
+                    multipart and ("as-text", str(value)) in values)
             except TypeError:
                 arrived = False
         if not arrived:
