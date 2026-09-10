@@ -262,6 +262,11 @@ class Agent:
         self.planner_model = planner_model
         self.stop_when    = list(stop_when) if stop_when is not None else [step_count(30)]
         self.hooks        = list(hooks or [])
+
+        #: The result of the last :meth:`stream`, once the generator has run
+        #: to the end. `run()` returns its result; a generator cannot, so it
+        #: is left here rather than mixed into a stream of events.
+        self.last_result: "AgentResult | None" = None
         self.permissions  = permissions
         self.name         = name
         self.description  = description
@@ -297,6 +302,67 @@ class Agent:
                                             "stopped_by": result.stopped_by},
                    usage=result.tokens_used, error=result.error)
         return result
+
+    def stream(self, task: str, variables: "dict | None" = None):
+        """
+        Run *task* and yield each :class:`~.._events.Event` as it happens.
+
+        ``run()`` is untouched and returns the same result it always did;
+        this is the same loop walked instead of exhausted. Three things are
+        worth knowing before reaching for it:
+
+        * **Events, not tokens.** A turn in an agent loop is usually a tool
+          call, not prose, so token deltas would be empty for most of a run
+          and would arrive interleaved with decisions in no useful order.
+          What a caller actually wants to show is what the agent is *doing* —
+          which is what the event channel already carries. `Skill.stream` is
+          the one for text.
+        * **The result is not yielded**, because a stream of one type is
+          easier to consume than a stream of two. It lands on
+          ``last_result`` when the generator finishes, with the journal
+          attached, exactly as ``run()`` would have returned it.
+        * **Abandoning the generator abandons the run.** A `break` out of the
+          loop leaves the agent mid-turn; the temporary hook is still removed
+          (that much is guaranteed), but no result is produced and no
+          `run.finished` is emitted. Exhaust it, or accept that.
+        """
+        journal  = Journal()
+        messages = self.opening(task, variables, ground_rules=True)
+        state    = self.new_state()
+        self.last_result = None
+
+        sink: list = []
+        # Appended for the duration and removed in `finally`: a hook left
+        # behind on the instance would go on collecting into a list nobody
+        # drains, which is a leak that only shows up under load.
+        collect = sink.append          # bound once, so `remove` finds it
+        self.hooks.append(collect)
+        try:
+            self._emit("run.started", payload={"task": task, "mode": self.mode})
+            while sink:
+                yield sink.pop(0)
+
+            walk = self._loop_events(messages, state, journal, sink=sink)
+            while True:
+                try:
+                    yield next(walk)
+                except StopIteration as done:
+                    result = done.value
+                    break
+
+            result.journal = journal.to_list()
+            self._emit("run.finished",
+                       payload={"success": result.success,
+                                "stopped_by": result.stopped_by},
+                       usage=result.tokens_used, error=result.error)
+            while sink:
+                yield sink.pop(0)
+            self.last_result = result
+        finally:
+            try:
+                self.hooks.remove(collect)
+            except ValueError:                       # already gone; fine
+                pass
 
     # ── Externally driven: one turn at a time ────────────────────────────
     #
@@ -350,12 +416,50 @@ class Agent:
     # ── The loop ─────────────────────────────────────────────────────────
 
     def _loop(self, messages: list, state: dict, journal: Journal) -> AgentResult:
+        """Drive the loop to its end and return the result.
+
+        One loop, driven two ways. ``run()`` exhausts it and takes the value;
+        ``stream()`` walks it and hands each event on as it appears. A second
+        copy of this loop for the streaming case is exactly the mistake 2.0
+        undid when `Agent` stopped hand-rolling its own call path — two paths
+        do not stay the same, and the one nobody watches is where the defect
+        lives.
+        """
+        walk = self._loop_events(messages, state, journal)
+        while True:
+            try:
+                next(walk)
+            except StopIteration as done:
+                return done.value
+
+    def _loop_events(self, messages: list, state: dict, journal: Journal,
+                     sink: "list | None" = None):
+        """The loop itself, yielding what it has emitted as it goes.
+
+        Events are not produced twice. They go out through ``_emit`` exactly
+        as they always have — every hook a caller installed still fires, in
+        the same order — and a streaming caller adds one more hook that
+        appends to *sink*, which is drained at each boundary. So the stream is
+        a view of the existing event channel rather than a second vocabulary
+        beside it.
+
+        The granularity is the turn, not the token: everything a turn emitted
+        is handed over when the turn is done. Within one model call there is
+        nothing to interleave, because the loop is synchronous by design —
+        no threads, no async, because the target is Lambda.
+        """
+        def drain():
+            while sink:
+                yield sink.pop(0)
+
         while True:
             try:
                 reply = self._ask(messages, state)
             except Exception as exc:
+                yield from drain()
                 return self._result(state, False, None, "llm_error",
                                     error=f"{type(exc).__name__}: {exc}")
+            yield from drain()
 
             # Text is the answer — one exit, not two spellings of it.
             if not isinstance(reply, ToolCallRequest):
@@ -370,8 +474,10 @@ class Agent:
             # the first would silently narrow the channel.
             for call in reply.calls:
                 self._emit("step.started", payload={"tool": call.name})
+                yield from drain()
                 result, error = self._execute(call, state)
                 self._emit("step.ended", payload={"tool": call.name}, error=error)
+                yield from drain()
 
                 journal.append(
                     call.name,
