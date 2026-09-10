@@ -152,6 +152,23 @@ def _resolve_provider(name: str) -> str:
 # Model — factory + base
 # ---------------------------------------------------------------------------
 
+
+def _merge_usage(into: "dict | None", incoming: dict) -> dict:
+    """Combine two usage envelopes of the same shape, field by field.
+
+    Two levels is all the shape has — an envelope key (`usage` /
+    `usageMetadata`) over a flat block of counts — and a provider that
+    reports a field twice means the later value, not the sum: Anthropic's
+    `message_delta` restates `output_tokens` as it grows.
+    """
+    merged = {k: dict(v) for k, v in (into or {}).items()}
+    for key, block in incoming.items():
+        if isinstance(block, dict):
+            merged.setdefault(key, {}).update(block)
+        else:
+            merged[key] = block
+    return merged
+
 class Model:
     """
     A configured model: provider resolved from the name, settings from data,
@@ -630,9 +647,13 @@ class Model:
                 path, body, self.client._auth_headers()):
             usage = self.client.stream_usage(event)
             if usage:
-                # Not `break`: a provider may report usage in an event that
-                # also carries text, and several send it before the last one.
-                self.last_stream_usage = usage
+                # Merged, not replaced. Anthropic reports the input tokens in
+                # `message_start` and the output tokens in `message_delta`, so
+                # keeping the last report drops the entire prompt from the
+                # bill — and the number that comes back is still plausible,
+                # which is what makes it worth a comment rather than a line.
+                self.last_stream_usage = _merge_usage(
+                    self.last_stream_usage, usage)
             piece = self.client.parse_stream_event(event, output)
             if piece:
                 yield piece

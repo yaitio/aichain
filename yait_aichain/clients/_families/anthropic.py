@@ -120,6 +120,49 @@ class AnthropicClient(BaseClient):
     #: Native tool calling implemented: tool_use / tool_result blocks.
     supports_tools = True
 
+    supports_streaming = True
+
+    def build_stream_request(self, messages, output, params, tools=None):
+        path, body = self.build_request(messages, output, params, tools=tools)
+        body["stream"] = True
+        return path, body
+
+    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+        # Anthropic names its event types rather than sending one shape with
+        # empty fields, so the filter is exact: only a text delta is text.
+        # A thinking delta arrives under the same event type with a different
+        # delta type, and passing it through would splice the model's private
+        # reasoning into the answer the caller shows a user.
+        if event.get("type") != "content_block_delta":
+            return None
+        delta = event.get("delta") or {}
+        if delta.get("type") != "text_delta":
+            return None
+        text = delta.get("text")
+        return text if isinstance(text, str) and text else None
+
+    def stream_usage(self, event: dict) -> "dict | None":
+        """
+        Anthropic reports usage **twice**, and the halves are different.
+
+        `message_start` carries the input tokens; `message_delta` carries the
+        output tokens and nothing else. Taking the last report — the obvious
+        implementation, and the one every other family here needs — loses the
+        whole prompt and under-bills by exactly the input side, invisibly,
+        because the number that comes back is still a plausible number.
+
+        So each half is returned as it arrives and the merge happens in the
+        caller, which accumulates rather than replaces for this reason.
+        """
+        etype = event.get("type")
+        if etype == "message_start":
+            usage = ((event.get("message") or {}).get("usage")) or {}
+            return {"usage": dict(usage)} if usage else None
+        if etype == "message_delta":
+            usage = event.get("usage") or {}
+            return {"usage": dict(usage)} if usage else None
+        return None
+
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         prov = self._data["provider"]
         from ...models._adaptation import (Adaptation, ADAPTED, DECLINED,

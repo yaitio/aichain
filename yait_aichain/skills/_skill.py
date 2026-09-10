@@ -363,8 +363,11 @@ class Skill:
         self.last_adaptations = list(getattr(model, "last_adaptations", []))
         raw_usage = getattr(model, "last_stream_usage", None)
         if raw_usage:
+            # `raw_usage` is already response-shaped — see
+            # `BaseClient.stream_usage` — so it reaches the same branch of
+            # `extract_usage` a buffered response does, per provider.
             self.last_usage = attach_cost(
-                extract_usage({"usage": raw_usage}), model.name,
+                extract_usage(raw_usage), model.name,
                 getattr(model, "cache_ttl", "5m"))
 
         text = "".join(pieces)

@@ -196,6 +196,43 @@ class GoogleClient(BaseClient):
     #: on this wire, so ToolCall.id degrades to the function name.
     supports_tools = True
 
+    supports_streaming = True
+
+    def build_stream_request(self, messages, output, params, tools=None):
+        """Google changes the **verb and the transport**, not a body flag.
+
+        `:streamGenerateContent` without `alt=sse` answers with a JSON array
+        streamed as one document — parseable only once it is complete, which
+        is a slower non-stream wearing a stream's name.
+        """
+        # The modality, not the presence of the key: a Skill sets
+        # `modalities: ["text"]` on every text call, so guarding on the key
+        # existing refused to stream anything at all through Google — and it
+        # refused it as "an image is not delivered progressively", a sentence
+        # that reads plausible enough to be believed.
+        fmt = ((output or {}).get("format") or {}).get("type", "text")
+        modalities = [str(m).lower() for m in ((output or {}).get("modalities") or [])]
+        if fmt == "image" or "image" in modalities:
+            raise NotImplementedError("an image is not delivered progressively")
+        path, body = self.build_request(messages, output, params, tools=tools)
+        path = path.replace(":generateContent", ":streamGenerateContent")
+        sep = "&" if "?" in path else "?"
+        return f"{path}{sep}alt=sse", body
+
+    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+        for candidate in (event.get("candidates") or []):
+            parts = ((candidate.get("content") or {}).get("parts")) or []
+            text = "".join(p["text"] for p in parts
+                           if isinstance(p.get("text"), str))
+            if text:
+                return text
+        return None
+
+    def stream_usage(self, event: dict) -> "dict | None":
+        usage = event.get("usageMetadata")
+        return ({"usageMetadata": dict(usage)}
+                if isinstance(usage, dict) and usage else None)
+
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         prov = self._data["provider"]
         rmap = prov.get("reasoning_map", {})
