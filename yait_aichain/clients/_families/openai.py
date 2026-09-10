@@ -181,7 +181,7 @@ class OpenAIClient(BaseClient):
 
     def stream_usage(self, event: dict) -> "dict | None":
         usage = event.get("usage")
-        return usage if isinstance(usage, dict) and usage else None
+        return {"usage": usage} if isinstance(usage, dict) and usage else None
 
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         m   = self._wrap(params)

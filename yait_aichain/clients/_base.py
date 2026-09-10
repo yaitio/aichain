@@ -220,11 +220,21 @@ class BaseClient:
             f"{type(self).__name__} cannot stream")
 
     def stream_usage(self, event: dict) -> "dict | None":
-        """The usage report, when an event is one. Providers put it in the
-        last event of the stream; a family that does not send one returns
-        None throughout and the caller gets no usage, which is honest —
-        inventing a token count from the text we happened to see would be
-        worse than admitting the provider did not say."""
+        """
+        The usage carried by one event, **shaped like a response**.
+
+        The envelope rather than the inner block, so that `extract_usage`
+        reads a streamed report through exactly the same branch as a
+        buffered one: `{"usage": {...}}` for the OpenAI and Anthropic
+        shapes, `{"usageMetadata": {...}}` for Google. Returning the bare
+        block instead would work for two families and silently produce a
+        zero for the third, which is the kind of asymmetry a "universal"
+        layer exists to not have.
+
+        None throughout when the provider reports nothing. That is honest:
+        counting the text we happened to see would be a number with no
+        provider behind it.
+        """
         return None
 
     def _post_sse(self, path: str, data: dict, headers: dict):
