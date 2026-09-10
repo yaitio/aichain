@@ -123,6 +123,10 @@ class AnthropicClient(BaseClient):
     supports_streaming = True
 
     def build_stream_request(self, messages, output, params, tools=None):
+        if tools:
+            raise NotImplementedError(
+                "a tool call is not reassembled from deltas yet, so this turn "
+                "is not streamed")
         path, body = self.build_request(messages, output, params, tools=tools)
         body["stream"] = True
         return path, body

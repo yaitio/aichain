@@ -190,6 +190,14 @@ def _parse_vectorize_response(response: dict) -> dict:
 class RecraftClient(OpenAIClient):
     """Recraft image generation + editing + vectorize (Bearer transport, image-only)."""
 
+    #: Recraft renders images and nothing else, so there is nothing to
+    #: deliver progressively. It is spelled out because this class inherits
+    #: from OpenAIClient, which streams — and inheriting a capability is
+    #: exactly how a provider comes to claim one it does not have. The same
+    #: defect the option layer was cleared of in 2.3.0, arriving through the
+    #: class hierarchy instead of through the data.
+    supports_streaming = False
+
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:
         super().__init__(api_key, data=data, **client_opts)
         self._vectorize_path = data["provider"].get(

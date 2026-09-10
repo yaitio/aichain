@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+## [2.5.1] — 2026-09-10
+
+Three defects in 2.5.0's streaming, found by asking the code what it does
+rather than by reading what the release notes said it did. All three returned
+something plausible, which is why none of them failed a test.
+
+### Fixed
+
+- **Every Qwen stream crashed.** `QwenClient` and `RecraftClient` override
+  `build_request` *without* a `tools` parameter, and the streaming builder
+  forwarded one — `TypeError`, not the `NotImplementedError` the fallback
+  catches, so it reached the caller. A keyword a sibling does not take is not
+  a keyword this family can pass.
+
+- **Recraft claimed it could stream.** It renders images and has nothing to
+  deliver progressively; it inherits from the client that streams, and the
+  capability came with it. That is the defect the option layer was cleared of
+  in 2.3.0 — a claim not backed by effect — arriving through the class
+  hierarchy instead of through the data. A test now builds a streaming
+  request for every provider that declares the capability, so the flag has to
+  be earned rather than inherited.
+
+- **A streamed tool call vanished.** With tools declared, a reply's call
+  arrives as deltas of a JSON argument string spread over several events, and
+  nothing reassembled them: the stream yielded nothing and `last_result` was
+  an empty string, which reads as "the model said nothing" — the most
+  expensive wrong reading available. Reassembly is a feature of its own and
+  is not in this patch; until it exists, a tool-calling turn is not streamed,
+  the answer comes back whole with the call intact, and a `declined` says so.
+  The object is kept rather than rendered: a tool call turned into text and
+  parsed back is not a tool call.
+
+  Its repr is not streamed either — `str(result)` would have put
+  `ToolCallRequest(calls=(...))` in front of whoever was printing the pieces.
+
+- **The non-streaming fallback read Google's usage as zero**, the same
+  envelope-versus-block mistake fixed in the streaming path itself, in the
+  one branch that had no test.
+
+
 ## [2.5.0] — 2026-09-10
 
 **Streaming.** `run()` is untouched — this is a second way to spend the same

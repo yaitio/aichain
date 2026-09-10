@@ -370,6 +370,20 @@ class Skill:
                 extract_usage(raw_usage), model.name,
                 getattr(model, "cache_ttl", "5m"))
 
+        whole = getattr(model, "last_stream_result", None)
+        if whole is not None and not isinstance(whole, str):
+            # The provider could not stream and answered in one piece; the
+            # object it answered with is the result, not the text it renders
+            # to. A tool call rendered to text and parsed back is not a tool
+            # call any more.
+            self.last_result = whole
+            self.history = [whole]
+            self._emit("llm_call.ended", name=model.name,
+                       usage=getattr(self.last_usage, "total_tokens", None),
+                       cost=getattr(self.last_usage, "cost", None),
+                       duration=_time.monotonic() - _t0)
+            return
+
         text = "".join(pieces)
         kind = ((self._output or {}).get("format") or {}).get("type", "text")
         if kind in ("json", "json_schema"):

@@ -153,6 +153,16 @@ class OpenAIClient(BaseClient):
 
     def build_stream_request(self, messages, output, params, tools=None):
         m = self._wrap(params)
+        if tools:
+            # A tool call arrives as deltas of a JSON argument string spread
+            # across events, and reassembling it is a feature of its own.
+            # Until it exists, streaming a tool-calling turn drops the call
+            # and leaves an empty answer behind — which reads as "the model
+            # said nothing", the most expensive wrong reading there is. So
+            # the request is not streamed and the caller is told why.
+            raise NotImplementedError(
+                "a tool call is not reassembled from deltas yet, so this turn "
+                "is not streamed")
         if self._provider == "openai" and (
                 _should_use_responses_api(m.name) or _is_openai_image_model(m.name)):
             raise NotImplementedError(
@@ -160,7 +170,13 @@ class OpenAIClient(BaseClient):
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         if fmt == "image":
             raise NotImplementedError("an image is not delivered progressively")
-        path, body = self.build_request(messages, output, params, tools=tools)
+        # `tools=` is not forwarded, and not merely because it is None here:
+        # two subclasses of this class override `build_request` without that
+        # parameter at all, so passing it raised TypeError — not the
+        # NotImplementedError the fallback catches — and every Qwen stream
+        # crashed instead of degrading. A keyword a sibling does not take is
+        # not a keyword this family can pass.
+        path, body = self.build_request(messages, output, params)
         # `include_usage` is what makes the provider send a final event with
         # the token counts in it. Without it a streamed call reports no usage
         # at all, and a run that cannot price itself is the one thing this

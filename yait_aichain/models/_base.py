@@ -404,6 +404,11 @@ class Model:
         #: see would be a number with no provider behind it.
         self.last_stream_usage: "dict | None" = None
 
+        #: The last :meth:`stream`'s answer as an object, when the provider
+        #: could not stream and it came back whole. None on a real stream,
+        #: where the pieces are the answer.
+        self.last_stream_result = None
+
         # ── build the family client (format + transport) ──────────────
         self.client = _build_client(self._provider, resolved_key, client_options or {})
 
@@ -606,6 +611,7 @@ class Model:
                                   enforce, note_absent)
 
         self.last_stream_usage = None
+        self.last_stream_result = None
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
             try:
@@ -638,9 +644,28 @@ class Model:
             import json as _json
             raw = self.client.send(path, body, self.client._auth_headers())
             response = _json.loads(raw)
-            self.last_stream_usage = response.get("usage")
+            # The whole response is already the envelope `extract_usage`
+            # reads, per provider — taking `response["usage"]` out of it
+            # worked for two families and read as zero for Google.
+            self.last_stream_usage = response
             result = self.from_response(response, output)
-            yield result if isinstance(result, str) else _json.dumps(result)
+            # Kept whole beside the text. A tool call is neither a string nor
+            # a dict, and rendering one to text and throwing the object away
+            # is how a streamed tool-calling turn came to look like a model
+            # that answered nothing.
+            self.last_stream_result = result
+            if isinstance(result, str):
+                yield result
+            elif isinstance(result, dict):
+                yield _json.dumps(result)
+            else:
+                # A tool call's own text, which is usually empty — and an
+                # empty stream is right here. What must not go out is its
+                # repr: a caller printing the pieces would print
+                # "ToolCallRequest(calls=(...))" to a user's screen.
+                text = getattr(result, "text", "") or ""
+                if text:
+                    yield text
             return
 
         for event in self.client._post_sse(
