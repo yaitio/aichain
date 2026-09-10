@@ -300,5 +300,99 @@ class TestTheTrapsPerFamily(unittest.TestCase):
                 m._params())
 
 
+
+
+class TestTheTwoThingsTheReleaseAlmostShipped(unittest.TestCase):
+    """Both were found by asking the code rather than by reading the release
+    notes, and both returned something plausible."""
+
+    def test_recraft_does_not_claim_a_capability_it_inherited(self):
+        """It renders images and subclasses the client that streams. A
+        capability arriving through the class hierarchy is the same defect
+        the option layer was cleared of in 2.3.0, by another door."""
+        self.assertFalse(Model("recraftv3", api_key="k").client.supports_streaming)
+
+    def test_a_streamed_tool_call_does_not_vanish(self):
+        """It used to yield nothing and leave `last_result` an empty string —
+        which reads as "the model said nothing", the most expensive wrong
+        reading there is."""
+        answer = {"choices": [{"message": {"content": None, "tool_calls": [
+            {"id": "c1", "type": "function",
+             "function": {"name": "echo", "arguments": '{"v": 1}'}}]}}],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 2,
+                      "total_tokens": 7}}
+        model = Model("gpt-4o", api_key="k")
+        skill = Skill(model=model,
+                      input={"messages": [{"role": "user", "parts": [
+                          {"type": "text", "text": "hi"}]}]},
+                      output={"format": {"type": "text"}},
+                      _tools=[{"function": {"name": "echo",
+                                            "parameters": {}}}])
+        with mock.patch.object(type(model.client), "send",
+                               return_value=json.dumps(answer).encode()):
+            pieces = list(skill.stream())
+
+        self.assertEqual(getattr(skill.last_result, "calls")[0].name, "echo")
+        self.assertIn(("stream", "declined"),
+                      {(a.option, a.kind) for a in skill.last_adaptations})
+        self.assertEqual(skill.last_usage.total_tokens, 7)
+
+    def test_and_its_repr_is_not_streamed_to_a_screen(self):
+        """Yielding `str(result)` puts "ToolCallRequest(calls=(...))" in
+        front of whoever is printing the pieces."""
+        answer = {"choices": [{"message": {"content": None, "tool_calls": [
+            {"id": "c1", "type": "function",
+             "function": {"name": "echo", "arguments": "{}"}}]}}]}
+        model = Model("gpt-4o", api_key="k")
+        skill = Skill(model=model,
+                      input={"messages": [{"role": "user", "parts": [
+                          {"type": "text", "text": "hi"}]}]},
+                      output={"format": {"type": "text"}},
+                      _tools=[{"function": {"name": "echo",
+                                            "parameters": {}}}])
+        with mock.patch.object(type(model.client), "send",
+                               return_value=json.dumps(answer).encode()):
+            pieces = list(skill.stream())
+        self.assertEqual(pieces, [])
+
+    def test_every_family_refuses_a_tool_calling_turn_the_same_way(self):
+        for family, spec in FAMILIES.items():
+            with self.subTest(family=family):
+                m = Model(spec["model"], api_key="k")
+                with self.assertRaises(NotImplementedError):
+                    m.client.build_stream_request(
+                        [{"role": "user", "parts": [
+                            {"type": "text", "text": "hi"}]}],
+                        {"format": {"type": "text"}}, m._params(),
+                        tools=[{"function": {"name": "echo",
+                                             "parameters": {}}}])
+
+
+class TestTheFlagMeansWhatItSays(unittest.TestCase):
+    """`supports_streaming` is a claim, and 2.3.0's rule is that a claim is
+    established by effect. Every provider declaring one must build a
+    streaming request for a plain text turn without raising."""
+
+    def test_no_provider_claims_more_than_it_does(self):
+        from yait_aichain.models._data import PROVIDERS
+        from yait_aichain.models._base import _build_client, models as _models
+
+        msgs = [{"role": "user", "parts": [{"type": "text", "text": "hi"}]}]
+        for name in sorted(PROVIDERS):
+            client = _build_client(name, "k", {})
+            if not client.supports_streaming:
+                continue
+            with self.subTest(provider=name):
+                # `private` lists no models on purpose — a self-hosted
+                # server takes whatever id it was started with — so it is
+                # probed with one rather than skipped.
+                text_models = [n for n in _models(provider=name)
+                               if "image" not in n] or ["any-local-model"]
+                m = Model(f"{name}/{text_models[0]}", api_key="k")
+                path, body = m.client.build_stream_request(
+                    msgs, {"format": {"type": "text"}}, m._params())
+                self.assertTrue(path)
+
+
 if __name__ == "__main__":
     unittest.main()

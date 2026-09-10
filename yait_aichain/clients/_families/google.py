@@ -199,6 +199,10 @@ class GoogleClient(BaseClient):
     supports_streaming = True
 
     def build_stream_request(self, messages, output, params, tools=None):
+        if tools:
+            raise NotImplementedError(
+                "a tool call is not reassembled from deltas yet, so this turn "
+                "is not streamed")
         """Google changes the **verb and the transport**, not a body flag.
 
         `:streamGenerateContent` without `alt=sse` answers with a JSON array
