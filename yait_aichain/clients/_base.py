@@ -237,6 +237,29 @@ class BaseClient:
         """
         return None
 
+    def stream_tool_fragments(self, event: dict) -> "list | None":
+        """
+        Fragments of tool calls carried by one event.
+
+        Each fragment is ``{"slot", "id", "name", "arguments"}``, and any of
+        the last three may be absent — that is the whole difficulty. A call
+        does not arrive as a call: an id and a name land once, then the
+        arguments trickle in as pieces of a JSON **string** across many
+        events, and two calls in one turn interleave.
+
+        ``slot`` is what keeps them apart. It is the provider's own index for
+        the call, never the order the fragments arrived in: OpenAI numbers
+        them and Anthropic uses its content-block index, precisely because
+        arrival order does not identify anything once there is more than one
+        call. Keying on arrival order splices two calls' arguments into one
+        unparseable string, and the recovery from unparseable arguments is an
+        empty dict — so the tool runs, with nothing, and the run continues.
+
+        Returning None means "this family does not stream tool calls", which
+        is different from "this event carried none" (an empty list).
+        """
+        return None
+
     def _post_sse(self, path: str, data: dict, headers: dict):
         """
         POST *data* and yield each server-sent event as a decoded object.

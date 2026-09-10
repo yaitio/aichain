@@ -302,70 +302,156 @@ class TestTheTrapsPerFamily(unittest.TestCase):
 
 
 
-class TestTheTwoThingsTheReleaseAlmostShipped(unittest.TestCase):
-    """Both were found by asking the code rather than by reading the release
-    notes, and both returned something plausible."""
+class TestRecraftDoesNotClaimWhatItInherited(unittest.TestCase):
 
-    def test_recraft_does_not_claim_a_capability_it_inherited(self):
+    def test_an_image_provider_does_not_stream(self):
         """It renders images and subclasses the client that streams. A
         capability arriving through the class hierarchy is the same defect
         the option layer was cleared of in 2.3.0, by another door."""
         self.assertFalse(Model("recraftv3", api_key="k").client.supports_streaming)
 
-    def test_a_streamed_tool_call_does_not_vanish(self):
-        """It used to yield nothing and leave `last_result` an empty string —
-        which reads as "the model said nothing", the most expensive wrong
-        reading there is."""
-        answer = {"choices": [{"message": {"content": None, "tool_calls": [
-            {"id": "c1", "type": "function",
-             "function": {"name": "echo", "arguments": '{"v": 1}'}}]}}],
-            "usage": {"prompt_tokens": 5, "completion_tokens": 2,
-                      "total_tokens": 7}}
-        model = Model("gpt-4o", api_key="k")
-        skill = Skill(model=model,
+
+# ── Tool calls, reassembled ─────────────────────────────────────────────────
+#
+# A call does not arrive as a call. An id and a name land once, the arguments
+# trickle in as fragments of a JSON string, and two calls in one turn
+# interleave. Every trap below has the same shape: the wrong implementation
+# produces a call that still runs, with the wrong arguments or none.
+
+def _oa_tc(slot, *, id=None, name=None, args=None):
+    d = {"index": slot}
+    if id:
+        d["id"] = id
+    fn = {}
+    if name:
+        fn["name"] = name
+    if args is not None:
+        fn["arguments"] = args
+    if fn:
+        d["function"] = fn
+    return {"choices": [{"delta": {"tool_calls": [d]}}]}
+
+
+class TestToolCallsSurviveAStream(unittest.TestCase):
+
+    def _stream(self, model_name, events):
+        skill = Skill(model=Model(model_name, api_key="k"),
                       input={"messages": [{"role": "user", "parts": [
                           {"type": "text", "text": "hi"}]}]},
                       output={"format": {"type": "text"}},
                       _tools=[{"function": {"name": "echo",
                                             "parameters": {}}}])
-        with mock.patch.object(type(model.client), "send",
-                               return_value=json.dumps(answer).encode()):
+        with mock.patch("urllib3.PoolManager.request",
+                        return_value=_sse(*events)):
             pieces = list(skill.stream())
+        return pieces, skill
 
-        self.assertEqual(getattr(skill.last_result, "calls")[0].name, "echo")
-        self.assertIn(("stream", "declined"),
-                      {(a.option, a.kind) for a in skill.last_adaptations})
-        self.assertEqual(skill.last_usage.total_tokens, 7)
+    def test_openai_arguments_are_concatenated_then_parsed_once(self):
+        """Parsing on the way sees truncated JSON on every fragment but the
+        last, and unparseable arguments recover to an empty dict — so the
+        tool runs, with nothing, and the run carries on."""
+        _, skill = self._stream("gpt-4o", [
+            _oa_tc(0, id="c1", name="echo", args=""),
+            _oa_tc(0, args='{"value":'),
+            _oa_tc(0, args=' "one"}'),
+        ])
+        call = skill.last_result.calls[0]
+        self.assertEqual(call.name, "echo")
+        self.assertEqual(call.id, "c1")
+        self.assertEqual(call.arguments, {"value": "one"})
 
-    def test_and_its_repr_is_not_streamed_to_a_screen(self):
-        """Yielding `str(result)` puts "ToolCallRequest(calls=(...))" in
-        front of whoever is printing the pieces."""
-        answer = {"choices": [{"message": {"content": None, "tool_calls": [
-            {"id": "c1", "type": "function",
-             "function": {"name": "echo", "arguments": "{}"}}]}}]}
-        model = Model("gpt-4o", api_key="k")
-        skill = Skill(model=model,
-                      input={"messages": [{"role": "user", "parts": [
-                          {"type": "text", "text": "hi"}]}]},
-                      output={"format": {"type": "text"}},
-                      _tools=[{"function": {"name": "echo",
-                                            "parameters": {}}}])
-        with mock.patch.object(type(model.client), "send",
-                               return_value=json.dumps(answer).encode()):
-            pieces = list(skill.stream())
+    def test_two_calls_in_one_turn_do_not_bleed_into_each_other(self):
+        """Keyed on the provider's index, not on arrival order: the
+        fragments interleave, and keying on order splices both argument
+        strings into one that does not parse."""
+        _, skill = self._stream("gpt-4o", [
+            _oa_tc(0, id="c1", name="echo", args=""),
+            _oa_tc(1, id="c2", name="echo", args=""),
+            _oa_tc(0, args='{"value": "first"}'),
+            _oa_tc(1, args='{"value": "second"}'),
+        ])
+        calls = skill.last_result.calls
+        self.assertEqual([c.id for c in calls], ["c1", "c2"])
+        self.assertEqual([c.arguments["value"] for c in calls],
+                         ["first", "second"])
+
+    def test_a_later_fragment_does_not_erase_the_name(self):
+        """The name arrives once; the fragments after it carry arguments
+        alone. Writing each fragment's empty name over the stored one leaves
+        a call nothing can route."""
+        _, skill = self._stream("gpt-4o", [
+            _oa_tc(0, id="c1", name="echo", args="{}"),
+            _oa_tc(0, args=""),
+        ])
+        self.assertEqual(skill.last_result.calls[0].name, "echo")
+
+    def test_prose_beside_a_call_is_yielded_and_kept(self):
+        """Some providers send both. The text is streamed as it arrives and
+        rides along on the request, so it is neither shown twice nor lost."""
+        pieces, skill = self._stream("gpt-4o", [
+            _delta("Let me check. "),
+            _oa_tc(0, id="c1", name="echo", args="{}"),
+        ])
+        self.assertEqual(pieces, ["Let me check. "])
+        self.assertEqual(skill.last_result.text, "Let me check. ")
+        self.assertEqual(skill.last_result.calls[0].name, "echo")
+
+    def test_a_turn_with_no_calls_is_still_just_text(self):
+        pieces, skill = self._stream("gpt-4o", [_delta("plain answer")])
+        self.assertEqual(pieces, ["plain answer"])
+        self.assertEqual(skill.last_result, "plain answer")
+
+    def test_anthropic_streams_the_arguments_under_another_name(self):
+        """The call's arguments arrive as `input_json_delta.partial_json`,
+        not as text — which is why the text filter never saw them."""
+        _, skill = self._stream("claude-haiku-4-5-20251001", [
+            {"type": "content_block_start", "index": 1,
+             "content_block": {"type": "tool_use", "id": "toolu_1",
+                               "name": "echo", "input": {}}},
+            {"type": "content_block_delta", "index": 1,
+             "delta": {"type": "input_json_delta",
+                       "partial_json": '{"value":'}},
+            {"type": "content_block_delta", "index": 1,
+             "delta": {"type": "input_json_delta",
+                       "partial_json": ' "one"}'}},
+            {"type": "content_block_stop", "index": 1},
+        ])
+        call = skill.last_result.calls[0]
+        self.assertEqual((call.id, call.name), ("toolu_1", "echo"))
+        self.assertEqual(call.arguments, {"value": "one"})
+
+    def test_anthropic_keeps_a_text_block_out_of_the_call(self):
+        pieces, skill = self._stream("claude-haiku-4-5-20251001", [
+            {"type": "content_block_delta", "index": 0,
+             "delta": {"type": "text_delta", "text": "Checking."}},
+            {"type": "content_block_start", "index": 1,
+             "content_block": {"type": "tool_use", "id": "toolu_1",
+                               "name": "echo", "input": {}}},
+            {"type": "content_block_delta", "index": 1,
+             "delta": {"type": "input_json_delta", "partial_json": "{}"}},
+        ])
+        self.assertEqual(pieces, ["Checking."])
+        self.assertEqual(skill.last_result.calls[0].name, "echo")
+
+    def test_google_sends_a_call_whole_rather_than_in_pieces(self):
+        """`args` is already an object, not a JSON string — the one family
+        that needs no reassembly, handled by the same assembler rather than
+        by a special case."""
+        _, skill = self._stream("gemini-2.5-flash", [
+            {"candidates": [{"content": {"parts": [
+                {"functionCall": {"name": "echo",
+                                  "args": {"value": "one"}}}]}}]},
+        ])
+        call = skill.last_result.calls[0]
+        self.assertEqual(call.name, "echo")
+        self.assertEqual(call.arguments, {"value": "one"})
+
+    def test_a_call_is_not_rendered_into_the_stream(self):
+        """The pieces are what a caller prints. A decision is not prose and
+        must not appear there as one."""
+        pieces, _ = self._stream("gpt-4o", [
+            _oa_tc(0, id="c1", name="echo", args="{}")])
         self.assertEqual(pieces, [])
-
-    def test_every_family_refuses_a_tool_calling_turn_the_same_way(self):
-        for family, spec in FAMILIES.items():
-            with self.subTest(family=family):
-                m = Model(spec["model"], api_key="k")
-                with self.assertRaises(NotImplementedError):
-                    m.client.build_stream_request(
-                        [{"role": "user", "parts": [
-                            {"type": "text", "text": "hi"}]}],
-                        {"format": {"type": "text"}}, m._params(),
-                        tools=[{"function": {"name": "echo",
-                                             "parameters": {}}}])
 
 
 class TestTheFlagMeansWhatItSays(unittest.TestCase):

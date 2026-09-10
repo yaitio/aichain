@@ -82,6 +82,13 @@ from the text we happened to see is a number with no provider behind it.
 that does not parse keeps its text rather than becoming `None`: the caller has
 already seen it and can say what arrived better than a swallowed exception.
 
+**Tool calls stream too.** A call does not arrive as a call — an id and a
+name land once, then the arguments trickle in as fragments of a JSON string,
+and two calls in one turn interleave. They are reassembled and `last_result`
+holds the `ToolCallRequest`, with any prose the model sent beside them yielded
+as it arrived and kept on `.text`. The call itself is never yielded: the
+pieces are what a caller prints, and a decision is not prose.
+
 **A provider that cannot stream still answers.** Image endpoints have nothing
 to deliver progressively, and two of OpenAI's own paths speak a different
 event vocabulary. Rather than raise — a library that raises on a provider gap

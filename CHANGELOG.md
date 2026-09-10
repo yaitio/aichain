@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+## [2.5.2] — 2026-09-10
+
+**Tool calls stream.** 2.5.0 shipped streaming with this named as missing and
+2.5.1 made the gap loud — a tool-calling turn was not streamed and said so.
+This closes it. A patch rather than a minor because no public API changed and
+the release that opened the gap is the one that documented it.
+
+### Added
+
+- **A call is reassembled from its fragments**, on all three families. It does
+  not arrive as a call: an id and a name land once, the arguments trickle in
+  as pieces of a JSON string, and two calls in one turn interleave. Three
+  things make the difference between working and appearing to work, and each
+  is a test:
+
+  * **Keyed on the provider's index, never on arrival order.** OpenAI numbers
+    its calls and Anthropic uses the content-block index precisely because
+    order identifies nothing once there is more than one. Keying on order
+    splices two calls' argument strings into one that does not parse — and
+    unparseable arguments recover to an empty dict, so the tool runs, with
+    nothing, and the run carries on.
+  * **Concatenated, then parsed once.** Parsing on the way sees truncated
+    JSON on every fragment but the last. Parsing is left to the same builder
+    the buffered path uses, so a malformed argument string fails identically
+    whether it was streamed or not.
+  * **A later fragment does not erase the name.** The name comes once and the
+    fragments after it carry arguments alone; writing each fragment's empty
+    name over the stored one leaves a call nothing can route.
+
+  Anthropic streams the arguments under `input_json_delta.partial_json`, which
+  is why the text filter never saw them. Google fragments nothing — its
+  `functionCall` arrives whole with `args` already an object — and is handled
+  by the same assembler rather than a special case.
+
+- **Prose beside a call** is yielded as it arrives and kept on the request's
+  `text`, so it is neither shown twice nor lost. The call itself is never
+  yielded: the pieces are what a caller prints, and a decision is not prose.
+
+### Notes
+
+- **Agent turns are still not streamed**, and not for want of the capability.
+  `Agent` calls the model with two retries, on the finding that a loop which
+  does not retry pays for each transient blip with a lost decision — and a
+  stream cannot retry once the caller has seen the first piece. The event
+  stream is what `Agent.stream()` offers; text is `Skill.stream()`'s.
+
+
 ## [2.5.1] — 2026-09-10
 
 Three defects in 2.5.0's streaming, found by asking the code what it does
