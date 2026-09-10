@@ -50,6 +50,55 @@ Deep dive ↓
 
 ---
 
+## Streaming
+
+`run()` waits for the whole answer; `stream()` yields it as it arrives. Same
+request, same cost — a second way to spend it, not a replacement.
+
+```python
+skill = Skill(model=Model("gpt-4o"), input={"messages": [...]})
+
+for piece in skill.stream():
+    print(piece, end="", flush=True)
+
+skill.last_result   # the whole answer, parsed when the format asks for JSON
+skill.last_usage    # what the provider reported, or None if it reported nothing
+```
+
+Four things differ from `run()`, and all four are deliberate.
+
+**No retries and no fallback chain.** Both work by discarding the attempt and
+starting over, which is impossible once the caller has seen the first piece.
+A rule that held only before the first byte would hold *sometimes*, which is
+worse than not holding — so the first model in the chain is used and an error
+is raised.
+
+**Usage may be `None`.** It is asked for explicitly and reported by most
+providers; where one does not, nothing is invented. A token count derived
+from the text we happened to see is a number with no provider behind it.
+
+**JSON is parsed at the end, not on the way.** Pieces arrive as text, and
+`last_result` holds the parsed value once the stream completes. An answer
+that does not parse keeps its text rather than becoming `None`: the caller has
+already seen it and can say what arrived better than a swallowed exception.
+
+**A provider that cannot stream still answers.** Image endpoints have nothing
+to deliver progressively, and two of OpenAI's own paths speak a different
+event vocabulary. Rather than raise — a library that raises on a provider gap
+is one you cannot swap a provider under — the whole answer arrives as one
+piece and a `declined` is recorded:
+
+```python
+skill.last_adaptations   # [Adaptation(kind="declined", option="stream", …)]
+```
+
+That matters because one chunk at the end *looks* like a working stream. A
+caller who needs the real thing says so once, at the model:
+
+```python
+Model("gpt-5.5", on_unsupported="requirements")   # raises instead
+```
+
 ## Reference
 
 ### How a Skill runs
