@@ -92,6 +92,44 @@ agent = Agent(orchestrator=Model("gpt-4o-mini"), hooks=[CostGuard()])
 
 ---
 
+## Watching a run as it happens
+
+Hooks are a push channel: you hand the agent a callable and it calls you.
+`stream()` is the same events pulled instead:
+
+```python
+agent = Agent(model=Model("gpt-4o"), tools=[...])
+
+for event in agent.stream("audit the invoices"):
+    print(event.type, event.payload)
+
+result = agent.last_result      # the AgentResult run() would have returned
+```
+
+It is the **same loop**, walked rather than exhausted — not a second
+implementation — so a run behaves identically whichever way it is driven, and
+hooks you installed yourself still fire in the same order. Events emitted by
+`Skill` (`llm_call.started`, `llm_call.ended`) arrive too, because the stream
+is a view of the hook channel rather than a vocabulary of its own.
+
+Three things to know:
+
+* **Events, not tokens.** A turn is usually a tool call rather than prose, so
+  token deltas would be empty for most of a run and would interleave with
+  decisions in no useful order. What a caller wants to show is what the agent
+  is *doing*. For text, `Skill.stream()` is the one.
+* **The result is not yielded.** A stream of one type is easier to consume
+  than a stream of two, so the result lands on `last_result` when the
+  generator finishes, journal attached.
+* **Abandoning the generator abandons the run.** Breaking out of the loop
+  leaves the agent mid-turn: no result, no `run.finished`. The temporary hook
+  is still removed — that much is guaranteed — but nothing else is.
+
+The granularity is the turn, not the token: everything a turn emitted is
+handed over when the turn ends. The loop is synchronous by design (no threads,
+no async — the target is Lambda), so within one model call there is nothing to
+interleave.
+
 ## Permission matrix
 
 A tool declares a **risk class** as data; a `PermissionPolicy` maps it to a

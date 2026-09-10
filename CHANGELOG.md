@@ -2,6 +2,77 @@
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-09-10
+
+**Streaming.** `run()` is untouched — this is a second way to spend the same
+request, not a replacement. `2.4.0` is skipped over rather than cancelled;
+judging and guardrails keep their number and their content.
+
+### Added
+
+- **`Skill.stream()`** yields the answer as the provider produces it. The
+  whole text is assembled as well as yielded — `last_result`, parsed when the
+  output format asks for JSON — so a caller does not have to choose between
+  showing progress and having the value. Usage is asked for explicitly and is
+  `None` when the provider reported none.
+
+- **`Agent.stream()`** yields each event as the run produces it, and
+  `last_result` holds the `AgentResult` at the end. It is the **same loop**
+  walked instead of exhausted, not a second implementation, and the events are
+  the ones already going to hooks — so a caller's own hooks still fire, in the
+  same order, and `llm_call.*` (emitted by `Skill`, not by the loop) arrives
+  without anything being wired for it.
+
+  Events, not tokens, and deliberately: a turn in an agent loop is usually a
+  tool call rather than prose, so token deltas would be empty for most of a
+  run and interleave with decisions in no useful order. The granularity is the
+  turn, because the loop is synchronous by design — no threads, no async, the
+  target is Lambda.
+
+- **Nine providers stream** — OpenAI chat completions and everything
+  compatible with it (DeepSeek, Kimi, Qwen, xAI, Perplexity, self-hosted),
+  plus Anthropic and Google.
+
+### Fixed
+
+Four defects found by the tests rather than by the author, each returning
+something plausible:
+
+- **Google streams priced themselves at zero.** `stream_usage` returned the
+  bare usage block, which two families' shapes were understood from and
+  Google's was not. It returns a response-shaped envelope now, so a streamed
+  report reaches the same branch of `extract_usage` a buffered one does.
+- **Nothing streamed through Google at all.** The image guard tested whether
+  `modalities` was present rather than what was in it, and a `Skill` sets
+  `modalities: ["text"]` on every text call — so every Gemini stream declined
+  with "an image is not delivered progressively", a sentence plausible enough
+  to be believed.
+- **Anthropic streams under-billed by the whole prompt.** Usage arrives in two
+  events — input tokens in `message_start`, output tokens in `message_delta` —
+  so keeping the last report drops the input side and leaves a believable
+  number behind. Reports are merged, not replaced.
+- **A `declined` notice was warned about and then vanished** from the
+  machine-readable half, which is the half a measurement run reads: on the
+  non-streaming fallback path `_built` overwrote `last_adaptations`.
+
+### Notes
+
+- **A provider that cannot stream still answers.** Image endpoints have
+  nothing to deliver progressively and two of OpenAI's own paths speak a
+  different event vocabulary; rather than raise — a library that raises on a
+  provider gap is one you cannot swap a provider under — the whole answer
+  arrives in one piece and a `declined` is recorded. One chunk at the end
+  looks like a working stream, so `Model(on_unsupported="requirements")`
+  raises for a caller who needs the real thing.
+- **Streamed calls do not retry and do not fall back.** Both work by
+  discarding the attempt and starting again, which is impossible once the
+  caller has seen the first piece.
+- **Not in scope:** `Chain` and `Pool`. A stream through a Chain means a
+  stream of *steps*, which is a different question; through a Pool it means
+  merging several, which is meaningless without concurrency. Half of each
+  would have been worse than neither.
+
+
 ## [2.3.0] — 2026-09-09
 
 **Sampling and every other option, audited.** The library's promise is one
