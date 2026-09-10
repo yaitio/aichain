@@ -169,6 +169,51 @@ def _merge_usage(into: "dict | None", incoming: dict) -> dict:
             merged[key] = block
     return merged
 
+
+class _ToolCallAssembly:
+    """Collects tool-call fragments from a stream into whole calls.
+
+    Two rules, and both were learned from what breaks without them:
+
+    * **Slot, not arrival order.** Providers interleave the fragments of
+      several calls in one turn, and the index is the only thing that says
+      which is which.
+    * **Arguments are concatenated, then parsed once.** Parsing on the way
+      sees truncated JSON on every fragment but the last. Parsing is left to
+      the same builder the buffered path uses, so a malformed argument string
+      fails identically whether it was streamed or not.
+    """
+
+    def __init__(self) -> None:
+        self._slots: dict = {}
+
+    def add(self, fragments: list) -> None:
+        for f in fragments or []:
+            slot = self._slots.setdefault(
+                f.get("slot", len(self._slots)),
+                {"id": "", "name": "", "arguments": ""})
+            # An id and a name arrive once, usually with the first fragment;
+            # later ones carry arguments alone. Overwriting with the empty
+            # string that follows is how a call loses its name and becomes
+            # unroutable.
+            if f.get("id"):
+                slot["id"] = f["id"]
+            if f.get("name"):
+                slot["name"] = f["name"]
+            if f.get("arguments"):
+                slot["arguments"] += f["arguments"]
+
+    def request(self, text: str = ""):
+        """The assembled :class:`ToolCallRequest`, or None if nothing came."""
+        if not self._slots:
+            return None
+        from ..clients._families._openai_compat import _tool_call_request
+        return _tool_call_request(
+            [(slot["name"], slot["arguments"], slot["id"])
+             for _, slot in sorted(self._slots.items(),
+                                   key=lambda kv: str(kv[0]))],
+            text)
+
 class Model:
     """
     A configured model: provider resolved from the name, settings from data,
@@ -668,8 +713,11 @@ class Model:
                     yield text
             return
 
+        assembly = _ToolCallAssembly()
+        spoken: list = []
         for event in self.client._post_sse(
                 path, body, self.client._auth_headers()):
+            assembly.add(self.client.stream_tool_fragments(event))
             usage = self.client.stream_usage(event)
             if usage:
                 # Merged, not replaced. Anthropic reports the input tokens in
@@ -681,7 +729,14 @@ class Model:
                     self.last_stream_usage, usage)
             piece = self.client.parse_stream_event(event, output)
             if piece:
+                spoken.append(piece)
                 yield piece
+
+        # A turn that asked for tools is a decision, not prose, so it is left
+        # as an object for the caller to act on. Any text the model sent
+        # beside the calls has already been yielded and rides along in
+        # `text`, so nothing is shown twice and nothing is lost.
+        self.last_stream_result = assembly.request("".join(spoken))
 
     def from_response(self, response: dict, output: dict) -> "str | dict":
         """

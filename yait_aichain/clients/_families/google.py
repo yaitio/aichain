@@ -199,10 +199,6 @@ class GoogleClient(BaseClient):
     supports_streaming = True
 
     def build_stream_request(self, messages, output, params, tools=None):
-        if tools:
-            raise NotImplementedError(
-                "a tool call is not reassembled from deltas yet, so this turn "
-                "is not streamed")
         """Google changes the **verb and the transport**, not a body flag.
 
         `:streamGenerateContent` without `alt=sse` answers with a JSON array
@@ -231,6 +227,27 @@ class GoogleClient(BaseClient):
             if text:
                 return text
         return None
+
+    def stream_tool_fragments(self, event: dict) -> "list | None":
+        """Google does not fragment a call at all: `functionCall` arrives
+        whole, with `args` already an object rather than a JSON string. The
+        assembler concatenates argument *strings*, so the object is dumped
+        back to one — round-tripping it costs nothing and keeps one
+        assembler for three families instead of a special case."""
+        out = []
+        for candidate in (event.get("candidates") or []):
+            parts = ((candidate.get("content") or {}).get("parts")) or []
+            for i, part in enumerate(parts):
+                fc = part.get("functionCall")
+                if not fc:
+                    continue
+                out.append({
+                    "slot":      f"{candidate.get('index', 0)}:{i}",
+                    "id":        fc.get("id") or fc.get("name") or "",
+                    "name":      fc.get("name") or "",
+                    "arguments": json.dumps(fc.get("args") or {}),
+                })
+        return out
 
     def stream_usage(self, event: dict) -> "dict | None":
         usage = event.get("usageMetadata")

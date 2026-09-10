@@ -153,16 +153,7 @@ class OpenAIClient(BaseClient):
 
     def build_stream_request(self, messages, output, params, tools=None):
         m = self._wrap(params)
-        if tools:
-            # A tool call arrives as deltas of a JSON argument string spread
-            # across events, and reassembling it is a feature of its own.
-            # Until it exists, streaming a tool-calling turn drops the call
-            # and leaves an empty answer behind — which reads as "the model
-            # said nothing", the most expensive wrong reading there is. So
-            # the request is not streamed and the caller is told why.
-            raise NotImplementedError(
-                "a tool call is not reassembled from deltas yet, so this turn "
-                "is not streamed")
+
         if self._provider == "openai" and (
                 _should_use_responses_api(m.name) or _is_openai_image_model(m.name)):
             raise NotImplementedError(
@@ -170,13 +161,15 @@ class OpenAIClient(BaseClient):
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         if fmt == "image":
             raise NotImplementedError("an image is not delivered progressively")
-        # `tools=` is not forwarded, and not merely because it is None here:
-        # two subclasses of this class override `build_request` without that
-        # parameter at all, so passing it raised TypeError — not the
+        # `tools=` is passed only when there are tools: two subclasses of
+        # this class override `build_request` without that parameter at all,
+        # so forwarding it unconditionally raised TypeError — not the
         # NotImplementedError the fallback catches — and every Qwen stream
-        # crashed instead of degrading. A keyword a sibling does not take is
-        # not a keyword this family can pass.
-        path, body = self.build_request(messages, output, params)
+        # crashed instead of degrading. Those two render images and declare
+        # no streaming, so they never reach here with tools.
+        path, body = (self.build_request(messages, output, params, tools=tools)
+                      if tools else
+                      self.build_request(messages, output, params))
         # `include_usage` is what makes the provider send a final event with
         # the token counts in it. Without it a streamed call reports no usage
         # at all, and a run that cannot price itself is the one thing this
@@ -194,6 +187,27 @@ class OpenAIClient(BaseClient):
         # A tool-call delta carries no content and must not be mistaken for
         # the end of the answer; it is simply not text.
         return text if isinstance(text, str) and text else None
+
+    def stream_tool_fragments(self, event: dict) -> "list | None":
+        choices = event.get("choices") or []
+        if not choices:
+            return []
+        deltas = (choices[0].get("delta") or {}).get("tool_calls")
+        if not deltas:
+            return []
+        out = []
+        for i, d in enumerate(deltas):
+            fn = d.get("function") or {}
+            out.append({
+                # `index` is the provider's, and it is what keeps two calls
+                # in one turn apart; the enumerate is only a fallback for a
+                # compatible server that omits it.
+                "slot":      d.get("index", i),
+                "id":        d.get("id") or "",
+                "name":      fn.get("name") or "",
+                "arguments": fn.get("arguments") or "",
+            })
+        return out
 
     def stream_usage(self, event: dict) -> "dict | None":
         usage = event.get("usage")

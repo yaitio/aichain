@@ -123,10 +123,6 @@ class AnthropicClient(BaseClient):
     supports_streaming = True
 
     def build_stream_request(self, messages, output, params, tools=None):
-        if tools:
-            raise NotImplementedError(
-                "a tool call is not reassembled from deltas yet, so this turn "
-                "is not streamed")
         path, body = self.build_request(messages, output, params, tools=tools)
         body["stream"] = True
         return path, body
@@ -144,6 +140,27 @@ class AnthropicClient(BaseClient):
             return None
         text = delta.get("text")
         return text if isinstance(text, str) and text else None
+
+    def stream_tool_fragments(self, event: dict) -> "list | None":
+        """Anthropic opens a content block for the call and then streams its
+        arguments into it, so the name arrives in one event type and the
+        arguments in another — under `partial_json`, not `text`, which is why
+        `parse_stream_event` filtering on `text_delta` does not see them."""
+        index = event.get("index")
+        etype = event.get("type")
+        if etype == "content_block_start":
+            block = event.get("content_block") or {}
+            if block.get("type") != "tool_use":
+                return []
+            return [{"slot": index, "id": block.get("id") or "",
+                     "name": block.get("name") or "", "arguments": ""}]
+        if etype == "content_block_delta":
+            delta = event.get("delta") or {}
+            if delta.get("type") != "input_json_delta":
+                return []
+            return [{"slot": index,
+                     "arguments": delta.get("partial_json") or ""}]
+        return []
 
     def stream_usage(self, event: dict) -> "dict | None":
         """
