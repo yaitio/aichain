@@ -1,6 +1,7 @@
 # Design — backing a conversational UI
 
-Status: **R1, R3 and R4 shipped in 2.7.0. R2 and R5 open.** Written 2026-09-11
+Status: **R1, R3 and R4 shipped in 2.7.0; R2 in 2.8.0. R5 open,
+and split — see below.** Written 2026-09-11
 from the needs of one consumer: a conversational BI product whose front end
 renders every tool result as a chart. (The header said "against `2.0.0`";
 `Agent.stream()`, which R2 quotes, arrived in `2.5.0`.)
@@ -237,10 +238,20 @@ documentation. A `Hook` subclass with `step_started` / `step_ended` still
 fires, once, with a `DeprecationWarning` — the rename is loud rather than
 silent, and costs nobody a run.
 
-**Where text deltas live (R2). Still open**, and now easier: `Agent.stream()`
-is already a view of the hook channel rather than a vocabulary beside it, so a
-`text.delta` with a message identity lands in one ordered stream without a new
-mechanism.
+**Where text deltas live (R2). Settled: one ordered stream**, as recommended —
+`Agent.stream()` was already a view of the hook channel rather than a
+vocabulary beside it, so `text.started` / `text.delta` / `text.ended` landed
+there without a new mechanism.
+
+What the requirement did not foresee is what streaming the agent's turns
+**costs**: a stream cannot use the fallback chain, and it cannot retry once a
+piece is out — while the loop retries every model call deliberately, because
+one that does not pays for each transient blip with a lost decision. So
+`run()` stays buffered (it has nobody to show pieces to) and the retry window
+was reopened for streams: transient failures retry while nothing has been
+yielded. The 2.5.0 note refusing retries outright, on the grounds that such a
+rule "holds sometimes", was wrong — before the first piece is a state the
+caller can see.
 
 **R5 splits, and the split is the library/product boundary.** The mechanism —
 `approve` actually blocking — is the library's, and shipped in `2.6.0` as

@@ -67,11 +67,19 @@ skill.last_usage    # what the provider reported, or None if it reported nothing
 
 Four things differ from `run()`, and all four are deliberate.
 
-**No retries and no fallback chain.** Both work by discarding the attempt and
-starting over, which is impossible once the caller has seen the first piece.
-A rule that held only before the first byte would hold *sometimes*, which is
-worse than not holding — so the first model in the chain is used and an error
-is raised.
+**Retries stop at the first piece; there is no fallback chain.** Both work by
+discarding the attempt and starting over, which is impossible once the caller
+has seen something. A transient failure (429, 5xx, network) therefore retries
+while the attempt is still discardable — exactly as `run()` does — and is
+raised once it is not. *Before the first piece* is not a "sometimes": it is a
+state you can see, because nothing has been yielded. The fallback chain stays
+out on purpose: a second model is a different answer, not a retry of this one,
+and swapping models mid-sentence is not a thing to do quietly.
+
+> **Changed in 2.8.0.** 2.5.0 refused to retry a stream at all, on the
+> reasoning that such a rule "holds sometimes". That was wrong, and the agent
+> needed it: its loop retries every model call because a loop that does not
+> pays for each transient blip with a lost decision.
 
 **Usage may be `None`.** It is asked for explicitly and reported by most
 providers; where one does not, nothing is invented. A token count derived

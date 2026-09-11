@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-09-11
+
+**The agent streams the answer, not only its actions.** R2 of
+[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md).
+`Agent.stream()` said why it did not: *a turn in an agent loop is usually a
+tool call, not prose, so token deltas would be empty for most of a run*. True
+of the middle of a run and false of its end — the last turn **is** the answer,
+a reader is watching it, and it arrived in one piece after a silence as long
+as the model takes.
+
+### Added
+
+- **`text.started` · `text.delta` · `text.ended`** on the same channel as
+  everything else, all carrying one `payload["id"]` so a consumer can open a
+  block of prose, append to it and close it. One ordered stream rather than
+  two to reassemble, and interleaved correctly with the tool calls that
+  preceded it. A turn that asks for a tool and says nothing produces none of
+  the three: an empty open/close pair is something a consumer would have to
+  filter.
+
+  `run()` emits none of them. It has nobody to show pieces to, and buffering
+  keeps the fallback chain.
+
+### Changed
+
+- **A stream retries while the attempt is still discardable.** `2.5.0`
+  refused to retry at all, reasoning that a rule holding only before the
+  first byte "holds sometimes". That was wrong — *before the first piece* is
+  not a sometimes, it is a state the caller can see, because nothing has been
+  yielded — and the agent is what made it matter: its loop retries every model
+  call deliberately, since one that does not pays for each transient blip with
+  a lost decision. Transient failures (429, 5xx, network) now retry until the
+  first piece is out and are raised after it.
+
+  The fallback chain stays out of a stream on purpose: a second model is a
+  different answer, not a retry of this one, and swapping models mid-sentence
+  is not a thing to do quietly. That cost is why `run()` does not stream.
+
+### Fixed
+
+- **The agent test double only answered the buffered call.** It mocked
+  `_post` and not `_post_sse`, so the moment the agent streamed, every tool
+  event vanished and the run ended in a network error — which reads as the
+  feature being broken rather than the fake being half-written. A double that
+  stands in for a provider has to stand in for both of its modes.
+
+
 ## [2.7.0] — 2026-09-11
 
 **The event channel carries enough to reconstruct a turn.** R1, R3 and R4 of

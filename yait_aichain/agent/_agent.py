@@ -282,6 +282,12 @@ class Agent:
         # the ordinary case for the serverless target — write into one stream
         # that cannot be demultiplexed afterwards.
         self._run_id: "str | None" = None
+
+        # Whether a consumer is walking this run. Set for the duration of
+        # `stream()` and never by `run()`: streaming costs the fallback chain,
+        # and paying that for an observer who cannot see the pieces anyway
+        # would be trading reliability for nothing.
+        self._streaming = False
         self.permissions  = permissions
         # Who answers when the policy says "approve". A callable taking an
         # ApprovalRequest and returning truthy to proceed. The library cannot
@@ -359,6 +365,7 @@ class Agent:
         # drains, which is a leak that only shows up under load.
         collect = sink.append          # bound once, so `remove` finds it
         self.hooks.append(collect)
+        self._streaming = True
         try:
             self._emit("run.started", payload={"task": task, "mode": self.mode})
             while sink:
@@ -381,6 +388,7 @@ class Agent:
                 yield sink.pop(0)
             self.last_result = result
         finally:
+            self._streaming = False
             try:
                 self.hooks.remove(collect)
             except ValueError:                       # already gone; fine
@@ -594,7 +602,7 @@ class Agent:
             # loop that doesn't pays for each blip with a lost decision.
             max_retries = 2,
         )
-        reply = skill.run()
+        reply = self._reply(skill)
         # Kept per run, deduplicated: a loop asks the same thing of the same
         # model every turn, so without this the list grows by a copy a step.
         for a in skill.last_adaptations:
@@ -808,6 +816,39 @@ class Agent:
         )
 
     # ── Plumbing ─────────────────────────────────────────────────────────
+
+    def _reply(self, skill):
+        """One model turn — streamed when somebody is watching it.
+
+        `run()` buffers, because it has nobody to show prose to and a
+        buffered call keeps the fallback chain. `stream()` streams, because a
+        reader is in front of the last turn and today it arrives in one piece
+        after a silence as long as the model takes.
+
+        The text goes out on the **same** channel as everything else, bracketed
+        so a consumer can open a block, append to it and close it:
+        ``text.started`` on the first piece, a ``text.delta`` per piece, and
+        ``text.ended`` when the turn is done — all carrying one ``id``. A turn
+        that asks for a tool and says nothing produces none of the three,
+        rather than an empty pair a consumer has to filter.
+        """
+        if not self._streaming:
+            return skill.run()
+
+        message_id = uuid.uuid4().hex[:12]
+        opened = False
+        for piece in skill.stream():
+            if not opened:
+                self._emit("text.started", payload={"id": message_id})
+                opened = True
+            self._emit("text.delta",
+                       payload={"id": message_id, "text": piece})
+        if opened:
+            self._emit("text.ended", payload={"id": message_id})
+        # `stream()` assembles as well as yields, so the decision this turn
+        # reached is the same object `run()` would have returned — a
+        # ToolCallRequest when the model asked to act, the text otherwise.
+        return skill.last_result
 
     def _stamping_hooks(self) -> list:
         """The caller's hooks, each seeing this run's id on every event."""

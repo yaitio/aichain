@@ -482,3 +482,85 @@ class TestTheFlagMeansWhatItSays(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAStreamRetriesWhileItStillCan(unittest.TestCase):
+    """2.5.0 refused to retry a stream at all, reasoning that a rule holding
+    only before the first byte "holds sometimes". That was wrong: *before the
+    first piece* is not a sometimes, it is a state the caller can see —
+    nothing has been yielded — so there is no reason to be less reliable than
+    `run()` while the attempt is still discardable."""
+
+    def _skill(self, **kw):
+        return Skill(model=Model("gpt-4o", api_key="k"),
+                     input={"messages": [{"role": "user", "parts": [
+                         {"type": "text", "text": "hi"}]}]},
+                     output={"format": {"type": "text"}},
+                     retry_delay=0, **kw)
+
+    def test_a_rate_limit_before_the_first_piece_is_retried(self):
+        from yait_aichain.clients._errors import RateLimitError
+        attempts = []
+
+        def flaky(*a, **k):
+            attempts.append(1)
+            if len(attempts) == 1:
+                raise RateLimitError(429, "slow down")
+            return _sse(_delta("hello"))
+
+        skill = self._skill(max_retries=2)
+        with mock.patch("urllib3.PoolManager.request", side_effect=flaky):
+            pieces = list(skill.stream())
+        self.assertEqual(pieces, ["hello"])
+        self.assertEqual(len(attempts), 2)
+
+    def test_a_failure_after_the_first_piece_is_not(self):
+        """Starting over would replay or contradict what the caller has
+        already seen."""
+        from yait_aichain.clients._errors import RateLimitError
+
+        class Broken:
+            status, headers = 200, {}
+
+            def stream(self, amt=None, decode_content=True):
+                yield b'data: {"choices":[{"delta":{"content":"par"}}]}\n\n'
+                raise RateLimitError(429, "mid-stream")
+
+            def read(self):
+                return b""
+
+            def release_conn(self):
+                pass
+
+        skill = self._skill(max_retries=2)
+        seen = []
+        with mock.patch("urllib3.PoolManager.request", return_value=Broken()):
+            with self.assertRaises(RateLimitError):
+                for piece in skill.stream():
+                    seen.append(piece)
+        self.assertEqual(seen, ["par"])
+
+    def test_a_permanent_error_is_not_retried_either(self):
+        """A 400 arrives as a response, not as a transport exception — which
+        is the shape worth testing, because the transport wraps anything it
+        catches as a NetworkError and a NetworkError is transient."""
+        from yait_aichain.clients._errors import APIError
+        attempts = []
+
+        class Refused:
+            status, headers = 400, {}
+
+            def __init__(self):
+                attempts.append(1)
+
+            def read(self):
+                return b'{"error": "bad request"}'
+
+            def release_conn(self):
+                pass
+
+        with mock.patch("urllib3.PoolManager.request",
+                        side_effect=lambda *a, **k: Refused()):
+            with self.assertRaises(APIError):
+                list(self._skill(max_retries=2).stream())
+        self.assertEqual(len(attempts), 1)

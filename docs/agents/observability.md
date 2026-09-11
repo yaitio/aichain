@@ -66,6 +66,7 @@ Event types:
 | `run.started` · `run.finished` | Agent, Chain | the task and mode; the verdict and usage |
 | `tool_call.started` · `tool_call.ended` | Agent | one tool call — see below |
 | `step.started` · `step.ended` | **Chain** | one chain step, `payload["kind"]` |
+| `text.started` · `text.delta` · `text.ended` | Agent, while streaming | the answer as it is written |
 | `llm_call.started` · `llm_call.ended` | Skill | model name, tokens, cost, duration |
 
 ### Enough to rebuild a turn, not to describe it
@@ -158,10 +159,28 @@ is a view of the hook channel rather than a vocabulary of its own.
 
 Three things to know:
 
-* **Events, not tokens.** A turn is usually a tool call rather than prose, so
-  token deltas would be empty for most of a run and would interleave with
-  decisions in no useful order. What a caller wants to show is what the agent
-  is *doing*. For text, `Skill.stream()` is the one.
+* **Events *and* tokens, on one channel.** A turn in the middle of a run is
+  usually a tool call and says nothing; the last turn is the answer, and a
+  reader is watching it. So prose arrives as `text.started` → `text.delta` …
+  → `text.ended`, all carrying one `payload["id"]`, interleaved in order with
+  the tool calls that preceded it:
+
+  ```python
+  for event in agent.stream("audit the invoices"):
+      if event.type == "text.delta":
+          print(event.payload["text"], end="", flush=True)
+      elif event.type == "tool_call.started":
+          show_spinner(event.name, event.payload["arguments"])
+  ```
+
+  A turn that asks for a tool and says nothing produces none of the three —
+  an empty open/close pair is something a consumer would have to filter.
+
+  `run()` emits no `text.*`: it has nobody to show pieces to, and buffering
+  keeps the fallback chain. Streaming costs that chain (a second model is a
+  different answer, not a retry of this one) and retries only while nothing
+  has been yielded — paying it for an observer who cannot see the pieces
+  would be trading reliability for nothing.
 * **The result is not yielded.** A stream of one type is easier to consume
   than a stream of two, so the result lands on `last_result` when the
   generator finishes, journal attached.

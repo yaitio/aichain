@@ -69,7 +69,29 @@ def _model(*responses, name="gpt-4o"):
         call[0] += 1
         return responses[i]
 
+    def sse(path, body, headers, *a, **k):
+        """The same script, delivered as a stream.
+
+        A double that answers only the buffered call stops being a stand-in
+        for a provider the moment the agent starts streaming: every tool event
+        vanished and the run ended in a network error, which reads as the
+        feature being broken rather than the fake being half-written.
+        """
+        m.sent.append(body)
+        i = min(call[0], len(responses) - 1)
+        call[0] += 1
+        message = (json.loads(responses[i])["choices"][0]["message"])
+        if message.get("content"):
+            yield {"choices": [{"delta": {"content": message["content"]}}]}
+        for index, tc in enumerate(message.get("tool_calls") or []):
+            yield {"choices": [{"delta": {"tool_calls": [
+                {"index": index, "id": tc["id"],
+                 "function": {"name": tc["function"]["name"],
+                              "arguments": tc["function"]["arguments"]}}]}}]}
+        yield {"choices": [], "usage": json.loads(responses[i])["usage"]}
+
     m.client._post = MagicMock(side_effect=side)
+    m.client._post_sse = MagicMock(side_effect=sse)
     m.client._auth_headers = MagicMock(return_value={})
     return m
 

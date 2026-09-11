@@ -131,3 +131,72 @@ class TestTheHookChannelIsLeftAsItWasFound(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheAnswerArrivesAsItIsWritten(unittest.TestCase):
+    """R2. The `stream()` docstring used to argue that a turn is usually a
+    tool call, not prose, so token deltas would be empty for most of a run.
+    True of the middle of a run and false of its end: the last turn **is** the
+    answer, a reader is watching it, and it arrived in one piece after a
+    silence as long as the model takes.
+
+    The text goes on the same channel as everything else — one ordered stream
+    beats two the consumer has to reassemble — bracketed so a block of prose
+    can be opened, appended to, and closed.
+    """
+
+    def _types_and_events(self, *responses):
+        agent = _agent(*responses)
+        events = list(agent.stream("do it"))
+        return [e.type for e in events], events, agent
+
+    def test_the_answer_comes_in_pieces(self):
+        types, events, _ = self._types_and_events(*SCRIPT)
+        self.assertIn("text.delta", types)
+        text = "".join(e.payload["text"] for e in events
+                       if e.type == "text.delta")
+        self.assertEqual(text, "done")
+
+    def test_the_block_is_opened_and_closed(self):
+        types, _, _ = self._types_and_events(*SCRIPT)
+        self.assertLess(types.index("text.started"), types.index("text.delta"))
+        self.assertLess(types.index("text.delta"), types.index("text.ended"))
+
+    def test_one_identity_runs_through_the_block(self):
+        """Without it a consumer appending to "the current block" guesses,
+        and guesses wrongly the moment two turns both speak."""
+        _, events, _ = self._types_and_events(*SCRIPT)
+        ids = {e.payload["id"] for e in events
+               if e.type.startswith("text.")}
+        self.assertEqual(len(ids), 1)
+        self.assertTrue(next(iter(ids)))
+
+    def test_a_silent_turn_opens_no_block(self):
+        """The turn that asked for the tool says nothing. An empty
+        started/ended pair is something a consumer would have to filter."""
+        agent = _agent(*SCRIPT)
+        events = list(agent.stream("do it"))
+        starts = [e for e in events if e.type == "text.started"]
+        self.assertEqual(len(starts), 1)          # the answer, not the call
+
+    def test_the_prose_is_in_order_with_the_actions(self):
+        """Interleaved correctly is the whole requirement: the tool call
+        happened before the answer, and the stream says so."""
+        types, _, _ = self._types_and_events(*SCRIPT)
+        self.assertLess(types.index("tool_call.ended"),
+                        types.index("text.started"))
+
+    def test_the_result_is_still_the_result(self):
+        _, _, agent = self._types_and_events(*SCRIPT)
+        self.assertTrue(agent.last_result.success)
+        self.assertEqual(agent.last_result.output, "done")
+
+    def test_run_says_nothing_and_that_is_deliberate(self):
+        """`run()` has nobody to show prose to, and buffering keeps the
+        fallback chain. Paying reliability for an observer who cannot see the
+        pieces would be trading it for nothing."""
+        seen = []
+        agent = Agent(model=_model(*SCRIPT), tools=[Echo()], verbose=0,
+                      hooks=[seen.append])
+        agent.run("do it")
+        self.assertEqual([e for e in seen if e.type.startswith("text.")], [])
