@@ -147,26 +147,49 @@ class IssueRefund(Tool):
 ```python
 from yait_aichain import PermissionPolicy
 
+def ask(request):                        # ApprovalRequest
+    answer = input(f"{request.tool}({request.arguments}) — run it? [y/N] ")
+    return answer.strip().lower() == "y"
+
 policy = PermissionPolicy({"financial": "approve", "destructive": "deny"})
-agent  = Agent(orchestrator=Model("gpt-4o-mini"),
-               tools=[IssueRefund()], permissions=policy)
+agent  = Agent(Model("gpt-4o-mini"), tools=[IssueRefund()],
+               permissions=policy, approve=ask)
 ```
 
 Decisions:
 
 - **`allow`** — run the tool.
-- **`approve`** — pause for an external approval, reusing suspend/resume; the
-  agent returns a `SuspendedResult`. Resume with the decision:
-  ```python
-  result = agent.run("Refund order #123")          # SuspendedResult
-  result = agent.resume(result.run_id, signal={"approved": True})
-  ```
+- **`approve`** — ask `approve=` and run only on a yes. The callable is handed
+  an `ApprovalRequest` carrying the tool's name, its risk class, **the
+  arguments it would run with**, the call id and the asking agent's name —
+  approving a name rather than a call is approving nothing, since the
+  arguments are what separate a $5 refund from a $50,000 one.
+
+  **With no `approve=` attached, the call is refused.** A decision whose whole
+  content is "a human should see this first" cannot resolve to "go ahead"
+  because no human was configured. The refusal names both ways out: attach an
+  approver, or set that risk class to `allow` if it does not need gating here.
 - **`deny`** — never run; the tool call still returns a (denial) result.
+
+A refusal — policy or approver — comes back through the tool channel as a
+result, not as a crash: the model is told and can choose something else. A
+denied call it never hears about is one it will simply make again.
 
 Shipped defaults gate `external` / `financial` / `privileged` behind approval and
 deny `destructive`; `read` / `draft` / `write` run. **Enforcement is opt-in** —
 an `Agent` without `permissions=` behaves exactly as before, and unmarked tools
 default to `write` (allowed), so you tag only the risky tools.
+
+A delegated worker inherits the approver along with the policy: rules without
+an answerer would refuse every gated call, which reads as the policy being
+stricter for children than for their parent.
+
+> **Changed in 2.6.0.** `approve` used to be consulted and discarded — the
+> agent acted on `deny` and on nothing else, so a gated tool ran. This page
+> also documented an `agent.resume(...)` flow for it; `Agent.resume()` was
+> removed in 2.0, when the agent's state became the conversation, so that
+> example could not have run either. If you attached a policy relying on the
+> old behaviour, pass `approve=` or relax the rule.
 
 The model never decides its own permission — the policy lives outside it.
 

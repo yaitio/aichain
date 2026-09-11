@@ -2,6 +2,69 @@
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-09-11
+
+**A permission policy that actually permits.** `approve` was the decision the
+shipped defaults give to `external`, `financial`, `privileged` and to any risk
+class nobody classified — and the agent consulted the policy for `deny` and for
+nothing else, so a gated tool ran. A policy attached in order to gate spending
+gated nothing while reading as protection in every docstring.
+
+### Changed
+
+- **`approve` now gates.** The Agent asks its new `approve=` callable and runs
+  the tool only on a yes. The callable is handed an `ApprovalRequest` carrying
+  the tool's name, its risk class, **the arguments it would run with**, the
+  call id and the asking agent's name — approving a name rather than a call is
+  approving nothing, since the arguments are what separate a $5 refund from a
+  $50,000 one.
+
+  **With no approver attached the call is refused.** A decision whose entire
+  content is "a human should see this first" cannot resolve to "go ahead"
+  because no human was configured. This is breaking for anyone who attached a
+  policy and relied on it doing nothing; the refusal names both ways out —
+  attach an approver, or set that risk class to `allow`.
+
+  A refusal comes back through the tool channel as a result, not as a crash:
+  the model is told and can choose something else. A denied call it never
+  hears about is one it will simply make again. A delegated worker inherits
+  the approver along with the policy.
+
+### Fixed — documentation that taught an API that is gone
+
+The module's own docstring promised `approve` would "pause the run for an
+external approval, reusing suspend/resume", and two pages showed the flow with
+`Agent(store=...)` and `agent.resume(...)`. `2.0.0` removed the agent's
+suspend/resume deliberately — its state **is** the conversation — so those
+examples could not have run either. Corrected, including the cross-process
+serverless pattern, which was written with an `Agent` on both sides and is a
+`Chain` capability.
+
+A `Gate` tool handed to an agent does not pause it: the `Suspend` it raises is
+caught like any other tool failure and reported to the model as an error. Said
+out loud now rather than implied.
+
+### Added
+
+- **`tests/test_docs_promise_what_exists.py`** parses every fenced example and
+  checks the constructor parameters it names exist. It found **34** that do
+  not, all of them the agent: `orchestrator` (renamed to `model`, in 13 pages
+  including the README), `max_steps` / `max_tokens` / `max_attempts` /
+  `done_when` (folded into `stop_when`), `memory`, `store`, `executors`
+  (dropped), `persona`, `allow_spawn` (now `team`).
+
+  Every one of those decisions is written down in
+  `docs/design/default-agent.md`, in full, with reasons. The design record was
+  kept and the pages that teach the API were never touched — so the agent
+  documentation describes a library that has not existed since `2.0.0`, and a
+  reader copying the README's agent example gets a `TypeError` on line one.
+
+  Held by a ratchet at 34, the way the parameter matrix holds silent cells:
+  lowered as pages are fixed, never raised, with a test that fails when it is
+  left slack. The sweep itself is the next release, not this one — a security
+  fix should not wait behind a documentation pass.
+
+
 ## [2.5.2] — 2026-09-10
 
 **Tool calls stream.** 2.5.0 shipped streaming with this named as missing and

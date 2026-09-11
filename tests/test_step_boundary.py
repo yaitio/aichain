@@ -179,6 +179,114 @@ class TestAgentEvents:
         assert fin.usage and fin.usage > 0
 
 
+class TestApproveActuallyGates:
+    """The decision that did nothing for four months.
+
+    `_do_tool` compared the policy's answer against "deny" and ignored every
+    other value, so `approve` — what the shipped defaults give to external,
+    financial, privileged, and to any risk class nobody classified — meant run
+    the tool. A policy attached in order to gate spending gated nothing.
+
+    The older tests here are the other half of the story: they asserted what
+    `decide()` **returns** and never that the returned decision **happened**.
+    Every test below is about the effect, and one of them is written the way
+    the missing one should have been.
+    """
+
+    def _watched(self, sink):
+        class Watched(Refund):
+            def run(self, amount, options=None):
+                sink.append(amount)
+                return super().run(amount)
+        return Watched()
+
+    def test_a_gated_tool_does_not_run_when_there_is_nobody_to_ask(self):
+        """The headline. A decision whose entire content is "a human should
+        see this first" cannot resolve to "go ahead" because no human was
+        configured."""
+        ran = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[self._watched(ran)],
+                   permissions=PermissionPolicy())          # defaults: approve
+        result = ag.run("refund")
+        assert ran == []
+        assert result.success                                # refusal is a result
+        failed = [e for e in result.journal if e["outcome"] == "failed"]
+        assert failed and "approval" in failed[0]["reason"].lower()
+
+    def test_the_refusal_names_both_ways_out(self):
+        """An error a reader cannot act on turns a safety default into a wall
+        they route around by removing the policy."""
+        ran = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[self._watched(ran)],
+                   permissions=PermissionPolicy())
+        reason = [e for e in ag.run("refund").journal
+                  if e["outcome"] == "failed"][0]["reason"]
+        assert "approve=" in reason
+        assert "'financial'" in reason and "allow" in reason
+
+    def test_an_approver_saying_yes_lets_it_run(self):
+        ran, seen = [], []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[self._watched(ran)],
+                   permissions=PermissionPolicy(),
+                   approve=lambda req: seen.append(req) or True)
+        ag.run("refund")
+        assert ran == [50]
+        assert (seen[0].tool, seen[0].risk) == ("issue_refund", "financial")
+
+    def test_the_approver_is_shown_what_it_would_run_with(self):
+        """Approving a name rather than a call is approving nothing: the
+        arguments are the whole of what distinguishes a $5 refund from a
+        $50 000 one."""
+        seen = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[Refund()], permissions=PermissionPolicy(),
+                   approve=lambda req: seen.append(req) or True)
+        ag.run("refund")
+        assert seen[0].arguments == {"amount": 50}
+
+    def test_an_approver_saying_no_blocks_it(self):
+        ran = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[self._watched(ran)],
+                   permissions=PermissionPolicy(),
+                   approve=lambda req: False)
+        result = ag.run("refund")
+        assert ran == []
+        failed = [e for e in result.journal if e["outcome"] == "failed"]
+        assert failed and "not approved" in failed[0]["reason"]
+
+    def test_a_refusal_is_a_result_the_model_hears_about(self):
+        """Not a crash, and not a silent no-op: a denied call the model is
+        never told about is one it will simply make again."""
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "done"]),
+                   tools=[Refund()], permissions=PermissionPolicy(),
+                   approve=lambda req: False)
+        result = ag.run("refund")
+        assert result.success and result.output == "done"
+
+    def test_an_allowed_class_is_not_asked_about(self):
+        """Asking about everything is how an approver stops being read."""
+        asked = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[Refund()],
+                   permissions=PermissionPolicy({"financial": "allow"}),
+                   approve=lambda req: asked.append(req) or True)
+        ag.run("refund")
+        assert asked == []
+
+    def test_no_policy_means_no_gate_at_all(self):
+        """Enforcement stays opt-in. An Agent without `permissions=` behaves
+        exactly as it did, approver or not."""
+        ran = []
+        ag = Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+                   tools=[self._watched(ran)])
+        ag.run("refund")
+        assert ran == [50]
+
+
 class TestAgentPermissions:
     def test_deny_blocks_the_tool_and_tells_the_model(self):
         # A denied call is reported back through the tool channel, so the

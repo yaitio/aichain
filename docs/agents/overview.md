@@ -161,9 +161,9 @@ the loop's working memory.
 lets the run finish on a `check`, a string only ever on a `model_claim`. See
 [Configuration](configuration.md#done_when--goal-mode-only-required).
 
-**Sub-agents.** A goal-mode agent with `allow_spawn=True` spawns children in the
-plan-driven mode, not in goal mode: `done_when` is a predicate over the parent's
-objective and memory, and a scoped sub-task is exactly what a plan is for.
+**Sub-agents.** A goal-mode agent with `team=` delegates in the plan-driven
+mode, not in goal mode: `done_when` is a predicate over the parent's objective
+and memory, and a scoped sub-task is exactly what a plan is for.
 
 **Stopping.** An open-ended loop needs stop rules a plan gives for free:
 
@@ -218,36 +218,49 @@ for rec in result.history:
 
 ### Suspend & resume
 
-An agent run can pause for an external signal and continue later — even in
-another process. Give the agent a `Wait`/`Gate` tool and (for cross-process) a
-persistent `store`:
+**This is a `Chain` capability, not an agent one.** A chain can pause for an
+external signal and continue later, in another process, through `Wait`/`Gate`
+and a persistent store — see [State](../primitives/state.md).
+
+The agent deliberately has none of that. `2.0.0` removed its suspend/resume
+because its state **is** the conversation: a message list, serialisable by
+construction, which a caller can put away and hand back to a new `Agent`
+without the library owning a store. There is no `Agent(store=...)` and no
+`Agent.resume()`.
+
+What that leaves for a human in the loop is `approve=`, which decides
+**before** the tool runs rather than by pausing after the model asked:
 
 ```python
-from yait_aichain.tools import Gate
-from yait_aichain.state import FileStore, SuspendedResult
-
-agent = Agent(
-    orchestrator = Model("gpt-4o"),
-    tools        = [Gate(IssueRefund(), reason="Manager must approve",
-                         resume_with={"approved": "bool"})],
-    store        = FileStore("runs/"),
-)
-
-res = agent.run("Issue a refund for order #123.")
-if isinstance(res, SuspendedResult):
-    # ...later, a webhook delivers the decision (possibly another process)...
-    final = agent.resume(res.run_id, signal={"approved": True})
+agent = Agent(Model("gpt-4o"), tools=[IssueRefund()],
+              permissions=PermissionPolicy({"financial": "approve"}),
+              approve=lambda req: ask_the_manager(req.tool, req.arguments))
 ```
 
-`resume()` restores memory, the plan, and the cursor, then runs to completion.
-See [State](../primitives/state.md) for stores, `Wait`/`Gate`, and the
-cross-process pattern.
+See [Observability](observability.md#permission-matrix) for the request an
+approver is handed and what happens when there is none.
+
+> **Corrected in 2.6.0.** This section previously showed `Agent(store=...)`,
+> `agent.resume(...)` and a `SuspendedResult` from `agent.run()` — none of
+> which have existed since `2.0.0`. A `Gate` tool handed to an agent does not
+> pause it either: the `Suspend` it raises is caught like any other tool
+> failure and reported to the model as an error.
 
 ### Sub-agents
 
-With `allow_spawn=True`, the orchestrator gets a `spawn_agent` tool and can
-delegate a sub-task to a fresh agent (its own tools/model), then use the result.
-Good for fan-out research — one sub-agent per topic.
+With `team="auto"`, the orchestrator gets a `delegate` tool and can hand a
+sub-task to a fresh agent (its own tools/model), then use the result. Pass a
+list of agents instead to delegate to named workers. Good for fan-out research
+— one worker per topic.
+
+A worker inherits the parent's permissions **and its approver**: rules without
+an answerer would refuse every gated call, which reads as the policy being
+stricter for children than for their parent.
+
+> **Corrected in 2.6.0.** `allow_spawn=True` and `spawn_agent` are the older
+> names; the parameter is `team=` and the tool is `delegate`. See
+> [design/default-agent.md](../design/default-agent.md), which recorded the
+> rename while this page kept the old spelling.
 
 ### When to reach for an Agent
 
