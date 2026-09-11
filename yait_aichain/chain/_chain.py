@@ -726,19 +726,47 @@ class Chain:
             elif kind == "agent":
                 cls        = type(runner)
                 class_path = f"{cls.__module__}.{cls.__qualname__}"
-                # Serialise key Agent constructor fields
+                # Serialise the Agent's constructor fields.
+                #
+                # Written against the pre-2.0 agent until 2026-09-11, entirely
+                # through `getattr(..., default)`: `orchestrator`, `max_steps`,
+                # `max_attempts`, `max_tokens` and `persona` stopped existing
+                # in 2.0 and every read fell back to its default, so a saved
+                # chain lost the model, the instructions and the stop
+                # conditions and gained three invented budget numbers — then
+                # `Chain.load` raised TypeError on the null model name. The
+                # defaults are what made it quiet: `getattr` with a fallback
+                # turns a renamed attribute into a plausible value.
                 agent_data: dict = {
                     "class":       class_path,
-                    "orchestrator": runner.orchestrator.name
-                        if hasattr(runner, "orchestrator") else None,
-                    "mode":        getattr(runner, "mode",        "agile"),
-                    "max_steps":   getattr(runner, "max_steps",   10),
-                    "max_attempts":getattr(runner, "max_attempts", 3),
-                    "max_tokens":  getattr(runner, "max_tokens",  50_000),
-                    "verbose":     getattr(runner, "verbose",     0),
+                    "model":       runner.model.name,
+                    "mode":        runner.mode,
+                    "verbose":     runner.verbose,
                 }
-                if getattr(runner, "persona", None):
-                    agent_data["persona"] = runner.persona
+                if runner.instructions:
+                    agent_data["instructions"] = runner.instructions
+                if runner.name:
+                    agent_data["name"] = runner.name
+                if runner.description:
+                    agent_data["description"] = runner.description
+                # `stop_when` holds closures — a step ceiling is a function, not
+                # a number — so what survives is what can be named. A condition
+                # that cannot be reconstructed is dropped **loudly**: a chain
+                # that silently comes back without its budget is the quiet
+                # failure this whole repair is about.
+                kept, lost = [], []
+                for cond in (runner.stop_when or []):
+                    spec = getattr(cond, "spec", None)
+                    (kept if spec else lost).append(spec or cond)
+                if kept:
+                    agent_data["stop_when"] = kept
+                if lost:
+                    import warnings as _w
+                    _w.warn(
+                        f"Agent {runner.name or class_path!r}: "
+                        f"{len(lost)} stop condition(s) cannot be serialised "
+                        "and will not come back on load; rebuild them in code.",
+                        RuntimeWarning, stacklevel=2)
                 # Tool list — store class paths only (no API keys)
                 if getattr(runner, "tools", None):
                     agent_data["tools"] = [
@@ -909,16 +937,35 @@ class Chain:
                         ) from exc
                     tool_instances.append(getattr(t_module, t_cls)())
 
+                from ..agent import check, cost_budget, step_count, token_budget
+                _BUILDERS = {"step_count": step_count,
+                             "token_budget": token_budget,
+                             "cost_budget": cost_budget}
+                stop_when = []
+                for spec in ad.get("stop_when", []):
+                    build = _BUILDERS.get(spec.get("kind"))
+                    if build is None:                # a `check` is a closure
+                        continue                     # and cannot come back
+                    stop_when.append(build(spec["value"]))
+
+                # `model`, not `orchestrator`. A file written before
+                # 2026-09-11 carries the old key with a null value, which is
+                # not something to paper over: it never held the model name.
+                if "model" not in ad:
+                    raise ValueError(
+                        "This chain was saved by a version whose agent "
+                        "serialisation was broken: the model name was never "
+                        "written (see CHANGELOG 2.6.1). Rebuild the chain in "
+                        "code and save it again.")
                 agent = _Agent(
-                    orchestrator = _Model(ad["orchestrator"],
-                                          api_key=api_key),
+                    _Model(ad["model"], api_key=api_key),
                     tools        = tool_instances or None,
-                    mode         = ad.get("mode",         "agile"),
-                    max_steps    = ad.get("max_steps",    10),
-                    max_attempts = ad.get("max_attempts", 3),
-                    max_tokens   = ad.get("max_tokens",   50_000),
-                    verbose      = ad.get("verbose",      0),
-                    persona      = ad.get("persona"),
+                    mode         = ad.get("mode", "agile"),
+                    stop_when    = stop_when or None,
+                    verbose      = ad.get("verbose", 0),
+                    instructions = ad.get("instructions", ""),
+                    name         = ad.get("name"),
+                    description  = ad.get("description"),
                 )
                 entry = (agent, output_key, input_map, options)
 

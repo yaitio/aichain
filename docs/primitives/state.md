@@ -129,8 +129,7 @@ in-memory), so the engine has a single uniform path.
 ```python
 from yait_aichain.state import InMemoryStore, FileStore
 
-Chain(steps=[...], store=FileStore("runs/"))
-Agent(orchestrator=..., tools=[...], store=FileStore("runs/"))
+Chain(steps=[...], store=FileStore("runs/"))     # Chain only
 ```
 
 ### `SuspendedResult`

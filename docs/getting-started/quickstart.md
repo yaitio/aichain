@@ -108,14 +108,14 @@ back.
 
 ```python
 from yait_aichain.models import Model
-from yait_aichain.agent  import Agent
+from yait_aichain.agent import Agent, step_count
 from yait_aichain.tools  import PerplexitySearchTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-8"),
+    model        = Model("claude-opus-4-8"),
     tools        = [PerplexitySearchTool()],
     mode         = "agile",   # can replan mid-task
-    max_steps    = 10,
+    stop_when    = [step_count(10)],
     verbose      = 1,         # progress in the terminal
 )
 

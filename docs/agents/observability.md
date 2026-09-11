@@ -52,7 +52,7 @@ hook cannot change behavior — observation only.
 from yait_aichain import Tracer
 
 tracer = Tracer()                       # records every event into .events
-agent = Agent(orchestrator=Model("gpt-4o-mini"), tools=[...], hooks=[tracer])
+agent = Agent(model=Model("gpt-4o-mini"), tools=[...], hooks=[tracer])
 agent.run("…")
 
 for e in tracer.events:
@@ -82,7 +82,7 @@ class CostGuard(Hook):
     def run_finished(self, e):
         print(f"run done: {e.usage} tokens")
 
-agent = Agent(orchestrator=Model("gpt-4o-mini"), hooks=[CostGuard()])
+agent = Agent(model=Model("gpt-4o-mini"), hooks=[CostGuard()])
 ```
 
 ### Event fields
@@ -201,7 +201,7 @@ Before a tool runs, its arguments are validated against the tool's
 `parameters` schema. A malformed call (a missing required argument) does not
 crash the run — it returns a **model-readable remediation message** as the step's
 observation, so the orchestrator corrects the call within the step's attempt
-budget (`max_attempts`).
+budget (a `stop_when` ceiling).
 
 This upholds the harness invariant: **every tool call returns a result** — on
 success, denial, validation failure, or error.
@@ -297,29 +297,24 @@ hard sub-problem must not be cut off.
 
 ### Checkpoints and crash recovery
 
-*Since 1.5.2.* The run is checkpointed to the `Store` **after every committed
-step** — not only when it suspends. An unplanned death (crash, OOM, function
-timeout) is therefore recoverable: a brand-new `Agent` instance sharing the
-store picks the run up with `resume(run_id)`, restoring memory, the plan cursor
-and the journal.
+**`Chain` only.** A chain is checkpointed to its `Store` after every committed
+step, so an unplanned death — crash, OOM, function timeout — is recoverable: a
+brand-new `Chain` sharing the store picks the run up with `resume(run_id)`.
 
 ```python
-agent = Agent(orchestrator=..., tools=[...], store=FileStore("./runs"))
-agent.run(task)          # process dies mid-run
+from yait_aichain.state import FileStore
+
+chain = Chain(steps=[...], store=FileStore("./runs"))
+chain.run(variables)     # process dies mid-run
 
 # …restart, different process…
-Agent(orchestrator=..., tools=[...], store=FileStore("./runs")).resume(run_id)
+Chain(steps=[...], store=FileStore("./runs")).resume(run_id)
 ```
 
-Suspend/resume is now the special case of the same mechanism — a step that is
-additionally marked `suspended` with a pending action to re-run against the
-external signal.
-
-> **Re-execution caveat.** Recovery restarts the step that was *in flight* when
-> the process died — its completion was never recorded, so it must be retried
-> (at-least-once). A side-effecting tool can therefore run twice. Gate such
-> tools with a `PermissionPolicy` (an approval pauses before the effect) or make
-> them idempotent. Committed steps are never re-run.
+The agent has no equivalent and needs none: its state **is** the conversation,
+a message list the caller can persist and hand back to a fresh `Agent`. There
+is no `Agent(store=...)` and no `Agent.resume()` — both were removed in
+`2.0.0`, and this section documented them for four minor versions after.
 
 ## Serverless note
 

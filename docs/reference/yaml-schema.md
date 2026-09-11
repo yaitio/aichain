@@ -169,13 +169,15 @@ steps:
       output_field: output              # extract AgentResult.output
     agent:
       class: "agent._agent.Agent"
-      orchestrator: "claude-opus-4-6"
+      model: "claude-opus-4-6"
       mode: agile
-      max_steps: 8
-      max_attempts: 3
-      max_tokens: 50000
+      stop_when:
+        - kind: step_count
+          value: 8
+        - kind: token_budget
+          value: 50000
       verbose: 1
-      persona: "You are a senior analyst."
+      instructions: "You are a senior analyst."
       tools:
         - "tools.search.brave_search.BraveSearchTool"
         - "tools.markitdown.MarkItDownTool"
@@ -220,13 +222,12 @@ steps:
 | `options.task_key` | | Accumulated variable holding the agent's task. Default `"task"`. |
 | `options.output_field` | | `AgentResult` attribute to extract. Default `"output"`. |
 | `agent.class` | ✓ | Fully-qualified class path. |
-| `agent.orchestrator` | | Model name for the agent's orchestrator. |
+| `agent.model` | ✓ | Model name. Written as `orchestrator` before 2.6.1, where it was always `null` — such a file is refused on load rather than rebuilt wrong. |
 | `agent.mode` | | `"waterfall"` or `"agile"`. |
-| `agent.max_steps` | | Integer. |
-| `agent.max_attempts` | | Integer. |
-| `agent.max_tokens` | | Integer. |
+| `agent.stop_when` | | List of `{kind, value}` — `step_count`, `token_budget`, `cost_budget`. A `check` is a closure and cannot be written; saving one warns. |
 | `agent.verbose` | | `0`, `1`, or `2`. |
-| `agent.persona` | | Prepended to all agent prompts. |
+| `agent.instructions` | | The stable part of the system prompt. Was `persona`. |
+| `agent.name`, `agent.description` | | Labels. |
 | `agent.tools` | | List of fully-qualified class paths. API keys resolved at load time. |
 
 ---
