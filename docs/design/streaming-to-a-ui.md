@@ -1,8 +1,17 @@
 # Design — backing a conversational UI
 
-Status: **requirements**, not shipped. Written 2026-09-11 against `2.0.0`, from
-the needs of one consumer: a conversational BI product whose front end renders
-every tool result as a chart.
+Status: **R1, R3 and R4 shipped in 2.7.0. R2 and R5 open.** Written 2026-09-11
+from the needs of one consumer: a conversational BI product whose front end
+renders every tool result as a chart. (The header said "against `2.0.0`";
+`Agent.stream()`, which R2 quotes, arrived in `2.5.0`.)
+
+**What the code said when the requirements were checked against it.** Three
+things the document assumed were not there. `run.suspended` does not exist —
+it appears once, as an example in a docstring — so R5 had nothing to build on.
+`run_id` was a declared field the agent never filled, so R3 was not "mostly
+satisfied": of its three identity fields only `ts` was populated. And `approve`
+was consulted and discarded, so the permission layer R5 extends was a policy
+that gated nothing; that was fixed first, in `2.6.0`.
 
 M3 shipped the step boundary — `Event`, `Hook`, `Tracer`, permissions. This
 document says what is still missing before that boundary can drive a user
@@ -98,9 +107,13 @@ A tool result is data. Two honest readings:
   Events stay small; the application gains a lifetime to manage, and a
   streaming consumer pays a round trip per call.
 
-By value is recommended. The payload is already `dict` and already untyped; a
-consumer that streams to a browser has to move those bytes regardless, and the
-reference variant only decides *when*. **This is open — see below.**
+**Settled: by value.** The argument the document makes is right and there is a
+stronger one it does not make. A handle needs a lifetime and somewhere to live
+— that is state between invocations, and the library's niche is Lambda, where
+`VISION.md` names synchronicity and connection-per-call as advantages not to
+be "fixed" into a daemon. The process that issued the handle may be gone. So
+events stop being uniformly small, and `Event.__repr__` omits the payload so a
+log stays readable.
 
 **Acceptance.** A `Tracer` attached to a run over a tool returning a structured
 document can rebuild, for every call: which tool, with which arguments, what
@@ -210,23 +223,33 @@ Every requirement is about what leaves it.
 
 ---
 
-## Open questions
+## Open questions — two settled, one still open
 
-**Result by value or by reference (R1).** By value is recommended and is the
-simpler contract, but it changes `Event` from a small operational record into
-something that can carry a hundred kilobytes. If the library wants events to
-stay cheap, the alternative is a handle plus an accessor, and the cost moves to
-the consumer as a round trip per call. **Falls due when R1 is implemented; it
-cannot be deferred past it, because the two produce different `Event` contracts.**
+**Result by value or by reference (R1). Settled: by value**, for the reason
+above: a handle is state between invocations and the target is Lambda.
 
-**`step.*` against `tool_call.*` (R1).** The documented names are not the
-emitted ones. Renaming is a breaking change for existing hooks; keeping both is
-a smaller one. Worth settling before more consumers attach.
+**`step.*` against `tool_call.*` (R1). Settled: renamed.** The deciding
+argument was not the disagreement with the docs but one the document does not
+mention: **`Chain` emits `step.*` too**, for a chain step, so a hook attached
+to a chain containing an agent received both under one name and could separate
+them only by the shape of the payload. That does not get fixed by
+documentation. A `Hook` subclass with `step_started` / `step_ended` still
+fires, once, with a `DeprecationWarning` — the rename is loud rather than
+silent, and costs nobody a run.
 
-**Where text deltas live (R2).** One ordered stream is easier to consume; a
-separate channel keeps `Event` homogeneous. The first is recommended for the
-same reason as by-value in R1 — a consumer reassembling two streams in order is
-doing work the library already knows how to avoid.
+**Where text deltas live (R2). Still open**, and now easier: `Agent.stream()`
+is already a view of the hook channel rather than a vocabulary beside it, so a
+`text.delta` with a message identity lands in one ordered stream without a new
+mechanism.
+
+**R5 splits, and the split is the library/product boundary.** The mechanism —
+`approve` actually blocking — is the library's, and shipped in `2.6.0` as
+`Agent(approve=...)`, fail-closed when nobody is there to ask. The
+*conversation* — asking a human, carrying the question and the answer — is the
+product's. Note that putting the request and the response on the event stream
+reopens a deliberate `2.0.0` decision (the agent has no suspend/resume: its
+state **is** the conversation), and that should be said out loud rather than
+arrive inside a UI feature.
 
 ---
 

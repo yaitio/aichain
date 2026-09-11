@@ -40,6 +40,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from typing import Any
 
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
@@ -275,6 +276,12 @@ class Agent:
         #: to the end. `run()` returns its result; a generator cannot, so it
         #: is left here rather than mixed into a stream of events.
         self.last_result: "AgentResult | None" = None
+
+        # `Event.run_id` has been a declared field since M3 and the agent
+        # never filled it. Without it two concurrent invocations — which is
+        # the ordinary case for the serverless target — write into one stream
+        # that cannot be demultiplexed afterwards.
+        self._run_id: "str | None" = None
         self.permissions  = permissions
         # Who answers when the policy says "approve". A callable taking an
         # ApprovalRequest and returning truthy to proceed. The library cannot
@@ -307,6 +314,7 @@ class Agent:
         journal  = Journal()
         messages = self.opening(task, variables, ground_rules=True)
         state    = self.new_state()
+        self._run_id = uuid.uuid4().hex
         self._emit("run.started", payload={"task": task, "mode": self.mode})
 
         result = self._loop(messages, state, journal)
@@ -342,6 +350,7 @@ class Agent:
         journal  = Journal()
         messages = self.opening(task, variables, ground_rules=True)
         state    = self.new_state()
+        self._run_id = uuid.uuid4().hex
         self.last_result = None
 
         sink: list = []
@@ -486,10 +495,25 @@ class Agent:
             # each with its own result turn and journal entry. Executing only
             # the first would silently narrow the channel.
             for call in reply.calls:
-                self._emit("step.started", payload={"tool": call.name})
+                # Everything a program needs to rebuild this call, rather
+                # than a description of it. `id` is what tells two calls in
+                # one turn apart — a provider may request several, and the
+                # agent honours all of them — and the raw result is the only
+                # form in which "no rows" and "the tool declined" are still
+                # different things. `prompts.observation_text` is the model's
+                # view and stays the model's view.
+                self._emit("tool_call.started", name=call.name,
+                           step=state["steps"],
+                           payload={"id": call.id or "",
+                                    "arguments": call.arguments or {},
+                                    "agent": self.name or ""})
                 yield from drain()
                 result, error = self._execute(call, state)
-                self._emit("step.ended", payload={"tool": call.name}, error=error)
+                self._emit("tool_call.ended", name=call.name,
+                           step=state["steps"],
+                           payload={"id": call.id or "", "result": result,
+                                    "agent": self.name or ""},
+                           error=error)
                 yield from drain()
 
                 journal.append(
@@ -557,7 +581,12 @@ class Agent:
         skill = Skill(
             model  = model,
             input  = {"messages": messages},
-            hooks  = self.hooks,
+            # Stamped, not passed through: a Skill emits `llm_call.*` and
+            # knows nothing of the run it is inside, so those events reached
+            # the stream with no run_id and a consumer could not tell them
+            # from another invocation's. Identity belongs to whoever owns the
+            # run, and that is the agent.
+            hooks  = self._stamping_hooks(),
             _tools = self._tool_schemas(),
             # Transient provider failures (rate limit / 5xx / network) retry
             # inside the call instead of costing the whole turn. The reference
@@ -780,9 +809,26 @@ class Agent:
 
     # ── Plumbing ─────────────────────────────────────────────────────────
 
+    def _stamping_hooks(self) -> list:
+        """The caller's hooks, each seeing this run's id on every event."""
+        if not self.hooks or self._run_id is None:
+            return self.hooks
+        import dataclasses
+
+        run_id = self._run_id
+
+        def stamp(event):
+            if getattr(event, "run_id", None) is None:
+                event = dataclasses.replace(event, run_id=run_id)
+            for hook in self.hooks:
+                emit([hook], event)
+
+        return [stamp]
+
     def _emit(self, etype: str, **fields) -> None:
         if self.hooks:
-            emit(self.hooks, Event(type=etype, name=self.name, **fields))
+            fields.setdefault("name", self.name)
+            emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
 
     def _log(self, level: int, message: str = "") -> None:
         _logger.log(logging.INFO if level == 1 else logging.DEBUG, "%s", message)
