@@ -196,7 +196,7 @@ from yait_aichain.tools  import MarkItDownTool
 chain = Chain(steps=[
     (MarkItDownTool(),        "article", {"source": "url"}),             # Tool
     (summariser,              "summary"),                                 # Skill
-    (Agent(orchestrator=...), "analysis", {}, {"task_key": "summary"}),   # Agent
+    (Agent(model=...), "analysis", {}, {"task_key": "summary"}),   # Agent
     (report_skill,            "report"),                                  # Skill
 ])
 ```

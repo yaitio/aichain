@@ -2,6 +2,72 @@
 
 ## [Unreleased]
 
+## [2.6.1] — 2026-09-11
+
+The documentation sweep 2.6.0 ratcheted, and the code defect it uncovered on
+the way: **a chain containing an agent could not be saved and reloaded at
+all.**
+
+### Fixed
+
+- **`Chain.save()` lost the agent and `Chain.load()` then crashed.** The
+  serialiser read the agent through `getattr(runner, "...", default)` under
+  the pre-`2.0.0` names — `orchestrator`, `max_steps`, `max_attempts`,
+  `max_tokens`, `persona`. Every one had been renamed or removed, so every
+  read fell back to its default: the file lost the model, the instructions,
+  the stop conditions and the labels, and gained three invented budget
+  numbers. Load then raised `TypeError` on the null model name.
+
+  The defaults are what made it quiet, and the lesson generalises: `getattr`
+  with a fallback turns a renamed attribute into a plausible value, and
+  plausible values do not fail tests. This shipped through four minor
+  versions with a documented "Persistence inside `Chain.save()`" section
+  describing it.
+
+  A ceiling now carries a `spec` naming itself and its number, so
+  `step_count` / `token_budget` / `cost_budget` survive the trip. A `check`
+  cannot — its predicate is the caller's own function — and **saving one
+  warns** rather than dropping it silently. A file written by the broken
+  versions is refused on load with what to do, instead of being rebuilt into
+  a different agent.
+
+### Fixed — documentation
+
+**34 documented parameters that do not exist, down to 0.** All of them the
+agent, all of them 2.0 renames that never reached the pages teaching the API:
+
+| documented | actually |
+|---|---|
+| `orchestrator` (13 pages, README included) | `model` |
+| `persona` | `instructions` |
+| `max_steps`, `max_tokens`, `max_attempts`, `done_when` | entries in `stop_when` |
+| `memory`, `store`, `executors` | gone |
+| `allow_spawn` | `team` |
+| `mode="goal"` | `"agile"` already is that |
+
+Three pages were rewritten rather than patched, because each taught a
+subsystem that is gone: `configuration.md` (the whole pre-2.0 parameter set),
+`memory.md` (the agent has no memory — the word does not occur in its source,
+and `AgentResult.memory` is never written to), and the agent halves of
+`state.md` and `observability.md`, which documented crash recovery and a
+cross-process serverless pattern through `Agent(store=...)` and
+`agent.resume()` — removed in `2.0.0` when the agent's state became the
+conversation.
+
+Two further claims were false and are now stated plainly: a `Gate` tool inside
+an agent does not pause it (the `Suspend` it raises is caught like any tool
+failure and reported to the model as an error), and the two documented
+automatic stop rules — "no progress" and repetition — are fired by **no
+library code**: `Journal.has_progress()` and `Journal.is_repeating()` exist
+and are called from nowhere.
+
+Every decision behind every rename is recorded, in full and with reasons, in
+`docs/design/default-agent.md`. The design record was kept; the pages were
+not touched. That is the same failure as the provider defaults losing their
+authorship in 1.2.3 and as the changelog living outside git — the reasoning
+survives and does not reach the person who needs it.
+
+
 ## [2.6.0] — 2026-09-11
 
 **A permission policy that actually permits.** `approve` was the decision the

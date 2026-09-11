@@ -65,6 +65,11 @@ def step_count(n: int):
     def _c(state):
         return "step_count" if state["steps"] >= n else None
     _c.kind, _c.name = "ceiling", "step_count"
+    # `spec` is what lets a ceiling survive `Chain.save()`: the condition
+    # itself is a closure and a file cannot hold one. A `check` has no
+    # spec on purpose — its predicate is the caller's function, and
+    # pretending it round-trips would be worse than saying it does not.
+    _c.spec = {"kind": "step_count", "value": n}
     return _c
 
 
@@ -73,6 +78,7 @@ def token_budget(n: int):
     def _c(state):
         return "token_budget" if state["tokens"] >= n else None
     _c.kind, _c.name = "ceiling", "token_budget"
+    _c.spec = {"kind": "token_budget", "value": n}
     return _c
 
 
@@ -86,6 +92,7 @@ def cost_budget(usd: float):
     def _c(state):
         return "cost_budget" if (state["cost"] or 0.0) >= usd else None
     _c.kind, _c.name = "ceiling", "cost_budget"
+    _c.spec = {"kind": "cost_budget", "value": usd}
     return _c
 
 

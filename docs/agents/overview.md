@@ -137,62 +137,52 @@ output lands in memory for later steps to reference.
 #### Goal mode
 
 *Since 1.6.0.* A plan is a bet that you know the steps up front. When you don't
-— when step 4 is unknowable until step 3 answers — `mode="goal"` drops the
-planning phase entirely: you give an objective and a **done condition**, and the
-agent decides one action at a time from what it has learned.
+— when step 4 is unknowable until step 3 answers — **that is what `"agile"`
+already is**: it decides one action at a time from what it has learned, with
+nothing written in advance.
 
 ```python
+from yait_aichain.agent import Agent, step_count, check
+
 agent = Agent(
-    orchestrator = Model("claude-sonnet-4-6"),
-    tools        = [Probe(), RecordAnswer()],
-    mode         = "goal",
-    done_when    = lambda memory: "answer" in memory,   # the harness checks it
+    model     = Model("claude-sonnet-4-6"),
+    tools     = [Probe(), RecordAnswer()],
+    mode      = "agile",
+    stop_when = [check(lambda state: answer_recorded()), step_count(50)],
 )
 result = agent.run("Find the combination and record it.")
 ```
 
-Each iteration the orchestrator sees the objective, the **observation trail**
-(recent attempts *with what came back*) and what has been
-[ruled out](observability.md#do-not-redo) — then picks one action. The
-[journal](observability.md#the-attempt-journal) is not a side-effect here, it is
-the loop's working memory.
+Each iteration the model sees the objective and the conversation so far —
+every attempt *with what came back* — then picks one action. The
+[journal](observability.md#the-attempt-journal) is not a side-effect here, it
+is the record of that.
 
-`done_when` is required, and should be a **callable** where possible: a callable
-lets the run finish on a `check`, a string only ever on a `model_claim`. See
-[Configuration](configuration.md#done_when--goal-mode-only-required).
-
-**Sub-agents.** A goal-mode agent with `team=` delegates in the plan-driven
-mode, not in goal mode: `done_when` is a predicate over the parent's objective
-and memory, and a scoped sub-task is exactly what a plan is for.
-
-**Stopping.** An open-ended loop needs stop rules a plan gives for free:
+**Stopping.** An open-ended loop needs stop rules a plan gives for free, and
+they all live in `stop_when`:
 
 | Rule | Meaning |
 |---|---|
-| `done_when` met | Success — the only exit that reports `success=True`. |
-| `max_steps` | Iteration cap (default `50`). |
-| `max_tokens` | Budget cap (default `250_000`). |
-| No progress | The last `NO_PROGRESS_WINDOW` (5) attempts all failed — stop rather than burn the rest of the budget proving it again. |
-| Repetition | The last `REPEAT_WINDOW` (5) attempts were the same move. Not a stop: the prompt says so and the model decides. |
+| `check(fn)` | Success — the harness verified a condition. |
+| `step_count(n)` | Iteration ceiling. `success=False`: a ceiling reached is not an answer. |
+| `token_budget(n)` / `cost_budget(x)` | Spending ceilings, same verdict. |
 
-The last one is the reason a goal run terminates in practice: a budget alone
-lets an agent spin in place until the tokens run out. The verdict needs a full
-window, so an early failure never ends a run that was about to recover.
-
-> The loop is only as good as the orchestrator driving it. On
+> The loop is only as good as the model driving it. On
 > [`examples/22_goal_mode.py`](../../examples/22_goal_mode.py) (find a number in
 > 1–1000, 15 iterations): `claude-sonnet-4-6` ran a clean binary search and
 > finished in 9 probes; `gpt-4o-mini` bisected for a while, then degenerated
 > into +1 scanning and hit the cap. Same harness both times — which is exactly
 > why the stop rules exist.
 
-### Budgets
-
-| Limit | Default | When hit |
-|---|---|---|
-| `max_steps` | `10` (`50` in goal mode) | The plan is truncated; never more than this many steps (iterations in goal mode). |
-| `max_attempts` | `3` | Retries per step are capped, then the loop moves on. |
-| `max_tokens` | `50_000` (`250_000` in goal mode) | Total across plan + actions + executions + reflections; the agent stops cleanly. |
+> **Corrected 2026-09-11.** This section documented a third mode, `"goal"`,
+> with a required `done_when` and its own defaults for `max_steps` /
+> `max_tokens`; the modes are `"agile"` and `"waterfall"`, and the ceilings
+> are entries in `stop_when`. It also listed two automatic stop rules — "no
+> progress" over a 5-attempt window, and repetition — that **no library code
+> fires**: `Journal.has_progress()` and `Journal.is_repeating()` exist and are
+> called from nowhere, so a run that stalls today spins until a ceiling stops
+> it. Making them fire is the `nudge` work in the plan, not a thing the
+> library does now.
 
 ### `AgentResult`
 

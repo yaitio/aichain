@@ -91,15 +91,15 @@ text = tool.run(
 ### Brave → MarkItDown — canonical pattern
 
 ```python
-from yait_aichain.agent import Agent
+from yait_aichain.agent import Agent, step_count
 from yait_aichain.models import Model
 from yait_aichain.tools import BraveSearchTool, MarkItDownTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
+    model        = Model("claude-opus-4-6"),
     tools        = [BraveSearchTool(), MarkItDownTool()],
     mode         = "agile",
-    max_steps    = 8,
+    stop_when    = [step_count(8)],
 )
 
 agent.run(

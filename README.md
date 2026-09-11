@@ -125,11 +125,13 @@ print(pool.history)  # per-item: status, output, error, duration
 ### Agent — autonomous reasoning
 
 ```python
+from yait_aichain.agent import Agent, step_count
+
 agent  = Agent(
-    orchestrator = Model("claude-opus-4-8"),
+    model        = Model("claude-opus-4-8"),
     tools        = [searchPerplexity(), convertToMD()],
     mode         = "agile",
-    max_steps    = 10,
+    stop_when    = [step_count(10)],
 )
 result = agent.run("Compare the top 3 vector databases.")
 print(result.output)

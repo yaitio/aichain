@@ -133,18 +133,17 @@ The most common reason to embed an Agent: open-ended research followed by determ
 ```python
 from yait_aichain.models import Model
 from yait_aichain.skills import Skill
-from yait_aichain.agent  import Agent
+from yait_aichain.agent  import Agent, step_count, token_budget
 from yait_aichain.chain  import Chain
 from yait_aichain.tools  import PerplexitySearchTool, WeasyPrintTool
 
 # Phase 1 — Agent: gather everything we need
 research_agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
+    model        = Model("claude-opus-4-6"),
     tools        = [PerplexitySearchTool()],
     mode         = "agile",
-    max_steps    = 12,
-    max_tokens   = 80_000,
-    persona      = "You are a senior market intelligence director…",
+    stop_when    = [step_count(12), token_budget(80_000)],
+    instructions = "You are a senior market intelligence director…",
 )
 
 # Phase 2 — Skill: turn the research brief into a structured report
@@ -207,7 +206,7 @@ Setting `verbose=1` on the Agent keeps the agent's progress log visible even whe
 
 ```python
 research_agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
+    model        = Model("claude-opus-4-6"),
     tools        = [...],
     verbose      = 1,   # agent prints its own progress; chain stays silent
 )
@@ -221,9 +220,9 @@ Set `verbose=0` in production — the `result.history` and `result.memory` snaps
 
 When you `chain.save(...)`, Agent steps are serialised too:
 
-- `orchestrator` model name
-- `mode`, `max_steps`, `max_attempts`, `max_tokens`, `verbose`
-- `persona`
+- the `model` name
+- `mode`, `stop_when`, `verbose`
+- `instructions`
 - Tool **class paths** (no API keys, no state)
 
 At load time, the tools are instantiated from their class paths and the orchestrator model is reconstructed via `Model(name, api_key=...)`. API keys are resolved from the environment unless `Chain.load(path, api_key=...)` overrides them.

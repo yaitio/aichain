@@ -1,162 +1,170 @@
 # Agent configuration
 
-Every knob that shapes how an Agent plans, acts, and spends its budget.
+Every parameter that shapes how an Agent decides, acts, and spends.
 
 ```python
 from yait_aichain.models import Model
-from yait_aichain.agent  import Agent
+from yait_aichain.agent  import Agent, step_count, token_budget
 from yait_aichain.tools  import PerplexitySearchTool, MarkItDownTool
 
 agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),
-    executors    = [Model("gpt-4o"), Model("gemini-2.5-flash")],
+    model        = Model("claude-opus-4-6"),
     tools        = [PerplexitySearchTool(), MarkItDownTool()],
     mode         = "agile",
-    max_steps    = 12,
-    max_attempts = 3,
-    max_tokens   = 80_000,
-    persona      = "You are a senior market intelligence analyst…",
+    stop_when    = [step_count(12), token_budget(80_000)],
+    instructions = "You are a senior market intelligence analyst…",
     verbose      = 1,
     name         = "market_research_agent",
 )
 ```
 
+> **Rewritten 2026-09-11.** This page documented the pre-`2.0.0` agent —
+> `orchestrator`, `executors`, `goal` mode, `done_when`, `max_steps`,
+> `max_attempts`, `max_tokens`, `persona`, `memory`. Every one of those is
+> either renamed or gone, every decision is recorded in
+> [design/default-agent.md](../design/default-agent.md), and none of it
+> reached this page: an example copied from here raised `TypeError` on its
+> first line. What follows is checked against the constructor by
+> `tests/test_docs_promise_what_exists.py`.
+
 ---
 
 ## Required
 
-### `orchestrator` — the brain
+### `model` — the brain
 
-The model that does planning, action determination, and reflection. **Always use a capable reasoning model** — the orchestrator makes every decision about what happens next.
+The model that decides what happens next, every turn. **Use a capable
+reasoning model**: the loop is only as good as the model driving it.
 
 ```python
-orchestrator = Model("claude-opus-4-6")   # recommended
-orchestrator = Model("gpt-4o")
-orchestrator = Model("o3")
-orchestrator = Model("gemini-2.5-pro")
+Agent(model=Model("claude-opus-4-6"))
 ```
 
-A weak orchestrator produces weak plans and poor decisions. This is the most important choice you make.
+It is the first positional parameter, so `Agent(Model("gpt-4o"))` is the same
+thing.
 
 ---
 
-## Tools and executors
+## Tools
 
 ### `tools: list[Tool] | None`
 
-Tools the agent is allowed to call. The orchestrator reads each tool's `name`, `description`, and `parameters` schema to decide how and when to use it.
+What the agent can do. Schemas travel as the provider's native `tools` field,
+not as prompt text, and a reply asking for one comes back as a typed
+`ToolCall`.
 
-```python
-tools = [PerplexitySearchTool(), MarkItDownTool(), WeasyPrintTool()]
-```
+An agent with no tools still runs — it just answers.
 
-Keep the list focused. Giving the agent 15 similar tools is usually worse than giving it 3 well-differentiated ones — it spends planning tokens deciding between near-duplicates.
+### `team: list[Agent] | "auto" | None`
 
-### `executors: list[Model] | None`
+Delegation. `"auto"` gives the model a `delegate` tool that hands a sub-task
+to a fresh agent inheriting the parent's model, tools, permissions and
+approver; a list delegates to named workers, each carrying its own model.
 
-Models available for LLM **skill** steps — the generation/reasoning work that isn't tool-based.
-
-```python
-agent = Agent(
-    orchestrator = Model("claude-opus-4-6"),    # strong planner
-    executors    = [Model("gpt-4o-mini")],       # cheap executor
-)
-```
-
-When `executors` is omitted, the orchestrator handles both roles. Splitting them is a real cost lever: the orchestrator only runs plan/action/reflect calls (small, structured); executors run the heavy generation work. Put a strong reasoner on one side and a cheap, fast model on the other.
-
-The orchestrator can ask for a specific executor by name in its action response — if multiple executors are provided, it picks the one best suited to the step.
+There is no `executors=`: a worker's model is the worker's own property.
 
 ---
 
-## Mode and limits
+## Mode
 
-### `mode: "waterfall" | "agile" | "goal"` — default `"waterfall"`
+### `mode: "agile" | "waterfall"` — default `"agile"`
 
-See [Overview: waterfall vs agile](overview.md#waterfall-vs-agile), and
-[Goal mode](#goal-mode) below.
+- **`"agile"`** decides at every step, with nothing written in advance.
+- **`"waterfall"`** writes a plan first and then follows it. The plan is
+  frozen: it cannot be rewritten mid-run, which is what makes a run readable
+  afterwards.
 
-- `"waterfall"` — plan is fixed; reflection can `continue`/`retry`/`stop`/`final_answer`.
-- `"agile"` — reflection can also `replan`, producing a revised step list and optionally jumping back.
-- `"goal"` — *no plan at all*; the agent decides one action at a time until `done_when` is met. Requires `done_when`. *Since 1.6.0.*
+There is no `"goal"` mode. Its ordinary exit — the model replying without
+asking for an action — is built into the loop and needs no condition, and its
+`done_when` split cleanly in two: the string form was a completion the *model*
+judged, which is now just that ordinary exit; the callable form was a
+completion the *harness* checked, which is `check(fn)` in `stop_when` below.
 
-### `done_when` — goal mode only, **required**
+### `planner_model: Model | None` — `waterfall` only
 
-The condition that ends the run. Either:
-
-- a **string** the orchestrator judges (`"the report is written and cites 3 sources"`), or
-- a **callable** `done_when(memory: dict) -> bool` the harness evaluates itself.
-
-Prefer the callable. A string can only ever produce a `model_claim` — the model
-asserting it is finished. A callable produces a `check`: the harness ran the
-predicate, so the run cannot be talked into success. A predicate that raises is
-treated as *not met* and recorded, never as a crash.
-
-Passing `done_when` outside goal mode is an error, as is goal mode without it —
-an open-ended loop with no stop condition can only end by exhausting its budget.
-
-### `max_steps: int` — default `10` (`50` in goal mode)
-
-Upper bound on how many distinct plan steps the agent will ever run. If the plan returned by the orchestrator is longer, it is truncated. If replanning produces more steps, the new plan is also truncated.
-
-In goal mode there is no plan, so this caps **iterations** instead.
-
-### `max_attempts: int` — default `3`
-
-Retries **per step**. After the cap, the step is recorded as failed and the loop advances (in waterfall) or the orchestrator decides what to do (in agile).
-
-### `max_tokens: int` — default `50_000` (`250_000` in goal mode)
-
-Total token budget across **all** LLM calls — planning, every action determination, every skill execution, every reflection. When exceeded, the agent stops cleanly with whatever it has.
-
-It is a **stop threshold, not a hard ceiling**: the budget is checked between steps, and the cost of a call is not known until it returns, so a run can finish slightly over. A 100 000-token budget was observed stopping at 102 211. Size the budget for the overshoot rather than assuming it caps spend exactly. Tokens are extracted from every raw provider response; OpenAI, Anthropic, Google, xAI, and Perplexity are all supported.
-
-Rough budgeting:
-
-- Short research task (3–5 steps): 15 000 – 30 000 tokens.
-- Deep research (8–12 steps): 40 000 – 80 000 tokens.
-- Long-document research phase: 80 000 – 150 000 tokens.
+A different, usually stronger model for writing the plan. Passing it in any
+other mode raises: a planner with no planning phase is a parameter that
+silently does nothing.
 
 ---
 
-## Persona
+## Stopping
 
-### `persona: str | None`
+### `stop_when: list | None`
 
-Identity / domain context prepended to **every** orchestrator system prompt (planning, action, and reflection).
+Everything that can end a run except the ordinary exit, in one readable list.
 
 ```python
-agent = Agent(
-    orchestrator = Model("gpt-4o"),
-    persona      = (
-        "You are a senior financial analyst specialising in tech equities. "
-        "Always cite data sources and flag information older than 30 days. "
-        "Prefer primary sources over aggregated news."
-    ),
-    tools        = [...],
-)
+from yait_aichain.agent import step_count, token_budget, cost_budget, check
+
+stop_when = [step_count(12), token_budget(80_000), cost_budget(0.50),
+             check(lambda state: Path("report.md").exists())]
 ```
 
-A persona shapes how the agent plans and reflects, not just how it writes. A "market intelligence director" persona produces different search queries and different next-step decisions than a "general research assistant" persona.
+Three ways a run ends, and conflating them is what made a benchmark
+unreadable:
 
-Keep it declarative — describe who the agent is and how it thinks, not step-by-step instructions (that's what `task` is for).
+| | meaning | result |
+|---|---|---|
+| answered | the model replied without asking for an action | **success** |
+| `check(fn)` | a condition the harness verified | **success**, with `check` evidence |
+| `step_count`, `token_budget`, `cost_budget` | a ceiling was reached | **`success=False`** |
+
+Whichever fired is named in `AgentResult.stopped_by`, so "finished" and "gave
+out" can never look identical from the outside.
+
+`cost_budget` is the honest one to ask for and the one to caveat: output
+length is not known before a call, so it bounds "do not begin another step",
+not "never exceed by a cent".
+
+There is no `max_attempts`: it governed retries of a *plan step*, and a loop
+has no plan steps — a call that fails comes back as the next turn and the
+model decides. Transport-level retries are `Model` options, where a caller
+can set them.
+
+---
+
+## Instructions
+
+### `instructions: str | None`
+
+Who the agent is and how it should work — the stable part of the system
+prompt. Formerly `persona`.
+
+```python
+instructions = ("You are a senior market intelligence analyst. Prefer primary "
+                "sources. State what you could not verify.")
+```
+
+Whether the loop honours a given instruction is, today, unmeasured — see the
+compliance work in the plan. An instruction is not a mechanism: where the
+behaviour matters, express it as one.
+
+---
+
+## Governance
+
+### `permissions: PermissionPolicy | None` and `approve: callable | None`
+
+A tool declares a risk class as data; the policy maps it to `allow`,
+`approve` or `deny` before the tool runs. `approve` asks `approve=` and runs
+only on a yes — **with no approver attached the call is refused.** See
+[Observability](observability.md#permission-matrix).
+
+### `hooks: list | None`
+
+Callables receiving an `Event` at each step boundary. The same events are
+available as an iterator through `agent.stream(task)`.
 
 ---
 
 ## Memory
 
-### `memory: AgentMemory | None`
-
-Custom memory instance. Omit for a fresh in-process memory per `run()` call.
-
-```python
-from yait_aichain.agent import AgentMemory, FileBackend
-
-memory = AgentMemory(backend=FileBackend("~/.my_agent.json"))
-agent  = Agent(..., memory=memory)
-```
-
-See [Memory](memory.md) for pre-populated memory, persistent memory across runs, and custom backends.
+There is no `memory=` parameter, and the agent has no memory subsystem. Its
+state **is** the conversation: a message list, serialisable by construction,
+which is also why `2.0.0` removed suspend/resume from the agent. `AgentMemory`
+survives as a standalone store you can use from your own tools; nothing in the
+loop reads or writes it.
 
 ---
 
@@ -167,8 +175,8 @@ See [Memory](memory.md) for pre-populated memory, persistent memory across runs,
 | Value | Output |
 |---|---|
 | `0` | Silent. Use for production / inside a Chain. |
-| `1` | Plan overview, one status line per step, final summary with token count. |
-| `2` | Everything in level 1 plus full action payloads (tool kwargs, skill prompts), output previews, per-call token breakdowns, and reflection reasoning. |
+| `1` | One status line per step, final summary with token count. |
+| `2` | Everything in level 1 plus full action payloads (tool kwargs), output previews, per-call token breakdowns. |
 
 `2` is for debugging — it prints a lot.
 
@@ -178,7 +186,9 @@ See [Memory](memory.md) for pre-populated memory, persistent memory across runs,
 
 ### `name: str | None`
 
-Human-readable identifier. Shown in the header line at `verbose >= 1`, used in `repr`, and used as the step name when the agent runs inside a Chain.
+Human-readable identifier. Shown in the header line at `verbose >= 1`, used in
+`repr`, carried on every `Event`, and used as the step name when the agent
+runs inside a Chain.
 
 ### `description: str | None`
 
@@ -186,28 +196,26 @@ Free-text description. Purely informational.
 
 ---
 
-## Task and initial variables
+## Task and variables
 
-These are the only inputs to `agent.run()`, not the constructor:
+These are the inputs to `agent.run()`, not to the constructor:
 
 ```python
 result = agent.run(
     task      = "Compare the top 3 managed vector databases.",
-    variables = {
-        "language":  "English",
-        "audience":  "C-level IT decision makers",
-        "horizon":   "12 months",
-    },
+    variables = {"audience": "C-level IT decision makers", "horizon": "12 months"},
 )
 ```
 
 ### `task: str`
 
-The natural-language description of what to accomplish. Be specific about **outputs** — the shape of what you want — not the steps to get there. The agent plans the steps.
+What to accomplish. Be specific about **outputs** — the shape of what you want
+— not about the steps. The agent chooses the steps.
 
 Good:
 
-> "Compare the top 3 managed vector databases. For each: name, estimated market share, and main differentiator. Return a Markdown table."
+> "Compare the top 3 managed vector databases. For each: name, estimated
+> market share, and main differentiator. Return a Markdown table."
 
 Less good:
 
@@ -215,49 +223,14 @@ Less good:
 
 ### `variables: dict | None`
 
-Key/value pairs seeded into memory **before** the first step. The orchestrator sees them in every prompt; any action (tool kwargs or skill prompts) can reference them via `{placeholder}`.
-
----
-
-## Full configuration example
-
-A Phase-1 research agent — strong orchestrator, cheap executor, single search tool, agile mode with a healthy token budget, verbose progress for monitoring:
-
-```python
-from yait_aichain.models import Model
-from yait_aichain.agent  import Agent
-from yait_aichain.tools  import PerplexitySearchTool
-
-agent = Agent(
-    orchestrator = Model("claude-opus-4-6",
-                          options={"reasoning": "medium"}),
-    executors    = [Model("claude-sonnet-4-6")],
-    tools        = [PerplexitySearchTool()],
-
-    mode         = "agile",
-    max_steps    = 14,
-    max_attempts = 3,
-    max_tokens   = 90_000,
-
-    persona      = (
-        "You are a senior market intelligence director. "
-        "Prefer Perplexity for live, citable facts. "
-        "Search in the local language when the target geography is non-English. "
-        "Produce a structured research brief, not a polished report — "
-        "the report will be written downstream."
-    ),
-
-    verbose      = 1,
-    name         = "phase_1_research",
-)
-```
-
-The Chain that consumes its output is shown in [Agent as Chain step](agent-as-chain-step.md).
+Data the caller already holds, appended to the opening message under `GIVEN:`
+so the model starts with it. This is how a `Chain` or `Pool` step hands its
+accumulated values down.
 
 ---
 
 ## See also
 
-- **The three phases & execution flow** → [Overview](overview.md)
-- **Shared state & persistence** → [Memory](memory.md)
-- **Embedding an Agent in a Chain** → [Agent as Chain step](agent-as-chain-step.md)
+- [Overview](overview.md) — what the loop does
+- [Observability](observability.md) — events, permissions, the journal
+- [Agent as a Chain step](agent-as-chain-step.md) — composition and persistence

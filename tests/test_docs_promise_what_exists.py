@@ -34,17 +34,18 @@ EXEMPT = {"docs/design"}
 #: reports a parameter that is not missing. A parser knows where a call ends.
 
 #: How many documented parameters do not exist. **34** the day this test was
-#: written, and every one of them is the agent: the 2.0 rewrite renamed
-#: `orchestrator` to `model` and folded `max_steps` / `max_tokens` /
-#: `max_attempts` / `done_when` into `stop_when`, dropped `memory`, `store`
-#: and `executors`, and turned `allow_spawn` into `team`. All of it is written
-#: down in `docs/design/default-agent.md`, decision by decision — the design
-#: record was kept and the pages that teach the API were not touched, so the
-#: agent documentation describes a library that has not existed since 2.0.0.
-#: A reader copying the README's agent example gets a TypeError on line one.
+#: written, **0** after the sweep on 2026-09-11. All 34 were the agent: the
+#: 2.0 rewrite renamed `orchestrator` to `model` and `persona` to
+#: `instructions`, folded `max_steps` / `max_tokens` / `max_attempts` /
+#: `done_when` into `stop_when`, dropped `memory`, `store`, `executors` and
+#: the `goal` mode, and turned `allow_spawn` into `team`. Every one of those
+#: decisions is written down in `docs/design/default-agent.md`, with reasons —
+#: the design record was kept and the pages that teach the API were not
+#: touched, so for four minor versions a reader copying the README's agent
+#: example got a TypeError on line one.
 #:
-#: Lower it as pages are fixed. Never raise it.
-STALE_CEILING = 34
+#: Never raise it.
+STALE_CEILING = 0
 
 CLASSES = {"Agent": Agent, "Chain": Chain, "Skill": Skill}
 
