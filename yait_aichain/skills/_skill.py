@@ -317,12 +317,17 @@ class Skill:
         request, not a replacement — and the differences from it are real
         rather than incidental, so they are stated instead of discovered:
 
-        * **No retries and no fallback chain.** Both work by throwing the
-          attempt away and starting again, which a stream cannot do once the
-          caller has seen the first piece. A failure before the first piece
-          could be retried; a failure after it could not, so the rule would
-          hold only sometimes, and a rule that holds sometimes is worse than
-          none. The first model in the chain is used, and an error is raised.
+        * **Retries stop at the first piece; there is no fallback chain.**
+          Both work by throwing the attempt away and starting again, which is
+          impossible once the caller has seen something. 2.5.0 refused to
+          retry at all, reasoning that a rule holding only before the first
+          byte "holds sometimes", and that was wrong: *before the first piece*
+          is not a sometimes, it is a state the caller can see — nothing has
+          been yielded. So a transient failure (429, 5xx, network) retries
+          while the attempt is still discardable, exactly as ``run()`` does,
+          and is raised once it is not. The fallback chain does stay out: a
+          second model is a different answer, not a retry of this one, and
+          swapping models mid-sentence is not something to do quietly.
         * **The result is assembled as well as yielded.** ``last_result``
           holds the whole text at the end, parsed when the output format
           asks for JSON, so a caller does not have to choose between showing
@@ -351,14 +356,33 @@ class Skill:
 
         self._emit("llm_call.started", name=model.name)
         _t0 = _time.monotonic()
-        try:
-            for piece in model.stream(messages, self._output, tools=_tools):
-                pieces.append(piece)
-                yield piece
-        except Exception as exc:
-            self._emit("llm_call.ended", name=model.name,
-                       duration=_time.monotonic() - _t0, error=str(exc))
-            raise
+        for attempt in range(max(0, self.max_retries) + 1):
+            if attempt > 0:
+                _time.sleep(self.retry_delay * (2 ** (attempt - 1)))
+            try:
+                for piece in model.stream(messages, self._output, tools=_tools):
+                    pieces.append(piece)
+                    yield piece
+                break
+            except APIError as exc:
+                transient = (exc.status in _TRANSIENT_STATUSES
+                             or isinstance(exc, NetworkError))
+                # `pieces` is the whole condition that matters: once the
+                # caller has seen something, starting over would replay or
+                # contradict it. Before that, the attempt is discardable and
+                # there is no reason to be less reliable than `run()`.
+                if (transient and not pieces
+                        and not isinstance(exc, (TaskFailedError,
+                                                 InsufficientCreditsError))
+                        and attempt < self.max_retries):
+                    continue
+                self._emit("llm_call.ended", name=model.name,
+                           duration=_time.monotonic() - _t0, error=str(exc))
+                raise
+            except Exception as exc:
+                self._emit("llm_call.ended", name=model.name,
+                           duration=_time.monotonic() - _t0, error=str(exc))
+                raise
 
         self.last_adaptations = list(getattr(model, "last_adaptations", []))
         raw_usage = getattr(model, "last_stream_usage", None)
