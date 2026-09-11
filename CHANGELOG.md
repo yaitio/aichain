@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-09-11
+
+**The event channel carries enough to reconstruct a turn.** R1, R3 and R4 of
+[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md). It carried a
+description: `step.started` emitted the tool's name and nothing else, and a
+call's arguments and its result reached only the message list — the model's
+view — and the journal, where the result had already been rendered to prose
+for the model, media reduced to `[returned 2 image]`. That is right for a
+journal and wrong for the only channel a program can watch while a run is
+alive.
+
+### Changed
+
+- **`step.*` → `tool_call.*` on the agent.** The documented names were never
+  the emitted ones, but the deciding argument is a different one: **`Chain`
+  emits `step.*` too**, for a chain step, so a hook attached to a chain
+  containing an agent received both under one name and could tell them apart
+  only by the shape of the payload. A `Hook` subclass with `step_started` /
+  `step_ended` still fires, once, with a `DeprecationWarning` naming the new
+  method — the rename is loud, and costs nobody a run.
+
+- **`tool_call.*` carries the call.** `payload["id"]` (a model may ask for
+  several in one turn and the agent honours all of them, so the id is how a
+  result pairs with its arguments), `payload["arguments"]` on started, and the
+  tool's **raw** result on ended.
+
+  By value, and that is a decision about what an `Event` is. A rendering
+  cannot be recovered downstream — units, column metadata, and the difference
+  between *no rows* and *the tool declined* are gone once it is prose, and a
+  consumer that cannot tell a refusal from an empty answer draws an empty
+  chart for both. A handle instead would need a lifetime and somewhere to
+  live, which is hostile to the serverless target: the process that issued it
+  may be gone. Events are therefore no longer uniformly small — about 90 KB
+  for a thousand-row result — and `Event.__repr__` omits the payload so a log
+  stays readable.
+
+### Fixed
+
+- **`run_id` was a declared field the agent never filled.** Two concurrent
+  invocations — the ordinary case for the serverless target — wrote into one
+  stream that could not be demultiplexed afterwards. Every event of a run now
+  carries it, **including the `llm_call.*` a `Skill` emits inside the run**: a
+  Skill knows nothing of the run it is inside, so the agent stamps identity on
+  what its children emit rather than asking them to know.
+
+- **`step` on a tool event**, so a consumer can say which turn a call belongs
+  to.
+
+### Notes
+
+R2 (text deltas from the agent's last turn) and R5 (approval as events) stay
+open. R5's *mechanism* shipped in `2.6.0` — `approve` gates now — and its
+*conversation* is the product's half; putting the request and the response on
+the event stream reopens the deliberate `2.0.0` decision that the agent has no
+suspend/resume, which should be said out loud rather than arrive inside a UI
+feature.
+
+
 ## [2.6.1] — 2026-09-11
 
 The documentation sweep 2.6.0 ratcheted, and the code defect it uncovered on

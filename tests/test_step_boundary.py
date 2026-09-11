@@ -168,7 +168,9 @@ class TestAgentEvents:
         r = ag.run("hi")
         types = {e.type for e in tr.events}
         assert r.success and r.output == "DONE"
-        assert {"run.started", "step.started", "step.ended",
+        # `tool_call.*`, not `step.*`: Chain emits `step.*` for a chain step
+        # (see the Chain test below), so one name meant two things.
+        assert {"run.started", "tool_call.started", "tool_call.ended",
                 "llm_call.started", "run.finished"} <= types
 
     def test_run_finished_carries_usage(self):

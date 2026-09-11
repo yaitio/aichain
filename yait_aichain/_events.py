@@ -29,6 +29,7 @@ in the application (or the product).
 from __future__ import annotations
 
 import logging
+import warnings
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
@@ -48,7 +49,8 @@ class Event:
     ----------
     type : str
         Dotted event name, e.g. ``"llm_call.started"``, ``"tool_call.ended"``,
-        ``"step.started"``, ``"run.suspended"``.
+        ``"tool_call.started"``, ``"step.started"`` (a **Chain** step;
+        the agent's tool events were spelled this way before 2.7.0).
     run_id : str | None
         Identifier of the run this event belongs to.
     step : int | None
@@ -56,7 +58,19 @@ class Event:
     name : str | None
         Tool or model name, when applicable.
     payload : dict
-        Event-specific extra fields (tool kwargs, decision, reason, …).
+        Event-specific extra fields. For ``tool_call.*`` this carries what a
+        program needs to **reconstruct** the turn rather than describe it:
+        ``id`` (so concurrent calls in one turn can be told apart),
+        ``arguments`` on started, and the tool's **raw** result on ended.
+
+        The result travels by value, and that is a deliberate choice about
+        what an ``Event`` is. A rendering of it cannot be recovered
+        downstream — units, column metadata, the difference between *no rows*
+        and *the tool declined* are all gone once it is prose — and a handle
+        instead would need a lifetime and a place to live, which is hostile to
+        the serverless niche this library targets: the process that issued the
+        handle may be gone. Events are therefore no longer uniformly small;
+        ``Event.__repr__`` omits the payload so a log stays readable.
     usage : int | None
         Token delta attributable to this event, when known.
     cost : float | None
@@ -102,10 +116,29 @@ class Hook:
     only ergonomics.
     """
 
+    #: The agent emitted a tool call as ``step.*`` while this module documented
+    #: it as ``tool_call.*`` — and `Chain` emits `step.*` too, for a chain
+    #: step, so one name meant two different things depending on which
+    #: primitive a hook was attached to. Renamed 2026-09-11; a hook written
+    #: against the old spelling keeps firing, once, with a warning.
+    _RENAMED = {"tool_call_started": "step_started",
+                "tool_call_ended":   "step_ended"}
+
     def __call__(self, event: "Event") -> None:
-        method = getattr(self, event.type.replace(".", "_"), None)
+        wanted = event.type.replace(".", "_")
+        method = getattr(self, wanted, None)
         if callable(method):
             method(event)
+            return
+        legacy = self._RENAMED.get(wanted)
+        if legacy and callable(getattr(self, legacy, None)):
+            warnings.warn(
+                f"{type(self).__name__}.{legacy}() is the old name for "
+                f"{wanted}(): the agent's tool events were called {legacy
+                .replace('_', '.')} until 2.7.0, which collided with Chain's "
+                "own step events. Rename the method.",
+                DeprecationWarning, stacklevel=2)
+            getattr(self, legacy)(event)
 
 
 class Tracer(Hook):

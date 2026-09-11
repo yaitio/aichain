@@ -61,10 +61,54 @@ for e in tracer.events:
 
 Event types:
 
-- `run.started` · `run.finished` · `run.suspended` · `run.resumed`
-- `step.started` · `step.ended`
-- `llm_call.started` · `llm_call.ended`
-- `tool_call.started` · `tool_call.ended`
+| type | emitted by | carries |
+|---|---|---|
+| `run.started` · `run.finished` | Agent, Chain | the task and mode; the verdict and usage |
+| `tool_call.started` · `tool_call.ended` | Agent | one tool call — see below |
+| `step.started` · `step.ended` | **Chain** | one chain step, `payload["kind"]` |
+| `llm_call.started` · `llm_call.ended` | Skill | model name, tokens, cost, duration |
+
+### Enough to rebuild a turn, not to describe it
+
+`tool_call.*` carries what a program needs to reconstruct the call, because a
+rendering of a result cannot be recovered downstream — units, column metadata,
+and the difference between *no rows* and *the tool declined* are all gone once
+it is prose, and a consumer that cannot tell a refusal from an empty answer
+draws an empty chart for both.
+
+```python
+class Watch(Hook):
+    def tool_call_started(self, e):
+        print(e.name, e.payload["arguments"], e.payload["id"])
+
+    def tool_call_ended(self, e):
+        if e.error:
+            print(e.name, "failed:", e.error)
+        else:
+            render(e.payload["result"])      # the tool's own value, verbatim
+```
+
+`payload["id"]` is the provider's id for the call. A model may ask for several
+in one turn and the agent honours all of them, so the id is how a result pairs
+with its arguments — and it stays the answer if calls ever execute
+concurrently rather than in sequence.
+
+**The result travels by value**, which makes an `Event` no longer uniformly
+small: a thousand-row result is about 90 KB. A handle instead would need a
+lifetime and somewhere to live, which is hostile to the serverless target —
+the process that issued it may be gone. `Event.__repr__` omits the payload, so
+`LoggingTracer` stays readable.
+
+`run_id` is on every event of a run, including the `llm_call.*` a `Skill`
+emits inside it: two concurrent invocations write into one stream, and without
+it that stream cannot be demultiplexed afterwards. `step` says which turn a
+tool call belongs to.
+
+> **Renamed in 2.7.0.** The agent emitted its tool calls as `step.*` while
+> this page documented `tool_call.*`, and `Chain` emits `step.*` for a chain
+> step — one name meaning two things depending on which primitive a hook was
+> attached to. A `Hook` subclass with `step_started` / `step_ended` still
+> fires, once, with a `DeprecationWarning` naming the new method.
 
 ### Convenience bases
 

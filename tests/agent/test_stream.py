@@ -72,9 +72,10 @@ class TestWhatTheStreamCarries(unittest.TestCase):
         """The point of the feature: a caller sees the step, not a summary
         after the fact."""
         types, _ = self._types(*SCRIPT)
-        self.assertIn("step.started", types)
-        self.assertIn("step.ended", types)
-        self.assertLess(types.index("step.started"), types.index("run.finished"))
+        self.assertIn("tool_call.started", types)
+        self.assertIn("tool_call.ended", types)
+        self.assertLess(types.index("tool_call.started"),
+                        types.index("run.finished"))
 
     def test_the_model_calls_come_through_too(self):
         """These are emitted by `Skill`, not by the loop — they reach the
@@ -86,8 +87,9 @@ class TestWhatTheStreamCarries(unittest.TestCase):
 
     def test_the_tool_name_rides_along(self):
         agent = _agent(*SCRIPT)
-        steps = [e for e in agent.stream("do it") if e.type == "step.started"]
-        self.assertEqual([e.payload["tool"] for e in steps], ["echo"])
+        steps = [e for e in agent.stream("do it")
+                 if e.type == "tool_call.started"]
+        self.assertEqual([e.name for e in steps], ["echo"])
 
     def test_a_stop_condition_still_stops_it(self):
         types, agent = self._types(
