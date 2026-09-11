@@ -1,7 +1,7 @@
 # Design — backing a conversational UI
 
-Status: **R1, R3 and R4 shipped in 2.7.0; R2 in 2.8.0. R5 open,
-and split — see below.** Written 2026-09-11
+Status: **shipped.** R1, R3 and R4 in `2.7.0`; R2 in `2.8.0`; R5's
+library half in `2.6.0` (the gate) and `2.9.0` (the conversation). Written 2026-09-11
 from the needs of one consumer: a conversational BI product whose front end
 renders every tool result as a chart. (The header said "against `2.0.0`";
 `Agent.stream()`, which R2 quotes, arrived in `2.5.0`.)
@@ -253,14 +253,26 @@ yielded. The 2.5.0 note refusing retries outright, on the grounds that such a
 rule "holds sometimes", was wrong — before the first piece is a state the
 caller can see.
 
-**R5 splits, and the split is the library/product boundary.** The mechanism —
-`approve` actually blocking — is the library's, and shipped in `2.6.0` as
-`Agent(approve=...)`, fail-closed when nobody is there to ask. The
-*conversation* — asking a human, carrying the question and the answer — is the
-product's. Note that putting the request and the response on the event stream
-reopens a deliberate `2.0.0` decision (the agent has no suspend/resume: its
-state **is** the conversation), and that should be said out loud rather than
-arrive inside a UI feature.
+**R5 split, and the split held.** The mechanism — `approve` actually blocking
+— shipped in `2.6.0` as `Agent(approve=...)`, fail-closed when nobody is there
+to ask. The *conversation* shipped in `2.9.0` as `approval.requested` /
+`approval.decided`, plus `ApprovalDecision(False, reason)` so a refusal can say
+why.
+
+**It did not reopen the `2.0.0` decision after all**, which is worth recording
+because the opposite was expected. Suspend/resume would only be needed if the
+library owned the *wait*; it does not. The approver is an ordinary callable,
+so a UI's answer arrives by whatever means the application already has, and
+the library carries the question and the answer without parking a run. Across
+processes the wait is the product's, exactly as this document says of
+transport.
+
+The requirement that had to be **built** rather than described was the
+ordering. The gate lived inside the tool call, so its events were drained at
+the next boundary — after `tool_call.ended` — and a prompt delivered after the
+decision is a record, not a prompt. Moving the gate to the loop boundary is
+also better placed: a permission is a property of the turn, not of the
+invocation.
 
 ---
 

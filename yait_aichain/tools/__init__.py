@@ -81,7 +81,7 @@ All previous class names still work:
 from ._base           import Tool, ToolResult
 from ._wait           import Wait, Gate
 from ._permissions    import (
-    PermissionPolicy,
+    PermissionPolicy, ApprovalRequest, ApprovalDecision,
     RISK_CLASSES, DECISIONS,
     READ, DRAFT, WRITE, EXTERNAL, FINANCIAL, DESTRUCTIVE, PRIVILEGED,
     ALLOW, APPROVE, DENY,
@@ -198,7 +198,7 @@ __all__ = [
     "Wait",
     "Gate",
     # ── Permissions (1.4.4) ───────────────────────────────────────────────
-    "PermissionPolicy",
+    "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
     "RISK_CLASSES", "DECISIONS",
     "READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL", "DESTRUCTIVE", "PRIVILEGED",
     "ALLOW", "APPROVE", "DENY",

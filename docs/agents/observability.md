@@ -67,6 +67,7 @@ Event types:
 | `tool_call.started` · `tool_call.ended` | Agent | one tool call — see below |
 | `step.started` · `step.ended` | **Chain** | one chain step, `payload["kind"]` |
 | `text.started` · `text.delta` · `text.ended` | Agent, while streaming | the answer as it is written |
+| `approval.requested` · `approval.decided` | Agent | a gated call, before and after someone answers |
 | `llm_call.started` · `llm_call.ended` | Skill | model name, tokens, cost, duration |
 
 ### Enough to rebuild a turn, not to describe it
@@ -233,6 +234,42 @@ Decisions:
   because no human was configured. The refusal names both ways out: attach an
   approver, or set that risk class to `allow` if it does not need gating here.
 - **`deny`** — never run; the tool call still returns a (denial) result.
+
+### The approval goes on the channel too
+
+A UI can present the prompt, return a decision and render the outcome without
+reaching into the permission layer at all:
+
+```python
+for event in agent.stream("issue the refunds"):
+    if event.type == "approval.requested":
+        show_prompt(event.payload["tool"], event.payload["risk"],
+                    event.payload["arguments"], event.payload["id"])
+    elif event.type == "approval.decided":
+        close_prompt(event.payload["id"], event.payload["granted"],
+                     event.payload["reason"])
+```
+
+**`approval.requested` reaches the consumer before the approver is called.**
+That ordering is the whole feature and it had to be built: the gate used to
+live inside the tool call, so its events were drained at the next boundary —
+after `tool_call.ended` — and a prompt delivered after the decision is a
+record, not a prompt. The gate is at the loop boundary now.
+
+The approver itself is where the waiting happens: it is an ordinary callable,
+so a UI's answer arrives by whatever means the application already has (a
+queue, a future, a blocking read). The library carries the question and the
+answer; it does not own the wait.
+
+A refusal can say why — return `ApprovalDecision(False, "over budget")`
+instead of a bare `False`. The reason travels into `approval.decided` and into
+the denial the model is told about. "Not approved" and nothing else throws
+away the only part a person can act on, and it cannot be recovered afterwards.
+
+A denied call still ends: `tool_call.ended` carries the refusal as its error,
+which is the terminal event a consumer needs in order to stop waiting. An
+`allow` class starts no conversation at all — asking about everything is how
+an approver stops being read.
 
 A refusal — policy or approver — comes back through the tool channel as a
 result, not as a crash: the model is told and can choose something else. A

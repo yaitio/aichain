@@ -61,6 +61,28 @@ class _FakeModel:
     def from_response(self, response, output):
         return self.client._scripted[response["_i"]]
 
+    def stream(self, messages, output, tools=None):
+        """The same script, delivered as a stream.
+
+        A double that answers only the buffered call stops standing in for a
+        provider the moment the agent streams — and the tests that caught this
+        are about streaming, so the fake would have failed the feature rather
+        than the code. Text is yielded piece by piece; a decision to call a
+        tool is not prose and is left on `last_stream_result`, exactly as a
+        real client does.
+        """
+        self.last_stream_usage = {"usage": {"input_tokens": 3,
+                                            "output_tokens": 4}}
+        i = min(self.client.i, len(self.client._scripted) - 1)
+        self.client.i += 1
+        reply = self.client._scripted[i]
+        self.last_stream_result = reply
+        if isinstance(reply, str):
+            for piece in (reply[:1], reply[1:]):
+                if piece:
+                    yield piece
+            self.last_stream_result = None
+
 
 # ── Tools ──────────────────────────────────────────────────────────────────────
 
@@ -386,3 +408,105 @@ class TestLoggingRouting:
         # and the application decides where that goes.
         assert any("echo" in m for m in records)
         assert any("[Done]" in m for m in records)
+
+
+class TestApprovalTravelsOnTheChannel:
+    """R5's library half: a UI presents a prompt, returns a decision and
+    renders the outcome, with no access to the permission layer beyond the
+    events and the approver.
+
+    The ordering is the part that had to be built rather than described. The
+    gate lived inside the tool call, so a streaming consumer received
+    `approval.requested` only after the decision had been made — the record
+    read correctly and was useless for the one thing R5 exists for. The gate
+    is at the loop boundary now, and the request goes out before anyone is
+    asked.
+    """
+
+    def _agent(self, approve=None, **kw):
+        return Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "done"]),
+                     tools=[Refund()], permissions=PermissionPolicy(),
+                     approve=approve, **kw)
+
+    def test_the_request_names_the_call_the_tool_and_the_risk(self):
+        tr = Tracer()
+        self._agent(approve=lambda r: True, hooks=[tr]).run("refund")
+        asked = next(e for e in tr.events if e.type == "approval.requested")
+        assert asked.payload["tool"] == "issue_refund"
+        assert asked.payload["risk"] == "financial"
+        assert asked.payload["arguments"] == {"amount": 50}
+        assert asked.payload["id"]
+
+    def test_the_decision_carries_the_verdict(self):
+        tr = Tracer()
+        self._agent(approve=lambda r: True, hooks=[tr]).run("refund")
+        decided = next(e for e in tr.events if e.type == "approval.decided")
+        assert decided.payload["granted"] is True
+        assert decided.payload["id"] == next(
+            e.payload["id"] for e in tr.events
+            if e.type == "approval.requested")
+
+    def test_a_refusal_can_say_why(self):
+        """A UI showing "not approved" and nothing else has thrown away the
+        only part a person can act on, and the reason cannot be recovered
+        afterwards — it was in the head of whoever clicked no."""
+        from yait_aichain.tools import ApprovalDecision
+        tr = Tracer()
+        self._agent(hooks=[tr],
+                    approve=lambda r: ApprovalDecision(False, "over budget")
+                    ).run("refund")
+        decided = next(e for e in tr.events if e.type == "approval.decided")
+        assert decided.payload["granted"] is False
+        assert decided.payload["reason"] == "over budget"
+
+    def test_a_denied_call_still_ends(self):
+        """The terminal event, so a consumer stops waiting."""
+        tr = Tracer()
+        self._agent(approve=lambda r: False, hooks=[tr]).run("refund")
+        ended = next(e for e in tr.events if e.type == "tool_call.ended")
+        assert ended.error and "not approved" in ended.error
+
+    def test_the_missing_approver_is_a_visible_decision(self):
+        """Otherwise the call simply fails and nothing says it was governance
+        rather than a broken tool."""
+        tr = Tracer()
+        self._agent(hooks=[tr]).run("refund")
+        types = [e.type for e in tr.events]
+        assert "approval.requested" in types and "approval.decided" in types
+        decided = next(e for e in tr.events if e.type == "approval.decided")
+        assert decided.payload["granted"] is False
+        assert "no approver" in decided.payload["reason"]
+
+    def test_an_allowed_class_starts_no_conversation(self):
+        tr = Tracer()
+        Agent(_FakeModel([_call("issue_refund", {"amount": 50}), "d"]),
+              tools=[Refund()],
+              permissions=PermissionPolicy({"financial": "allow"}),
+              hooks=[tr]).run("refund")
+        assert not [e for e in tr.events if e.type.startswith("approval.")]
+
+    def test_a_streaming_consumer_sees_the_prompt_before_it_is_answered(self):
+        """The requirement that had to be built. A prompt delivered after the
+        decision is a record, not a prompt."""
+        order = []
+        agent = self._agent(
+            approve=lambda r: order.append("asked") or True)
+        for event in agent.stream("refund"):
+            order.append(event.type)
+        assert order.index("approval.requested") < order.index("asked")
+        assert order.index("asked") < order.index("approval.decided")
+
+    def test_and_in_the_right_place_among_the_actions(self):
+        agent = self._agent(approve=lambda r: True)
+        types = [e.type for e in agent.stream("refund")]
+        assert (types.index("tool_call.started")
+                < types.index("approval.requested")
+                < types.index("approval.decided")
+                < types.index("tool_call.ended"))
+
+    def test_the_human_is_asked_once(self):
+        """The gate moved to the loop; leaving a second one inside the tool
+        call would put the question to a person twice."""
+        asked = []
+        self._agent(approve=lambda r: asked.append(r) or True).run("refund")
+        assert len(asked) == 1

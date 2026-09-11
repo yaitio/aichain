@@ -100,6 +100,31 @@ class ApprovalRequest:
     agent:     str = ""
 
 
+@dataclass(frozen=True)
+class ApprovalDecision:
+    """An approver's answer, when a bare yes/no is not enough.
+
+    Returning ``True`` or ``False`` stays the short form and is what most
+    approvers will use. This exists for the other half of the requirement: a
+    refusal that says *why*. A UI that shows "the tool was not approved" and
+    nothing else has thrown away the only part a person can act on, and the
+    reason cannot be recovered afterwards — it lived in the head of whoever
+    clicked no.
+
+    Attributes
+    ----------
+    granted : whether the call may run.
+    reason  : one sentence, carried into the event stream and into the
+              denial the model is told about.
+    """
+
+    granted: bool
+    reason:  str = ""
+
+    def __bool__(self) -> bool:
+        return bool(self.granted)
+
+
 class PermissionPolicy:
     """
     Maps a tool's risk class to a runtime decision (``allow``/``approve``/
@@ -148,7 +173,7 @@ class PermissionPolicy:
 
 
 __all__ = [
-    "PermissionPolicy", "ApprovalRequest",
+    "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
     "RISK_CLASSES", "DECISIONS",
     "READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL", "DESTRUCTIVE", "PRIVILEGED",
     "ALLOW", "APPROVE", "DENY",

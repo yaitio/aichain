@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "2.8.0"
+__version__ = "2.9.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -56,7 +56,8 @@ from .agent  import Agent                                          # noqa: F401
 # Observability events & lifecycle hooks (1.4.4).
 from ._events import Event, Hook, Tracer, LoggingTracer            # noqa: F401
 # Permission matrix for tool governance (1.4.4).
-from .tools._permissions import PermissionPolicy                   # noqa: F401
+from .tools._permissions import (PermissionPolicy, ApprovalRequest,   # noqa: F401
+                                 ApprovalDecision)                    # noqa: F401
 
 # Exception hierarchy — catch APIError for everything, or a subclass for a
 # specific failure mode (rate limit, auth, server error, …).

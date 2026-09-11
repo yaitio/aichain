@@ -201,6 +201,12 @@ def _delegate_schema(team) -> dict:
 
 # ── Agent ────────────────────────────────────────────────────────────────────
 
+#: Returned by `_ask_permission` when a request has gone out and the answer
+#: has not been asked for yet. A string would be a denial and None a pass, so
+#: the third state needs a value of its own.
+_AWAITING = object()
+
+
 class Agent:
     """
     A loop that holds one growing conversation and acts on the world.
@@ -288,6 +294,9 @@ class Agent:
         # and paying that for an observer who cannot see the pieces anyway
         # would be trading reliability for nothing.
         self._streaming = False
+
+        #: The approval request between going out and being answered.
+        self._pending = None
         self.permissions  = permissions
         # Who answers when the policy says "approve". A callable taking an
         # ApprovalRequest and returning truthy to proceed. The library cannot
@@ -516,7 +525,17 @@ class Agent:
                                     "arguments": call.arguments or {},
                                     "agent": self.name or ""})
                 yield from drain()
-                result, error = self._execute(call, state)
+
+                denial = self._ask_permission(call, state)
+                if denial is _AWAITING:
+                    # The request reaches the consumer *here*, before anyone
+                    # is asked — which is the whole point of splitting it.
+                    yield from drain()
+                    denial = self._resolve_permission(state)
+                    yield from drain()
+
+                result, error = ((None, denial) if denial
+                                 else self._execute(call, state))
                 self._emit("tool_call.ended", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "", "result": result,
@@ -627,69 +646,99 @@ class Agent:
                 return self._do_delegate(call.arguments, state), None
             if call.name == "write_plan":
                 return self._do_plan(call.arguments, state), None
-            return self._do_tool(call), None
+            return self._do_tool(call, state), None
         except Exception as exc:
             return None, f"{type(exc).__name__}: {exc}"
 
-    def _do_tool(self, call) -> Any:
+    def _do_tool(self, call, state: "dict | None" = None) -> Any:
         tool = self._tool_map.get(call.name)
         if tool is None:
             raise ValueError(f"no tool named {call.name!r}. "
                              f"Available: {sorted(self._tool_map)}")
         kwargs = call.arguments or {}
-        self._permit(tool, call, kwargs)
+        # No permission check here: the loop resolved it before calling, so
+        # a second one would put the question to a person twice.
         if (problem := tool.check_args(kwargs)) is not None:
             raise ValueError(problem)
         self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
 
-    def _permit(self, tool, call, kwargs: dict) -> None:
-        """Consult the policy before a tool runs, and act on what it says.
+    def _ask_permission(self, call, state: "dict | None" = None):
+        """Consult the policy before a tool runs. Returns a denial, or None.
 
-        Until 2026-09-11 this consulted it for ``deny`` and ignored every
-        other answer, so ``approve`` — the decision the shipped defaults give
-        to ``external``, ``financial``, ``privileged`` and to any risk class
-        nobody classified — meant *run the tool*. A policy attached in order
-        to gate spending gated nothing, and read as protection everywhere it
-        appeared.
+        **At the loop boundary, not inside the call.** It lived in
+        `_do_tool` until 2026-09-11, which put the approver's question and the
+        approver's answer in the same instant as far as anyone outside could
+        tell: a streaming consumer received `approval.requested` only after
+        the decision had already been made, because the events it produced
+        were drained at the next boundary — after `tool_call.ended`. The
+        record read correctly and was useless for the one thing R5 exists
+        for, which is showing a person the prompt. Split in two here so the
+        loop can hand the request over *before* asking.
 
-        ``approve`` now asks :attr:`approve`, and **refuses when there is
-        nobody to ask**. That is the only defensible reading: a decision whose
-        entire content is "a human should see this first" cannot resolve to
-        "go ahead" because no human was configured. It is a breaking change
-        for anyone who attached a policy and relied on it doing nothing, and
-        the error says so, with both ways out.
+        Emitted even when there is nobody to ask. A consumer needs to see
+        that a decision was required, and the refusing case is where that
+        matters most: otherwise the call simply fails and nothing says it was
+        governance rather than a broken tool.
         """
-        if not self.permissions:
-            return
+        tool = self._tool_map.get(call.name)
+        if tool is None or not self.permissions:
+            return None
         from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
 
         decision = self.permissions.decide(tool)
         if decision == ALLOW:
-            return
+            return None
         risk = getattr(tool, "risk", "write")
         if decision == DENY:
-            raise PermissionError(f"tool {tool.name!r} denied by policy")
+            return f"tool {tool.name!r} denied by policy"
         if decision != APPROVE:                       # unreachable via the
-            return                                    # policy's own validation
+            return None                               # policy's own validation
 
+        self._pending = ApprovalRequest(
+            tool=tool.name, risk=risk, arguments=dict(call.arguments or {}),
+            call_id=getattr(call, "id", "") or "", agent=self.name or "")
+        self._emit("approval.requested", name=tool.name,
+                   step=(state or {}).get("steps"),
+                   payload={"id": self._pending.call_id, "tool": tool.name,
+                            "risk": risk, "arguments": self._pending.arguments,
+                            "agent": self.name or ""})
+        return _AWAITING
+
+    def _resolve_permission(self, state: "dict | None" = None):
+        """Ask, then say what the answer was. Returns a denial, or None."""
+        request = self._pending
+        self._pending = None
         if self.approve is None:
-            raise PermissionError(
-                f"tool {tool.name!r} ({risk}) needs approval and no approver "
-                f"is attached. Pass Agent(approve=...) to decide per call, or "
-                f"set the policy rule for {risk!r} to 'allow' if this class "
-                "does not need gating here.")
-        granted = self.approve(ApprovalRequest(
-            tool=tool.name, risk=risk, arguments=dict(kwargs),
-            call_id=getattr(call, "id", "") or "",
-            agent=self.name or ""))
-        if not granted:
-            # A refusal is a result, not a crash: the invariant that every
-            # tool call comes back with something is what keeps the model's
-            # history well-formed, and a denied call the model never hears
-            # about is one it will simply make again.
-            raise PermissionError(
-                f"tool {tool.name!r} ({risk}) was not approved")
+            granted = False
+            reason  = (f"no approver is attached. Pass Agent(approve=...) to "
+                       f"decide per call, or set the policy rule for "
+                       f"{request.risk!r} to 'allow' if this class does not "
+                       "need gating here.")
+        else:
+            answer  = self.approve(request)
+            granted = bool(answer)
+            # An `ApprovalDecision` carries why; a bare False does not, and a
+            # UI showing "not approved" and nothing else has thrown away the
+            # only part a person can act on.
+            reason  = getattr(answer, "reason", "") or (
+                "" if granted else "not approved")
+
+        self._emit("approval.decided", name=request.tool,
+                   step=(state or {}).get("steps"),
+                   payload={"id": request.call_id, "tool": request.tool,
+                            "risk": request.risk, "granted": granted,
+                            "reason": reason, "agent": self.name or ""})
+        if granted:
+            return None
+        # A refusal is a result, not a crash: every tool call coming back with
+        # something is what keeps the model's history well-formed, and a
+        # denied call the model never hears about is one it will simply make
+        # again. `tool_call.ended` then carries this as its error, which is
+        # the terminal event a consumer needs in order to stop waiting.
+        head = ("needs approval and" if self.approve is None
+                else "was not approved:")
+        return f"tool {request.tool!r} ({request.risk}) {head} {reason}"
 
     def _do_plan(self, args: dict, state: dict) -> str:
         items = args.get("items") or []

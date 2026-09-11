@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+## [2.9.0] — 2026-09-11
+
+**Approval travels on the same channel.** R5 of
+[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md), and the last
+of the five. A UI can now present the prompt, return a decision and render the
+outcome without reaching into the permission layer at all.
+
+### Added
+
+- **`approval.requested` · `approval.decided`**, carrying the call id, the
+  tool, the risk class, the arguments, and then the verdict with its reason.
+  Emitted **even when there is nobody to ask**: otherwise the call simply
+  fails and nothing says it was a governance decision rather than a broken
+  tool.
+
+- **`ApprovalDecision(granted, reason)`** — return it instead of a bare
+  `False` and the refusal says why. The reason travels into the event and
+  into the denial the model is told about. "Not approved" and nothing else
+  throws away the only part a person can act on, and it cannot be recovered
+  afterwards: it was in the head of whoever clicked no.
+
+- `ApprovalRequest` and `ApprovalDecision` are importable. The approver has
+  been handed an `ApprovalRequest` since `2.6.0` and could not import the
+  type to check against it.
+
+### Changed
+
+- **The permission gate moved from the tool call to the loop boundary.**
+  This is the requirement that had to be built rather than described. Inside
+  the call, the gate's events were drained at the next boundary — after
+  `tool_call.ended` — so a streaming consumer received `approval.requested`
+  only once the decision had been made. The record read correctly and was
+  useless for the one thing R5 exists for. Now the request reaches the
+  consumer **before** the approver is called, which is also the better place
+  for it: a permission is a property of the turn, not of the invocation.
+
+  The human is asked once — a second gate left inside the call would put the
+  question to a person twice.
+
+### Notes
+
+**R5 did not reopen the `2.0.0` decision**, which is worth recording because
+the opposite was expected when the requirements were reviewed.
+Suspend/resume would be needed only if the library owned the *wait*; it does
+not. The approver is an ordinary callable, so a UI's answer arrives by
+whatever means the application already has, and the library carries the
+question and the answer without parking a run. Across processes the wait is
+the product's half, exactly as the document says of transport.
+
+### Fixed
+
+- **The second test double only answered the buffered call**, the same defect
+  fixed in the agent's double in `2.8.0` — and it mattered here, because the
+  tests that needed it are about streaming: the fake would have failed the
+  feature rather than the code. Both doubles stand in for a provider in both
+  of its modes now.
+
+
 ## [2.8.0] — 2026-09-11
 
 **The agent streams the answer, not only its actions.** R2 of
