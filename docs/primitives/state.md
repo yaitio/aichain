@@ -149,7 +149,6 @@ It is **falsy**, so an accidental `if result:` treats a pause as "not done".
 
 ```python
 final = chain.resume(run_id, signal={...})        # Chain
-result = agent.resume(run_id, signal={...})       # Agent
 ```
 
 Loads the parked document, injects `signal` into the suspended step, and runs to
@@ -172,10 +171,13 @@ chain.context.get("req")      # "r-42"
 ```
 
 `RunContext(tenant=None, metadata={})` is a frozen value object with a
-convenience `.get(key, default)` reader. It is exposed as `chain.context` /
-`agent.context` while the run is in flight and is **persisted in the run
-document**, so `resume()` restores it (even in another process — pass it again
-to override). `Agent.run()` / `Agent.resume()` accept `context=` the same way.
+convenience `.get(key, default)` reader. It is exposed as `chain.context`
+while the run is in flight and is **persisted in the run document**, so
+`resume()` restores it (even in another process — pass it again to override).
+
+**`Chain` only.** `Agent.run()` takes `task` and `variables`; there is no
+`agent.context` and no `context=`. Put an agent inside a chain step when a run
+needs per-request context.
 
 ### The cross-process pattern
 
@@ -185,18 +187,27 @@ share nothing but the store.
 ```python
 # Invocation 1 — start; it parks at the gate
 def start():
-    agent = build_agent(store=FileStore("/srv/runs"))
-    res = agent.run("Issue a refund for order #123.")
+    chain = build_chain(store=FileStore("/srv/runs"))
+    res = chain.run(variables={"order": "#123"})
     return res.run_id                      # persist this id somewhere
 
 # Invocation 2 — a webhook delivers the decision later
 def approval_webhook(run_id, approved):
-    agent = build_agent(store=FileStore("/srv/runs"))   # fresh agent, same store
-    return agent.resume(run_id, signal={"approved": approved})
+    chain = build_chain(store=FileStore("/srv/runs"))   # fresh chain, same store
+    return chain.resume(run_id, signal={"approved": approved})
 ```
 
 The trigger needs only the `run_id`, the shared store, and the signal — no
 reference to the original object.
+
+> **Corrected in 2.6.0.** This pattern was written with an `Agent` on both
+> sides. `2.0.0` removed the agent's suspend/resume — its state **is** the
+> conversation, a message list the caller can park and hand back — so
+> `Agent(store=...)`, `Agent.resume()` and `agent.context` do not exist, and a
+> `Gate` tool inside an agent does not pause it: the `Suspend` it raises is
+> caught like any other tool failure and reported to the model as an error.
+> For a human deciding before a tool runs, the agent's mechanism is
+> `approve=` — see [Permissions](../agents/observability.md#permission-matrix).
 
 ---
 

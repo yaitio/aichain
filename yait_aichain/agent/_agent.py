@@ -237,6 +237,7 @@ class Agent:
         stop_when:    "list | None" = None,
         hooks:        "list | None" = None,
         permissions                 = None,
+        approve                     = None,
         name:         "str | None"  = None,
         description:  "str | None"  = None,
         verbose:      int           = 0,
@@ -268,6 +269,11 @@ class Agent:
         #: is left here rather than mixed into a stream of events.
         self.last_result: "AgentResult | None" = None
         self.permissions  = permissions
+        # Who answers when the policy says "approve". A callable taking an
+        # ApprovalRequest and returning truthy to proceed. The library cannot
+        # ask a human; it can only make sure one is asked when a policy said
+        # to. Absent, an `approve` decision refuses — see `_permit`.
+        self.approve      = approve
         self.name         = name
         self.description  = description
         self.verbose      = verbose
@@ -587,12 +593,59 @@ class Agent:
             raise ValueError(f"no tool named {call.name!r}. "
                              f"Available: {sorted(self._tool_map)}")
         kwargs = call.arguments or {}
-        if self.permissions and self.permissions.decide(tool) == "deny":
-            raise PermissionError(f"tool {tool.name!r} denied by policy")
+        self._permit(tool, call, kwargs)
         if (problem := tool.check_args(kwargs)) is not None:
             raise ValueError(problem)
         self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
+
+    def _permit(self, tool, call, kwargs: dict) -> None:
+        """Consult the policy before a tool runs, and act on what it says.
+
+        Until 2026-09-11 this consulted it for ``deny`` and ignored every
+        other answer, so ``approve`` — the decision the shipped defaults give
+        to ``external``, ``financial``, ``privileged`` and to any risk class
+        nobody classified — meant *run the tool*. A policy attached in order
+        to gate spending gated nothing, and read as protection everywhere it
+        appeared.
+
+        ``approve`` now asks :attr:`approve`, and **refuses when there is
+        nobody to ask**. That is the only defensible reading: a decision whose
+        entire content is "a human should see this first" cannot resolve to
+        "go ahead" because no human was configured. It is a breaking change
+        for anyone who attached a policy and relied on it doing nothing, and
+        the error says so, with both ways out.
+        """
+        if not self.permissions:
+            return
+        from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
+
+        decision = self.permissions.decide(tool)
+        if decision == ALLOW:
+            return
+        risk = getattr(tool, "risk", "write")
+        if decision == DENY:
+            raise PermissionError(f"tool {tool.name!r} denied by policy")
+        if decision != APPROVE:                       # unreachable via the
+            return                                    # policy's own validation
+
+        if self.approve is None:
+            raise PermissionError(
+                f"tool {tool.name!r} ({risk}) needs approval and no approver "
+                f"is attached. Pass Agent(approve=...) to decide per call, or "
+                f"set the policy rule for {risk!r} to 'allow' if this class "
+                "does not need gating here.")
+        granted = self.approve(ApprovalRequest(
+            tool=tool.name, risk=risk, arguments=dict(kwargs),
+            call_id=getattr(call, "id", "") or "",
+            agent=self.name or ""))
+        if not granted:
+            # A refusal is a result, not a crash: the invariant that every
+            # tool call comes back with something is what keeps the model's
+            # history well-formed, and a denied call the model never hears
+            # about is one it will simply make again.
+            raise PermissionError(
+                f"tool {tool.name!r} ({risk}) was not approved")
 
     def _do_plan(self, args: dict, state: dict) -> str:
         items = args.get("items") or []
@@ -672,7 +725,12 @@ class Agent:
                 self.model, tools=self.tools,
                 instructions=args.get("instructions", ""),
                 stop_when=self.stop_when, hooks=self.hooks,
-                permissions=self.permissions, verbose=self.verbose,
+                # The approver travels with the policy: a worker that
+                # inherited the rules and not the answerer would refuse every
+                # gated call, which reads as the policy being stricter for
+                # children than for their parent.
+                permissions=self.permissions, approve=self.approve,
+                verbose=self.verbose,
                 _depth=self._depth + 1, _max_depth=self._max_depth,
             )
 

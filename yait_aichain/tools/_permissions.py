@@ -10,9 +10,11 @@ enforces *before* a tool executes — outside the model.
 Decisions:
 
 * ``"allow"``   — run the tool.
-* ``"approve"`` — pause the run for an external approval (reuses suspend/resume,
-  exactly like :class:`~yait_aichain.tools.Gate`); resume with
-  ``{"approved": True}`` to proceed.
+* ``"approve"`` — do not run the tool until someone outside the model says so.
+  The Agent asks its ``approve=`` callable and runs the tool only on a yes.
+  **With no approver attached the call is refused**, because the alternative is
+  worse in exactly the case this exists for: a policy whose whole content is
+  "ask a human" cannot mean "go ahead" when there is no human.
 * ``"deny"``    — never run; the tool call still returns a (denial) result, so
   the "every tool call returns a result" invariant holds.
 
@@ -21,9 +23,21 @@ as before. With a policy attached, the shipped default lets ``read``/``draft``/
 ``write`` run, gates ``external``/``financial``/``privileged`` behind approval,
 and denies ``destructive`` — so existing (unmarked, ``write``) tools keep
 working and you opt risky tools into gating by tagging their ``risk``.
+
+**What this module promised and did not do, until 2026-09-11.** Everything
+above was written when the module was; the Agent consulted it for ``deny`` and
+for nothing else, so ``approve`` fell through to running the tool. A policy
+left at its defaults — and the default for an unclassified risk is
+``approve`` — therefore gated nothing at all, including ``financial``, while
+reading in every docstring and every test as protection. The tests are part of
+the story: they asserted what :meth:`PermissionPolicy.decide` *returns* and
+never once that the returned decision *happened*. An opinion nobody acts on is
+not a policy, and this is the shape that defect takes in a permission layer.
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 # ── Risk classes (a tool's ``risk`` attribute) ─────────────────────────────────
 
@@ -57,6 +71,33 @@ _DEFAULT_RULES = {
     PRIVILEGED:  APPROVE,
     DESTRUCTIVE: DENY,
 }
+
+
+@dataclass(frozen=True)
+class ApprovalRequest:
+    """What an approver is shown before the tool runs.
+
+    Enough to decide with, and no more: the tool's own name and risk class,
+    the arguments it would run with, and the call id so a request can be
+    paired with the event stream and with the result that follows. Deliberately
+    not the Tool object — an approver that can reach in and run it is not a
+    gate.
+
+    Attributes
+    ----------
+    tool      : the tool's name.
+    risk      : its risk class, which is what the policy actually judged.
+    arguments : what it would be called with.
+    call_id   : the provider's id for this call, when there is one.
+    agent     : the name of the agent asking, which matters once a team is
+                delegating — the approver needs to know who wants this.
+    """
+
+    tool:      str
+    risk:      str
+    arguments: dict
+    call_id:   str = ""
+    agent:     str = ""
 
 
 class PermissionPolicy:
@@ -107,7 +148,7 @@ class PermissionPolicy:
 
 
 __all__ = [
-    "PermissionPolicy",
+    "PermissionPolicy", "ApprovalRequest",
     "RISK_CLASSES", "DECISIONS",
     "READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL", "DESTRUCTIVE", "PRIVILEGED",
     "ALLOW", "APPROVE", "DENY",
