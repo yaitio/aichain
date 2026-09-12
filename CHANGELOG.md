@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [2.17.1] — 2026-09-13
+
+### Fixed
+
+- **The package could not be imported on Python 3.10 or 3.11 — from 2.7.0
+  through 2.17.0.** `pyproject.toml` declares `requires-python = ">=3.10"`,
+  and `_events.py` carried an f-string whose replacement field was broken
+  across two lines. That is PEP 701 syntax, valid only from 3.12; on 3.10 and
+  3.11 it is a `SyntaxError` at import, so `import yait_aichain` failed
+  outright for anyone on those versions. Eleven releases were published to
+  PyPI in that state.
+
+  CI caught it on the first affected commit and on every one after — the
+  `Tests` workflow went red at 2.7.0 and stayed red. It was not looked at,
+  because every release was checked against a local test run on 3.14, where
+  the line is legal, and "the suite passes" was reported on that basis. The
+  local run was true and was not the check that mattered: the supported floor
+  is what a release has to pass, not the interpreter that happens to be
+  installed.
+
+  If you are on 3.10 or 3.11 and pinned any of 2.7.0–2.17.0, upgrade to this
+  release.
+
+
 ## [2.17.0] — 2026-09-13
 
 **Swarm coordination.** The plan's row, and the reason it waited for `state/`
