@@ -370,6 +370,36 @@ class AnthropicClient(BaseClient):
                 if "function" in t else t
                 for t in tools
             ]
+        if fmt.get("type") == "json":
+            # Anthropic has no JSON-mode field. Every other provider does, so
+            # by the universal-vs-local rule this is absorbed rather than
+            # refused: the intent is portable, only the control is missing
+            # here. Until 2026-09-12 the request went out **byte-identical**
+            # to a plain text one and nothing was said — the caller asked for
+            # JSON, got prose, and `parse_response` was left digging a JSON
+            # object out of whatever came back. Silence about a format is
+            # worse than silence about a sampling knob: the answer does not
+            # merely differ, it is the wrong type.
+            #
+            # An instruction, not a prefilled `{`: prefilling is Anthropic's
+            # own trick and it works, but the opening brace is then missing
+            # from the reply, so every reader of the raw text — ours and the
+            # caller's — has to know it was done.
+            rule = ("Respond with a single valid JSON object and nothing "
+                    "else: no prose, no code fence.")
+            existing = body.get("system")
+            if isinstance(existing, str):
+                body["system"] = f"{existing}\n\n{rule}"
+            elif isinstance(existing, list):
+                body["system"] = existing + [{"type": "text", "text": rule}]
+            else:
+                body["system"] = rule
+            record(Adaptation(
+                kind=ADAPTED, option="format.json", asked="json",
+                sent="a system instruction", model=name,
+                why="anthropic has no JSON-mode field; the requirement is "
+                    "carried in the system prompt instead"))
+
         if fmt.get("type") == "json_schema":
             tool = fmt.get("name", "structured_output")
             spec = {"name": tool,
