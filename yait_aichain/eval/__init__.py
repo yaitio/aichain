@@ -47,11 +47,13 @@ from ._records import Case, Record, adapt, read, write          # noqa: F401
 from ._report import Report, se                                 # noqa: F401
 from ._eval import Eval                                         # noqa: F401
 from ._scorers import (                                         # noqa: F401
-    Scorer, all_of, contains, exact, judge, normalise, numeric, regex,
+    Scorer, abstain, all_of, contains, exact, judge, normalise, numeric,
+    pairwise, regex,
 )
 
 __all__ = [
     "Eval", "Case", "Record", "Report",
-    "exact", "contains", "regex", "numeric", "judge", "all_of",
+    "exact", "contains", "regex", "numeric", "judge", "pairwise",
+    "abstain", "all_of",
     "adapt", "read", "write", "normalise", "se", "Scorer",
 ]
