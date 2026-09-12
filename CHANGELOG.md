@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+## [2.9.3] — 2026-09-12
+
+**A tool's schema becomes authority over its options.** They already declared
+them and nothing read them: `searchPerplexity` describes seven option keys,
+and `options={"recencyy": "day"}` passed validation, reached the tool and was
+dropped on the floor — the search ran unfiltered and answered confidently. A
+typo cost a run and left no trace. The same shape as the model options fixed
+in 2.3.0, one layer down.
+
+### Added
+
+- **`Tool.unknown_keys()`**, and both call paths use it:
+
+  * a **model's** call gets a remediation message from `check_args` naming the
+    wrong key and the accepted ones, which an Agent feeds back inside the
+    step's attempt budget;
+  * a **person's** call gets a warning from `_validate`, not a refusal. The
+    asymmetry is deliberate: a subclass may legitimately read an option its
+    schema does not advertise, and refusing someone's call over the library's
+    reading of their own schema would be the library knowing better.
+
+  One level into a declared object and no further. The top level already fails
+  loudly — an unexpected keyword reaches `run(**kwargs)` and Python raises —
+  and a nested object with no `properties` of its own is a free-form dict by
+  declaration, left alone. A schema is authority only over what it describes.
+
+  It reaches most of the surface: 28 of 32 tool classes describe their
+  options, and the number is now asserted so a drop is visible.
+
+### Fixed
+
+- **`ttsQwen` read an option it did not declare.** The other direction, and
+  the worse one: `region` is honoured by the tool and absent from the schema,
+  so a **model could not discover it at all**, and a caller who used it was
+  passing a key the schema calls unknown. Declared on `ttsQwen` alone —
+  putting it on the shared TTS schema would advertise it on OpenAI, Google
+  and xAI, where nothing reads it, which is the opposite defect and the one
+  2.3.0 was about. A test now checks every tool for the same disagreement;
+  this was the only one.
+
+
 ## [2.9.2] — 2026-09-12
 
 Two silent divergences in what the providers were actually sent, both in the
