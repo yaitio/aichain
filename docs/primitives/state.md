@@ -178,6 +178,37 @@ while the run is in flight and is **persisted in the run document**, so
 `agent.context` and no `context=`. Put an agent inside a chain step when a run
 needs per-request context.
 
+### Per-request secrets, for multi-tenant
+
+`RunContext` carries a tenant's **name**, never its credentials — it is
+serialised into the run document and `FileStore` writes that to disk, so a key
+placed in it would be persisted in plaintext. The secret is resolved *from* it
+instead:
+
+```python
+from yait_aichain.state import RunContext, using
+
+model = Model("gpt-4o", api_key=lambda ctx: vault.key_for(ctx.tenant))
+
+chain.run(variables={...}, context=RunContext(tenant="acme"))   # Chain
+with using(RunContext(tenant="acme")):                          # anything else
+    skill.run()
+```
+
+The callable is asked **once per request** and handed whatever run is in
+flight, so one `Model` serves every tenant. Resolving at construction would
+bind the first tenant's credential to every later request.
+
+**A resolver that returns nothing raises.** There is no fall-back to the
+process-wide key, deliberately: a fall-back would send one tenant's request
+under another's credential and the provider would answer normally.
+
+**No `context=` on `Skill`, `Pool` or `Tool`.** The context is ambient for the
+duration of a run — a parameter on every primitive would be the environment
+leaking into the scenario, which [VISION](../../VISION.md) names as the signal
+that a design has gone wrong. `Pool` copies it into each worker thread
+explicitly, because `contextvars` do not cross a thread boundary on their own.
+
 ### The cross-process pattern
 
 The whole point: the two halves can be separate serverless invocations that

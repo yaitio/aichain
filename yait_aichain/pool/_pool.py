@@ -44,6 +44,7 @@ from __future__ import annotations
 import threading
 import time
 import warnings
+import contextvars
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -270,7 +271,14 @@ class Pool:
 
             for i, item in enumerate(self._items):
                 merged = {**shared, **item}
-                future = executor.submit(self._run_one, i, merged)
+                # `contextvars` do not cross a thread boundary on their
+                # own, so the current run's context is copied into each
+                # worker explicitly. Without this a fan-out under a tenant
+                # would resolve every item's API key as if no run were in
+                # flight — and the failure would look like a missing key
+                # rather than a lost context.
+                future = executor.submit(
+                    contextvars.copy_context().run, self._run_one, i, merged)
                 future_to_idx[future] = i
 
             for future in as_completed(future_to_idx):

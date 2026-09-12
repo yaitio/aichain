@@ -102,9 +102,13 @@ class OpenAIClient(BaseClient):
         # server running open). Sending "Bearer " with nothing after it is
         # not neutral: some servers 401 on a malformed header where they
         # would accept no header at all. So no key, no header.
-        if not self._api_key:
+        # Read once. The property may be a resolver — a vault lookup, a
+        # signed token — and reading it twice per request would do the work
+        # twice for a caller who cannot see that it happened.
+        key = self.api_key
+        if not key:
             return {"Content-Type": "application/json"}
-        return {"Authorization": f"Bearer {self._api_key}",
+        return {"Authorization": f"Bearer {key}",
                 "Content-Type": "application/json"}
 
     def list_models(self) -> list[str]:

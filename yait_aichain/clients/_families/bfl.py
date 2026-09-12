@@ -65,7 +65,7 @@ class BFLClient(BaseClient):
 
     # ── transport ────────────────────────────────────────────────────
     def _auth_headers(self) -> dict:
-        return {"Content-Type": "application/json", "x-key": self._api_key}
+        return {"Content-Type": "application/json", "x-key": self.api_key}
 
     def list_models(self) -> list[str]:
         raise NotImplementedError(
