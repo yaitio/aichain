@@ -168,7 +168,9 @@ class Skill:
     def __init__(
         self,
         model:        "Model | list[Model]",
-        input:        dict,
+        input:        "dict | None" = None,
+        *,
+        prompt:       "str | None" = None,
         output:       "dict | None" = None,
         variables:    dict  | None  = None,
         options:      dict  | None  = None,
@@ -180,6 +182,23 @@ class Skill:
         max_cost:     "float | object | None" = None,
         _tools:       list  | None  = None,
     ) -> None:
+        # `prompt=` is the shortcut for the commonest shape there is: one
+        # user message, one text part. The long form stays the only way to say
+        # anything else — a system message, several turns, an image — because
+        # a shortcut that grows options becomes a second input format, and two
+        # ways to say the same thing is how the docs and the code drift apart.
+        if prompt is not None:
+            if input is not None:
+                raise ValueError(
+                    "pass prompt= or input=, not both: prompt is shorthand "
+                    "for input={'messages': [{'role': 'user', 'parts': "
+                    "[prompt]}]}, so giving both leaves it ambiguous which "
+                    "one the model should see.")
+            input = {"messages": [{"role": "user", "parts": [prompt]}]}
+        if input is None:
+            raise ValueError(
+                "Skill needs input= (the full messages spec) or prompt= (one "
+                "user message).")
         input  = adapters.normalize_input(input)
         output = adapters.normalize_output(output)
         adapters.validate_input(input)

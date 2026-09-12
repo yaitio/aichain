@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [2.16.0] — 2026-09-13
+
+The last of the Consistency list. Two of its entries turned out to be wrong
+about the code rather than the code being wrong about itself, and that is
+recorded rather than quietly dropped: a stale plan item costs somebody an
+afternoon rediscovering there is nothing to fix.
+
+### Added
+
+- **`Skill(model, prompt="...")`** — one user message, one text part, which
+  is the commonest shape there is. `input=` remains the only way to say
+  anything else, deliberately: a shortcut that grows options becomes a second
+  input format. Passing both raises rather than merging, because which one
+  the model should see would be a guess.
+
+### Not done, and why
+
+- **"Bring camelCase classes to one style"** — measured, and the plan was
+  wrong. Every camelCase class name *is* its tool's `name`, the string the
+  model sees; every PascalCase one differs and carries a snake_case wire
+  name. The two styles encode two different things. Renaming the camelCase
+  ones would either change the wire name — breaking every prompt, eval and
+  saved chain that references it — or open exactly the gap the PascalCase
+  ones have.
+
+  There is a real inconsistency one layer down, and it is a decision rather
+  than a sweep: the *wire* names mix `convertToMD` with `vector_query`, so a
+  model sees both styles in one tool list. Recorded as such.
+
+- **"`response_field` and the REST auth token are silently dropped"** —
+  stale. Both are read and applied; so are the static headers. Pinned by a
+  test so the entry cannot come back.
+
+
 ## [2.15.0] — 2026-09-13
 
 Two more Consistency items: the escape hatch a closed vocabulary needs, and
