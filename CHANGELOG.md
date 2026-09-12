@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+## [2.12.0] — 2026-09-12
+
+**A ceiling in money**, on every primitive that spends it. The last of the
+serverless product's library requirements bar one.
+
+### Added
+
+- **`max_cost` on `Skill`, `Chain`, `Pool` and `Agent`**, taking a number or a
+  shared `Budget`. `max_tokens` bounds one reply, and nobody budgets in
+  replies: a chain of ten steps, a pool over a thousand items and an agent
+  that decides how many turns it needs were all unbounded in the only unit
+  that appears on the invoice. The agent has had `cost_budget` since 2.0; the
+  other three had nothing, so a runaway `Pool` was visible on the bill and
+  nowhere else — the worst place for a product whose pitch is not having to
+  administer it.
+
+  **One object, shared.** A budget given to a `Chain` covers the `Agent`
+  inside it and the `Skill` inside that, because they decrement the same
+  thing. Copies would let every level spend the full amount, which is the
+  failure the shape exists to avoid, and it is why `Pool` — whose items run
+  concurrently — needs an object with a lock rather than a number.
+
+  A `Chain` **lends** its ceiling to its steps and takes it back afterwards:
+  the steps arrive already built, and a `Skill` reused in a second chain must
+  not keep the first one's budget.
+
+  **It bounds beginning, not exceeding.** A reply's length is not known before
+  it is paid for, so the first call always runs and the ceiling refuses the
+  next. Promising otherwise would be lying about the one number a caller
+  checks — the caveat `cost_budget` already carried, now carried twice.
+
+  Exhaustion **raises** `BudgetExceeded`. Returning what finished with a flag
+  set is how a truncated run is read as a complete one; catch it and read
+  `last_usage` for the partial result.
+
+  Money is counted in `Skill` and nowhere else, because `Skill` is the one
+  primitive that talks to a model — `Agent` builds them, `Chain` and `Pool`
+  run them. A second ceiling elsewhere would be a second thing to keep in
+  sync.
+
+
 ## [2.11.0] — 2026-09-12
 
 **Judging.** Both items carried over from `2.3.0`, and the reason they matter

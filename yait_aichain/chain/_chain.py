@@ -271,6 +271,7 @@ class Chain:
         on_step_error:  str         = "raise",
         store=None,
         hooks:          list | None = None,
+        max_cost=None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
@@ -313,6 +314,13 @@ class Chain:
         self._accumulated: dict   = {}     # snapshot of accumulated vars after last run()
         # Summed token usage of the last run() across Skill steps; None until
         # the first run or when no step reported usage. Reading is optional.
+        # One ceiling for the whole chain, lent to each step for the duration
+        # of a run — see `_lend_budget`. Shared rather than divided: a step
+        # cannot be given "its share" when nobody knows in advance which step
+        # will be the expensive one.
+        from .._budget import as_budget
+        self.max_cost = as_budget(max_cost)
+
         self.last_usage: "Usage | None" = None
         # Per-request RunContext for the current run() / resume() (tenant +
         # metadata); set while a run is in flight, restored on resume.
@@ -373,8 +381,10 @@ class Chain:
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
         doc = RunDocument.new("chain", step_names, variables=accumulated)
-        return self._run_from(doc, accumulated, start_idx=0, signal=None,
-                              usage_in=None, on_error=_on_error, context=context)
+        with self._lend_budget():
+            return self._run_from(doc, accumulated, start_idx=0, signal=None,
+                                  usage_in=None, on_error=_on_error,
+                                  context=context)
 
     def resume(
         self,
@@ -428,8 +438,40 @@ class Chain:
             total_tokens  = u.get("total_tokens", 0),
             cost          = u.get("cost"),
         ) if u else None
-        return self._run_from(doc, accumulated, start_idx=start, signal=signal,
-                              usage_in=usage_in, on_error=_on_error, context=context)
+        with self._lend_budget():
+            return self._run_from(doc, accumulated, start_idx=start,
+                                  signal=signal,
+                                  usage_in=usage_in, on_error=_on_error,
+                                  context=context)
+
+    def _lend_budget(self):
+        """Put this chain's budget on every step that can hold one.
+
+        Lent, not injected at construction: the steps arrive already built,
+        and a caller who set a budget on the chain means the chain's whole
+        spend rather than each step's. Restored afterwards, because a Skill
+        reused in two chains must not keep the first one's ceiling — that
+        would be the chain quietly editing an object it does not own.
+        """
+        import contextlib
+
+        @contextlib.contextmanager
+        def _lent():
+            if self.max_cost is None:
+                yield
+                return
+            touched = []
+            for entry in self._steps:
+                runner = entry[0]
+                if hasattr(runner, "max_cost"):
+                    touched.append((runner, runner.max_cost))
+                    runner.max_cost = self.max_cost
+            try:
+                yield
+            finally:
+                for runner, previous in touched:
+                    runner.max_cost = previous
+        return _lent()
 
     def _park(self, doc, idx, awaiting, accumulated, usage_total, history):
         """Persist the run as suspended at *idx* and return a SuspendedResult."""

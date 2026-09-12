@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "2.11.0"
+__version__ = "2.12.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ from .models import portable_schema, check_structure               # noqa: F401
 # What the library had to change about a request to fit a provider. Reachable
 # so a caller can log it, not only read the warning.
 from .models._adaptation import Adaptation, UnsupportedOption      # noqa: F401
+from ._budget import Budget, BudgetExceeded                        # noqa: F401
 from .models._usage import Usage                                   # noqa: F401
 from .skills import Skill                                          # noqa: F401
 from .chain  import Chain                                          # noqa: F401
