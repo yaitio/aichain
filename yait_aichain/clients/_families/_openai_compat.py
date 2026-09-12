@@ -257,6 +257,35 @@ def _build_openai_compat_request(
         else:
             openai_messages.append({"role": role, "content": items})
 
+    # A system message means the same thing wherever it sits: it applies to
+    # the whole conversation. That is not a preference — it is the only
+    # meaning every provider can express. Anthropic, Google and the Responses
+    # API each carry the system prompt in a field of their own, so a system
+    # message written in the middle of a conversation is hoisted out of the
+    # sequence and becomes global; this family left it in place, where it
+    # reads as an instruction that begins to apply at that point. The same
+    # conversation therefore meant two different things depending on the
+    # model, with nothing said — measured 2026-09-12 across every provider.
+    #
+    # Hoisted here too, so the meaning is one. Reported, because for this
+    # family it is a real change to what the model sees.
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    if any(m["role"] == "system" for m in openai_messages[1:]):
+        hoisted = [m for m in openai_messages if m["role"] == "system"]
+        rest    = [m for m in openai_messages if m["role"] != "system"]
+        joined  = "\n".join(
+            m["content"] if isinstance(m["content"], str)
+            else " ".join(i.get("text", "") for i in m["content"])
+            for m in hoisted)
+        openai_messages = [{"role": "system", "content": joined}] + rest
+        record(Adaptation(
+            kind=ADAPTED, option="system message position",
+            asked="mid-conversation", sent="hoisted to the front",
+            model=model.name,
+            why="a system message applies to the whole conversation on every "
+                "provider; three of them cannot express one that begins "
+                "mid-way, so it is made global here as well"))
+
     body: dict = {
         "model":          model.name,
         "messages":       openai_messages,
@@ -880,6 +909,7 @@ def _build_responses_api_request(
     - ``text.format``  instead of ``response_format`` for structured output
     """
     instructions   = None
+    system_texts: list = []
     input_messages: list[dict] = []
 
     for msg in messages:
@@ -919,10 +949,21 @@ def _build_responses_api_request(
             continue
 
         if role == "system":
-            # Responses API takes the system prompt as a top-level field.
-            text_parts   = [it["text"] for it in items
-                            if it["type"] in ("input_text", "output_text")]
-            instructions = "\n".join(text_parts)
+            # Responses API takes the system prompt as a top-level field —
+            # one string, so several system messages have to be joined here.
+            #
+            # This was an assignment until 2026-09-12, inside this loop, so a
+            # second system message **replaced** the first and only the last
+            # survived. Parts within one message were joined, which is why it
+            # looked right: the common shape is a single system message, and
+            # the defect needed two to appear. Every other family concatenates
+            # them, so the same conversation carried different instructions
+            # depending on which model it was sent to, silently — and the plan
+            # had this recorded as "Responses overwrites", a property of the
+            # provider. It was ours.
+            text_parts = [it["text"] for it in items
+                          if it["type"] in ("input_text", "output_text")]
+            system_texts.extend(text_parts)
         else:
             # No collapsing a lone text part to a bare string. It is the
             # commonest shape by far, and while it took that shortcut every
@@ -939,6 +980,7 @@ def _build_responses_api_request(
         "max_output_tokens": model.max_tokens,
     }
 
+    instructions = "\n".join(system_texts) or instructions
     if instructions:
         body["instructions"] = instructions
 
