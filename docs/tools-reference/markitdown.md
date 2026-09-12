@@ -1,12 +1,45 @@
-# `markitdown` — `MarkItDownTool`
+<!-- g:tool -->
+# `convertToMD` — `MarkItDownTool`
 
-Convert **any file or URL to Markdown** using Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) library. The standard companion to any link-returning search tool.
+Convert a file or URL to Markdown text.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import MarkItDownTool` |
+| Risk class | `write` |
+| Also exported as | `convertToMD` |
+
+```python
+MarkItDownTool(
+    llm_client: Any = None,
+    llm_model: str | None = None,
+    enable_builtins: bool | None = None,
+    enable_plugins: bool | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | Absolute or relative file path, or a URL, to convert to Markdown. |
+| `options.output_path` | `string` |  | Optional file path to write the result. Parent dirs created automatically. |
+
+```python
+result = MarkItDownTool()(
+    input="…",
+    options={"output_path": …},
+)
+```
+<!-- /g:tool -->
+
+Converts **any file or URL to Markdown** with Microsoft's
+[MarkItDown](https://github.com/microsoft/markitdown). The standard companion to
+any search tool that returns links.
 
 ```python
 from yait_aichain.tools import MarkItDownTool
 
 tool     = MarkItDownTool()
-markdown = tool.run(source="report.pdf")
+markdown = tool.run(input="report.pdf")
 ```
 
 ---
@@ -28,36 +61,11 @@ markdown = tool.run(source="report.pdf")
 ## Installation
 
 ```bash
-pip install markitdown
+pip install "yait-aichain[convert]"     # or: pip install markitdown
 ```
 
-No env var required. If `markitdown` isn't installed, the tool raises `ImportError` on first use.
-
----
-
-## Constructor
-
-```python
-MarkItDownTool(
-    llm_client:      Any        = None,
-    llm_model:       str | None = None,
-    enable_builtins: bool | None = None,
-    enable_plugins:  bool | None = None,
-)
-```
-
-- `llm_client` — OpenAI-compatible client used to describe images and transcribe audio.
-- `llm_model` — model name for that client, e.g. `"gpt-4o"`. Required when `llm_client` is set.
-- `enable_builtins` / `enable_plugins` — passed through to `MarkItDown(...)`.
-
----
-
-## Parameters
-
-| Name | Type | Required | Notes |
-|---|---|---|---|
-| `source` | `string` | ✓ | File path (absolute or relative) **or** URL. |
-| `output_path` | `string` | | Save Markdown to this path. Parent directories are created. |
+No key required. Without `markitdown` installed, the tool raises `ImportError`
+on first use.
 
 ---
 
@@ -69,58 +77,48 @@ MarkItDownTool(
 tool = MarkItDownTool()
 
 # Call-style — errors captured in ToolResult
-result = tool(source="slides.pptx")
+result = tool(input="slides.pptx")
 if result:
     print(result.output)
 
-# Direct — raises on error
-markdown = tool.run(source="https://example.com/article")
+# Run-style — raises on error
+markdown = tool.run(input="https://example.com/article")
 
-# Save directly
-tool.run(source="data.xlsx", output_path="exports/data.md")
+# Save to a file as well
+tool.run(input="data.xlsx", options={"output_path": "exports/data.md"})
 ```
 
-### With LLM (image descriptions / audio transcription)
+### With an LLM (image descriptions, audio transcription)
 
 ```python
 import openai
 from yait_aichain.tools import MarkItDownTool
 
-tool = MarkItDownTool(
-    llm_client = openai.OpenAI(),
-    llm_model  = "gpt-4o",
-)
-result = tool(source="architecture_diagram.png")
+tool   = MarkItDownTool(llm_client=openai.OpenAI(), llm_model="gpt-4o")
+result = tool(input="architecture_diagram.png")
 ```
 
-### In a Chain — search → fetch → summarise
+### In a Chain — fetch, then summarise
 
 ```python
 from yait_aichain.chain import Chain
-from yait_aichain.tools import BraveSearchTool, MarkItDownTool
-from yait_aichain.skills import Skill
 from yait_aichain.models import Model
+from yait_aichain.skills import Skill
+from yait_aichain.tools import MarkItDownTool
 
-summariser = Skill(
-    model  = Model("gpt-4o-mini"),
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "text", "text": "Summarise in 200 words:\n\n{article}"}
-    ]}]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
-)
+summariser = Skill(Model("gpt-4o-mini"), prompt="Summarise in 200 words:\n\n{article}")
 
 chain = Chain(steps=[
-    (BraveSearchTool(),  "search_results"),
-    # (orchestrator step picks a URL — in an agent; for a chain you'd
-    # structure the search tool to return a specific URL variable.)
-    (MarkItDownTool(),   "article", {"source": "target_url"}),
-    (summariser,         "summary"),
+    (MarkItDownTool(), "article", {"input": "url"}),
+    (summariser,       "summary"),
 ])
+
+chain.run(variables={"url": "https://example.com/article"})
 ```
 
 ### In an Agent
 
-Together with a search tool, this is the canonical 2-tool research loop:
+With a search tool this is the canonical two-tool research loop:
 
 ```python
 from yait_aichain.agent import Agent, step_count
@@ -128,10 +126,9 @@ from yait_aichain.models import Model
 from yait_aichain.tools import BraveSearchTool, MarkItDownTool
 
 agent = Agent(
-    model        = Model("claude-opus-4-6"),
-    tools        = [BraveSearchTool(), MarkItDownTool()],
-    mode         = "agile",
-    stop_when    = [step_count(10)],
+    Model("claude-opus-4-6"),
+    tools     = [BraveSearchTool(), MarkItDownTool()],
+    stop_when = [step_count(10)],
 )
 ```
 
@@ -139,13 +136,13 @@ agent = Agent(
 
 ## Notes
 
-- The `MarkItDown` instance is lazy-initialised on first `run()` and reused.
-- Parent directories for `output_path` are created with `os.makedirs(..., exist_ok=True)`.
-- Pairs naturally with any of the search tools — feed the URL returned in search output straight into `source=`.
+- The `MarkItDown` instance is created on first `run()` and reused.
+- Parent directories for `output_path` are created as needed.
+- Output paths are confined by `AICHAIN_OUTPUT_ROOT` when it is set.
 
 ---
 
 ## See also
 
-- Search tools: [`brave_search`](brave-search.md), [`serp_api_search`](serp-api.md), [`perplexity_search`](perplexity-search.md)
-- [`mistletoe`](mistletoe.md) — go the other direction: Markdown → HTML / LaTeX.
+- Search tools: [`searchBrave`](brave-search.md), [`searchSerp`](serp-api.md), [`searchPerplexity`](perplexity-search.md)
+- [`convertToHTML`](mistletoe.md) — the other direction: Markdown → HTML / LaTeX.

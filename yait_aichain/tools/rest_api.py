@@ -67,7 +67,7 @@ Quick example
 -------------
 ::
 
-    from tools import RestApiTool
+    from yait_aichain.tools import RestApiTool
 
     # Declare the endpoint once
     create_user = RestApiTool(

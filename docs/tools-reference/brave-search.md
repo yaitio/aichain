@@ -1,51 +1,51 @@
-# `brave_search` — `BraveSearchTool`
+<!-- g:tool -->
+# `searchBrave` — `BraveSearchTool`
 
-Web search via the **Brave Search API**. Returns ranked links with short description snippets — the tool to reach for when you want **URLs an agent can feed straight into `markitdown`**.
+Web search powered by the Brave Search API.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import BraveSearchTool` |
+| Risk class | `write` |
+| Also exported as | `searchBrave` |
+| Key | `BRAVE_SEARCH_API_KEY` |
+
+```python
+BraveSearchTool(
+    api_key: str | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | The search query (required, 1–400 characters). |
+| `options.max_results` | `integer` |  | Number of results to return (1–20, default 10). |
+| `options.country` | `string` |  | Two-letter ISO 3166-1 country code that biases results (e.g. 'US', 'GB', 'DE'). Defaults to 'US'. |
+| `options.language` | `string` |  | Language code for results (e.g. 'en', 'de', 'fr'). Defaults to 'en'. |
+| `options.safe_search` | `string` |  | Adult-content filter level. Defaults to 'moderate'. One of `off`, `moderate`, `strict`. |
+| `options.freshness` | `string` |  | Filter results by page age. Use 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year), or a date range 'YYYY-MM-DDtoYYYY-MM-DD'. |
+| `options.extra_snippets` | `boolean` |  | When True, up to 5 additional excerpt snippets are included per result. Defaults to False. |
+| `options.result_filter` | `string` |  | Comma-separated list of result types to include. Allowed values: discussions, faq, infobox, news, query, summarizer, videos, web, locations. Defaults to all types. |
+
+```python
+result = BraveSearchTool()(
+    input="…",
+    options={"max_results": …},
+)
+```
+<!-- /g:tool -->
+
+Ranked links with short description snippets — the tool to reach for when you
+want **URLs an agent can hand straight to `convertToMD`**.
 
 ```python
 from yait_aichain.tools import BraveSearchTool
 
 tool   = BraveSearchTool()
-result = tool(query="Python asyncio tutorial", count=5)
+result = tool(input="Python asyncio tutorial", options={"max_results": 5})
 
 print(result.output)
 ```
-
----
-
-## Requirements
-
-| | |
-|---|---|
-| Env var | `BRAVE_SEARCH_API_KEY` |
-| Get a key | <https://api-dashboard.search.brave.com> |
-| Endpoint | `POST https://api.search.brave.com/res/v1/web/search` |
-| Auth header | `x-subscription-token` |
-
-`ValueError` at construction time if the key isn't found.
-
----
-
-## Constructor
-
-```python
-BraveSearchTool(api_key: str | None = None)
-```
-
----
-
-## Parameters
-
-| Name | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `query` | `string` | ✓ | — | 1–400 characters. |
-| `count` | `integer` | | `10` | 1–20. |
-| `country` | `string` | | `US` | ISO 3166-1 alpha-2 (`GB`, `DE`, …). |
-| `search_lang` | `string` | | `en` | Language code. |
-| `safesearch` | `string` | | `moderate` | `off` / `moderate` / `strict`. |
-| `freshness` | `string` | | — | `pd`, `pw`, `pm`, `py`, or `YYYY-MM-DDtoYYYY-MM-DD`. |
-| `extra_snippets` | `boolean` | | `false` | Up to 5 extra excerpts per result. |
-| `result_filter` | `string` | | — | Comma-separated list: `discussions, faq, infobox, news, query, summarizer, videos, web, locations`. |
 
 ---
 
@@ -68,7 +68,8 @@ Search results for "Python asyncio tutorial" (5 results):
     · extra snippet 2
 ```
 
-Plain text keeps URLs visible in the agent's memory preview, so the orchestrator can copy a specific URL into a follow-up tool call (e.g. `markitdown(source=…)`).
+Plain text keeps the URLs visible in the agent's conversation, so the model can
+pass one to a follow-up call such as `convertToMD`.
 
 ---
 
@@ -80,15 +81,13 @@ Plain text keeps URLs visible in the agent's memory preview, so the orchestrator
 tool = BraveSearchTool()
 
 text = tool.run(
-    query          = "climate change solutions",
-    count          = 10,
-    country        = "GB",
-    freshness      = "pw",
-    extra_snippets = True,
+    input   = "climate change solutions",
+    options = {"max_results": 10, "country": "GB",
+               "freshness": "pw", "extra_snippets": True},
 )
 ```
 
-### Brave → MarkItDown — canonical pattern
+### Search, then read — the canonical pair
 
 ```python
 from yait_aichain.agent import Agent, step_count
@@ -96,10 +95,9 @@ from yait_aichain.models import Model
 from yait_aichain.tools import BraveSearchTool, MarkItDownTool
 
 agent = Agent(
-    model        = Model("claude-opus-4-6"),
-    tools        = [BraveSearchTool(), MarkItDownTool()],
-    mode         = "agile",
-    stop_when    = [step_count(8)],
+    Model("claude-opus-4-6"),
+    tools     = [BraveSearchTool(), MarkItDownTool()],
+    stop_when = [step_count(8)],
 )
 
 agent.run(
@@ -108,18 +106,20 @@ agent.run(
 )
 ```
 
-The agent learns: search first, then fetch the URLs it surfaces.
+The model searches first, then fetches the URLs the search surfaced.
 
 ---
 
 ## Notes
 
-- Brave returns **ranked links**, not substantive content snippets. Pair with `markitdown` for deep reads.
-- If you want a single-hop search with real content, prefer [`perplexity_search`](perplexity-search.md).
+- Brave returns **ranked links**, not substantive content. Pair it with
+  `convertToMD` for deep reads.
+- For a single-hop search with real content, prefer
+  [`searchPerplexity`](perplexity-search.md).
 
 ---
 
 ## See also
 
-- [`perplexity_search`](perplexity-search.md), [`serp_api_search`](serp-api.md), [`openai_web_search`](openai-web-search.md)
-- [`markitdown`](markitdown.md) — convert URLs Brave returned into readable text.
+- [`searchPerplexity`](perplexity-search.md), [`searchSerp`](serp-api.md), [`searchOpenAI`](openai-web-search.md)
+- [`convertToMD`](markitdown.md) — turn the URLs Brave returns into readable text.

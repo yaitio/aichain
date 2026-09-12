@@ -32,9 +32,9 @@ Examples
 --------
 Give an agent full local filesystem access in the current directory::
 
-    from tools.local import LocalTools
-    from agent import Agent
-    from models import Model
+    from yait_aichain.tools.local import LocalTools
+    from yait_aichain.agent import Agent
+    from yait_aichain.models import Model
 
     agent = Agent(
         orchestrator = Model("claude-sonnet-4-6"),
@@ -56,7 +56,7 @@ Pin to a specific directory::
 
 Use tools individually::
 
-    from tools.local import localBrowse, localRead, localWrite, localRun
+    from yait_aichain.tools.local import localBrowse, localRead, localWrite, localRun
 
     browse = localBrowse("/my/project")
     print(browse.run("src", {"depth": 3, "pattern": "*.py"}))
@@ -104,9 +104,9 @@ def LocalTools(root_dir: str | None = None) -> list:
     -------
     ::
 
-        from tools.local import LocalTools
-        from agent import Agent
-        from models import Model
+        from yait_aichain.tools.local import LocalTools
+        from yait_aichain.agent import Agent
+        from yait_aichain.models import Model
 
         agent = Agent(
             orchestrator = Model("claude-sonnet-4-6"),

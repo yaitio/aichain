@@ -13,6 +13,7 @@ key      = "reve"
 client   = "reve"
 base_url = "https://api.reve.com"
 env_key  = "REVE_API_KEY"
+label    = "Reve"
 auth     = "bearer"
 images_path = "/v1/image/create"
 

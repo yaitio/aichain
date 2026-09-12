@@ -1,52 +1,51 @@
-# `perplexity_search` — `PerplexitySearchTool`
+<!-- g:tool -->
+# `searchPerplexity` — `PerplexitySearchTool`
 
-Web search powered by the **Perplexity Search API**. Returns rich text snippets extracted directly from page content — the best-in-class choice when an agent needs substantive excerpts without a separate URL-fetch step.
+Web search powered by the Perplexity Search API.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import PerplexitySearchTool` |
+| Risk class | `write` |
+| Also exported as | `searchPerplexity` |
+| Key | `PERPLEXITY_API_KEY` |
+
+```python
+PerplexitySearchTool(
+    api_key: str | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | The search query (required). |
+| `options.max_results` | `integer` |  | Maximum number of results to return (1–20, default 10). |
+| `options.recency` | `string` |  | Filter results by how recently they were published. Use 'day' for breaking news, 'week' for recent events, 'month' for the past month, 'year' for the past year. One of `hour`, `day`, `week`, `month`, `year`. |
+| `options.domains` | `list[string]` |  | Restrict results to specific domains (e.g. ["openai.com", "arxiv.org"]). Up to 20 domains. |
+| `options.country` | `string` |  | Two-letter ISO 3166-1 country code to localise results (e.g. 'US', 'GB', 'DE'). |
+| `options.language` | `string` |  | ISO 639-1 language code (or list of codes) for results (e.g. 'en', 'fr'). Up to 20 languages. |
+| `options.after_date` | `string` |  | Only return results published after this date. Format: MM/DD/YYYY (e.g. '01/01/2025'). |
+| `options.before_date` | `string` |  | Only return results published before this date. Format: MM/DD/YYYY (e.g. '12/31/2025'). |
+
+```python
+result = PerplexitySearchTool()(
+    input="…",
+    options={"max_results": …},
+)
+```
+<!-- /g:tool -->
+
+Returns rich text snippets extracted from page content — the choice when an
+agent needs substantive excerpts without a separate fetch step.
 
 ```python
 from yait_aichain.tools import PerplexitySearchTool
 
 tool   = PerplexitySearchTool()
-result = tool(query="nuclear fusion breakthroughs 2025", max_results=5)
+result = tool(input="nuclear fusion breakthroughs 2025", options={"max_results": 5})
 
 print(result.output)
 ```
-
----
-
-## Requirements
-
-| | |
-|---|---|
-| Env var | `PERPLEXITY_API_KEY` |
-| Get a key | <https://www.perplexity.ai/settings/api> |
-| Endpoint | `POST https://api.perplexity.ai/search` |
-
-At construction time, the tool raises `ValueError` if no key is available — either pass `api_key=` or set `PERPLEXITY_API_KEY` in the environment.
-
----
-
-## Constructor
-
-```python
-PerplexitySearchTool(api_key: str | None = None)
-```
-
-- `api_key` — Perplexity key (`pplx-…`). Falls back to `PERPLEXITY_API_KEY`.
-
----
-
-## Parameters
-
-| Name | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `query` | `string` | ✓ | — | The search query. |
-| `max_results` | `integer` | | `10` | 1–20. |
-| `search_recency_filter` | `string` | | — | One of `hour`, `day`, `week`, `month`, `year`. |
-| `search_domain_filter` | `list[string]` | | — | Restrict to specific domains (up to 20). |
-| `country` | `string` | | — | ISO 3166-1 alpha-2 (e.g. `US`, `GB`, `DE`). |
-| `search_after_date_filter` | `string` | | — | `MM/DD/YYYY`. |
-| `search_before_date_filter` | `string` | | — | `MM/DD/YYYY`. |
-| `search_language_filter` | `list[string]` | | — | ISO 639-1 codes (e.g. `["en", "fr"]`). |
 
 ---
 
@@ -67,21 +66,21 @@ Search results for "nuclear fusion breakthroughs 2025" (5 results):
     Snippet: …
 ```
 
-Plain text is deliberate — it keeps the output visible in an agent's memory preview and avoids JSON parsing by downstream skills.
+Plain text is deliberate — it stays readable in an agent's conversation and
+needs no JSON parsing downstream.
 
 ---
 
 ## Usage
 
-### Direct call (errors wrapped in `ToolResult`)
+### Call-style (errors wrapped in `ToolResult`)
 
 ```python
 tool   = PerplexitySearchTool()
 result = tool(
-    query                  = "GPT-5 benchmark results",
-    max_results            = 8,
-    search_recency_filter  = "month",
-    search_domain_filter   = ["openai.com", "arxiv.org"],
+    input   = "GPT-5 benchmark results",
+    options = {"max_results": 8, "recency": "month",
+               "domains": ["openai.com", "arxiv.org"]},
 )
 
 if result:
@@ -93,33 +92,29 @@ else:
 ### Run-style (raises on error)
 
 ```python
-text = tool.run(
-    query       = "managed vector databases comparison 2025",
-    max_results = 10,
-    country     = "KZ",
-)
+tool = PerplexitySearchTool()
+text = tool.run(input="managed vector databases comparison 2025",
+                options={"max_results": 10, "country": "KZ"})
 ```
 
 ### In a Chain
 
+A Tool step receives the accumulated variables that match its parameters —
+`input` and `options` — so the third element renames a variable onto `input`.
+
 ```python
 from yait_aichain.chain import Chain
+from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.tools import PerplexitySearchTool
-from yait_aichain.models import Model
 
-query_skill = Skill(
-    model  = Model("gpt-4o-mini"),
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "text", "text": "Formulate a precise search query for: {topic}"}
-    ]}]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
-)
+query_skill = Skill(Model("gpt-4o-mini"),
+                    prompt="Write one precise web search query for: {topic}")
 
 chain = Chain(steps=[
-    (query_skill,              "search_query"),
-    (PerplexitySearchTool(),   "search_results", {"query": "search_query"}),
-    (analysis_skill,           "report"),
+    (query_skill,            "search_query"),
+    (PerplexitySearchTool(), "search_results", {"input": "search_query"}),
+    (analysis_skill,         "report"),
 ])
 
 chain.run(variables={"topic": "AI regulation in the EU (2025)"})
@@ -133,9 +128,8 @@ from yait_aichain.models import Model
 from yait_aichain.tools import PerplexitySearchTool
 
 agent = Agent(
-    model        = Model("claude-opus-4-6"),
+    Model("claude-opus-4-6"),
     tools        = [PerplexitySearchTool()],
-    mode         = "agile",
     stop_when    = [step_count(10)],
     instructions = "You are a research analyst. Prefer primary sources.",
 )
@@ -147,13 +141,17 @@ result = agent.run("Find and compare the top 3 cloud ERP vendors in 2025.")
 
 ## Notes
 
-- Unlike `brave_search`, Perplexity returns **snippets with substantive content**, not just ranked links — ideal for a single-hop research agent.
-- On non-2xx responses the tool raises `RuntimeError`. When called via the `tool(…)` style, the error is captured in `ToolResult.error`.
+- Unlike `searchBrave`, Perplexity returns **snippets with substantive content**,
+  not just ranked links — suited to a single-hop research agent.
+- On a non-2xx response the tool raises `RuntimeError`; called as `tool(…)`,
+  the error is captured in `ToolResult.error`.
+- An option the schema does not declare is refused before the request, with
+  the declared ones named — see [Tools](../primitives/tools.md).
 
 ---
 
 ## See also
 
-- [`brave_search`](brave-search.md) — alternative web search (ranked links).
-- [`openai_web_search`](openai-web-search.md) — OpenAI Responses API with built-in search.
-- [`serp_api_search`](serp-api.md) — any engine, any locale.
+- [`searchBrave`](brave-search.md) — ranked links.
+- [`searchOpenAI`](openai-web-search.md) — a synthesized answer with citations.
+- [`searchSerp`](serp-api.md) — any engine, any locale.

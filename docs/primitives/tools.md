@@ -105,6 +105,58 @@ raw = tool.run(input="…")       # raw   → bare output; raises on error
 `ToolResult` has `success: bool`, `output: Any`, `error: str | None`, and is
 truthy when `success`.
 
+### Governance: what a call may say, and what a tool may do
+
+**A call is checked against the schema.** The schema a tool declares is also
+the authority over its calls, one level into a declared object:
+
+- `tool(input=…, options={"recencyy": "day"})` warns with a `RuntimeWarning`
+  that names the accepted keys. It warns rather than refuses because the caller
+  is a person whose subclass may read an option its schema does not advertise.
+- Inside an Agent the caller is a model, so `check_args` turns a missing
+  required argument or an unknown key into a message the model reads and
+  corrects within its step budget — a bad call comes back as a tool result,
+  not as a crash.
+- `tool.unknown_keys(kwargs)` returns the offending paths, e.g.
+  `["options.recencyy"]`.
+
+**Risk is data on the tool.** `risk` is a class attribute — `read`, `draft`,
+`write` (the default), `external`, `financial`, `destructive`, `privileged` —
+and an Agent's `PermissionPolicy` reads it before the tool runs. With no policy
+attached it is inert, so you tag only the tools that matter.
+
+```python
+from yait_aichain.agent import Agent
+from yait_aichain.tools import Tool, PermissionPolicy, ApprovalDecision, FINANCIAL
+
+class IssueRefund(Tool):
+    name        = "issue_refund"
+    description = "Issue a refund to the customer."
+    risk        = FINANCIAL
+    parameters  = {"type": "object",
+                   "properties": {"amount": {"type": "number"}},
+                   "required": ["amount"]}
+
+    def run(self, amount, options=None):
+        return f"refunded {amount}"
+
+def manager(request):                  # an ApprovalRequest: tool, risk, arguments, call id
+    if request.arguments["amount"] <= 50:
+        return True
+    return ApprovalDecision(False, "refunds over $50 need a ticket")
+
+agent = Agent(model, tools=[IssueRefund()],
+              permissions=PermissionPolicy({"financial": "approve"}),
+              approve=manager)
+```
+
+`allow` runs the tool, `deny` never does, and `approve` asks `approve=` and
+runs only on a yes — **with no `approve=` attached, the call is refused**. A
+refusal reaches the model as a tool result carrying its reason. The full
+contract, including the approval events a UI consumes:
+[Observability](../agents/observability.md).
+[`examples/20_observability.py`](../../examples/20_observability.py) runs it offline.
+
 ### Provider function-calling schema
 
 Every tool exposes an OpenAI/Anthropic-ready schema via `tool.schema()` — useful
@@ -140,17 +192,13 @@ full step syntax.
 
 ### Built-in tools
 
-| Group | Tools |
-|---|---|
-| **Web search** | `PerplexitySearchTool`, `BraveSearchTool`, `OpenAIWebSearchTool`, `SerpApiTool` (functional forms: `searchPerplexity`, `searchBrave`, `searchOpenAI`, `searchSerp`) |
-| **Convert** | `convertToMD` / `MarkItDownTool` (→ Markdown), `convertToHTML` / `MistletoeTool` (→ HTML), `convertToPDF` / `WeasyprintTool` (→ PDF), `convertToText` |
-| **Speech** | `convertToSpeech`, `TTS` (`ttsOpenAI/Google/XAI/Qwen`), `STT` (`sttOpenAI/Google/XAI/Qwen`) |
-| **Embeddings** | `Embedding` + `EmbeddingOpenAI/Cohere/Voyage/Google/Qwen` |
-| **Vector DB** | `VectorDB`, `VectorStore` |
-| **HTTP** | `RestApiTool` — call any REST endpoint as a tool |
-| **Suspend** | `Wait`, `Gate` — pause a run for an external signal ([State](state.md)) |
+Search, conversion, speech, local files, vector-store operations, REST, MCP,
+and `Wait`/`Gate`. Every one — its wire name, class, key, risk class and full
+parameter table — is in the [Tools reference](../tools-reference/index.md),
+which is generated from the classes themselves.
 
-Per-tool parameters and examples: [Tools reference](../tools-reference/).
+Embeddings (`Embedding`), rerankers (`Reranker`) and vector stores (`VectorDB`)
+are not tools: they are what the vector tools are built from.
 
 ### Wait & Gate
 

@@ -60,7 +60,7 @@ Examples
 --------
 Standalone::
 
-    from tools.reranking import Reranker
+    from yait_aichain.tools.reranking import Reranker
 
     reranker = Reranker("cohere/rerank-v3.5")
     result   = reranker.rerank(
@@ -72,8 +72,8 @@ Standalone::
 
 With vectorQuery output (dicts preserved)::
 
-    from tools.vectordb  import VectorDB, vectorQuery
-    from tools.reranking import Reranker
+    from yait_aichain.tools.vectordb  import VectorDB, vectorQuery
+    from yait_aichain.tools.reranking import Reranker
 
     store     = VectorDB("chroma", "docs", embedder=...)
     candidates = vectorQuery(store).run("KV caching", {"n": 20})
@@ -84,7 +84,7 @@ With vectorQuery output (dicts preserved)::
 
 In a Chain::
 
-    from chain import Chain
+    from yait_aichain.chain import Chain
 
     pipeline = Chain(steps=[
         (vectorQuery(store),  "candidates", {"input": "{question}"}),
@@ -171,7 +171,7 @@ def Reranker(
     --------
     ::
 
-        from tools.reranking import Reranker
+        from yait_aichain.tools.reranking import Reranker
 
         r1 = Reranker("cohere/rerank-v3.5")
         r2 = Reranker("voyage/rerank-2")

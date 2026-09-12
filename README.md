@@ -1,6 +1,6 @@
 # aichain
 
-**The simplest way to build AI pipelines. 11 cloud providers + your own private server. 1 interface. Zero lock-in.**
+**The simplest way to build AI pipelines. <!-- g:count-providers -->11 cloud providers<!-- /g:count-providers --> + your own private server. 1 interface. Zero lock-in.**
 
 ```python
 from yait_aichain import Model, Skill
@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **88 models from 11 cloud providers** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
+All of these work identically across **<!-- g:count-models -->90 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
 
 ---
 
@@ -53,22 +53,30 @@ pip install fastmcp      # MCP server integration
 
 API keys — only for the providers you use:
 
+<!-- g:exports -->
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-…"
-export OPENAI_API_KEY="sk-…"
-export GOOGLE_AI_API_KEY="AIza…"
-export XAI_API_KEY="xai-…"
-export PERPLEXITY_API_KEY="pplx-…"
-export MOONSHOT_API_KEY="sk-…"      # Kimi
-export DEEPSEEK_API_KEY="sk-…"
-export DASHSCOPE_API_KEY="sk-…"     # Qwen
-export COHERE_API_KEY="…"           # embeddings + reranking
-export VOYAGE_API_KEY="…"           # embeddings + reranking
+export ANTHROPIC_API_KEY="…"
+export BFL_API_KEY="…"
+export DEEPSEEK_API_KEY="…"
+export GOOGLE_AI_API_KEY="…"
+export MOONSHOT_API_KEY="…"
+export OPENAI_API_KEY="…"
+export PERPLEXITY_API_KEY="…"
+export DASHSCOPE_API_KEY="…"
+export RECRAFT_API_TOKEN="…"
+export REVE_API_KEY="…"
+export XAI_API_KEY="…"
+export BRAVE_SEARCH_API_KEY="…"
+export COHERE_API_KEY="…"
+export GOOGLE_API_KEY="…"
+export SERPAPI_API_KEY="…"
+export VOYAGE_API_KEY="…"
 ```
+<!-- /g:exports -->
 
 ---
 
-## 12 providers, one syntax
+## Every provider, one syntax
 
 ```python
 from yait_aichain.models import Model

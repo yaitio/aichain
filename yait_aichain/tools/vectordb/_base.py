@@ -308,8 +308,8 @@ class VectorStore:
     --------
     With auto-embedding::
 
-        from tools.embedding import Embedding
-        from tools.vectordb  import VectorDB
+        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools.vectordb  import VectorDB
 
         store = VectorDB(
             "chroma",

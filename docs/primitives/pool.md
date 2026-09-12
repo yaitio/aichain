@@ -52,9 +52,19 @@ Deep dive ↓
 
 ### Constructor
 
+<!-- g:pool-signature -->
 ```python
-Pool(runner, items, max_flows=10, on_error="collect", name=None, description=None)
+Pool(
+    runner,
+    items: list[dict],
+    max_flows: int = 10,
+    on_error: str = 'collect',
+    name: str | None = None,
+    description: str | None = None,
+    max_cost = None,
+)
 ```
+<!-- /g:pool-signature -->
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -81,11 +91,14 @@ results = pool.run(variables={"language": "English"})   # every item gets langua
 
 ### `on_error` modes
 
+<!-- g:policy -->
 | Mode | Behaviour |
 |---|---|
-| `"raise"` | The first item error aborts the whole pool and propagates. |
-| `"collect"` (default) | Record the error; that item's result is `None`; other items continue. |
-| `"skip"` | Like `collect`, but also emit a warning. |
+| `"raise"` | The first failing item propagates out of `run()`. |
+| `"stop"` | Start no further items; items already running finish. Every failed or unstarted item is `None` in the results. |
+| `"skip"` | That item's result is `None`, a `RuntimeWarning` names it, the others continue. |
+| `"collect"` (default) | That item's result is `None` and its error is in `history`; the others continue, silently. |
+<!-- /g:policy -->
 
 ### Monitoring: `status` and `history`
 

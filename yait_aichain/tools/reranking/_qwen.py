@@ -69,7 +69,7 @@ class RerankQwen(RerankBase):
     --------
     ::
 
-        from tools.reranking import Reranker
+        from yait_aichain.tools.reranking import Reranker
 
         reranker = Reranker("qwen/gte-rerank")
         result   = reranker.rerank(

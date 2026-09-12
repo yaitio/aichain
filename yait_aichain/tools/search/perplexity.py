@@ -79,7 +79,7 @@ class searchPerplexity(Search):
     --------
     Basic search::
 
-        from tools.search import searchPerplexity
+        from yait_aichain.tools.search import searchPerplexity
 
         tool   = searchPerplexity()
         result = tool(input="nuclear fusion breakthroughs 2025",

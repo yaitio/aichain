@@ -5,6 +5,8 @@ key      = "perplexity"
 client   = "perplexity"
 base_url = "https://api.perplexity.ai"
 env_key  = "PERPLEXITY_API_KEY"
+label    = "Perplexity"
+keys_url = "https://www.perplexity.ai/settings/api"
 auth     = "bearer"
 max_tokens_field = "max_completion_tokens"
 

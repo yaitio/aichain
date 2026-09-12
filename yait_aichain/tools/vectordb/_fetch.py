@@ -11,7 +11,7 @@ Chain usage
 -----------
 ::
 
-    from tools.vectordb import VectorDB, vectorFetch
+    from yait_aichain.tools.vectordb import VectorDB, vectorFetch
 
     store = VectorDB("qdrant", collection="docs")
     tool  = vectorFetch(store)

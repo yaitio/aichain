@@ -62,21 +62,25 @@ Set keys only for the providers you use — or none at all: a model you host
 yourself needs no key and sends nothing outside your network. See
 [Private models](private-models.md).
 
-| Provider | Environment variable | Get a key |
+<!-- g:install-keys -->
+| Service | Environment variable | Get a key |
 |---|---|---|
-| Anthropic | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
-| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) |
-| Google AI | `GOOGLE_AI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
-| xAI | `XAI_API_KEY` | [console.x.ai](https://console.x.ai) |
-| Perplexity | `PERPLEXITY_API_KEY` | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
-| Kimi | `MOONSHOT_API_KEY` | [platform.moonshot.cn](https://platform.moonshot.cn) |
-| DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
-| Qwen | `DASHSCOPE_API_KEY` | [dashscope.aliyuncs.com](https://dashscope.aliyuncs.com) |
-| Cohere | `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com) |
-| Voyage | `VOYAGE_API_KEY` | [dash.voyageai.com](https://dash.voyageai.com) |
-| Brave Search | `BRAVE_SEARCH_API_KEY` | [brave.com/search/api](https://brave.com/search/api) |
-| SerpAPI | `SERP_API_KEY` | [serpapi.com](https://serpapi.com) |
-| DeepL | `DEEPL_API_KEY` | [deepl.com/pro-api](https://www.deepl.com/pro-api) |
+| Anthropic | `ANTHROPIC_API_KEY` | <https://console.anthropic.com/settings/keys> |
+| Black Forest Labs (FLUX) | `BFL_API_KEY` | — |
+| DeepSeek | `DEEPSEEK_API_KEY` | <https://platform.deepseek.com/api_keys> |
+| Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
+| Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |
+| OpenAI | `OPENAI_API_KEY` | <https://platform.openai.com/api-keys> |
+| Perplexity | `PERPLEXITY_API_KEY` | <https://www.perplexity.ai/settings/api> |
+| Qwen (DashScope) | `DASHSCOPE_API_KEY` | <https://dashscope.aliyuncs.com> |
+| Recraft | `RECRAFT_API_TOKEN` | — |
+| Reve | `REVE_API_KEY` | — |
+| xAI | `XAI_API_KEY` | <https://console.x.ai/> |
+| Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
+| SerpAPI | `SERPAPI_API_KEY` | <https://serpapi.com> |
+| Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
+| Voyage | `VOYAGE_API_KEY` | <https://dash.voyageai.com> |
+<!-- /g:install-keys -->
 
 Set for the current session:
 

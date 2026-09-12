@@ -86,8 +86,8 @@ class PineconeBackend(VectorBackend):
     --------
     ::
 
-        from tools.vectordb import VectorDB
-        from tools.embedding import Embedding
+        from yait_aichain.tools.vectordb import VectorDB
+        from yait_aichain.tools.embedding import Embedding
 
         store = VectorDB(
             "pinecone",

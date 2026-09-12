@@ -89,7 +89,7 @@ class searchOpenAI(Search):
     --------
     Basic search::
 
-        from tools.search import searchOpenAI
+        from yait_aichain.tools.search import searchOpenAI
 
         tool   = searchOpenAI()
         result = tool(input="nuclear fusion breakthroughs 2025")

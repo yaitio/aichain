@@ -13,9 +13,9 @@ Typical usage — Skills only
 -----------------------------
 ::
 
-    from models import Model
-    from skills import Skill
-    from chain  import Chain
+    from yait_aichain.models import Model
+    from yait_aichain.skills import Skill
+    from yait_aichain.chain  import Chain
 
     analyst = Skill(
         model=Model("gpt-4o"),
@@ -47,8 +47,8 @@ Typical usage — Mixed Tool + Skill pipeline
 --------------------------------------------
 ::
 
-    from tools import MarkItDownTool
-    from chain import Chain
+    from yait_aichain.tools import MarkItDownTool
+    from yait_aichain.chain import Chain
 
     fetch      = MarkItDownTool()          # Tool: converts URL → Markdown
     cleaner    = Skill(...)                # Skill: strips boilerplate
@@ -97,7 +97,7 @@ detail in code::
     chain.save("chains/my_chain.yaml")
 
     # Load — API keys resolved from environment variables automatically
-    from chain import Chain
+    from yait_aichain.chain import Chain
     chain = Chain.load("chains/my_chain.yaml")
     result = chain.run(variables={"topic": "AI", "language": "French"})
 

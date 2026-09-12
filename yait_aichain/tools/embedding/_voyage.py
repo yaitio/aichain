@@ -54,7 +54,7 @@ class EmbeddingVoyage(Embedder):
     --------
     ::
 
-        from tools.embedding import Embedding
+        from yait_aichain.tools.embedding import Embedding
 
         embedder = Embedding("voyage/voyage-3-large")
         result   = embedder.embed(

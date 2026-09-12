@@ -11,8 +11,8 @@ Chain usage
 -----------
 ::
 
-    from tools.vectordb import VectorDB, vectorUpsert
-    from tools.embedding import Embedding
+    from yait_aichain.tools.vectordb import VectorDB, vectorUpsert
+    from yait_aichain.tools.embedding import Embedding
 
     store = VectorDB(
         "qdrant",

@@ -23,3 +23,7 @@ jobs:
       - run: pip install -e ".[all]" pytest pytest-asyncio
       # *Live* tests hit real provider APIs (keys + network) — skipped in CI.
       - run: pytest -k "not Live"
+      # Generated pages: the tests hold them too, but a named step says which
+      # page went stale and how to regenerate it, instead of a diff in a log.
+      - run: python scripts/docs.py --check
+      - run: python scripts/examples_index.py --check

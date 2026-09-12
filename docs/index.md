@@ -8,7 +8,7 @@ Text, image, and video — route to any AI model through a single, centralized i
 
 ## What it is
 
-aichain is a pure-Python library that sits between your application and the AI providers you use. It normalises the differences between OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek — and a private server of your own (vLLM, Ollama, LM Studio), where nothing leaves your perimeter — into one universal interface, then gives you programmable building blocks to compose those models into pipelines, tools, and autonomous agents.
+aichain is a pure-Python library that sits between your application and the AI providers you use. It normalises the differences between the providers listed below — and a private server of your own (vLLM, Ollama, LM Studio), where nothing leaves your perimeter — into one universal interface, then gives you programmable building blocks to compose those models into pipelines, tools, and autonomous agents.
 
 ```
 Your code
@@ -63,12 +63,15 @@ Model("deepseek-chat")       # DeepSeek
 
 ## What the gateway routes
 
-| Modality | Supported providers |
+<!-- g:modalities -->
+| Modality | Providers |
 |---|---|
-| **Text → Text** | OpenAI, Anthropic, Google, xAI, Perplexity, Kimi, DeepSeek, [your own private server](getting-started/private-models.md) |
-| **Text → Image** | OpenAI (gpt-image-1), Google (Imagen via Gemini), xAI (Aurora) |
-| **Image → Text** | OpenAI, Anthropic, Google, xAI, Kimi (k2.5) |
-| **Text → Search** | Perplexity (sonar), OpenAI web search, Brave, SerpAPI |
+| **Text → Text** | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI, [your own private server](getting-started/private-models.md) |
+| **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
+| **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| **Web search** (a tool) | `searchBrave`, `searchOpenAI`, `searchPerplexity`, `searchSerp` |
+<!-- /g:modalities -->
 
 ---
 
@@ -80,8 +83,7 @@ Model("deepseek-chat")       # DeepSeek
 | Different response parsing per provider | One `skill.run()` returns clean Python |
 | Switching models requires rewriting code | Change the model name, nothing else |
 | Building pipelines is manual glue code | Chain wires steps together automatically |
-| LLMs truncate long document outputs | Sectional generation — no length limits |
-| Complex research tasks need custom agents | Agent handles planning, tools, reflection |
+| Tool-using loops are hand-rolled per project | Agent runs one loop: tools or an answer each turn, `stop_when` decides the end |
 
 ---
 
@@ -99,9 +101,9 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 **[Pool](primitives/pool.md)** — run one Skill or Chain across many inputs in parallel. Total time is the slowest item, not the sum.
 
-**[Agent](agents/overview.md)** — an autonomous engine that plans, acts with tools, reflects, and replans. Runs inside a Chain or standalone.
+**[Agent](agents/overview.md)** — one loop: each turn the model calls tools or answers, and `stop_when` decides when the run ends. Runs inside a Chain or standalone.
 
-**[State](primitives/state.md)** — suspend a Chain or Agent until an external signal (human, webhook, cron) and resume later, even in another process.
+**[State](primitives/state.md)** — park a Chain until an external signal (human, webhook, cron) and resume it later, even in another process. An agent's state is its conversation, so it needs no suspend.
 
 **[Eval](primitives/eval.md)** — run the same cases through several models, prompts or modes, several times each, and get accuracy, reliability and cost side by side. Reports on other benchmarks' data too.
 
@@ -109,13 +111,9 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 ## What's in the box
 
-**11 cloud providers + your own** — OpenAI, Anthropic, Google AI, xAI, Perplexity, Kimi, DeepSeek, Qwen, Recraft, BFL (FLUX), Reve, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
+<!-- g:provider-list -->**11 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, Reve, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
 **Built-in tools** — web search (Perplexity, Brave, SerpAPI, OpenAI), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
-
-**Sectional document generation** — produce documents of any length without hitting output token limits. Each section is an independent model call; sections are assembled in order at the end.
-
-**Multilingual search** — Professional and Expert pipelines automatically search in the local language(s) of the target geography alongside English.
 
 **Full persistence** — Skills and Chains serialise to YAML. API keys are never stored.
 
@@ -137,3 +135,4 @@ See [Installation](getting-started/installation.md) for optional dependencies an
 - **First working example** → [Quickstart](getting-started/quickstart.md)
 - **Understand the design** → [Concepts](getting-started/concepts.md)
 - **All model options** → [Models](primitives/models.md)
+- **Why it is built this way** → design notes: [the default agent](design/default-agent.md) · [streaming to a UI](design/streaming-to-a-ui.md) · [image editing](design/image-edit.md) · [the 2026-09-13 audit](design/audit-2026-09-13.md) and its [cleanup plan](design/cleanup-plan-2026-09-13.md)

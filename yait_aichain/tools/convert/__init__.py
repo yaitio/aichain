@@ -110,7 +110,7 @@ def TTS(provider: str, *, api_key: "str | None" = None) -> convertToSpeech:
     --------
     ::
 
-        from tools.convert import TTS
+        from yait_aichain.tools.convert import TTS
 
         tts  = TTS("openai")
         path = tts.run(input="Hello!", options={"voice": "nova"})
@@ -157,7 +157,7 @@ def STT(provider: str, *, api_key: "str | None" = None) -> convertToText:
     --------
     ::
 
-        from tools.convert import STT
+        from yait_aichain.tools.convert import STT
 
         stt  = STT("openai")
         text = stt.run(input="meeting.mp3", options={"language": "en"})

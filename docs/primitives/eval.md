@@ -83,6 +83,7 @@ contains(all_of=True)         # every expected string present; partial score
 regex()                       # expect is a pattern
 numeric(tolerance=0.5)        # first number in the answer
 judge(model, rubric="...")    # an LLM decides
+pairwise(model, rubric="...") # an LLM compares the answer with case.expect, both orderings
 all_of(a, b)                  # every scorer must pass
 ```
 
@@ -93,6 +94,40 @@ an `(ok, score)` pair, or a dict with `ok`.
 model and prompt for every arm**, and check it with controls before trusting
 it. A verdict it cannot parse raises rather than defaulting to a pass —
 guessing "pass" lifts every arm at once and reads as a good day.
+
+### Comparing with a champion: `pairwise`
+
+LLM judges prefer whichever answer they read first, so a single-ordering
+comparison measures that preference as much as quality. `pairwise` puts the
+pair twice, candidate first and champion first, and the candidate **wins only
+by winning both**. A disagreement between the orderings is the position bias
+showing itself, and it resolves **to the champion** — the challenger carries
+the burden, which keeps a best-so-far from drifting on noise.
+
+```python
+score = pairwise(Model("claude-sonnet-4-6"), champion="the current prompt")
+# the champion is case.expect; each row records whether the orderings agreed
+```
+
+### A judge that cannot judge: `abstain`
+
+A scorer that cannot read an answer returns `abstain(why)` instead of a
+verdict. The row carries `ok=False`, so nothing that ignores the flag can read
+it as a pass, and `Report` **removes it from the denominator** rather than
+scoring it zero: "wrong" and "unreadable by the instrument" are different
+claims.
+
+```python
+def score(case, output):
+    verdict = parse(output)
+    if verdict is None:
+        return abstain("no verdict line in the judge's reply")
+    return verdict == case.expect
+```
+
+The exclusions are counted, never hidden: the `n/j` column of
+`report.table()` is how many rows the judge declined for each arm, and
+`report.abstentions(arm)` returns the number.
 
 ---
 
@@ -119,12 +154,14 @@ themselves are worthless.
 ## Validity guards
 
 ```python
-report.reject(max_empty=2, max_errors=5)
-# {'arm-c': '7 errors'}
+report.reject(max_empty=2, max_errors=5, max_abstained=0.2)
+# {'arm-c': '7 errors', 'arm-d': '9 of 30 unscored — the judge could not read them'}
 ```
 
-A cell with too many empty outputs or provider errors is **absent from every
-figure**, not scored as zero. A zero is a measurement; a rejected cell is the
+A cell with too many empty outputs, provider errors, or abstentions — more
+than a fifth of its rows by default — is **absent from every figure**, not
+scored as zero. Past that share a judge has not measured the arm, and the
+number that survives the exclusions is not worth printing. A zero is a measurement; a rejected cell is the
 absence of one, and printing it as zero invents a result.
 
 ---

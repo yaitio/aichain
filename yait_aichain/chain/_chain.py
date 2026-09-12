@@ -237,10 +237,10 @@ class Chain:
     --------
     Mixed Skill + Tool pipeline — fetch a URL, clean it, translate it::
 
-        from models import Model
-        from skills import Skill
-        from tools  import MarkItDownTool
-        from chain  import Chain
+        from yait_aichain.models import Model
+        from yait_aichain.skills import Skill
+        from yait_aichain.tools  import MarkItDownTool
+        from yait_aichain.chain  import Chain
 
         fetch      = MarkItDownTool()
         cleaner    = Skill(model=Model("gpt-4o"), ...)
@@ -932,7 +932,7 @@ class Chain:
         -------
         ::
 
-            from chain import Chain
+            from yait_aichain.chain import Chain
 
             chain  = Chain.load("chains/analyse_and_translate.yaml")
             result = chain.run(variables={"topic": "AI safety",

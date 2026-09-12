@@ -29,15 +29,15 @@ Quick examples
 --------------
 ::
 
-    from tools import MCPTools, MCPTool
+    from yait_aichain.tools import MCPTools, MCPTool
 
     # ── Discover all tools on a server ─────────────────────────────────
     tools = MCPTools("https://api.example.com/mcp")
     # → [MCPTool("search"), MCPTool("summarise"), ...]
 
     # ── Use in an Agent ────────────────────────────────────────────────
-    from agent import Agent
-    from models import Model
+    from yait_aichain.agent import Agent
+    from yait_aichain.models import Model
 
     agent = Agent(
         model = Model("claude-sonnet-4-6"),
@@ -377,7 +377,7 @@ class MCPTool(Tool):
     --------
     ::
 
-        from tools import MCPTool
+        from yait_aichain.tools import MCPTool
 
         # ── HTTP server ────────────────────────────────────────────────
         tool = MCPTool(
@@ -396,7 +396,7 @@ class MCPTool(Tool):
         result = tool.run(input={"path": "/tmp"})
 
         # ── Use in a Chain step ────────────────────────────────────────
-        from chain import Chain
+        from yait_aichain.chain import Chain
         chain = Chain(steps=[
             (tool, "files"),
         ])
@@ -642,9 +642,9 @@ def MCPTools(
     --------
     ::
 
-        from tools import MCPTools
-        from agent import Agent
-        from models import Model
+        from yait_aichain.tools import MCPTools
+        from yait_aichain.agent import Agent
+        from yait_aichain.models import Model
 
         # ── HTTP server ────────────────────────────────────────────────
         tools = MCPTools("https://api.example.com/mcp")
