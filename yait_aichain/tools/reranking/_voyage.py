@@ -53,7 +53,7 @@ class RerankVoyage(RerankBase):
     --------
     ::
 
-        from tools.reranking import Reranker
+        from yait_aichain.tools.reranking import Reranker
 
         reranker = Reranker("voyage/rerank-2")
         result   = reranker.rerank(

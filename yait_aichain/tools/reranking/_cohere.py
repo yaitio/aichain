@@ -54,7 +54,7 @@ class RerankCohere(RerankBase):
     --------
     ::
 
-        from tools.reranking import Reranker
+        from yait_aichain.tools.reranking import Reranker
 
         reranker = Reranker("cohere/rerank-v3.5")
         result   = reranker.rerank(

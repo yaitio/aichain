@@ -53,8 +53,8 @@ Examples
 Parse files in parallel::
 
     import os
-    from tools.convert import convertToMD
-    from pool import Pool
+    from yait_aichain.tools.convert import convertToMD
+    from yait_aichain.pool import Pool
 
     files  = [{"source": f} for f in os.listdir("./documents")]
     pool   = Pool(convertToMD(), items=files, max_flows=5)
@@ -63,8 +63,8 @@ Parse files in parallel::
 
 Fetch 20 URLs, shared variable merged in::
 
-    from tools.convert import convertToMD
-    from pool import Pool
+    from yait_aichain.tools.convert import convertToMD
+    from yait_aichain.pool import Pool
 
     pool  = Pool(
         convertToMD(),
@@ -77,7 +77,7 @@ Fetch 20 URLs, shared variable merged in::
 Progress monitoring while running::
 
     import threading, time
-    from pool import Pool, DONE, FAILED
+    from yait_aichain.pool import Pool, DONE, FAILED
 
     pool   = Pool(my_skill, items=items, max_flows=8)
     thread = threading.Thread(target=pool.run)
@@ -93,8 +93,8 @@ Progress monitoring while running::
 
 Use a Chain as runner (multi-step pipeline per item)::
 
-    from chain import Chain
-    from pool  import Pool
+    from yait_aichain.chain import Chain
+    from yait_aichain.pool  import Pool
 
     per_item = Chain(steps=[fetch_tool, summarize_skill])
     pool     = Pool(per_item, items=[{"url": u} for u in urls])

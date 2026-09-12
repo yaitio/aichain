@@ -5,6 +5,8 @@ key      = "google"
 client   = "google"
 base_url = "https://generativelanguage.googleapis.com/v1beta"
 env_key  = "GOOGLE_AI_API_KEY"
+label    = "Google AI"
+keys_url = "https://aistudio.google.com/app/apikey"
 auth     = "x-goog-api-key"
 max_tokens_field = "maxOutputTokens"
 

@@ -91,17 +91,33 @@ Model(name, options=None, client_options=None, api_key=None)
 
 ### `options` — generation parameters
 
-One vocabulary for every provider; a provider silently ignores a key it doesn't
-use.
+One vocabulary for every provider. Where a provider has no control for an
+option, the library declines it and says so — it is never dropped silently.
 
-| Key | Type | Notes |
+<!-- g:model-options -->
+| Key | What it asks for | Providers with a control for it |
 |---|---|---|
-| `temperature` | `float` | Sampling temperature. Reasoning models set their own and refuse it; when that happens the library says so rather than dropping it quietly. |
-| `max_tokens` | `int` | Maximum output tokens. |
-| `top_p` | `float` | Nucleus sampling mass. |
-| `top_k` | `int` | Top-K sampling. Anthropic and Google take it; the OpenAI-compatible wire has no such field and it is declined with a notice — see [Parameters, per provider](../reference/parameters.md). |
-| `cache_control` | `bool` | Enable provider-level prompt caching. Anthropic is the one provider with an explicit breakpoint; the others cache implicitly and the saving shows in the usage report instead. |
-| `reasoning` | `None`\|`"low"`\|`"medium"`\|`"high"` | Universal reasoning depth (below). |
+| `temperature` | how much randomness the model is allowed | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
+| `top_p` | nucleus sampling: the probability mass to sample from | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
+| `top_k` | sample only from the k most likely tokens | Anthropic, Google AI |
+| `max_tokens` | ceiling on the answer's length | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
+| `reasoning` | how much deliberation before answering: low / medium / high | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
+| `cache_control` | cache the stable prefix so a repeated one is not re-billed | Anthropic |
+| `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | Anthropic |
+
+`output["format"]` keys, asked per call rather than per model. ✓ marks a key whose loss changes *what* you get rather than how good it is — the set `Model(on_unsupported="requirements")` raises for.
+
+| Key | What it asks for | ✓ | Providers that read it |
+|---|---|---|---|
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| `quality` | how much work to spend on the render |  | OpenAI, Reve |
+| `background` | transparent, opaque, or let the model decide | ✓ | OpenAI, Reve |
+| `output_format` | the file format to return: png, jpeg, webp | ✓ | Black Forest Labs (FLUX), OpenAI |
+| `compression` | compression level for jpeg and webp, 0-100 | ✓ | OpenAI |
+| `seed` | fix the randomness so the same prompt renders the same way | ✓ | Black Forest Labs (FLUX) |
+| `fidelity` | how much of the original survives an edit: 0 to 1, or 'low'/'high'. One axis, and providers run it both ways — OpenAI asks how much to preserve, Recraft how much to change, so the number is inverted for the latter | ✓ | OpenAI, Recraft |
+<!-- /g:model-options -->
 
 An option this library has no word for **raises at construction**, naming the
 ones that exist — a misspelt `temperatur` used to be accepted, ignored, and
@@ -152,7 +168,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (11 cloud providers, 88 models — the `private` provider
+and is tested with (<!-- g:count-models -->90 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
 deliberately lists none, because its catalogue belongs to your server):
 
 ```python

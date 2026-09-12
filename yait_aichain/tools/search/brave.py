@@ -74,7 +74,7 @@ class searchBrave(Search):
     --------
     Basic search::
 
-        from tools.search import searchBrave
+        from yait_aichain.tools.search import searchBrave
 
         tool   = searchBrave()
         result = tool(input="Python asyncio tutorial",

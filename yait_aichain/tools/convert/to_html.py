@@ -56,7 +56,7 @@ class convertToHTML(Tool):
     --------
     Convert to HTML::
 
-        from tools.convert import convertToHTML
+        from yait_aichain.tools.convert import convertToHTML
 
         tool = convertToHTML()
 

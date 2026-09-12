@@ -10,7 +10,7 @@ Chain usage
 -----------
 ::
 
-    from tools.vectordb import VectorDB, vectorDelete
+    from yait_aichain.tools.vectordb import VectorDB, vectorDelete
 
     store = VectorDB("chroma", collection="docs")
     tool  = vectorDelete(store)

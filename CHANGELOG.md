@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
-**The examples run, and the index cannot describe one that does not.** Stage 1
-of `docs/design/cleanup-plan-2026-09-13.md`. No library code changed.
+## [2.18.1] — 2026-09-13
 
-### Fixed
+**The examples run, the docs are generated from the code, and two speech tools
+construct.** Stages 1 and 2 of `docs/design/cleanup-plan-2026-09-13.md`.
+The library changes are small and all fixes: `sttQwen`/`ttsQwen` imported a
+package that has not existed since 2.0, and the Google speech tools ignored
+the Google provider's key.
+
+### Fixed — stage 1, examples
 
 - **Three examples could not construct their agent for the whole 2.x line**
   and the index described all three as working. `16_debug.py` now uses the
@@ -29,10 +34,57 @@ of `docs/design/cleanup-plan-2026-09-13.md`. No library code changed.
   now carries a `Required env vars:` block, and one without it stops the
   generator.
 
+### Fixed — stage 2, documentation generated from data
+
+- **`sttQwen()` could not be constructed, and `ttsQwen` failed on a region
+  override.** Both imported `clients._families.qwen` — the pre-2.0 top-level
+  layout. The same spelling sat in some eighty docstring examples; all now
+  import `yait_aichain.*`.
+- `ttsGoogle` and `sttGoogle` read only `GOOGLE_API_KEY`; they now read
+  `GOOGLE_AI_API_KEY` first, the Google provider's key, as the embeddings do.
+- **Every tool page called its tool with keywords no tool accepts** —
+  `tool(query=…, max_results=5)`, `run(source=…)`, `run(text=…, format=…)` —
+  36 calls on seven pages, and Chain input maps naming parameters that do not
+  exist. A Tool is called with `input` and `options`; the pages now say so.
+- `docs/reference/model-registry.md` listed 67 of 90 models and a `REGISTRY`
+  constant that does not exist; `environment-variables.md` and
+  `installation.md` named keys the library does not read (`DEEPL_API_KEY`,
+  `LATE_API_KEY`, `SERP_API_KEY`) and missed four it does; `docs/index.md`
+  listed three image providers of seven and headlined "sectional generation"
+  and "Professional and Expert pipelines", neither of which exists;
+  `tools-reference` described `convertToText` as text extraction (it is
+  speech-to-text).
+- `concepts.md` taught a plan/act/reflect agent with `max_attempts`;
+  `overview.md` called `waterfall` the default; `agent-as-chain-step.md`
+  listed `executors` and `memory` among what `Chain.save` handles. All three
+  describe the 2.x loop now.
+
+### Changed — stage 2
+
+- **`scripts/docs.py` generates every data table in the docs** between
+  `<!-- g:NAME -->` markers: the provider/modality table, the whole model
+  registry with prices, the provider and tool key tables, the install key
+  table, the tools index, a page per tool (search, conversion, speech, local,
+  vector store, REST, MCP, Wait/Gate — 30 tools, up from 7), the Chain and
+  Pool error-policy tables, `Pool`'s signature, the model option vocabulary,
+  and the headline counts. `--check` runs in CI.
+- Provider data carries `label` and, where a source documents one, `keys_url`.
+- `primitives/tools.md` gained the governance section it never had — schema
+  checks on a call, `risk`, `PermissionPolicy`, `approve=`.
+- `primitives/eval.md` documents `pairwise`, `abstain`, the `n/j` column and
+  the abstention rejection.
+- `docs/index.md` links the design notes.
+
 ### Tests
 
 - The bind test reads `examples/*.py` and `examples/README.md`, and checks
   `Model(` beside the four primitives.
+- `tests/test_docs_generated.py` holds every generated page, fails when an
+  exported tool has no page, and checks that tool pages call tools with
+  `input`/`options`, name only declared options, and map Chain inputs onto
+  parameters that exist.
+- `tests/test_no_flat_imports.py` — no source line imports the pre-2.0 layout,
+  and every tool that needs only a key constructs.
 - `tests/test_examples_index.py` holds both generated pages and executes the
   examples that need no key and no network (`18`, `20`), checking each for the
   thing it exists to show.

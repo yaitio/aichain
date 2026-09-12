@@ -11,6 +11,7 @@ key      = "bfl"
 client   = "bfl"
 base_url = "https://api.bfl.ai"
 env_key  = "BFL_API_KEY"
+label    = "Black Forest Labs (FLUX)"
 auth     = "x-key"
 
 [provider.options]

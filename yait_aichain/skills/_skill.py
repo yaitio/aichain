@@ -128,8 +128,8 @@ class Skill:
     --------
     Text output (minimal — ``output`` omitted, shorthand parts)::
 
-        from models import Model
-        from skills import Skill
+        from yait_aichain.models import Model
+        from yait_aichain.skills import Skill
 
         skill = Skill(
             model=Model("gpt-4o"),
@@ -685,7 +685,7 @@ class Skill:
         -------
         ::
 
-            from skills import Skill
+            from yait_aichain.skills import Skill
 
             skill  = Skill.load("skills/translation.yaml")
             result = skill.run(variables={"text": "Hello, world!"})

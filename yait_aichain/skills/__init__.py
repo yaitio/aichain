@@ -13,8 +13,8 @@ Typical usage
 -------------
 ::
 
-    from models import Model
-    from skills import Skill
+    from yait_aichain.models import Model
+    from yait_aichain.skills import Skill
 
     model = Model("gpt-4o")
 

@@ -205,7 +205,7 @@ class ttsOpenAI(convertToSpeech):
     --------
     ::
 
-        from tools.convert import ttsOpenAI
+        from yait_aichain.tools.convert import ttsOpenAI
 
         tool = ttsOpenAI()
 
@@ -316,7 +316,7 @@ class ttsGoogle(convertToSpeech):
     --------
     ::
 
-        from tools.convert import ttsGoogle
+        from yait_aichain.tools.convert import ttsGoogle
 
         tool = ttsGoogle()
         path = tool.run(
@@ -346,7 +346,10 @@ class ttsGoogle(convertToSpeech):
     }
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or os.environ.get("GOOGLE_API_KEY")
+        # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
+        # the older spelling. Embeddings accept both, and so does this.
+        self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
+                         or os.environ.get("GOOGLE_API_KEY"))
         # No ValueError here — ADC may be available even without an explicit key.
 
     def run(self, input: str, options: dict | None = None) -> str:
@@ -443,7 +446,7 @@ class ttsXAI(convertToSpeech):
     --------
     ::
 
-        from tools.convert import ttsXAI
+        from yait_aichain.tools.convert import ttsXAI
 
         tool = ttsXAI()
         path = tool.run(
@@ -560,7 +563,7 @@ class ttsQwen(convertToSpeech):
     --------
     ::
 
-        from tools.convert import ttsQwen
+        from yait_aichain.tools.convert import ttsQwen
 
         tool = ttsQwen()
 
@@ -617,7 +620,7 @@ class ttsQwen(convertToSpeech):
         )
 
     def _base_url(self) -> str:
-        from clients._families.qwen import resolve_qwen_base_url
+        from ...clients._families.qwen import resolve_qwen_base_url
         return resolve_qwen_base_url(self._region)
 
     def run(self, input: str, options: dict | None = None) -> str:
@@ -650,7 +653,7 @@ class ttsQwen(convertToSpeech):
 
         # Override region from options if provided
         if region and region != self._region:
-            from clients._families.qwen import resolve_qwen_base_url
+            from ...clients._families.qwen import resolve_qwen_base_url
             base_url = resolve_qwen_base_url(region)
         else:
             base_url = self._base_url()

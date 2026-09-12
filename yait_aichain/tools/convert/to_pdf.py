@@ -65,7 +65,7 @@ class convertToPDF(Tool):
     --------
     From an HTML string, save to file::
 
-        from tools.convert import convertToPDF
+        from yait_aichain.tools.convert import convertToPDF
 
         tool = convertToPDF()
 
@@ -97,7 +97,7 @@ class convertToPDF(Tool):
 
     Chained with convertToHTML::
 
-        from tools.convert import convertToHTML, convertToPDF
+        from yait_aichain.tools.convert import convertToHTML, convertToPDF
 
         html = convertToHTML().run(input=markdown_text, options={"format": "html"})
         convertToPDF().run(input=html, options={"output_path": "document.pdf"})

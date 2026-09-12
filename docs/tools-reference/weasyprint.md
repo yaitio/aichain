@@ -1,15 +1,45 @@
-# `weasyprint` — `WeasyprintTool`
+<!-- g:tool -->
+# `convertToPDF` — `WeasyprintTool`
 
-Render HTML to **PDF** using [WeasyPrint](https://weasyprint.org/). Accepts either a raw HTML string or a path to an HTML file; returns either the saved PDF's path or raw bytes.
+Render an HTML document to PDF.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import WeasyprintTool` |
+| Risk class | `write` |
+| Also exported as | `convertToPDF` |
+
+```python
+WeasyprintTool(
+    *args,
+    **kwargs,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | HTML content as a string, or path to an existing HTML file. |
+| `options.output_path` | `string` |  | Destination file path for the PDF. Returns raw bytes when omitted. |
+| `options.base_url` | `string` |  | Base URL for resolving relative asset references in the HTML. |
+
+```python
+result = WeasyprintTool()(
+    input="…",
+    options={"output_path": …},
+)
+```
+<!-- /g:tool -->
+
+Renders HTML to **PDF** with [WeasyPrint](https://weasyprint.org/). Takes a raw
+HTML string or a path to an HTML file; returns the saved file's path, or the
+PDF bytes when no path is given.
 
 ```python
 from yait_aichain.tools import WeasyprintTool
 
 tool = WeasyprintTool()
-path = tool.run(source="<h1>Hello</h1>", output_path="hello.pdf")
+path = tool.run(input="<h1>Hello</h1>", options={"output_path": "hello.pdf"})
 ```
-
-> Note: the class is **`WeasyprintTool`** (lowercase `p`), matching `tools/__init__.py`.
 
 ---
 
@@ -19,26 +49,14 @@ path = tool.run(source="<h1>Hello</h1>", output_path="hello.pdf")
 pip install weasyprint
 ```
 
-Stateless; no env var required.
-
----
-
-## Parameters
-
-| Name | Type | Required | Notes |
-|---|---|---|---|
-| `source` | `string` | ✓ | Either an HTML string **or** a path to an `.html` file. Auto-detected. |
-| `output_path` | `string` | | Destination `.pdf` path. Parent directories are created. |
-| `base_url` | `string` | | Base URL or directory for resolving relative CSS / image / font references. |
+Stateless; no key required.
 
 ---
 
 ## Return value
 
-- **`output_path` provided** — the tool writes the file and returns its **absolute path string**.
-- **`output_path` omitted** — the tool returns the **raw PDF bytes**.
-
-This dual return type is useful: a Chain step typically wants the path; a direct script might want the bytes in memory.
+- **`options["output_path"]` given** — the file is written and its **absolute path** returned.
+- **omitted** — the **raw PDF bytes** are returned.
 
 ---
 
@@ -50,26 +68,25 @@ This dual return type is useful: a Chain step typically wants the path; a direct
 tool = WeasyprintTool()
 
 # Call-style — ToolResult wraps any exception
-result = tool(source="<h1>Hello</h1><p>World</p>", output_path="hello.pdf")
+result = tool(input="<h1>Hello</h1><p>World</p>", options={"output_path": "hello.pdf"})
 if result:
     print("Saved to:", result.output)
 else:
     print("Error:", result.error)
-
-# Direct run
-path = tool.run(source="<h1>Hi</h1>", output_path="out.pdf")
 ```
 
 ### From an HTML file
 
 ```python
-tool.run(source="report.html", output_path="report.pdf")
+tool = WeasyprintTool()
+tool.run(input="report.html", options={"output_path": "report.pdf"})
 ```
 
 ### Raw bytes (no file written)
 
 ```python
-pdf_bytes = tool.run(source="<p>Hello</p>")
+tool      = WeasyprintTool()
+pdf_bytes = tool.run(input="<p>Hello</p>")
 with open("manual.pdf", "wb") as fh:
     fh.write(pdf_bytes)
 ```
@@ -77,11 +94,9 @@ with open("manual.pdf", "wb") as fh:
 ### With relative assets
 
 ```python
-tool.run(
-    source      = "<link rel='stylesheet' href='styles.css'>…",
-    output_path = "out.pdf",
-    base_url    = "/path/to/assets/",
-)
+tool = WeasyprintTool()
+tool.run(input="<link rel='stylesheet' href='styles.css'>…",
+         options={"output_path": "out.pdf", "base_url": "/path/to/assets/"})
 ```
 
 ### In a Chain — Markdown → HTML → PDF
@@ -91,25 +106,24 @@ from yait_aichain.chain import Chain
 from yait_aichain.tools import MistletoeTool, WeasyprintTool
 
 chain = Chain(steps=[
-    (report_skill,      "report_md"),
-    (MistletoeTool(),   "report_html", {"text": "report_md", "format": "format"}),
-    (WeasyprintTool(),  "pdf_path",    {"source": "report_html"}),
-], variables={"format": "html"})
+    (report_skill,     "report_md"),
+    (MistletoeTool(),  "report_html", {"input": "report_md"}),
+    (WeasyprintTool(), "pdf_bytes",   {"input": "report_html"}),
+])
 ```
-
-`chain.accumulated["pdf_path"]` is now the absolute path of the final PDF.
 
 ---
 
 ## Notes
 
-- The tool module file is named `weasyprint.py`, so it explicitly strips its own directory from `sys.path` before importing the library.
-- If `source` is a path that resolves to an existing file, the tool uses `HTML(filename=…)`. Otherwise it uses `HTML(string=…)`.
-- `output_path` parent directories are created with `os.makedirs(..., exist_ok=True)`.
+- If `input` is a path to an existing file the tool renders that file;
+  otherwise it treats `input` as an HTML string.
+- Parent directories for `output_path` are created as needed, and confined by
+  `AICHAIN_OUTPUT_ROOT` when it is set.
 
 ---
 
 ## See also
 
-- [`mistletoe`](mistletoe.md) — convert Markdown to HTML first.
-- [`markitdown`](markitdown.md) — round-trip: PDF → Markdown (and back via Mistletoe → WeasyPrint).
+- [`convertToHTML`](mistletoe.md) — Markdown to HTML first.
+- [`convertToMD`](markitdown.md) — the round trip: PDF → Markdown.

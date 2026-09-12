@@ -92,8 +92,8 @@ class ChromaBackend(VectorBackend):
     --------
     Local server::
 
-        from tools.vectordb import VectorDB
-        from tools.embedding import Embedding
+        from yait_aichain.tools.vectordb import VectorDB
+        from yait_aichain.tools.embedding import Embedding
 
         store = VectorDB(
             "chroma",

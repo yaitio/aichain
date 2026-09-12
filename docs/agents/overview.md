@@ -150,10 +150,10 @@ you; a driver that owns the loop owns it too.
 
 ### Modes
 
-| Mode | Plan can change? | Use when |
+| Mode | What it does | Use when |
 |---|---|---|
-| `waterfall` (default) | No (retries only) | The path is predictable. |
-| `agile` | Yes, via `replan` | The path is exploratory; later steps depend on what early ones reveal. |
+| `agile` (default) | Decides every step from what the previous one returned; nothing is written in advance. | The path is exploratory; later steps depend on what early ones reveal. |
+| `waterfall` | Writes a plan at step 0 and holds to it. `planner_model` applies to this mode only. | The path is predictable, or a stronger model should design it once. |
 
 There is no `goal` mode: what it did — deciding one action at a time with
 nothing written in advance — is what `agile` is.

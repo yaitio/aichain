@@ -41,6 +41,7 @@ key      = "private"
 client   = "openai"
 base_url = "http://localhost:8000"
 env_key  = "PRIVATE_API_KEY"
+label    = "Private server"
 # Your own server usually runs without auth; started with --api-key it
 # expects a Bearer token, and an aggregator always needs one. auth = "none"
 # makes the key optional instead of required: no key sends no Authorization

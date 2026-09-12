@@ -60,7 +60,7 @@ class EmbeddingCohere(Embedder):
     --------
     ::
 
-        from tools.embedding import Embedding
+        from yait_aichain.tools.embedding import Embedding
 
         embedder = Embedding("cohere/embed-v4.0")
         result   = embedder.embed(

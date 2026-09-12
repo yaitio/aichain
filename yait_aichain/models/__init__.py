@@ -8,7 +8,7 @@ Typical usage
 -------------
 ::
 
-    from models import Model
+    from yait_aichain.models import Model
 
     # Auto-detected provider — returns the correct subclass
     gpt    = Model("gpt-4o")
@@ -27,7 +27,7 @@ Typical usage
     model = Model("claude-sonnet-4-5", api_key="sk-ant-...")
 
     # Query the model registry
-    from models import registry
+    from yait_aichain.models import registry
     registry.models(task="text-to-image")           # all text-to-image models
     registry.providers(task="text-to-image")        # ["google", "openai", "xai"]
     registry.tasks("gpt-4o")                        # ["image-to-text", "text-to-text"]

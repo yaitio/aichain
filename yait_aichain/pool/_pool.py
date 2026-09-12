@@ -156,8 +156,8 @@ class Pool:
     --------
     Parse every file in a directory::
 
-        from tools.convert import convertToMD
-        from pool import Pool
+        from yait_aichain.tools.convert import convertToMD
+        from yait_aichain.pool import Pool
 
         files = [{"source": f} for f in os.listdir("./docs")]
         pool  = Pool(convertToMD(), items=files, max_flows=5)
@@ -165,8 +165,8 @@ class Pool:
 
     Fetch 20 URLs in parallel::
 
-        from tools.convert import convertToMD
-        from pool import Pool
+        from yait_aichain.tools.convert import convertToMD
+        from yait_aichain.pool import Pool
 
         pool    = Pool(convertToMD(), items=[{"source": u} for u in urls])
         pages   = pool.run()

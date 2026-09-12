@@ -136,13 +136,16 @@ distinct key, then you read them all at once).
 
 ### Error handling
 
-By default a step exception propagates and stops the run. Two alternatives:
+By default a step exception propagates and stops the run. The same four words mean the same thing on `Pool`:
 
+<!-- g:policy -->
 | Mode | Behaviour |
 |---|---|
-| `"raise"` (default) | Propagate the exception. |
-| `"stop"` | Record the error in `history`, return the last successful output (or `None`), don't raise. |
-| `"skip"` | Record the error, emit a `RuntimeWarning`, continue. Downstream steps may see missing variables — your responsibility. |
+| `"raise"` (default) | Propagate the exception. The run is marked failed and nothing after the step runs. |
+| `"stop"` | End the run without raising; the error is in `history` and `run()` returns the last successful output (or `None`). |
+| `"skip"` | Record the error, emit a `RuntimeWarning`, and run the next step. A later step that reads the failed step's output gets a stale or absent value. |
+| `"collect"` | As `skip`, without the warning — for a long generated chain that expects a few steps to fail. |
+<!-- /g:policy -->
 
 ```python
 chain = Chain(steps=[...], on_step_error="stop")

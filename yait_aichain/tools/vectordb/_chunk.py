@@ -73,8 +73,8 @@ Chain usage
 -----------
 ::
 
-    from tools.vectordb import VectorDB, vectorChunk, vectorUpsert
-    from tools.embedding import Embedding
+    from yait_aichain.tools.vectordb import VectorDB, vectorChunk, vectorUpsert
+    from yait_aichain.tools.embedding import Embedding
 
     chunker = vectorChunk(max_chars=800, overlap_chars=80)
     store   = VectorDB("chroma", "docs",
@@ -506,7 +506,7 @@ class VectorChunkTool(Tool):
     --------
     ::
 
-        from tools.vectordb import vectorChunk
+        from yait_aichain.tools.vectordb import vectorChunk
 
         chunker = vectorChunk(max_chars=800, overlap_chars=80)
         chunks  = chunker.run(markdown_text)
@@ -794,7 +794,7 @@ def vectorChunk(
     --------
     ::
 
-        from tools.vectordb import vectorChunk
+        from yait_aichain.tools.vectordb import vectorChunk
 
         chunker = vectorChunk(max_chars=800, overlap_chars=80)
         chunks  = chunker.run(my_text)

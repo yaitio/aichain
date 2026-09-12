@@ -4,6 +4,8 @@
 key      = "qwen"
 client   = "qwen"
 env_key  = "DASHSCOPE_API_KEY"
+label    = "Qwen (DashScope)"
+keys_url = "https://dashscope.aliyuncs.com"
 auth     = "bearer"
 max_tokens_field = "max_completion_tokens"
 models_path      = "/compatible-mode/v1/models"

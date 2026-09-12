@@ -142,22 +142,27 @@ When a Tool or Agent returns a **dict**, all keys are merged into the accumulate
 
 ## Agent
 
-An **Agent** solves tasks that require planning, multiple tool calls, and reasoning about intermediate results.
+An **Agent** runs one loop. Each turn the model either calls tools or
+answers; tool results go back into the conversation and the loop asks again.
+Routing is decided by the reply — tool calls continue, prose ends the turn —
+so the model chooses content, not control flow.
 
-The orchestrator (a Model) drives three phases per step:
+`stop_when` decides how a run ends, and keeps the three endings apart:
 
-1. **Plan** — produces an ordered list of steps to achieve the goal
-2. **Act** — for the current step, decides which tool to call or what to ask the model
-3. **Reflect** — assesses the result, decides: continue / retry / replan / stop
-
-Two execution modes:
+- a **ceiling** — `step_count(30)` is the default, `token_budget`, `cost_budget`
+  — ends it as a failure and says which one;
+- a **check** — `check(fn)` — ends it on a fact the harness verified itself;
+- a **nudge** — `stalled(k)`, `repeating(k)` — says something to the model and
+  lets the run continue.
 
 | Mode | Behaviour |
 |---|---|
-| `waterfall` | Fixed plan. Steps execute in order. Retries on failure, stops if max attempts exceeded. |
-| `agile` | Same, but the reflect phase can also trigger replanning. The agent can revise its plan based on what it has learned. |
+| `agile` (default) | Decides one action at a time from what the last one returned. |
+| `waterfall` | Writes a plan at step 0 and holds to it; `planner_model` can be a stronger model for that one turn. |
 
-Agents can be used standalone or as a step inside a Chain (`kind="agent"`).
+An agent has no suspend: its state is the conversation, a message list. A tool
+that needs a person is gated with `approve=`. Agents run standalone or as a
+step inside a Chain (`kind="agent"`).
 
 ---
 
@@ -169,7 +174,7 @@ Agents can be used standalone or as a step inside a Chain (`kind="agent"`).
 | Fixed sequence of steps with known data flow | **Chain** of Skills and Tools |
 | Need to call an external API or service | **Tool** in a Chain |
 | Task requires searching, reading, and reasoning across multiple sources | **Agent** |
-| Long document that would exceed the model's output limit | **Chain** with sectional pattern |
+| Long document that would exceed the model's output limit | **Chain** — one Skill per section, joined by a final step |
 | Research phase followed by document generation | **Agent** inside a **Chain** |
 
 ---

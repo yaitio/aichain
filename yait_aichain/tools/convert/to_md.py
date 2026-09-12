@@ -23,7 +23,7 @@ MarkItDown can use an LLM to generate textual descriptions of images and
 transcribe audio.  Pass a client and model name at construction::
 
     import openai
-    from tools.convert import convertToMD
+    from yait_aichain.tools.convert import convertToMD
 
     tool = convertToMD(
         llm_client=openai.OpenAI(),
@@ -79,7 +79,7 @@ class convertToMD(Tool):
     --------
     Basic usage (no LLM)::
 
-        from tools.convert import convertToMD
+        from yait_aichain.tools.convert import convertToMD
 
         tool = convertToMD()
 

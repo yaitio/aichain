@@ -85,7 +85,7 @@ class searchSerp(Search):
     --------
     Google search (default engine)::
 
-        from tools.search import searchSerp
+        from yait_aichain.tools.search import searchSerp
 
         tool   = searchSerp()
         result = tool(input="Python asyncio tutorial",

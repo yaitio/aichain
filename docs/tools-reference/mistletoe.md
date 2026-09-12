@@ -1,12 +1,44 @@
-# `mistletoe` — `MistletoeTool`
+<!-- g:tool -->
+# `convertToHTML` — `MistletoeTool`
 
-Convert Markdown to **HTML**, **LaTeX**, or **normalised Markdown** using the [mistletoe](https://github.com/miyuchina/mistletoe) library. Each format has a first-class renderer — no regex post-processing.
+Convert Markdown text to HTML, LaTeX, or normalised Markdown.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import MistletoeTool` |
+| Risk class | `write` |
+| Also exported as | `convertToHTML` |
+
+```python
+MistletoeTool(
+    *args,
+    **kwargs,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | Markdown text to convert. |
+| `options.format` | `string` |  | Output format. Default: 'html'. One of `html`, `latex`, `markdown`. |
+| `options.output_path` | `string` |  | Optional file path to write the result. |
+
+```python
+result = MistletoeTool()(
+    input="…",
+    options={"format": …},
+)
+```
+<!-- /g:tool -->
+
+Converts Markdown to **HTML**, **LaTeX**, or **normalised Markdown** with
+[mistletoe](https://github.com/miyuchina/mistletoe). Each format has a real
+renderer — no regex post-processing.
 
 ```python
 from yait_aichain.tools import MistletoeTool
 
 tool = MistletoeTool()
-html = tool.run(text="# Hello\n\nWorld", format="html")
+html = tool.run(input="# Hello\n\nWorld", options={"format": "html"})
 # '<h1>Hello</h1>\n<p>World</p>\n'
 ```
 
@@ -14,7 +46,7 @@ html = tool.run(text="# Hello\n\nWorld", format="html")
 
 ## Supported formats
 
-| `format` | What you get |
+| `options["format"]` | What you get |
 |---|---|
 | `html` | HTML fragment (no `<html>`/`<body>` wrapper). |
 | `latex` | LaTeX document body, ready for inclusion in a `.tex` file. |
@@ -28,43 +60,25 @@ html = tool.run(text="# Hello\n\nWorld", format="html")
 pip install mistletoe
 ```
 
-Stateless; no env var required.
-
----
-
-## Parameters
-
-| Name | Type | Required | Notes |
-|---|---|---|---|
-| `text` | `string` | ✓ | Markdown source text. |
-| `format` | `string` | ✓ | `html` / `latex` / `markdown`. |
-| `output_path` | `string` | | Save converted output to this path. Parent directories created. |
+Stateless; no key required.
 
 ---
 
 ## Usage
 
-### Markdown → HTML
+### Markdown → LaTeX, saved to a file
 
 ```python
 tool = MistletoeTool()
-html = tool.run(text="# Hello\n\nWorld", format="html")
-```
-
-### Markdown → LaTeX, save to file
-
-```python
-tool.run(
-    text        = "# Introduction\n\nSome **bold** text.",
-    format      = "latex",
-    output_path = "out/intro.tex",
-)
+tool.run(input="# Introduction\n\nSome **bold** text.",
+         options={"format": "latex", "output_path": "out/intro.tex"})
 ```
 
 ### Normalise messy Markdown
 
 ```python
-clean_md = tool.run(text=messy_markdown, format="markdown")
+tool     = MistletoeTool()
+clean_md = tool.run(input=messy_markdown, options={"format": "markdown"})
 ```
 
 ### In a Chain — Markdown → HTML → PDF
@@ -74,25 +88,26 @@ from yait_aichain.chain import Chain
 from yait_aichain.tools import MistletoeTool, WeasyprintTool
 
 chain = Chain(steps=[
-    (write_report_skill,   "report_md"),
-    (MistletoeTool(),      "report_html", {"text":   "report_md", "format": "format"}),
-    (WeasyprintTool(),     "pdf_path",    {"source": "report_html"}),
-], variables={"format": "html"})
+    (write_report_skill, "report_md"),
+    (MistletoeTool(),    "report_html", {"input": "report_md"}),
+    (WeasyprintTool(),   "pdf_bytes",   {"input": "report_html"}),
+])
 
 chain.run(variables={"topic": "quarterly review"})
 ```
+
+HTML is the default format, so the step needs only its input.
 
 ---
 
 ## Notes
 
-- Raises `ValueError` if `format` is not one of the three supported values.
-- Raises `ImportError` if `mistletoe` isn't installed.
-- The tool's own module file is named `mistletoe.py`; it explicitly strips its own directory from `sys.path` before import so it doesn't shadow the installed library.
+- Raises `ValueError` when `format` is not one of the three values.
+- Raises `ImportError` when `mistletoe` is not installed.
 
 ---
 
 ## See also
 
-- [`markitdown`](markitdown.md) — the opposite direction (files/URLs → Markdown).
-- [`weasyprint`](weasyprint.md) — render HTML to PDF.
+- [`convertToMD`](markitdown.md) — the other direction (files/URLs → Markdown).
+- [`convertToPDF`](weasyprint.md) — render HTML to PDF.

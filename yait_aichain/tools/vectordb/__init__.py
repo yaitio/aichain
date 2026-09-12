@@ -43,8 +43,8 @@ Examples
 --------
 Chroma (local, auto-embed)::
 
-    from tools.vectordb  import VectorDB, vectorQuery, vectorUpsert
-    from tools.embedding import Embedding
+    from yait_aichain.tools.vectordb  import VectorDB, vectorQuery, vectorUpsert
+    from yait_aichain.tools.embedding import Embedding
 
     store = VectorDB(
         "chroma",
@@ -81,9 +81,9 @@ Qdrant (local)::
 
 In a Chain::
 
-    from chain import Chain
-    from skills import Skill
-    from models import Model
+    from yait_aichain.chain import Chain
+    from yait_aichain.skills import Skill
+    from yait_aichain.models import Model
 
     retriever = vectorQuery(store)
     answer_skill = Skill(
@@ -212,8 +212,8 @@ def VectorDB(
     --------
     ::
 
-        from tools.vectordb  import VectorDB
-        from tools.embedding import Embedding
+        from yait_aichain.tools.vectordb  import VectorDB
+        from yait_aichain.tools.embedding import Embedding
 
         store = VectorDB(
             "chroma",

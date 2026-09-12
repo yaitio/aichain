@@ -212,7 +212,7 @@ research_agent = Agent(
 )
 ```
 
-Set `verbose=0` in production — the `result.history` and `result.memory` snapshots are enough for post-hoc inspection.
+Set `verbose=0` in production — `result.journal` and the event stream (`hooks=`) are what post-hoc inspection reads.
 
 ---
 
@@ -221,32 +221,37 @@ Set `verbose=0` in production — the `result.history` and `result.memory` snaps
 When you `chain.save(...)`, Agent steps are serialised too:
 
 - the `model` name
-- `mode`, `stop_when`, `verbose`
-- `instructions`
-- Tool **class paths** (no API keys, no state)
+- `mode`, `verbose`
+- `instructions`, `name`, `description`
+- `stop_when` — the conditions that can be named (`step_count`, `token_budget`,
+  …). A condition built from your own closure cannot be written down; it is
+  dropped **with a `RuntimeWarning`** at save time rather than coming back
+  silently absent
+- tool **class paths** (no API keys, no state)
 
-At load time, the tools are instantiated from their class paths and the orchestrator model is reconstructed via `Model(name, api_key=...)`. API keys are resolved from the environment unless `Chain.load(path, api_key=...)` overrides them.
+At load time the tools are instantiated from their class paths and the model is
+rebuilt with `Model(name, api_key=...)`. Keys come from the environment unless
+`Chain.load(path, api_key=...)` overrides them.
 
-Not serialised:
+Not serialised — set them on the loaded chain's agent step before `run()`:
 
-- `executors` (the orchestrator is used for everything at load time)
-- `memory` (fresh memory per run)
-
-If you need a specific executor set or pre-populated memory after loading, set them on the reconstructed chain's agent step before calling `chain.run()`.
+- `permissions`, `approve`, `hooks` — they are code, not configuration
+- `team`, `planner_model`, `max_cost`
+- `check(fn)` conditions and anything else that wraps a callable
 
 ---
 
 ## When **not** to use an Agent inside a Chain
 
-If the sequence of work is fully deterministic — e.g. "fetch URL → clean → summarise → translate" — use a plain Chain of Skills and Tools. Agents add planning overhead and token cost that isn't warranted when the path is knowable upfront.
+If the sequence of work is fully deterministic — e.g. "fetch URL → clean → summarise → translate" — use a plain Chain of Skills and Tools. Agents add turns and token cost that isn't warranted when the path is knowable upfront.
 
-Rule of thumb: the moment you catch yourself writing `if/else` logic to decide what the next step should be, that's exactly what an Agent's reflection loop does for you.
+Rule of thumb: the moment you catch yourself writing `if/else` logic to decide what the next step should be, that is the decision an Agent's loop makes for you.
 
 ---
 
 ## See also
 
-- **Plan/act/reflect loop** → [Overview](overview.md)
-- **Orchestrator, executors, tools, budgets, persona** → [Configuration](configuration.md)
+- **The loop and its stop conditions** → [Overview](overview.md)
+- **Model, tools, stop conditions, permissions** → [Configuration](configuration.md)
 - **Seeding memory and persisting it across runs** → [Memory](memory.md)
 - **Full Chain step syntax** → [Chain](../primitives/chain.md)

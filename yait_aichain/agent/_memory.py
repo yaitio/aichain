@@ -27,7 +27,7 @@ discarding scratch values from previous runs.
 
 For durable state across separate ``run()`` calls, supply a ``FileBackend``::
 
-    from agent import AgentMemory, FileBackend
+    from yait_aichain.agent import AgentMemory, FileBackend
 
     memory = AgentMemory(backend=FileBackend("~/.agent_state.json"))
     agent  = Agent(..., memory=memory)
@@ -213,7 +213,7 @@ class AgentMemory:
 
     File-backed memory::
 
-        from agent import AgentMemory, FileBackend
+        from yait_aichain.agent import AgentMemory, FileBackend
 
         memory = AgentMemory(backend=FileBackend("~/.my_agent.json"))
         agent  = Agent(..., memory=memory)

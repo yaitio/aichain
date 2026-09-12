@@ -37,7 +37,7 @@ Examples
 --------
 ::
 
-    from tools.embedding import Embedding
+    from yait_aichain.tools.embedding import Embedding
 
     # Provider-prefixed (unambiguous)
     e = Embedding("openai/text-embedding-3-large")

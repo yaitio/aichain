@@ -134,7 +134,7 @@ class Tool:
     --------
     Defining a custom tool::
 
-        from tools import Tool, ToolResult
+        from yait_aichain.tools import Tool, ToolResult
 
         class ReverseTextTool(Tool):
             name        = "reverse_text"
