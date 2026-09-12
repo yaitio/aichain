@@ -217,6 +217,7 @@ class Pool:
             )
 
         self._runner    = runner
+        self._beacons: list = []
         # One ceiling for the whole fan-out, and this is where sharing earns
         # its keep: items run concurrently, so a per-item copy of a number
         # would let every worker spend the full amount. `Budget` takes a lock
@@ -270,50 +271,75 @@ class Pool:
 
         results: list = [None] * len(self._items)
 
-        with ThreadPoolExecutor(max_workers=self._max_flows) as executor:
-            future_to_idx: dict = {}
+        # A board for the whole fan-out. Each item's context is copied at
+        # submit time, so every worker posts to this one — and the wait below
+        # is where a blocker is noticed, which is the wait it exists to end.
+        from ..agent._swarm import collecting_beacons
+        with collecting_beacons() as board:
+            with ThreadPoolExecutor(max_workers=self._max_flows) as executor:
+                future_to_idx: dict = {}
 
-            for i, item in enumerate(self._items):
-                merged = {**shared, **item}
-                # `contextvars` do not cross a thread boundary on their
-                # own, so the current run's context is copied into each
-                # worker explicitly. Without this a fan-out under a tenant
-                # would resolve every item's API key as if no run were in
-                # flight — and the failure would look like a missing key
-                # rather than a lost context.
-                future = executor.submit(
-                    contextvars.copy_context().run, self._run_one, i, merged)
-                future_to_idx[future] = i
+                for i, item in enumerate(self._items):
+                    merged = {**shared, **item}
+                    # `contextvars` do not cross a thread boundary on their
+                    # own, so the current run's context is copied into each
+                    # worker explicitly. Without this a fan-out under a tenant
+                    # would resolve every item's API key as if no run were in
+                    # flight — and the failure would look like a missing key
+                    # rather than a lost context.
+                    future = executor.submit(
+                        contextvars.copy_context().run, self._run_one, i, merged)
+                    future_to_idx[future] = i
 
-            stopped = False
-            for future in as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                try:
-                    results[idx] = future.result()
-                except Exception as exc:
-                    if self._on_error == "raise":
-                        raise
-                    if self._on_error == "stop":
-                        # Start no more items. The ones already in flight are
-                        # let finish rather than cancelled: killing a call
-                        # mid-request costs the tokens anyway and loses the
-                        # answer, so the only thing "stop" can honestly buy
-                        # is not beginning more.
+                stopped = False
+                for future in as_completed(future_to_idx):
+                    idx = future_to_idx[future]
+                    if future.cancelled():
+                        # Never started: left PENDING in the history, which is
+                        # the honest status for work nobody began.
+                        continue
+                    if not stopped and board.attention():
+                        # A blocker, a question or a changed contract from any
+                        # item — or from anything that item delegated to. Stop
+                        # starting more: the rest of the fan-out would be
+                        # spent on work the beacon just made pointless. Items
+                        # already in flight finish, because killing a call
+                        # mid-request costs the tokens and loses the answer.
                         stopped = True
                         for pending in future_to_idx:
                             pending.cancel()
-                    if self._on_error == "skip":
-                        name = getattr(self._runner, "name", None) or \
-                               type(self._runner).__name__
-                        warnings.warn(
-                            f"Pool item {idx} ({name!r}) failed and was "
-                            f"skipped: {type(exc).__name__}: {exc}",
-                            RuntimeWarning,
-                            stacklevel=2,
-                        )
-                    # "collect", "skip" and "stop" all leave results[idx] None
+                    try:
+                        results[idx] = future.result()
+                    except Exception as exc:
+                        if self._on_error == "raise":
+                            raise
+                        if self._on_error == "stop":
+                            # Start no more items. The ones already in flight are
+                            # let finish rather than cancelled: killing a call
+                            # mid-request costs the tokens anyway and loses the
+                            # answer, so the only thing "stop" can honestly buy
+                            # is not beginning more.
+                            stopped = True
+                            for pending in future_to_idx:
+                                pending.cancel()
+                        if self._on_error == "skip":
+                            name = getattr(self._runner, "name", None) or \
+                                   type(self._runner).__name__
+                            warnings.warn(
+                                f"Pool item {idx} ({name!r}) failed and was "
+                                f"skipped: {type(exc).__name__}: {exc}",
+                                RuntimeWarning,
+                                stacklevel=2,
+                            )
+                        # "collect", "skip" and "stop" all leave results[idx] None
+        self._beacons = board.all()
 
         return results
+
+    @property
+    def beacons(self) -> list:
+        """Beacons raised by any item during the last run, attention or not."""
+        return list(self._beacons)
 
     @property
     def history(self) -> list[dict]:

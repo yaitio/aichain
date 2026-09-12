@@ -194,6 +194,69 @@ handed over when the turn ends. The loop is synchronous by design (no threads,
 no async — the target is Lambda), so within one model call there is nothing to
 interleave.
 
+## What a result rests on
+
+Every `AgentResult` carries an `acceptance`:
+
+```python
+result = agent.run("reconcile the ledger")
+result.acceptance.kind          # "checked" | "claimed" | "unsupported"
+```
+
+* **`checked`** — a programmatic fact supports it: a tool ran and returned.
+* **`claimed`** — only a model's word does. A delegated worker's report is the
+  usual case: the worker *says* it reconciled the ledger, and nothing in the
+  parent verified that.
+* **`unsupported`** — nothing does. The model answered without acting.
+
+It is reported, not enforced — an unsupported answer is still returned, and
+the caller can see it is one.
+
+The acceptance can be **invalidated**. It carries a fingerprint of the checked
+evidence, so re-obtaining that evidence later tells you whether the result was
+accepted on facts that are still true:
+
+```python
+if not result.acceptance.still_holds(fresh_journal):
+    ...                                    # re-earn it
+overruled = result.acceptance.supersede("the file was edited by hand")
+```
+
+Only checked evidence is fingerprinted. A worker re-wording its report changes
+no fact, and folding claims in would make it look as if the facts had moved.
+
+> **Changed in 2.17.0.** A `delegate` call used to be written into the
+> parent's journal as `check` — the call ran — while the worker's report it
+> returned was only a claim. An unverified account entered the record as a
+> verified fact. It is recorded as `model_claim` now.
+
+## Beacons
+
+A child can signal whoever is waiting on it, from anywhere inside a run:
+
+```python
+from yait_aichain.agent import beacon
+
+class Probe(Tool):
+    def run(self, value, options=None):
+        if expired():
+            beacon("blocker", "credentials expired")
+```
+
+| kind | interrupts a wait? |
+|---|---|
+| `blocker`, `question`, `contract_change` | **yes** |
+| `contract`, `decision`, `fact` | no — recorded and passed up |
+
+A `Pool` watching its items **stops starting new ones** when an attention
+beacon arrives, instead of spending the rest of the fan-out on work the
+blocker already made pointless; items in flight finish. Beacons forward up
+through every level — a delegated worker's blocker reaches the pool two levels
+above — and land on `result.beacons` and `pool.beacons`.
+
+A beacon raised outside any run warns that nobody heard it rather than
+vanishing.
+
 ## Permission matrix
 
 A tool declares a **risk class** as data; a `PermissionPolicy` maps it to a

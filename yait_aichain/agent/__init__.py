@@ -80,10 +80,19 @@ from ._agent   import (Agent, step_count, token_budget, cost_budget, check)
 from ._journal import Journal, JournalEntry, evidence
 from ._memory  import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
 from ._result  import AgentResult
+from ._swarm   import (Acceptance, Beacon, beacon, ATTENTION, COORDINATION,
+                       acceptance_from)
 
 __all__ = [
     "Agent",
     "AgentResult",
+    # Swarm coordination
+    "Acceptance",
+    "acceptance_from",
+    "Beacon",
+    "beacon",
+    "ATTENTION",
+    "COORDINATION",
     # Stop conditions
     "step_count",
     "token_budget",
