@@ -52,6 +52,19 @@ from .._base import Tool
 
 # ── Base class ────────────────────────────────────────────────────────────────
 
+
+def _without_options(parameters: dict, *keys: str) -> dict:
+    """A copy of *parameters* with option *keys* removed — see the twin in
+    `to_speech.py`. Declaring an option a provider has no control for
+    advertises it to the model, which sets it and watches it vanish."""
+    import copy
+    out = copy.deepcopy(parameters)
+    options = out.get("properties", {}).get("options", {}).get("properties", {})
+    for key in keys:
+        options.pop(key, None)
+    return out
+
+
 class convertToText(Tool):
     """
     Transcribe an audio file to text.
@@ -421,6 +434,12 @@ class sttGoogle(convertToText):
             options={"language": "en-US", "model": "latest_long"},
         )
     """
+
+    # Google's speech-to-text has no prompt: biasing the transcription is
+    # done with a speech context, which is a different shape and is not
+    # wired. Declaring `prompt` offered the model something that fell on the
+    # floor.
+    parameters = _without_options(convertToText.parameters, "prompt")
 
     name = "sttGoogle"
 

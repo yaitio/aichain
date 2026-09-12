@@ -41,6 +41,40 @@ from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 # VectorRecord
 # ---------------------------------------------------------------------------
 
+#: Metrics the library names, and how each backend's raw number becomes a
+#: similarity in [0, 1] where higher is better.
+#:
+#: The formulas are not interchangeable and the direction is the reason:
+#: cosine and dot are *similarities* (higher is nearer), euclidean is a
+#: *distance* (lower is nearer). Folding them into one field without
+#: converting is how a threshold tuned on one collection silently inverts on
+#: another.
+METRICS = ("cosine", "euclidean", "dot")
+
+
+def normalise_score(raw: "float | None", metric: str) -> "float | None":
+    """A backend's raw number as a similarity in [0, 1], higher is better.
+
+    * **cosine** — a similarity in [-1, 1]; mapped linearly onto [0, 1].
+    * **euclidean** — an unbounded distance, lower being nearer; ``1/(1+d)``,
+      which is monotonic, bounded, and inverts the direction.
+    * **dot** — unbounded and scale-dependent, so it cannot be mapped onto
+      [0, 1] without knowing the vectors' magnitudes. Passed through, and
+      that is stated rather than papered over: a made-up bound would be worse
+      than an honest raw number, because it would look comparable.
+
+    ``None`` in, ``None`` out — a fetch by id has no score and inventing one
+    would make an exact lookup look like a ranked hit.
+    """
+    if raw is None:
+        return None
+    if metric == "cosine":
+        return max(0.0, min(1.0, (float(raw) + 1.0) / 2.0))
+    if metric == "euclidean":
+        return 1.0 / (1.0 + max(0.0, float(raw)))
+    return float(raw)
+
+
 @dataclass
 class VectorRecord:
     """
@@ -50,14 +84,30 @@ class VectorRecord:
     ----------
     id       : str            — unique document identifier
     text     : str            — original text content
-    score    : float | None   — similarity score (populated on query results only)
+    score    : float | None   — similarity in [0, 1], higher is more similar
+    raw_score: float | None   — what the backend returned, unconverted
     metadata : dict           — arbitrary key-value payload / metadata
+
+    **``score`` means one thing on every backend**, which it did not until
+    2026-09-13. Chroma normalised its distances to [0, 1] and Qdrant and
+    Pinecone handed their raw numbers through, so the same field carried a
+    cosine similarity in [-1, 1] on one, a normalised score on another, and —
+    for the euclidean metric — a *distance*, where **lower** is more similar.
+    The docstring on `query()` promised "highest score = most similar" and it
+    was false for two backends on one metric. Anyone comparing retrievers, or
+    setting a threshold and moving a collection, was reading three scales as
+    one.
+
+    ``raw_score`` keeps whatever the backend said. Normalising is a
+    conversion, and a conversion that throws the original away cannot be
+    checked.
     """
 
-    id:       str
-    text:     str
-    score:    float | None = None
-    metadata: dict         = field(default_factory=dict)
+    id:        str
+    text:      str
+    score:     float | None = None
+    metadata:  dict         = field(default_factory=dict)
+    raw_score: float | None = None
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
@@ -321,7 +371,12 @@ class VectorStore:
         Returns
         -------
         list[VectorRecord]
-            Records with ``score`` populated (highest score = most similar).
+            Records with ``score`` in [0, 1], highest = most similar, on
+            every backend and every metric. ``raw_score`` carries what the
+            backend actually returned. The one exception is the ``dot``
+            metric, which is unbounded and scale-dependent: it is passed
+            through and says so, because a fabricated bound would look
+            comparable when it is not.
         """
         vector = self._embed_query(text)
         return self._backend.query(self._collection, vector, n=n, filter=filter)

@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [2.14.0] — 2026-09-13
+
+Consistency, measured rather than listed. Two items, and both are the same
+defect in different layers: a claim the code does not keep.
+
+### Fixed
+
+- **`score` means one thing on every vector backend now.** Chroma normalised
+  its distances to [0, 1]; Qdrant and Pinecone handed their raw numbers
+  through. One field therefore carried a normalised score on one backend, a
+  cosine similarity in [-1, 1] on another, and — for the euclidean metric — a
+  **distance**, where lower is nearer. `query()` promised "highest score =
+  most similar" and that was false for two backends on one metric, so a
+  descending sort put the least similar first.
+
+  Whoever this hurt was doing exactly what this library tells people to do:
+  comparing retrievers, or tuning a threshold on one collection and moving it.
+  Three scales read as one, with nothing saying so — the provider defaults
+  again, one floor down.
+
+  `raw_score` keeps what the backend returned, because a conversion that
+  throws the original away cannot be checked. `dot` is passed through and says
+  so: unbounded and scale-dependent, it cannot reach [0, 1] without the
+  vectors' magnitudes, and a fabricated bound would look comparable when it is
+  not.
+
+  The metric is **declared**, not discovered. Asking the collection was tried
+  and withdrawn within the hour: it puts a network round trip with retries in
+  front of the first query, and on an unreachable host that is a minute of
+  backoff before a search that would otherwise fail fast. The suite going from
+  9 seconds to 68 is what showed it.
+
+- **Five tools declared options nothing reads.** `ttsOpenAI` and `ttsXAI`
+  offered `language`, `ttsQwen` offered `language` and `speed`, `ttsGoogle`
+  offered `model`, `sttGoogle` offered `prompt` — a model could see each one,
+  set it, and watch it fall on the floor. The shared schema even claimed
+  `language` was "optional for OpenAI and xAI"; neither endpoint has the
+  field. Each subclass now narrows the shared schema to what its own `run()`
+  consumes.
+
+- **The test that was supposed to catch that could only see half.** It read
+  `inspect.getsource(cls)` — the class body alone — and most of these tools
+  implement `run()` in a shared base, so a read in a base was invisible. It
+  found `region` on `ttsQwen` in 2.9.3 only because that read happened to sit
+  in the subclass. It walks the MRO now, and checks **both** directions:
+  declared-and-unread as well as read-and-undeclared.
+
+
 ## [2.13.0] — 2026-09-12
 
 **Per-request secrets.** The last of the serverless product's library
