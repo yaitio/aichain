@@ -132,11 +132,16 @@ class Hook:
             return
         legacy = self._RENAMED.get(wanted)
         if legacy and callable(getattr(self, legacy, None)):
+            # Computed outside the f-string: an expression broken across
+            # lines inside a replacement field is PEP 701 syntax, 3.12+ only,
+            # and this line made the package unimportable on 3.10 and 3.11
+            # from 2.7.0 until it was noticed in CI.
+            dotted = legacy.replace("_", ".")
             warnings.warn(
                 f"{type(self).__name__}.{legacy}() is the old name for "
-                f"{wanted}(): the agent's tool events were called {legacy
-                .replace('_', '.')} until 2.7.0, which collided with Chain's "
-                "own step events. Rename the method.",
+                f"{wanted}(): the agent's tool events were called {dotted} "
+                "until 2.7.0, which collided with Chain's own step events. "
+                "Rename the method.",
                 DeprecationWarning, stacklevel=2)
             getattr(self, legacy)(event)
 
