@@ -21,24 +21,24 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from clients._families._openai_compat import (
+from yait_aichain.clients._families._openai_compat import (
     _messages_have_image,
     _is_openai_editable_image_model,
     _build_image_edits_request,
     _build_xai_image_edit_request,
     _parse_image_generations_response,
 )
-from clients._families.openai import OpenAIClient
-from clients._families.qwen import (
+from yait_aichain.clients._families.openai import OpenAIClient
+from yait_aichain.clients._families.qwen import (
     QwenClient,
     _MULTIMODAL_GEN_PATH,
     _build_qwen_image_edit_request,
     _is_qwen_image_edit,
 )
-from models._data import PROVIDERS as _PROVIDERS
-from models import Model, registry
-from skills import Skill
-from skills._adapters import normalize_input, resolve_media, substitute
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.models import Model, registry
+from yait_aichain.skills import Skill
+from yait_aichain.skills._adapters import normalize_input, resolve_media, substitute
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 _B64 = base64.b64encode(_PNG).decode("ascii")

@@ -58,7 +58,7 @@ class TestBrokenImports(unittest.TestCase):
         chain = Chain(steps=[(skill, "result", {}, {})])
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "chain.yaml")
+            path = os.path.join(tmp, "yait_aichain.chain.yaml")
             chain.save(path)
             loaded = Chain.load(path, api_key="test-key")
 

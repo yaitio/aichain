@@ -20,8 +20,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from models import Model
-from models._calls import ToolCall, ToolCallRequest
+from yait_aichain.models import Model
+from yait_aichain.models._calls import ToolCall, ToolCallRequest
 
 SEARCH = {
     "type": "function",

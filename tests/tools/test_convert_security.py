@@ -14,7 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import tempfile
-from tools.convert.to_html import convertToHTML
+from yait_aichain.tools.convert.to_html import convertToHTML
 
 
 class TestConvertToHtmlConfinement(unittest.TestCase):

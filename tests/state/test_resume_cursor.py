@@ -10,11 +10,11 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from chain import Chain
-from tools import Wait
-from tools._base import Tool
-from state import InMemoryStore, SuspendedResult
-from state._run_document import RunDocument, StepStatus
+from yait_aichain.chain import Chain
+from yait_aichain.tools import Wait
+from yait_aichain.tools._base import Tool
+from yait_aichain.state import InMemoryStore, SuspendedResult
+from yait_aichain.state._run_document import RunDocument, StepStatus
 
 
 class Counter(Tool):

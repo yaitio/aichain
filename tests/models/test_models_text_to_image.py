@@ -30,7 +30,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model
+from yait_aichain.models import Model
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -336,7 +336,7 @@ _QWEN_REAL   = os.getenv("DASHSCOPE_API_KEY", "").startswith("sk-")
 @unittest.skipUnless(_OPENAI_REAL, "Set a real OPENAI_API_KEY to run live image tests")
 class TestOpenAIImageLive(unittest.TestCase):
     def test_gpt_image_returns_base64(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("gpt-image-1"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "A tiny red dot"}]}]},
@@ -351,7 +351,7 @@ class TestOpenAIImageLive(unittest.TestCase):
 @unittest.skipUnless(_GOOGLE_REAL, "Set a real GOOGLE_AI_API_KEY to run live image tests")
 class TestGoogleImageLive(unittest.TestCase):
     def test_gemini_image_returns_base64(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model      = Model("gemini-3.1-flash-image"),
             input      = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "A tiny red dot"}]}]},

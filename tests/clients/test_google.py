@@ -24,9 +24,9 @@ import os
 import unittest
 from unittest.mock import patch, MagicMock
 
-from clients._base import APIError
-from clients._families.google import GoogleClient as _Family
-from models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.clients._base import APIError
+from yait_aichain.clients._families.google import GoogleClient as _Family
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
 def GoogleAIClient(api_key, **kw):
     return _Family(api_key, data=_PROVIDERS['google'], **kw)
 

@@ -10,7 +10,7 @@ import base64
 import unittest
 from unittest.mock import patch, MagicMock
 
-from clients._base import BaseClient, APIError
+from yait_aichain.clients._base import BaseClient, APIError
 
 
 # ---------------------------------------------------------------------------

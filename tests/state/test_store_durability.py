@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from state import FileStore
+from yait_aichain.state import FileStore
 
 
 class TestFileStoreLoad(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestFileStoreLoad(unittest.TestCase):
 class TestChromaEmptyDeleteGuard(unittest.TestCase):
 
     def test_empty_delete_refused(self):
-        from tools.vectordb.providers._chroma import ChromaBackend
+        from yait_aichain.tools.vectordb.providers._chroma import ChromaBackend
         backend = ChromaBackend(url="http://localhost:8000")
         with self.assertRaises(ValueError):
             backend.delete("docs")                 # no ids, no filter

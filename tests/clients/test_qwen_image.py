@@ -16,16 +16,16 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from clients._errors import TaskFailedError
-from clients._families.qwen import (
+from yait_aichain.clients._errors import TaskFailedError
+from yait_aichain.clients._families.qwen import (
     QwenClient as _Family,
     _IMAGE_SYNTHESIS_PATH,
     _TASKS_PATH,
     _build_qwen_image_request,
 )
-from models._data import PROVIDERS as _PROVIDERS
-from models import Model
-from skills import Skill
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 

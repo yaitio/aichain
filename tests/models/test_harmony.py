@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from clients._families._openai_compat import _is_harmony, _parse_harmony
-from models._calls import ToolCallRequest
+from yait_aichain.clients._families._openai_compat import _is_harmony, _parse_harmony
+from yait_aichain.models._calls import ToolCallRequest
 
 OUT = {"modalities": ["text"], "format": {"type": "text"}}
 
@@ -120,7 +120,7 @@ class TestThroughTheModelLayer(unittest.TestCase):
     """The seam that matters: a private server returning harmony in content."""
 
     def _reply(self, content):
-        from models import Model
+        from yait_aichain.models import Model
         m = Model("private/openai/gpt-oss-20b", api_key="k",
                   client_options={"url": "http://127.0.0.1:8080/v1"})
         return m.from_response({"choices": [{"message": {"content": content}}]},

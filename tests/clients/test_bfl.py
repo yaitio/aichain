@@ -16,10 +16,10 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from clients._errors import TaskFailedError
-from clients._families.bfl import BFLClient, _flux_image_value
-from models._data import PROVIDERS as _PROVIDERS
-from models import Model, registry
+from yait_aichain.clients._errors import TaskFailedError
+from yait_aichain.clients._families.bfl import BFLClient, _flux_image_value
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.models import Model, registry
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 _B64 = base64.b64encode(_PNG).decode("ascii")
@@ -118,7 +118,7 @@ class TestAsyncFlow(unittest.TestCase):
             c.send("/v1/flux-kontext-pro", {"prompt": "x"}, {})
 
     def test_end_to_end_through_skill(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         m = Model("flux-kontext-pro", api_key="k")
         m.client = self._ready_client()
         img = Skill(model=m, input={"messages": _edit_msgs()}, output=_OUT).run()

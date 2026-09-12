@@ -28,8 +28,8 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model
-from skills import Skill
+from yait_aichain.models import Model
+from yait_aichain.skills import Skill
 
 
 # ---------------------------------------------------------------------------
@@ -400,8 +400,8 @@ class TestSkillRunPerplexity(unittest.TestCase):
 class TestSkillUnsupportedModel(unittest.TestCase):
 
     def test_unsupported_model_raises_not_implemented(self):
-        from models._base   import Model
-        from clients._base  import BaseClient
+        from yait_aichain.models._base   import Model
+        from yait_aichain.clients._base  import BaseClient
 
         # A model whose client is a bare BaseClient (no wire format implemented).
         # Format now lives in the client, so build_request() is what's abstract:

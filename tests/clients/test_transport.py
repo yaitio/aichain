@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import urllib3
-from clients._base import make_http
+from yait_aichain.clients._base import make_http
 
 
 class TestMakeHttp(unittest.TestCase):
@@ -36,13 +36,13 @@ class TestMakeHttp(unittest.TestCase):
 
     def test_model_client_uses_factory(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
-        from models import Model
+        from yait_aichain.models import Model
         m = Model("gpt-4o", api_key="k")
         self.assertIsInstance(m.client._http, urllib3.ProxyManager)
 
     def test_tool_client_uses_factory(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
-        from tools import PerplexitySearchTool
+        from yait_aichain.tools import PerplexitySearchTool
         tool = PerplexitySearchTool(api_key="k")
         self.assertIsInstance(tool._http, urllib3.ProxyManager)
 

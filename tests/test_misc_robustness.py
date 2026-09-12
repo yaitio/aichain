@@ -12,9 +12,9 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from agent import Agent
-from models import Model
-from clients._families.openai import _is_deepseek_reasoner
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.clients._families.openai import _is_deepseek_reasoner
 
 
 
@@ -30,7 +30,7 @@ class TestDeepSeekReasonerGate(unittest.TestCase):
 class TestGoogleEmbeddingEnv(unittest.TestCase):
 
     def test_accepts_google_api_key(self):
-        from tools.embedding._google import EmbeddingGoogle
+        from yait_aichain.tools.embedding._google import EmbeddingGoogle
         os.environ.pop("GOOGLE_AI_API_KEY", None)
         os.environ["GOOGLE_API_KEY"] = "g-key"
         try:
