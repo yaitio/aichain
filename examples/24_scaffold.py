@@ -1,5 +1,5 @@
 """
-23 · Scaffold — the model designs the team, then runs it
+24 · Scaffold — the model designs the team, then runs it
 ========================================================
 
 The sixth cell of the design grid::
@@ -22,7 +22,7 @@ never-thinking configurations of the same model.
 Run it::
 
     export OPENAI_API_KEY=...
-    python examples/23_scaffold.py
+    python examples/24_scaffold.py
 
 What to check in the output
 ---------------------------
@@ -32,6 +32,9 @@ What to check in the output
   report is the worker's word, and the journal names that instead of letting
   it pass as verified fact.
 * ``result.cost`` includes the workers' spend: a child's bill rolls up.
+
+Required env vars:
+    OPENAI_API_KEY
 """
 
 import textwrap

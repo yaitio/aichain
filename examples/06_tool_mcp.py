@@ -10,6 +10,9 @@ Tools available:
     search_news        — search articles (requires: q, sources, or domains)
     get_top_headlines  — breaking news  (requires: q, country, category, or sources)
     get_sources        — list all available news sources
+
+Required env vars:
+    (none — an MCP server of your own on :8009)
 """
 
 from yait_aichain.tools import MCPTools

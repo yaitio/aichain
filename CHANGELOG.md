@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+**The examples run, and the index cannot describe one that does not.** Stage 1
+of `docs/design/cleanup-plan-2026-09-13.md`. No library code changed.
+
+### Fixed
+
+- **Three examples could not construct their agent for the whole 2.x line**
+  and the index described all three as working. `16_debug.py` now uses the
+  2.x constructor and prints the journal. `20_observability.py` shows what
+  gates a risky call today, `approve=`, with an approved and a refused refund
+  and the refusal's reason on the event channel; it no longer claims a
+  suspend/resume that was removed in 2.0. `18_agent_external_trigger.py` is
+  now **`18_chain_external_trigger.py`**: parking a run and resuming it from
+  another process is a Chain capability, so the webhook story is told with a
+  `Gate` step and a shared `FileStore`.
+- `docs/agents/observability.md` said agent approval rides suspend/resume; it
+  says what happens instead and where the cross-process pattern lives.
+- The quick reference in `examples/README.md` constructed an `Agent` with
+  `orchestrator=` and `max_steps=`.
+
+### Changed
+
+- `examples/23_scaffold.py` is **`24_scaffold.py`** — two examples shared 23.
+- `examples/README.md` and the examples table in `README.md` are **generated**
+  by `scripts/examples_index.py` from each script's docstring. Every example
+  now carries a `Required env vars:` block, and one without it stops the
+  generator.
+
+### Tests
+
+- The bind test reads `examples/*.py` and `examples/README.md`, and checks
+  `Model(` beside the four primitives.
+- `tests/test_examples_index.py` holds both generated pages and executes the
+  examples that need no key and no network (`18`, `20`), checking each for the
+  thing it exists to show.
+
 ## [2.18.0] — 2026-09-13
 
 **`nudge` — a stop condition that speaks instead of ending the run.** Stage 0

@@ -248,29 +248,36 @@ Embedding("voyage/voyage-3-large")
 
 ## Examples
 
-→ **[examples/](examples/README.md)** — 18 focused examples, one concept each
+→ **[examples/](examples/README.md)** — one concept per file
 
+<!-- examples:start -->
 | # | File | What it shows |
 |---|---|---|
-| 01 | `01_skill.py` | The minimum viable aichain program |
-| 02 | `02_skill_models.py` | Same prompt, Claude + GPT + Gemini |
-| 03 | `03_skill_multimodal.py` | Text → image → vision, three providers |
-| 04 | `04_skill_save_load.py` | Save to YAML, reload anywhere |
-| 05 | `05_tool_convert.py` | URL → Markdown |
-| 06 | `06_tool_mcp.py` | Connect an MCP server, discover + call tools |
-| 07 | `07_tool_custom.py` | Build your own Tool, plug into a Chain |
-| 08 | `08_chain.py` | GPT writes → Claude reviews |
-| 09 | `09_chain_tool_skill.py` | Fetch page → summarise |
-| 10 | `10_chain_save_load.py` | Save/reload a full pipeline |
-| 11 | `11_pool.py` | 5 topics, all in parallel |
-| 12 | `12_pool_chain.py` | Chain-per-item, all in parallel |
-| 13 | `13_agent.py` | Autonomous agent, one tool |
-| 14 | `14_agent_tools.py` | Agent picks its own tools |
-| 15 | `15_agent_orchestrator.py` | Orchestrator spawns sub-agents |
-| 16 | `16_debug.py` | Inspect Chain history, Pool status, Agent steps |
-| 17 | `17_chain_human_input.py` | Pause a chain for human approval, then resume |
-| 18 | `18_agent_external_trigger.py` | Suspend an agent; a webhook resumes it (cross-process) |
-| 19 | `19_image_edit.py` | Edit one product photo across four image providers |
+| 01 | [`01_skill.py`](examples/01_skill.py) | Run a prompt against a model. |
+| 02 | [`02_skill_models.py`](examples/02_skill_models.py) | Same prompt, three providers. |
+| 03 | [`03_skill_multimodal.py`](examples/03_skill_multimodal.py) | Text → Image → Text, three different providers. |
+| 04 | [`04_skill_save_load.py`](examples/04_skill_save_load.py) | Save a skill to YAML, reload and run it. |
+| 05 | [`05_tool_convert.py`](examples/05_tool_convert.py) | Convert a URL or file to Markdown. |
+| 06 | [`06_tool_mcp.py`](examples/06_tool_mcp.py) | Connect to an MCP server, discover tools, run them. |
+| 07 | [`07_tool_custom.py`](examples/07_tool_custom.py) | Define your own tool and use it in a Chain. |
+| 08 | [`08_chain.py`](examples/08_chain.py) | Two skills in sequence, two different providers. |
+| 09 | [`09_chain_tool_skill.py`](examples/09_chain_tool_skill.py) | Tool + Skill in one chain. |
+| 10 | [`10_chain_save_load.py`](examples/10_chain_save_load.py) | Save a chain to YAML, reload and run it. |
+| 11 | [`11_pool.py`](examples/11_pool.py) | Run the same skill in parallel for multiple inputs. |
+| 12 | [`12_pool_chain.py`](examples/12_pool_chain.py) | Chain as a Pool runner. |
+| 13 | [`13_agent.py`](examples/13_agent.py) | Basic agent with one tool. |
+| 14 | [`14_agent_tools.py`](examples/14_agent_tools.py) | Agent with multiple tools, picks autonomously. |
+| 15 | [`15_agent_orchestrator.py`](examples/15_agent_orchestrator.py) | Orchestrator agent spawns sub-agents. |
+| 16 | [`16_debug.py`](examples/16_debug.py) | Inspect intermediate steps in Chain, Pool, and Agent. |
+| 17 | [`17_chain_human_input.py`](examples/17_chain_human_input.py) | Human-in-the-loop: pause a chain for manual input. |
+| 18 | [`18_chain_external_trigger.py`](examples/18_chain_external_trigger.py) | Pause a run until an EXTERNAL trigger resumes it. |
+| 19 | [`19_image_edit.py`](examples/19_image_edit.py) | Image → image (editing) across four providers, one Skill. |
+| 20 | [`20_observability.py`](examples/20_observability.py) | The step boundary: hooks, events, and an approval gate. |
+| 21 | [`21_multi_turn.py`](examples/21_multi_turn.py) | Directed multi-turn reasoning in ONE Skill. |
+| 22 | [`22_goal_mode.py`](examples/22_goal_mode.py) | A stop condition the harness can verify |
+| 23 | [`23_private_model.py`](examples/23_private_model.py) | Run a model on hardware you control. |
+| 24 | [`24_scaffold.py`](examples/24_scaffold.py) | Scaffold — the model designs the team, then runs it |
+<!-- examples:end -->
 
 ---
 

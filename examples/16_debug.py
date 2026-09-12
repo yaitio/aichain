@@ -6,8 +6,9 @@ Shows how to debug complex pipelines:
   Chain  → chain.history  (step, name, input keys, output preview, duration)
   Pool   → pool.status    (live counts while running)
            pool.history   (per-item status, output, error, duration)
-  Agent  → verbose=1      (plan + one line per step)
-           verbose=2      (full action payloads)
+  Agent  → verbose=1      (one line per tool call)
+           verbose=2      (full arguments and results)
+           result.journal (what was attempted, and what backs each outcome)
 
 Required env vars:
     ANTHROPIC_API_KEY
@@ -20,7 +21,7 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
 from yait_aichain.pool import Pool, PENDING, RUNNING, DONE, FAILED
-from yait_aichain.agent  import Agent
+from yait_aichain.agent  import Agent, step_count
 from yait_aichain.tools import searchPerplexity
 
 ANTHROPIC_KEY  = os.getenv("ANTHROPIC_API_KEY")
@@ -102,17 +103,20 @@ for r in pool.history:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. AGENT — verbose=1 shows plan + step-by-step progress
+# 3. AGENT — verbose=1 while it runs, the journal afterwards
 # ─────────────────────────────────────────────────────────────────────────────
-_hr("AGENT · verbose=1 (plan + steps)")
+_hr("AGENT · verbose=1 + result.journal")
 
 agent = Agent(
-    orchestrator = Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
-    tools        = [searchPerplexity(api_key=PERPLEXITY_KEY)],
-    max_steps    = 5,
-    verbose      = 1,    # ← shows plan + one line per step
+    Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
+    tools     = [searchPerplexity(api_key=PERPLEXITY_KEY)],
+    stop_when = [step_count(5)],   # a ceiling; reaching it is a failure, and it says so
+    verbose   = 1,                 # ← one line per tool call
 )
 
 result = agent.run("What is the latest version of Python and when was it released?")
-print(f"\n  ▸ final answer: {result.output[:120]}")
-print(f"  ▸ steps={result.steps_taken}  tokens={result.tokens_used:,}")
+print(f"\n  ▸ final answer: {str(result.output)[:120]}")
+print(f"  ▸ steps={result.steps_taken}  tokens={result.tokens_used:,}"
+      f"  stopped_by={result.stopped_by}")
+for e in result.journal:
+    print(f"    {e['seq']:>2}. [{e['outcome']}] {e['intent'] or e['action']}")

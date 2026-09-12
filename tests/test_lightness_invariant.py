@@ -36,12 +36,19 @@ from unittest.mock import MagicMock
 from yait_aichain import Agent, Chain, Model, Pool, Skill
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = sorted((ROOT / "docs").rglob("*.md")) + [ROOT / "README.md"]
+PAGES = (sorted((ROOT / "docs").rglob("*.md"))
+         + [ROOT / "README.md", ROOT / "examples" / "README.md"])
+
+#: Whole scripts, not fenced blocks. Three of them constructed an `Agent`
+#: with pre-2.0 keywords through the entire 2.x line, and the index described
+#: all three as working, because nothing here looked at `examples/`.
+EXAMPLES = sorted((ROOT / "examples").glob("*.py"))
 
 #: Historical records: they describe a past version on purpose.
 EXEMPT = ("docs/design",)
 
-CLASSES = {"Agent": Agent, "Chain": Chain, "Skill": Skill, "Pool": Pool}
+CLASSES = {"Agent": Agent, "Chain": Chain, "Skill": Skill, "Pool": Pool,
+           "Model": Model}
 
 
 def _blocks(text: str):
@@ -53,6 +60,15 @@ def _pages():
         rel = page.relative_to(ROOT).as_posix()
         if not rel.startswith(EXEMPT):
             yield rel, page.read_text()
+
+
+def _sources():
+    """Every piece of code a reader is shown: fenced blocks and example scripts."""
+    for rel, text in _pages():
+        for block in _blocks(text):
+            yield rel, block
+    for script in EXAMPLES:
+        yield script.relative_to(ROOT).as_posix(), script.read_text()
 
 
 class TestTheHelloWorldStillRuns(unittest.TestCase):
@@ -112,33 +128,37 @@ class TestEveryExampleBindsToTheRealThing(unittest.TestCase):
     required arguments supplied, arity right. The agent examples had both
     problems, and only the first was being caught."""
 
+    def test_the_examples_are_read(self):
+        # A glob that matches nothing passes every test above it.
+        self.assertGreater(len(EXAMPLES), 20)
+
     def test_every_call_binds(self):
         failures = []
-        for rel, text in _pages():
-            for block in _blocks(text):
+        for rel, source in _sources():
+            try:
+                tree = ast.parse(source)
+            except SyntaxError:
+                continue                        # a fragment, not an example
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                name = (getattr(node.func, "id", None)
+                        or getattr(node.func, "attr", None))
+                cls = CLASSES.get(name)
+                if cls is None:
+                    continue
+                # Values are irrelevant: this asks whether the call shape
+                # is one the constructor accepts, not whether it works.
+                args = [None] * len(node.args)
+                if any(isinstance(a, ast.Starred) for a in node.args):
+                    continue
+                if any(kw.arg is None for kw in node.keywords):
+                    continue                    # **kwargs: shape unknowable
+                kwargs = {kw.arg: None for kw in node.keywords}
                 try:
-                    tree = ast.parse(block)
-                except SyntaxError:
-                    continue                    # a fragment, not an example
-                for node in ast.walk(tree):
-                    if not isinstance(node, ast.Call):
-                        continue
-                    name = (getattr(node.func, "id", None)
-                            or getattr(node.func, "attr", None))
-                    cls = CLASSES.get(name)
-                    if cls is None:
-                        continue
-                    # Values are irrelevant: this asks whether the call shape
-                    # is one the constructor accepts, not whether it works.
-                    args = [None] * len(node.args)
-                    if any(isinstance(a, ast.Starred) for a in node.args):
-                        continue
-                    kwargs = {kw.arg: None for kw in node.keywords if kw.arg}
-                    try:
-                        inspect.signature(cls.__init__).bind(None, *args,
-                                                             **kwargs)
-                    except TypeError as exc:
-                        failures.append(f"{rel}: {name}(...) — {exc}")
+                    inspect.signature(cls.__init__).bind(None, *args, **kwargs)
+                except TypeError as exc:
+                    failures.append(f"{rel}:{node.lineno}: {name}(...) — {exc}")
         self.assertEqual(sorted(set(failures)), [],
                          "\n".join(sorted(set(failures))))
 
