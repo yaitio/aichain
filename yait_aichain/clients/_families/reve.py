@@ -127,7 +127,7 @@ class ReveClient(BaseClient):
     def _auth_headers(self) -> dict:
         return {"Content-Type": "application/json",
                 "Accept":       "application/json",
-                "Authorization": f"Bearer {self._api_key}"}
+                "Authorization": f"Bearer {self.api_key}"}
 
     def list_models(self) -> list[str]:
         raise NotImplementedError(

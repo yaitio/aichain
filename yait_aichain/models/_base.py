@@ -353,8 +353,19 @@ class Model:
         # token when started with --api-key. So the key is still *resolved*
         # (passed or from env) and still sent when present; only the "you
         # must have one" gate is lifted.
-        resolved_key = api_key or os.getenv(prov["env_key"])
-        if not resolved_key:
+        # A callable key is resolved per request rather than here, and that
+        # is the whole of multi-tenant support. One `Model` serves every
+        # tenant; the key belongs to whichever run is in flight, so resolving
+        # at construction would bind the first tenant's credential to every
+        # later one. The callable is handed the current `RunContext` — which
+        # is emphatically *not* where the secret lives: that object is
+        # serialised into the run document and `FileStore` writes it to disk,
+        # so it carries the tenant's **name** and the caller looks the key up
+        # from it.
+        self._resolve_key = api_key if callable(api_key) else None
+        resolved_key = "" if self._resolve_key else (
+            api_key or os.getenv(prov["env_key"]))
+        if not self._resolve_key and not resolved_key:
             if prov.get("auth") == "none":
                 resolved_key = ""
             else:
@@ -456,6 +467,9 @@ class Model:
 
         # ── build the family client (format + transport) ──────────────
         self.client = _build_client(self._provider, resolved_key, client_options or {})
+        if self._resolve_key is not None:
+            # The client asks at header time, once per request.
+            self.client._resolve_key = self._resolve_key
 
     # ------------------------------------------------------------------
     # Format — thin delegation to the family client

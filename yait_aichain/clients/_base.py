@@ -128,6 +128,35 @@ class BaseClient:
     # Authentication — must be overridden by every provider subclass
     # ------------------------------------------------------------------
 
+    #: Set by `Model` when the caller passed a callable `api_key`. Asked
+    #: once per request rather than once per Model, which is what makes one
+    #: Model serve many tenants.
+    _resolve_key = None
+
+    @property
+    def api_key(self) -> str:
+        """The key for the request being built.
+
+        A constant unless a resolver was given, in which case the current
+        `RunContext` decides. Failing loudly on an empty answer is the point:
+        falling back to the process-wide key would send one tenant's request
+        under another's credential, and the provider would answer normally.
+        """
+        if self._resolve_key is None:
+            return self._api_key
+        from ..state import current
+        context = current()
+        key = self._resolve_key(context)
+        if not key:
+            tenant = getattr(context, "tenant", None)
+            raise ValueError(
+                f"no API key resolved for tenant {tenant!r}. The resolver "
+                "passed to Model(api_key=...) returned nothing; there is no "
+                "process-wide key to fall back on, because falling back would "
+                "bill one tenant to another and the provider would answer "
+                "normally.")
+        return key
+
     def _auth_headers(self) -> dict:
         """
         Return the provider-specific HTTP headers needed for authentication

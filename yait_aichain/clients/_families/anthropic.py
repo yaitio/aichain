@@ -108,7 +108,7 @@ class AnthropicClient(BaseClient):
 
     # ── transport ────────────────────────────────────────────────────
     def _auth_headers(self) -> dict:
-        return {"x-api-key": self._api_key,
+        return {"x-api-key": self.api_key,
                 "anthropic-version": _API_VERSION,
                 "Content-Type": "application/json"}
 

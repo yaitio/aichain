@@ -381,7 +381,8 @@ class Chain:
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
         doc = RunDocument.new("chain", step_names, variables=accumulated)
-        with self._lend_budget():
+        from ..state import using
+        with using(context), self._lend_budget():
             return self._run_from(doc, accumulated, start_idx=0, signal=None,
                                   usage_in=None, on_error=_on_error,
                                   context=context)
@@ -438,7 +439,8 @@ class Chain:
             total_tokens  = u.get("total_tokens", 0),
             cost          = u.get("cost"),
         ) if u else None
-        with self._lend_budget():
+        from ..state import using
+        with using(context), self._lend_budget():
             return self._run_from(doc, accumulated, start_idx=start,
                                   signal=signal,
                                   usage_in=usage_in, on_error=_on_error,

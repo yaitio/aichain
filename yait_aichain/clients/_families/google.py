@@ -184,7 +184,7 @@ class GoogleClient(BaseClient):
     # ── transport ────────────────────────────────────────────────────
     def _auth_headers(self) -> dict:
         return {"Content-Type": "application/json",
-                "x-goog-api-key": self._api_key}
+                "x-goog-api-key": self.api_key}
 
     def list_models(self) -> list[str]:
         data = self._get("/models", self._auth_headers())

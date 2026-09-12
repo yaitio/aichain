@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+## [2.13.0] — 2026-09-12
+
+**Per-request secrets.** The last of the serverless product's library
+requirements. It was recorded as *"`RunContext` exists; whether it covers the
+injection story end to end is unverified"* — measured, it did not cover it at
+all: `RunContext` reached `Chain` alone, and its own docstring calls its
+contents non-secret, correctly, because the run document is serialised and
+`FileStore` writes it to disk.
+
+### Added
+
+- **`Model(api_key=callable)`** — asked **once per request** and handed
+  whatever run is in flight, so one `Model` serves every tenant. Resolving at
+  construction would bind the first tenant's credential to every later
+  request.
+
+  The secret is resolved *from* the context and never stored in it: the
+  context carries the tenant's **name**, and putting a key there would write
+  it to disk in plaintext with the rest of the document. That fact settled a
+  design question rather than a preference.
+
+  A resolver returning nothing **raises**. There is no fall-back to the
+  process-wide key, deliberately: a fall-back would send one tenant's request
+  under another's credential and the provider would answer normally.
+
+- **`state.using(context)` and `state.current()`** — the run in flight, in a
+  `ContextVar`. A `context=` on `Skill`, on `Pool`, on every `Tool` would be
+  the environment leaking into the scenario, which `VISION.md` names as the
+  signal that a design has gone wrong. `Pool` copies it into each worker
+  thread explicitly, because `contextvars` do not cross a thread boundary on
+  their own — a silent failure otherwise, reading as a missing key rather than
+  a lost context.
+
+### Fixed
+
+- **Every family now resolves the key through one property.** Five clients
+  read `self._api_key` straight out of the attribute in their own
+  `_auth_headers`, so a resolver would have reached whichever family somebody
+  remembered to change.
+
+- **The key is read once per request.** OpenAI's `_auth_headers` read it twice
+  — once to test it, once to format it — which for a resolver means doing a
+  vault lookup twice for work the caller cannot see. Found by a test counting
+  the calls, not by reading the code.
+
+
 ## [2.12.0] — 2026-09-12
 
 **A ceiling in money**, on every primitive that spends it. The last of the

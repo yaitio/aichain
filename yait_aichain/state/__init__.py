@@ -17,12 +17,13 @@ All of this is opt-in: a run that never suspends behaves exactly as before.
 """
 
 from ._context import RunContext
+from ._current import current, using
 from ._suspend import Suspend, SuspendedResult
 from ._store import StateStore, InMemoryStore, FileStore
 from ._run_document import RunDocument, StepStatus
 
 __all__ = [
-    "RunContext",
+    "RunContext", "current", "using",
     "Suspend",
     "SuspendedResult",
     "StateStore",
