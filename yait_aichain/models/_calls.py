@@ -124,6 +124,43 @@ def split_media_result(msg: dict) -> "tuple[dict, dict | None]":
     return tool_turn, {"role": "user", "parts": [label, *media]}
 
 
+def dangling_calls(messages: list) -> list:
+    """Ids of tool calls in *messages* that no later turn answers.
+
+    A conversation in which the model asked for a tool and never heard back
+    is malformed, and providers disagree about it in the worst possible way:
+    OpenAI's chat completions, the Responses API and Anthropic all reject the
+    request; Google keys results by name and is looser; a self-hosted
+    OpenAI-compatible server — vLLM, llama.cpp, mlx — validates nothing at
+    all and templates whatever it was handed, so the model meets its own
+    unanswered call and improvises. It repeats it, apologises, or invents the
+    result, differently each time.
+
+    That is run-to-run variance manufactured by us, and it is worst where it
+    is least visible: the condition that produces a dangling call — a tool
+    that raised, a result lost across an invocation boundary — is itself
+    intermittent, so the same input behaves differently on different trials.
+
+    ``run()`` cannot produce one: it appends a result turn for every call in
+    a reply, failed ones included. The externally driven seam can, because
+    ``step()`` hands the obligation to the caller and nothing checked that
+    they met it — and that seam is precisely what a benchmark harness and a
+    serverless driver use, which is where a result crosses a process boundary
+    and can be lost.
+    """
+    answered = {m.get("call_id") for m in messages
+                if isinstance(m, dict) and m.get("role") == "tool"}
+    asked: list = []
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            continue
+        for call in message.get("tool_calls") or []:
+            call_id = call.get("id") if isinstance(call, dict) else None
+            if call_id and call_id not in answered:
+                asked.append(call_id)
+    return asked
+
+
 def tool_result_turn(call_id: str, result) -> dict:
     """
     One call's result as a universal ``tool`` turn.

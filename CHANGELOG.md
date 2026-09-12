@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+## [2.10.0] — 2026-09-12
+
+**A tool call with no result never reaches a provider.** The history invariant
+on the externally driven seam, outstanding in `PLAN.md` since the τ²-bench
+study.
+
+### Changed
+
+- **`step()` refuses a malformed history**, naming the unanswered call ids and
+  what to append. Its docstring already handed the obligation to the caller —
+  *"the caller appends the reply and whatever the world answered, then calls
+  again"* — and nothing verified that they did. That seam is what a benchmark
+  harness and a serverless driver use, which is exactly where a result crosses
+  a process boundary and can be lost.
+
+  It matters more than it looks because the providers disagree in the worst
+  possible way. OpenAI chat completions, the Responses API and Anthropic all
+  reject the request; Google keys results by name and is looser; a self-hosted
+  OpenAI-compatible server — vLLM, llama.cpp, mlx — validates **nothing** and
+  templates whatever it was handed, so the model meets its own unanswered call
+  and improvises: repeats it, apologises, or invents the result, differently
+  each time. Provider interchangeability is this library's main promise and
+  this is a place it did not hold.
+
+  And the condition that produces a dangling call — a tool that raised, a
+  result dropped across an invocation boundary — is itself intermittent, so it
+  became unbounded behaviour on some trials and not others: run-to-run
+  variance manufactured by us. The check does not turn a wrong answer into a
+  right one; it turns quiet weirdness into the same named failure every time,
+  locally, before the network, pointing at the caller rather than at a
+  provider's wording. An instrument for reliability, not for accuracy — and on
+  a benchmark a crash can rank below a model muddling through, which is worth
+  knowing before reading the next score.
+
+  `run()` is unaffected: it appends a result turn for every call in a reply,
+  failed ones included, and always did. Turning the check on cost the existing
+  suite nothing, which is the evidence for that.
+
+### Added
+
+- **`dangling_calls(messages)`** in `models._calls` — the invariant as a
+  function, so a driver can ask before it commits rather than learn from the
+  raise.
+
+### Fixed
+
+- **The documented external-driver example could not run.** It read
+  `agent.execute(decision["action"], state)`; `step()` returns a
+  `ToolCallRequest` or a string, never a dict. The paragraph after it
+  described reflection assigning a `store_as` key into memory — gone since
+  `2.0.0` — and the modes table still listed a third mode, `goal`. Replaced
+  with the whole loop, including the appending the invariant now requires.
+
+
 ## [2.9.3] — 2026-09-12
 
 **A tool's schema becomes authority over its options.** They already declared
