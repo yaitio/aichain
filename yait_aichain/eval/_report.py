@@ -62,7 +62,8 @@ class Report:
         return cls(adapt(source, **keys))
 
     # ── validity ─────────────────────────────────────────────────────────
-    def reject(self, *, max_empty: int = 2, max_errors: int = 5) -> "dict[str, str]":
+    def reject(self, *, max_empty: int = 2, max_errors: int = 5,
+               max_abstained: float = 0.2) -> "dict[str, str]":
         """
         Mark cells whose data is not worth reporting, and say why.
 
@@ -75,10 +76,17 @@ class Report:
         for arm, rows in self._by_arm().items():
             empty  = sum(1 for r in rows if not r.error and _is_empty(r.output))
             errors = sum(1 for r in rows if r.error)
+            silent = sum(1 for r in rows if self._abstained(r))
             if empty > max_empty:
                 self._rejected[arm] = f"{empty} empty outputs"
             elif errors > max_errors:
                 self._rejected[arm] = f"{errors} errors"
+            # A judge that could not read most of an arm has not measured it.
+            # Excluding those rows keeps the surviving number honest; past
+            # this share there is no surviving number worth printing.
+            elif rows and silent > max_abstained * len(rows):
+                self._rejected[arm] = (f"{silent} of {len(rows)} unscored — "
+                                       "the judge could not read them")
         return dict(self._rejected)
 
     @property
@@ -101,10 +109,30 @@ class Report:
         return sorted({r.group for r in self._live() if r.group})
 
     # ── the numbers ──────────────────────────────────────────────────────
+    @staticmethod
+    def _abstained(record: Record) -> bool:
+        """The judge said nothing about this row, so nothing may be counted.
+
+        Excluded from the denominator rather than scored zero, because those
+        are different claims: "wrong" and "unreadable by the instrument" fold
+        into one number only if you are willing to blame the arm for the
+        judge. The exclusions are counted and printed — a denominator that
+        quietly shrinks is its own defect, and the arm a judge could not read
+        twenty times has an instrument problem, not a 0.95.
+        """
+        return bool((record.meta or {}).get("abstained"))
+
+    def abstentions(self, arm: str, group: str = "") -> int:
+        """How many rows the judge declined to score for *arm*."""
+        return sum(1 for r in self._live()
+                   if r.arm == arm and (not group or r.group == group)
+                   and self._abstained(r))
+
     def _cases(self, arm: str, group: str = "") -> "dict[str, list[Record]]":
         out: "dict[str, list[Record]]" = defaultdict(list)
         for r in self._live():
-            if r.arm == arm and (not group or r.group == group):
+            if r.arm == arm and (not group or r.group == group) \
+                    and not self._abstained(r):
                 out[r.case].append(r)
         return dict(out)
 
@@ -221,7 +249,7 @@ class Report:
     def table(self, group: str = "", k: "int | None" = None) -> str:
         """One row per arm: accuracy, reliability, and what it cost."""
         head = (f"{'arm':<22}{'mean':>8}{'pass^k':>9}{'flips':>8}"
-                f"{'cases':>7}{'err':>5}{'$':>10}")
+                f"{'cases':>7}{'err':>5}{'n/j':>5}{'$':>10}")
         lines = [head, "─" * len(head)]
         for arm in sorted(self.arms(),
                           key=lambda a: -self.pass_k(a, k, group)):
@@ -230,7 +258,8 @@ class Report:
                 f"{arm:<22}{self.mean(arm, group):>8.3f}"
                 f"{self.pass_k(arm, k, group):>9.3f}"
                 f"{self.flips(arm, group):>8.3f}"
-                f"{s['cases']:>7.0f}{s['errors']:>5.0f}{s['cost']:>10.4f}")
+                f"{s['cases']:>7.0f}{s['errors']:>5.0f}"
+                f"{self.abstentions(arm, group):>5.0f}{s['cost']:>10.4f}")
         for arm, why in sorted(self._rejected.items()):
             lines.append(f"{arm:<22}{'rejected — ' + why:>42}")
         if self.groups() and not group:

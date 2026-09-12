@@ -137,9 +137,17 @@ def judge(model, *, rubric: str = "The answer is correct if it states the same "
         reply = _text(skill.run())
         found = _VERDICT.match(reply.strip())
         if not found:
-            raise ValueError(
-                f"judge returned no verdict for case {case.id!r}: "
-                f"{reply.strip()[:120]!r}")
+            # Fail-closed accounting: excluded from the count, never recorded
+            # as a clean verdict. Raising — which this did until 2026-09-12 —
+            # was right about the important half (guessing "pass" raises every
+            # arm at once and reads as a good result) and wrong about the
+            # rest: it ends the whole run over one row a judge could not read.
+            # The arm that a judge abstained on twenty times has not scored
+            # 0.95 out of the eighty it could read; it has an instrument that
+            # does not work, and that is only visible if the abstentions are
+            # counted and shown.
+            return abstain(f"no verdict for case {case.id!r}: "
+                           f"{reply.strip()[:120]!r}")
         passed = found.group(1).upper() == "PASS"
         usage  = getattr(skill, "last_usage", None)
         return {"ok": passed, "score": 1.0 if passed else 0.0,
@@ -147,6 +155,80 @@ def judge(model, *, rubric: str = "The answer is correct if it states the same "
                 # cost table cannot quietly include the cost of grading
                 "judge_tokens": getattr(usage, "total_tokens", 0) or 0,
                 "judge_cost":   getattr(usage, "cost", 0.0) or 0.0}
+    return _score
+
+
+def abstain(why: str) -> dict:
+    """A verdict of *no verdict* — the judge could not judge this one.
+
+    ``ok`` is False so nothing downstream that ignores the flag can read an
+    abstention as a pass; ``abstained`` is what :class:`~._report.Report`
+    reads, and it removes the row from the denominator rather than counting it
+    as a failure. Those two are different claims and the difference is the
+    whole point: a judge that cannot read an answer has said nothing about it.
+    """
+    return {"ok": False, "score": 0.0, "abstained": True, "why": why}
+
+
+def pairwise(model, *, rubric: str = "Which answer better fulfils the "
+                                     "question? Consider accuracy first, "
+                                     "then completeness, then concision.",
+             champion: str = "the reference") -> Scorer:
+    """
+    A judge compares the candidate with the champion, **in both orderings**.
+
+    LLM judges have a documented preference for whichever answer they read
+    first, and a single-ordering comparison measures that preference as much
+    as it measures quality. So the pair is put twice, A/B and B/A, and the
+    candidate wins only by winning both. A disagreement between the two
+    orderings *is* the position bias showing itself, and it resolves **to the
+    champion**: the burden is on the challenger, which is what keeps a
+    best-so-far from drifting on noise.
+
+    The champion is ``case.expect`` — the same field :func:`judge` reads as
+    the reference.
+
+    ``extra`` carries what each ordering said, so a run can report how often
+    they disagreed. That number is the judge's own reliability, measured for
+    free while grading, and a pair of orderings that disagree half the time
+    means the comparison is a coin toss wearing a rubric.
+    """
+    from ..models import Model
+    from ..skills import Skill
+
+    m = model if isinstance(model, Model) else Model(model)
+
+    def _ask(question, first, second):
+        text = (f"{rubric}\n\nAnswer with exactly one word on the first "
+                f"line — FIRST or SECOND — and nothing else on that line.\n\n"
+                f"QUESTION:\n{question}\n\nFIRST:\n{first}\n\n"
+                f"SECOND:\n{second}")
+        skill = Skill(m, {"messages": [{"role": "user", "parts": [text]}]})
+        reply = _text(skill.run()).strip()
+        head = _re.match(r"^\W*(FIRST|SECOND)\b", reply, _re.IGNORECASE)
+        usage = getattr(skill, "last_usage", None)
+        return (head.group(1).upper() if head else None,
+                getattr(usage, "total_tokens", 0) or 0,
+                getattr(usage, "cost", 0.0) or 0.0)
+
+    def _score(case, output):
+        question  = _text(case.input)
+        candidate = _text(output)
+        reference = _text(case.expect)
+
+        first_up,  t1, c1 = _ask(question, candidate, reference)
+        second_up, t2, c2 = _ask(question, reference, candidate)
+        if first_up is None or second_up is None:
+            return abstain(f"unreadable comparison for case {case.id!r}")
+
+        # The candidate led in run one and trailed in run two, so winning
+        # means FIRST then SECOND.
+        won_both = (first_up == "FIRST" and second_up == "SECOND")
+        agreed   = ((first_up == "FIRST") == (second_up == "SECOND"))
+        return {"ok": won_both, "score": 1.0 if won_both else 0.0,
+                "orderings_agreed": agreed,
+                "champion": champion,
+                "judge_tokens": t1 + t2, "judge_cost": c1 + c2}
     return _score
 
 

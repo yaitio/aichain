@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+## [2.11.0] — 2026-09-12
+
+**Judging.** Both items carried over from `2.3.0`, and the reason they matter
+is that the first thing needing them cannot be built from what was here: every
+number in the byheart study is recall of evidence, and nothing scores the
+answer.
+
+### Added
+
+- **`pairwise(model)` — a comparison that is not measuring position.** LLM
+  judges have a documented preference for whichever answer they read first, so
+  a single-ordering comparison measures that preference alongside quality and
+  produces a number that looks exactly like a quality score. The pair is put
+  twice, A/B and B/A, and the candidate wins only by winning both.
+
+  A disagreement between the orderings **is** the position bias showing
+  itself, and it resolves to the champion: the burden is on the challenger,
+  which is what keeps a best-so-far from drifting on noise. How often they
+  disagreed is reported per verdict — that is the judge's own reliability,
+  measured for free while grading, and a pair that disagrees half the time is
+  a coin toss wearing a rubric.
+
+- **`abstain(why)` — a verdict of no verdict.** `ok=False`, so nothing that
+  ignores the flag can read it as a pass, and excluded from the denominator,
+  so nothing reads it as a wrong answer. Those are different claims: "wrong"
+  and "unreadable by the instrument" fold into one number only if you are
+  willing to blame the arm for the judge.
+
+### Changed
+
+- **`judge()` abstains instead of raising** on an unparseable verdict. Raising
+  was right about the important half — guessing "pass" raises every arm at
+  once and reads as a good result — and wrong about the rest: it ended the
+  whole run over one row a judge could not read.
+
+- **`Report` counts and prints the exclusions** (`abstentions()`, an `n/j`
+  column). A denominator that quietly shrinks is its own defect. And an arm
+  the judge could not read for more than a fifth of its rows is **rejected**:
+  excluding rows keeps the survivors honest, but past that share there are no
+  survivors worth printing — 0.95 of the fifth it managed to read is not a
+  result.
+
+
 ## [2.10.0] — 2026-09-12
 
 **A tool call with no result never reaches a provider.** The history invariant
