@@ -2,6 +2,61 @@
 
 ## [Unreleased]
 
+## [2.9.2] — 2026-09-12
+
+Two silent divergences in what the providers were actually sent, both in the
+handling of the system prompt, and both invisible to every example this
+repository ships.
+
+### Fixed
+
+- **The Responses API path kept only the last system message.** `instructions`
+  was **assigned** inside the loop over messages rather than accumulated, so a
+  second system message replaced the first. Present since the very first
+  commit (`0211386`, 1.0.0) and carried through the 1.2.3 migration verbatim.
+
+  Scope, measured rather than estimated: `gpt-5.4` / `5.5` / `5.6` only, and
+  only when the caller wrote two or more `system` messages — one is the common
+  shape and always worked, and `Agent` emits exactly one. Nothing shipped in
+  this repository could reach it: of 24 examples one carries a system prompt
+  (a single one, on Anthropic) and one runs a Responses model (through an
+  Agent). The prompt did not fail, it arrived **partially** — which is worse
+  than failing, because the answer is plausible and the model gets the blame.
+
+  The plan had this recorded as *"Responses overwrites, the rest
+  concatenate"* — as a **property of the provider**. It was ours: the
+  `instructions` field is one string, so joining several system messages is
+  the library's job, and every other family does it. A defect filed as a
+  provider difference is one nobody fixes, because provider differences are
+  supposed to differ.
+
+- **A mid-conversation system message meant two different things.** Anthropic,
+  Google and the Responses API each carry the system prompt in a field of
+  their own, so one written in the middle is hoisted out of the sequence and
+  applies from the start; the OpenAI-compatible family left it in place, where
+  it reads as an instruction that begins at that point. The same conversation,
+  two meanings, nothing said.
+
+  Three providers cannot express the positional reading at all, so global is
+  the only portable one, and it is now global everywhere — hoisted on the
+  OpenAI family too, and **reported** as an adaptation, because for that
+  family it is a real change to what the model sees.
+
+### Added
+
+- **The conversations no example contains**, compared across all nine text
+  providers: a system message in the middle, system messages at both ends, an
+  assistant turn first and in the middle, two user turns in a row, multi-part
+  messages, empty parts. What is compared is the **meaning** — is the system
+  prompt global, what is the sequence of turns — not the wire, because the
+  wire legitimately differs: Google says `model` where the others say
+  `assistant`, and three providers carry the system prompt in a field.
+
+  Both defects above lived in a shape our own corpus cannot produce. The
+  examples had been doubling as the test set, and the test set never contained
+  the case.
+
+
 ## [2.9.1] — 2026-09-12
 
 The five instruments `PLAN.md` has been asking for since the June audit, and
