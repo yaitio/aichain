@@ -63,6 +63,21 @@ def _auto_path(fmt: str) -> str:
 
 # ── Base class ────────────────────────────────────────────────────────────────
 
+
+def _deep_with_option(parameters: dict, key: str, spec: dict) -> dict:
+    """A copy of *parameters* with one more key under ``options``.
+
+    A copy, because the schemas are class attributes shared by inheritance:
+    mutating the parent's dict in place would add the key to every sibling —
+    which is exactly the mistake this is here to avoid.
+    """
+    import copy
+    out = copy.deepcopy(parameters)
+    out.setdefault("properties", {}).setdefault(
+        "options", {}).setdefault("properties", {})[key] = spec
+    return out
+
+
 class convertToSpeech(Tool):
     """
     Synthesise speech from text and save to an audio file.
@@ -532,6 +547,17 @@ class ttsQwen(convertToSpeech):
         "pcm":  "pcm",
         "flac": "flac",
     }
+
+    # `region` is read from `options` by this class and by no other TTS tool,
+    # and the shared schema above does not carry it — so a model could not
+    # discover an option the tool honours, and a caller who used it was
+    # passing a key the schema calls unknown. Declared here rather than in the
+    # parent, because advertising it on OpenAI, Google and xAI would be the
+    # opposite defect: an option offered where nothing reads it.
+    parameters = _deep_with_option(
+        convertToSpeech.parameters, "region",
+        {"type": "string", "enum": ["ap", "us", "cn", "hk"],
+         "description": "DashScope region for this call. Default: ap."})
 
     def __init__(
         self,

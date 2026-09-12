@@ -52,6 +52,7 @@ forwarded directly to OpenAI function-calling or Anthropic tool-use APIs::
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -300,6 +301,52 @@ class Tool:
             raise ValueError(
                 f"Tool '{self.name}' missing required parameter: 'input'"
             )
+        # A warning rather than a raise, and the asymmetry with `check_args`
+        # is deliberate. There the caller is a model, the message goes back
+        # into its attempt budget, and it retries; here the caller is a person
+        # whose tool subclass may legitimately read an option its schema does
+        # not advertise. Refusing their call over the library's reading of
+        # their own schema would be the library knowing better. Saying so is
+        # the most it is entitled to.
+        if isinstance(options, dict):
+            if unknown := self.unknown_keys({"options": options}):
+                warnings.warn(self._unknown_message(unknown),
+                              RuntimeWarning, stacklevel=3)
+
+    def unknown_keys(self, kwargs: dict) -> list:
+        """Keys the schema does not declare, as ``"options.recencyy"`` paths.
+
+        The schemas were already there and nothing read them. `searchPerplexity`
+        declares seven option keys — `max_results`, `recency`, `domains`,
+        `country`, `language`, `after_date`, `before_date` — and
+        `options={"recencyy": "day"}` passed validation, reached the tool, and
+        was dropped on the floor: a search ran unfiltered and answered
+        confidently. A typo cost a run and left no trace.
+
+        One level into a declared object, and no further. That is where the
+        gap was — the top level already fails loudly, because an unexpected
+        keyword reaches `run(**kwargs)` and Python raises — and a schema is
+        only authority over what it actually describes. A nested object with
+        no `properties` of its own is a free-form dict by declaration, and is
+        left alone.
+        """
+        declared = self.parameters.get("properties", {})
+        unknown  = [k for k in kwargs if k not in declared]
+        for key, spec in declared.items():
+            nested = (spec or {}).get("properties")
+            value  = kwargs.get(key)
+            if nested and isinstance(value, dict):
+                unknown += [f"{key}.{k}" for k in value if k not in nested]
+        return sorted(unknown)
+
+    def _unknown_message(self, unknown: list) -> str:
+        declared = self.parameters.get("properties", {})
+        known = sorted(declared)
+        for key, spec in declared.items():
+            for nested in sorted((spec or {}).get("properties") or {}):
+                known.append(f"{key}.{nested}")
+        return (f"Invalid call to tool '{self.name}': unknown "
+                f"argument(s) {unknown}. Accepted: {known}.")
 
     def check_args(self, kwargs: dict) -> "str | None":
         """
@@ -321,6 +368,12 @@ class Tool:
                 f"argument(s) {missing}. Expected parameters: "
                 f"{sorted(properties) or 'see the tool schema'}."
             )
+        # A name the schema does not carry is a mistake, not a request, and
+        # the model can fix it inside the step's attempt budget — which is
+        # exactly what this message is for. Missing is reported first because
+        # it is the more basic failure.
+        if unknown := self.unknown_keys(kwargs):
+            return self._unknown_message(unknown)
         return None
 
     # ------------------------------------------------------------------
