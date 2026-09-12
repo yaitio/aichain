@@ -43,6 +43,7 @@ import time
 import uuid
 from typing import Any
 
+from ._swarm import acceptance_from, collecting_beacons
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
                       DONE as _J_DONE, FAILED as _J_FAILED, SKIPPED as _J_SKIPPED
 from ._result  import AgentResult
@@ -341,8 +342,11 @@ class Agent:
         self._run_id = uuid.uuid4().hex
         self._emit("run.started", payload={"task": task, "mode": self.mode})
 
-        result = self._loop(messages, state, journal)
+        with collecting_beacons() as board:
+            result = self._loop(messages, state, journal)
         result.journal = journal.to_list()
+        result.beacons = board.all()
+        result.acceptance = acceptance_from(result.journal)
         self._emit("run.finished", payload={"success": result.success,
                                             "stopped_by": result.stopped_by},
                    usage=result.tokens_used, error=result.error)
@@ -384,6 +388,8 @@ class Agent:
         collect = sink.append          # bound once, so `remove` finds it
         self.hooks.append(collect)
         self._streaming = True
+        beacons_scope = collecting_beacons()
+        board = beacons_scope.__enter__()
         try:
             self._emit("run.started", payload={"task": task, "mode": self.mode})
             while sink:
@@ -398,6 +404,8 @@ class Agent:
                     break
 
             result.journal = journal.to_list()
+            result.beacons = board.all()
+            result.acceptance = acceptance_from(result.journal)
             self._emit("run.finished",
                        payload={"success": result.success,
                                 "stopped_by": result.stopped_by},
@@ -407,6 +415,7 @@ class Agent:
             self.last_result = result
         finally:
             self._streaming = False
+            beacons_scope.__exit__(None, None, None)
             try:
                 self.hooks.remove(collect)
             except ValueError:                       # already gone; fine
@@ -582,7 +591,18 @@ class Agent:
                     action      = _safe({"name": call.name,
                                          "arguments": call.arguments}),
                     outcome     = _J_FAILED if error else _J_DONE,
-                    evidence    = _evidence(CHECK, error or "executed"),
+                    # A call that *ran* is a fact, but what it returned is
+                    # only as good as its source. `delegate` hands back a
+                    # worker's own account and marks it MODEL_CLAIM; this
+                    # recorded the call as CHECK regardless, so an unverified
+                    # report entered the parent's journal as a programmatic
+                    # fact — the distinction existed and decided nothing. A
+                    # failure stays CHECK: that the call failed is verified.
+                    evidence    = _evidence(
+                        MODEL_CLAIM if (not error and isinstance(result, dict)
+                                        and result.get("evidence") == MODEL_CLAIM)
+                        else CHECK,
+                        error or "executed"),
                     reason      = error or "",
                     # The journal is a written record; an image cannot go in
                     # it, so media is named rather than embedded.
@@ -875,6 +895,11 @@ class Agent:
                 "stopped_by": child.stopped_by,
                 "success": child.success,
                 "output": child.output,
+                # The worker's board already forwarded these to ours, so a
+                # waiting Pool above has seen them. They are repeated here
+                # because the model that delegated is waiting too, and the
+                # tool result is the only channel it reads.
+                "beacons": [b.to_dict() for b in (child.beacons or [])],
                 "evidence": MODEL_CLAIM}
 
     # ── Result ───────────────────────────────────────────────────────────

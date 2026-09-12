@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [2.17.0] — 2026-09-13
+
+**Swarm coordination.** The plan's row, and the reason it waited for `state/`
+and `Pool` to settle: both mechanisms are a field and a comparison, not an
+architecture.
+
+### Added
+
+- **`AgentResult.acceptance` — what a result rests on.** `checked` when a
+  programmatic fact supports it, `claimed` when only a model's word does, and
+  `unsupported` when nothing does. `_journal.py` has separated `CHECK` from
+  `MODEL_CLAIM` since it was written and nothing ever read the field, so the
+  distinction was decoration; an agent closed its run on its own word. It is
+  reported, not enforced — making the kind *change* what the loop does is
+  `nudge`, the next row.
+
+  An acceptance can be **invalidated**. It fingerprints the checked evidence,
+  so `still_holds(fresh)` tells a caller whether the result was accepted on
+  facts that are still true, and `supersede(reason)` records that someone
+  intervened. Only checked evidence is fingerprinted: a worker re-wording its
+  report changes no fact, and folding claims in would make it look as if the
+  facts had moved.
+
+- **Beacons that interrupt a wait.** `beacon(kind, message)` from anywhere
+  inside a run — no parameter, the board is ambient like `RunContext`.
+  `blocker`, `question` and `contract_change` demand attention; `contract`,
+  `decision` and `fact` are coordination and never interrupt. A `Pool`
+  watching its items **stops starting new ones** on an attention beacon
+  instead of spending the rest of the fan-out on work the blocker already made
+  pointless; items in flight finish. Boards forward upward, so a delegated
+  worker's blocker reaches the pool two levels above. They land on
+  `result.beacons` and `pool.beacons`, and a beacon raised outside any run
+  warns that nobody heard it rather than vanishing.
+
+### Fixed
+
+- **A delegated report entered the parent's journal as a verified fact.**
+  `delegate` returned the worker's account marked `MODEL_CLAIM`, and the loop
+  wrote the call as `CHECK` regardless — the call ran, after all. So the one
+  place the two kinds were meant to be told apart was exactly where they were
+  merged. It is recorded as `model_claim` now; a *failed* call stays `check`,
+  because that it failed is verified.
+
+
 ## [2.16.0] — 2026-09-13
 
 The last of the Consistency list. Two of its entries turned out to be wrong

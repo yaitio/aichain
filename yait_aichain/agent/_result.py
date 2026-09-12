@@ -120,6 +120,17 @@ class AgentResult:
     #: whose evidence is ``model_claim`` were asserted, not verified.
     journal:     list[dict]     = field(default_factory=list)
 
+    #: What this result rests on. ``kind`` is ``checked`` when a programmatic
+    #: fact supports it, ``claimed`` when only a model's word does — a
+    #: delegated worker's report is the common case — and ``unsupported``
+    #: when nothing does. Reported, not enforced: an unsupported answer is
+    #: still returned, and the caller can see that it is one.
+    acceptance:  "object | None" = None
+
+    #: Beacons raised during the run, including by delegated workers — a
+    #: blocker, a question, a contract that changed under the task.
+    beacons:     list           = field(default_factory=list)
+
     def __bool__(self) -> bool:
         return self.success
 
