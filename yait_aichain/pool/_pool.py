@@ -201,6 +201,7 @@ class Pool:
         on_error:    str       = "collect",
         name:        str | None = None,
         description: str | None = None,
+        max_cost=None,
     ) -> None:
         if not items:
             raise ValueError("Pool requires at least one item.")
@@ -211,6 +212,12 @@ class Pool:
             )
 
         self._runner    = runner
+        # One ceiling for the whole fan-out, and this is where sharing earns
+        # its keep: items run concurrently, so a per-item copy of a number
+        # would let every worker spend the full amount. `Budget` takes a lock
+        # for exactly this.
+        from .._budget import as_budget
+        self.max_cost = as_budget(max_cost)
         self._items     = list(items)
         self._max_flows = max_flows
         self._on_error  = on_error
@@ -412,6 +419,8 @@ class Pool:
                 raise ValueError(
                     "Agent runner requires a 'task' key in the item variables."
                 )
+            if self.max_cost is not None and hasattr(runner, "max_cost"):
+                runner.max_cost = self.max_cost
             result = runner.run(task=task, variables=variables)
             if not result:
                 raise RuntimeError(
@@ -430,6 +439,13 @@ class Pool:
         # usage counter is not.
         import copy
         own = copy.copy(runner)
+        # The copy is shallow, so the budget travels by reference and every
+        # item charges the same object — which is the point. Copying the
+        # runner is what makes usage per-item; copying the ceiling would make
+        # it per-item too, and a hundred items with the full budget each is
+        # not a budget.
+        if self.max_cost is not None and hasattr(own, "max_cost"):
+            own.max_cost = self.max_cost
         return own.run(variables=variables), getattr(own, "last_usage", None)
 
     # ── Dunder helpers ────────────────────────────────────────────────────────

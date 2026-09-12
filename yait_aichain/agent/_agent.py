@@ -253,6 +253,7 @@ class Agent:
         hooks:        "list | None" = None,
         permissions                 = None,
         approve                     = None,
+        max_cost                    = None,
         name:         "str | None"  = None,
         description:  "str | None"  = None,
         verbose:      int           = 0,
@@ -304,6 +305,13 @@ class Agent:
         # ask a human; it can only make sure one is asked when a policy said
         # to. Absent, an `approve` decision refuses — see `_permit`.
         self.approve      = approve
+        # A ceiling in money for everything this agent spends, shared with the
+        # Skills it builds and with any worker it delegates to. `cost_budget`
+        # in `stop_when` stops the loop between turns; this stops a call from
+        # beginning, and the two compose — one is a decision, the other a
+        # limit.
+        from .._budget import as_budget
+        self.max_cost = as_budget(max_cost)
         self.name         = name
         self.description  = description
         self.verbose      = verbose
@@ -640,6 +648,7 @@ class Agent:
             # from another invocation's. Identity belongs to whoever owns the
             # run, and that is the agent.
             hooks  = self._stamping_hooks(),
+            max_cost = self.max_cost,
             _tools = self._tool_schemas(),
             # Transient provider failures (rate limit / 5xx / network) retry
             # inside the call instead of costing the whole turn. The reference
@@ -849,6 +858,7 @@ class Agent:
                 # gated call, which reads as the policy being stricter for
                 # children than for their parent.
                 permissions=self.permissions, approve=self.approve,
+                max_cost=self.max_cost,
                 verbose=self.verbose,
                 _depth=self._depth + 1, _max_depth=self._max_depth,
             )

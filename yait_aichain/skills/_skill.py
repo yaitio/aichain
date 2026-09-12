@@ -177,6 +177,7 @@ class Skill:
         max_retries:  int           = 0,
         retry_delay:  float         = 2.0,
         hooks:        list  | None  = None,
+        max_cost:     "float | object | None" = None,
         _tools:       list  | None  = None,
     ) -> None:
         input  = adapters.normalize_input(input)
@@ -211,6 +212,13 @@ class Skill:
         # Token usage of the most recent run() — None until the first call.
         # Reading it is optional; it never affects run()'s inputs or output.
         # For a multi-turn run it is the sum across turns.
+        # A ceiling in money. Takes a number or a shared `Budget`, because a
+        # chain hands the same object to every step: separate copies would let
+        # each level spend the full amount, which is the failure this exists
+        # to prevent.
+        from .._budget import as_budget
+        self.max_cost = as_budget(max_cost)
+
         self.last_usage: "Usage | None" = None
         #: What the library had to change about the last call to fit the
         #: provider — empty when it went out as asked. A warning is easy to
@@ -354,6 +362,9 @@ class Skill:
         _tools = getattr(self, "_tools", None)
         pieces = []
 
+        if self.max_cost is not None:
+            self.max_cost.check(f"{model.name} for skill "
+                                f"{self.name or '(unnamed)'}")
         self._emit("llm_call.started", name=model.name)
         _t0 = _time.monotonic()
         for attempt in range(max(0, self.max_retries) + 1):
@@ -393,6 +404,8 @@ class Skill:
             self.last_usage = attach_cost(
                 extract_usage(raw_usage), model.name,
                 getattr(model, "cache_ttl", "5m"))
+            if self.max_cost is not None:
+                self.max_cost.charge(getattr(self.last_usage, "cost", None))
 
         whole = getattr(model, "last_stream_result", None)
         if whole is not None and not isinstance(whole, str):
@@ -515,6 +528,14 @@ class Skill:
                 time.sleep(retry_delay * (2 ** (attempt - 1)))
 
             try:
+                # Before the call, not after: the length of a reply is not
+                # known until it is paid for, so a budget bounds "do not begin
+                # another call" and never "do not exceed by a cent". Saying
+                # otherwise would be lying about the one number a caller
+                # checks.
+                if self.max_cost is not None:
+                    self.max_cost.check(f"{model.name} for skill "
+                                        f"{self.name or '(unnamed)'}")
                 self._emit("llm_call.started", name=model.name)
                 _t0 = time.monotonic()
                 raw      = model.client.send(
@@ -528,6 +549,8 @@ class Skill:
                 # that already succeeded.
                 usage    = attach_cost(extract_usage(response), model.name,
                                        getattr(model, "cache_ttl", "5m"))
+                if self.max_cost is not None:
+                    self.max_cost.charge(getattr(usage, "cost", None))
                 result   = model.from_response(response, output)
                 self._emit("llm_call.ended", name=model.name,
                            usage=getattr(usage, "total_tokens", None),

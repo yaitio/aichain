@@ -50,6 +50,42 @@ Deep dive ↓
 
 ---
 
+## A ceiling in money
+
+`max_tokens` bounds one reply; nobody budgets in replies. `max_cost` bounds
+what a run may spend, in the unit that appears on the invoice, and every
+primitive takes it:
+
+```python
+from yait_aichain import Budget, BudgetExceeded
+
+budget = Budget(0.50)                       # or max_cost=0.50 for one of them
+chain  = Chain(steps=[...], max_cost=budget)
+
+try:
+    chain.run()
+except BudgetExceeded:
+    pass                                    # what completed is still there
+print(budget.spent, budget.remaining)
+```
+
+**One object, shared.** A budget handed to a `Chain` covers the `Agent` inside
+it and the `Skill` inside that, because they decrement the same thing. Copies
+would let every level spend the full amount, which is the failure the shape
+exists to avoid — and it is why a `Pool`, whose items run concurrently, needs
+this rather than a number.
+
+**It bounds beginning, not exceeding.** The length of a reply is not known
+before it is paid for, so the first call always runs and the ceiling refuses
+the *next* one. A budget promising "never exceed by a cent" would be lying
+about the one number a caller checks. `cost_budget` in an agent's `stop_when`
+carries the same caveat and composes with this: one ends the loop between
+turns, the other refuses a call.
+
+**Exhaustion raises.** Returning what finished with a flag set is how a
+truncated run gets read as a complete one; catch `BudgetExceeded` and read
+`last_usage` if you want the partial result.
+
 ## Streaming
 
 `run()` waits for the whole answer; `stream()` yields it as it arrives. Same
