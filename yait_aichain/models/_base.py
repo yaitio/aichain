@@ -381,20 +381,46 @@ class Model:
         # What the caller asked for, apart from what the defaults supply. Only
         # these are reported when an option does not survive to the wire: a
         # default that a provider ignores is not something anybody chose.
-        self._asked = dict(opts)
+        # `extra` is excluded on purpose: `note_absent` reports an option the
+        # caller asked for that left no trace, and every `extra` field is by
+        # definition outside the vocabulary that mechanism speaks. Reporting
+        # them would be the library commenting on a wheel it handed over.
+        self._asked = {k: v for k, v in opts.items() if k != "extra"}
 
         # An option this library has no word for is a mistake, not a request,
         # and the place to say so is here — where it was written — rather than
         # at the wire or, as before, nowhere at all. A misspelt `temperatur`
         # used to be accepted, ignored, and cost a whole run to notice.
         from ._options import UNIVERSAL_OPTIONS
+        # `extra` is the escape hatch a closed vocabulary needs, and refusing
+        # to have one is how a library that promises portability starts
+        # costing people the thing they came for. Perplexity's
+        # `search_domain_filter` has no universal meaning and never will:
+        # nobody else has a search index. Without a way to send it, the
+        # answer to "how do I filter by domain?" was "not through this
+        # library", and a caller who needs it drops the whole abstraction.
+        #
+        # It is deliberately not part of the vocabulary. Everything inside it
+        # goes on the wire **verbatim and unchecked**, so nothing here
+        # translates it, nothing declines it, and no notice is emitted — the
+        # caller took the wheel and the library says so once, in the
+        # docstring, rather than pretending to supervise.
+        extra = opts.pop("extra", None)
+        if extra is not None and not isinstance(extra, dict):
+            raise ValueError(
+                f"extra must be a dict of provider fields; got "
+                f"{type(extra).__name__}")
+        self.extra = dict(extra or {})
+
         unknown = [k for k in opts if k not in UNIVERSAL_OPTIONS]
         if unknown:
             raise ValueError(
                 f"unknown model option(s): {', '.join(map(repr, sorted(unknown)))}. "
                 f"Known options are: {', '.join(sorted(UNIVERSAL_OPTIONS))}. "
                 "Per-call settings such as image size or quality belong in "
-                "output={'format': {...}}, not here."
+                "output={'format': {...}}, not here. A field only one "
+                "provider has goes in options={'extra': {...}}, which travels "
+                "verbatim and unchecked."
             )
         self.temperature   = opts.get("temperature",   defaults.get("temperature"))
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
@@ -503,6 +529,14 @@ class Model:
             "cache_control": self.cache_control,
             "cache_ttl":     self.cache_ttl,
             "_asked":        dict(self._asked),
+            # `extra` emits no warning and no adaptation — the caller took
+            # the wheel — but it does go on the wire, so a measurement run
+            # that records what its arms sent must be able to see it. Leaving
+            # it out would make two arms differing only by an `extra` field
+            # look identical in the record, which is the exact failure the
+            # notice channel exists to prevent, arriving by the one door that
+            # channel does not watch.
+            "extra":         dict(self.extra),
         }
 
     def _params(self) -> dict:
@@ -635,6 +669,14 @@ class Model:
         asked = {**self._asked,
                  **{k: v for k, v in (output.get("format") or {}).items()
                     if k not in ("type", "schema", "name", "strict")}}
+        if self.extra:
+            # Last, and on top: a caller reaching for `extra` is overriding,
+            # and a merge that lost to the library's own field would be an
+            # escape hatch that does not escape. Multipart bodies are a list
+            # of pairs, not a mapping, and are left alone rather than
+            # corrupted.
+            if isinstance(body, dict) and not body.get("_multipart"):
+                body.update(self.extra)
         note_absent(made, asked, body, self.name, provider=self._provider)
         announce(made)
         self.last_adaptations = list(made)

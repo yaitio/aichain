@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+## [2.15.0] — 2026-09-13
+
+Two more Consistency items: the escape hatch a closed vocabulary needs, and
+one vocabulary where there were two.
+
+### Added
+
+- **`options={"extra": {...}}` — provider fields, verbatim.** The model
+  options are a closed set on purpose: a typo in them is unambiguous and
+  raises. A closed set with no valve is a cage, though, and Perplexity's
+  `search_domain_filter` has no universal meaning and never will — nobody
+  else has a search index. The answer to "how do I filter by domain?" was
+  "not through this library", so a caller who needed it dropped the whole
+  abstraction rather than one field.
+
+  What goes in travels unchanged and **unchecked**: nothing translates it,
+  nothing declines it, no warning is raised. The library says that once
+  instead of pretending to supervise, and it wins over the library's own
+  field on a clash — an escape hatch that loses to what it is escaping is
+  not one.
+
+  It still appears in `Model.effective_options`. No warning is not the same
+  as no record: two arms differing only by an `extra` field must not look
+  identical in a run's own account of itself, which is the failure the notice
+  channel exists to prevent, arriving by the one door that channel does not
+  watch.
+
+### Changed
+
+- **`Chain` and `Pool` share one error vocabulary.** `on_step_error` took
+  {raise, stop, skip} and `on_error` took {raise, collect, skip}; only
+  `raise` meant the same thing in both, so a caller who learned one primitive
+  guessed wrong at the other. `skip` was the trap — in a chain "carry on,
+  loudly", in a pool the silent option was `collect` while `skip` warned.
+
+  Four words now, one meaning each, on both: `raise` propagates, `stop` ends
+  and keeps what completed, `skip` carries on and warns, `collect` carries on
+  silently. `Chain` gains `collect` and `Pool` gains `stop`; the defaults do
+  not move. What each does with `stop` differs in the obvious way — a chain
+  stops running steps, a pool starts no more items, and the ones in flight
+  are let finish, because killing a call mid-request costs the tokens anyway
+  and loses the answer.
+
+- **A failure is recorded as more than `str(exc)`.** Both primitives stored
+  the message alone, which is the least useful part: `KeyError('tenant')`
+  renders as `'tenant'`, reading as a value rather than a fault, and a
+  `TimeoutError` with no message renders as nothing at all. The record now
+  carries the type and the traceback beside it.
+
+
 ## [2.14.0] — 2026-09-13
 
 Consistency, measured rather than listed. Two items, and both are the same
