@@ -117,14 +117,36 @@ that must be one step, or a harness that executes the tools itself — the same
 machinery is exposed:
 
 ```python
+from yait_aichain.models._calls import ToolCallRequest, tool_result_turn
+
 messages = agent.opening(task)
 state    = agent.new_state()
-decision = agent.step(messages, state)      # decide, do not execute
-result, error = agent.execute(decision["action"], state)
+
+while True:
+    decision = agent.step(messages, state)          # decide, do not execute
+    if not isinstance(decision, ToolCallRequest):
+        answer = decision                           # a string is the answer
+        break
+    messages.append(decision.as_turn())
+    for call in decision.calls:
+        result, error = agent.execute(call, state)
+        messages.append(tool_result_turn(call.id, error or result))
 ```
 
-Reflection also assigns a `store_as` key: a snake_case name where the step
-output lands in memory for later steps to reference.
+**Append a result for every call, failed ones included** — the error *is* the
+result. `step()` checks this before it asks anything and raises locally,
+naming the unanswered ids, because a history holding a call nobody answered is
+malformed and the providers disagree about it in the worst way: three reject
+the request, Google is looser, and a self-hosted OpenAI-compatible server
+validates nothing and templates it through, so the model meets its own
+unanswered call and improvises — differently each time. `run()` owns this for
+you; a driver that owns the loop owns it too.
+
+> **Corrected 2026-09-12.** This example read
+> `agent.execute(decision["action"], state)`. `step()` returns a
+> `ToolCallRequest` or a string, never a dict, so the line raised `TypeError`
+> — and the paragraph that followed described reflection assigning a
+> `store_as` key into memory, which the agent has not had since `2.0.0`.
 
 ### Modes
 
@@ -132,7 +154,9 @@ output lands in memory for later steps to reference.
 |---|---|---|
 | `waterfall` (default) | No (retries only) | The path is predictable. |
 | `agile` | Yes, via `replan` | The path is exploratory; later steps depend on what early ones reveal. |
-| `goal` | There is no plan | The steps cannot be known in advance at all. |
+
+There is no `goal` mode: what it did — deciding one action at a time with
+nothing written in advance — is what `agile` is.
 
 #### Goal mode
 

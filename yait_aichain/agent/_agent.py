@@ -48,7 +48,8 @@ from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
 from ._result  import AgentResult
 from .         import _prompts as prompts
 from .._events import Event, emit
-from ..models._calls import ToolCallRequest, tool_result_turn
+from ..models._calls import (ToolCallRequest, dangling_calls,
+                             tool_result_turn)
 from ..pool    import Pool
 from ..tools._base import Tool
 
@@ -445,7 +446,32 @@ class Agent:
         Returns a :class:`~models._calls.ToolCallRequest` when the model asked
         to act, or a string — the answer. The caller appends the reply (via
         ``.as_turn()``) and whatever the world answered, then calls again.
+
+        **The obligation in that sentence is now checked.** A history holding
+        a tool call nobody answered is malformed, and the providers disagree
+        about it in the worst way: three reject the request, Google is looser,
+        and a self-hosted OpenAI-compatible server validates nothing and
+        templates it through, so the model meets its own unanswered call and
+        improvises — differently each time. Provider interchangeability is
+        this library's main promise and that is a place it did not hold.
+
+        Raising here buys three things and costs one. It makes the providers
+        agree; it turns an intermittent, unbounded behaviour into the same
+        named failure every time, since the condition that produces a
+        dangling call is itself intermittent; and it fails locally, before
+        the network, pointing at the caller rather than at a provider's
+        wording. What it does not buy is a better score — on a benchmark a
+        crash can rank below a model muddling through. This is an instrument
+        for reliability, not for accuracy.
         """
+        if unanswered := dangling_calls(messages):
+            raise ValueError(
+                f"agent {self.name or ''!r}: the history has tool call(s) "
+                f"{unanswered} with no result. Append "
+                "`tool_result_turn(call.id, result)` for every call in the "
+                "previous reply — failed ones included, with the error as "
+                "the result — before calling step() again. `run()` does this "
+                "for you; an external driver owns it.")
         return self._ask(messages, state if state is not None else self.new_state())
 
     def execute(self, call, state: "dict | None" = None):
