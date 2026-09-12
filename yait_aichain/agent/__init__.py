@@ -76,7 +76,8 @@ action repeated over a list, and a delegated sub-task is another ``Agent``. The
 agent composes the library rather than reimplementing it.
 """
 
-from ._agent   import (Agent, step_count, token_budget, cost_budget, check)
+from ._agent   import (Agent, step_count, token_budget, cost_budget, check,
+                       nudge, stalled, repeating)
 from ._journal import Journal, JournalEntry, evidence
 from ._memory  import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
 from ._result  import AgentResult
@@ -98,6 +99,9 @@ __all__ = [
     "token_budget",
     "cost_budget",
     "check",
+    "nudge",
+    "stalled",
+    "repeating",
     # Journal
     "Journal",
     "JournalEntry",

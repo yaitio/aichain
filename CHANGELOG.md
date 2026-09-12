@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [2.18.0] — 2026-09-13
+
+**`nudge` — a stop condition that speaks instead of ending the run.** Stage 0
+of *iterating toward a target*, first because it needs no scorer.
+
+### Added
+
+- **`nudge(predicate, message)`, `stalled(k)`, `repeating(k)`** in
+  `stop_when`. A ceiling says "stop" where a stalled run needs "change
+  approach", so a stuck agent either spun until a ceiling caught it or was cut
+  short by a ceiling low enough to catch the spin. A nudge appends a visible
+  user turn and the loop carries on; it fires **once per streak** and re-arms
+  when the condition clears, and terminal conditions are checked first, so a
+  nudge cannot talk the loop past its budget. `nudge.fired` goes on the event
+  channel.
+
+  `stalled` and `repeating` call `Journal.has_progress` and
+  `Journal.is_repeating`, which existed, were documented, and were called
+  from no library code at all. They read the journal, not the task, so they
+  apply to every task and have nothing to overfit to.
+
+### Fixed
+
+- **The agent loop recorded the tool's name as the attempt's intent.** Every
+  call to one tool therefore shared an "intent", and `is_repeating` read ten
+  different searches as one search repeated ten times. Latent until
+  `repeating()` called it, and found by its first test. The loop records no
+  intent now — it has no plan step to name — and the action carries the tool.
+
+- **`Journal.progress_summary()` crashed on any journal the 2.x agent wrote.**
+  The loop stores the action as text and the renderer called `.get` on it.
+  Unnoticed because nothing in the library calls the view. Both renderers now
+  label an entry by its action when it has no intent, instead of printing
+  "(no intent)" down the list.
+
+### Changed — release process
+
+- **Publishing is gated on every supported Python.** `publish.yml` already
+  ran the suite before building — on 3.12 only, the one version where the
+  line that broke 3.10/3.11 was legal, which is how eleven unimportable
+  releases went through a gate that was standing. It now runs 3.10–3.14 and
+  `publish` needs all of them. The `Tests` workflow covers the same five.
+
+
 ## [2.17.1] — 2026-09-13
 
 ### Fixed

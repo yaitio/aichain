@@ -122,6 +122,35 @@ has no plan steps — a call that fails comes back as the next turn and the
 model decides. Transport-level retries are `Model` options, where a caller
 can set them.
 
+
+### A third kind: `nudge`
+
+A ceiling says *stop*; a stalled run needs *change approach*. A nudge speaks
+instead of ending the run: when its predicate is true, a user turn is added
+and the loop carries on.
+
+```python
+from yait_aichain.agent import stalled, repeating, nudge, step_count
+
+stop_when = [
+    stalled(5),       # the last 5 attempts moved nothing
+    repeating(5),     # the last 5 actions were the same
+    step_count(30),   # the ceiling still ends the run
+]
+```
+
+* **It is a visible message**, not an edit to the system prompt, so the
+  transcript shows exactly what the model was told and when.
+* **It fires once per streak.** While the condition stays true it stays
+  quiet; it re-arms when the condition clears. A reminder repeated every turn
+  stops being read.
+* **It cannot talk the loop past a ceiling.** Terminal conditions are
+  checked first, whatever order `stop_when` lists them in.
+
+`stalled` and `repeating` read the journal, not the task — so they apply to
+every task, verifiable or not, and have nothing to overfit to. `nudge(predicate,
+message)` is the general form; `message` may be a callable of `state`.
+
 ---
 
 ## Instructions

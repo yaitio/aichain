@@ -96,6 +96,12 @@ def _action_excerpt(action: "dict | None") -> str:
     """
     if not action:
         return ""
+    if isinstance(action, str):
+        # The agent loop stores the action already rendered to text (a JSON
+        # string, via `_safe`). This called `.get` on it and raised, so
+        # `progress_summary()` crashed on any journal the 2.x agent wrote —
+        # unnoticed because nothing in the library calls it.
+        return _excerpt(action, ACTION_CHARS)
     kind = action.get("type")
     if kind == "tool":
         args = ", ".join(f"{k}={_excerpt(v, ACTION_CHARS // 2)}"
@@ -104,6 +110,16 @@ def _action_excerpt(action: "dict | None") -> str:
     if kind == "skill":
         return _excerpt(action.get("user_prompt", ""), ACTION_CHARS)
     return ""
+
+
+def _label(entry) -> str:
+    """What an entry was — its intent, or failing that what it did.
+
+    The agent loop records no intent (it has no plan step to name), and
+    "(no intent)" repeated down a list tells a reader nothing about which
+    attempt is which. The action does.
+    """
+    return entry.intent or _action_excerpt(entry.action) or "(no intent)"
 
 
 def _excerpt(value, limit: int = OBSERVATION_CHARS) -> str:
@@ -310,7 +326,7 @@ class Journal:
             else:
                 mark = e.outcome
             stored = f" → memory['{e.artifact}']" if e.artifact else ""
-            lines.append(f"- [{mark}] {e.intent or '(no intent)'}{stored}")
+            lines.append(f"- [{mark}] {_label(e)}{stored}")
             tried = _action_excerpt(e.action)
             if tried:
                 lines.append(f"    tried:  {tried}")
@@ -326,8 +342,7 @@ class Journal:
         items = self.refuted()[-limit:]
         if not items:
             return ""
-        lines = [f"- {e.intent or '(no intent)'}: {e.reason or 'ruled out'}"
-                 for e in items]
+        lines = [f"- {_label(e)}: {e.reason or 'ruled out'}" for e in items]
         return "\n".join(lines)
 
     # ── serialisation ────────────────────────────────────────────────
