@@ -30,8 +30,8 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from skills._adapters import validate_input, validate_output, substitute
-from models import Model
+from yait_aichain.skills._adapters import validate_input, validate_output, substitute
+from yait_aichain.models import Model
 
 
 # ---------------------------------------------------------------------------

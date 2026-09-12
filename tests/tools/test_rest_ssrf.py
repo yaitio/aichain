@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from tools.rest_api import RestApiTool
+from yait_aichain.tools.rest_api import RestApiTool
 
 
 def _tool(url):

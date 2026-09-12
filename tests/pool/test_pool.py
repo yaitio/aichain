@@ -20,8 +20,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from pool import Pool
-from tools._base import Tool
+from yait_aichain.pool import Pool
+from yait_aichain.tools._base import Tool
 
 
 class Echo(Tool):

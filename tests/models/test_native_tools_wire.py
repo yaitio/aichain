@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from models import Model
-from models._calls import ToolCall, ToolCallRequest, tool_result_turn
+from yait_aichain.models import Model
+from yait_aichain.models._calls import ToolCall, ToolCallRequest, tool_result_turn
 
 SEARCH = {
     "type": "function",
@@ -241,7 +241,7 @@ class TestGrammar(unittest.TestCase):
     """The conversation schema itself — enforced at Skill construction."""
 
     def _validate(self, messages):
-        from skills._adapters import validate_input
+        from yait_aichain.skills._adapters import validate_input
         validate_input({"messages": messages})
 
     def test_the_tool_conversation_is_valid(self):
@@ -271,7 +271,7 @@ class TestGrammar(unittest.TestCase):
         ])
 
     def test_an_assistant_call_turn_is_not_a_generate_marker(self):
-        from skills._adapters import is_generate_marker
+        from yait_aichain.skills._adapters import is_generate_marker
         self.assertFalse(is_generate_marker(
             {"role": "assistant",
              "tool_calls": [{"id": "c", "name": "t", "arguments": {}}]}))

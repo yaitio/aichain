@@ -31,8 +31,8 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model
-from models import registry
+from yait_aichain.models import Model
+from yait_aichain.models import registry
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -316,13 +316,13 @@ class TestGoogleJsonOutput(unittest.TestCase):
         self.assertIn("responseSchema", gc)
 
     def test_google_schema_sanitisation_strips_additional_properties(self):
-        from clients._families.google import _sanitize_google_schema
+        from yait_aichain.clients._families.google import _sanitize_google_schema
         schema = {"type": "object", "additionalProperties": False, "properties": {}}
         result = _sanitize_google_schema(schema)
         self.assertNotIn("additionalProperties", result)
 
     def test_google_schema_sanitisation_handles_nullable_types(self):
-        from clients._families.google import _sanitize_google_schema
+        from yait_aichain.clients._families.google import _sanitize_google_schema
         schema = {"type": ["string", "null"]}
         result = _sanitize_google_schema(schema)
         self.assertEqual(result["type"], "string")
@@ -446,7 +446,7 @@ class TestRegistry(unittest.TestCase):
 class TestDetectImageMime(unittest.TestCase):
 
     def setUp(self):
-        from clients._families._openai_compat import _detect_image_mime
+        from yait_aichain.clients._families._openai_compat import _detect_image_mime
         self._detect = _detect_image_mime
 
     def _b64(self, raw: bytes) -> str:

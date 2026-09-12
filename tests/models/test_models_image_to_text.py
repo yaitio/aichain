@@ -35,7 +35,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model
+from yait_aichain.models import Model
 
 # ---------------------------------------------------------------------------
 # Shared universal message fixtures
@@ -299,8 +299,8 @@ _GOOGLE_REAL     = os.getenv("GOOGLE_AI_API_KEY", "").startswith("AIza")
 
 
 def _vision_skill(model_name, url=_IMAGE_URL_PUBLIC):
-    from models import Model
-    from skills import Skill
+    from yait_aichain.models import Model
+    from yait_aichain.skills import Skill
     return Skill(
         model = Model(model_name),
         input = {

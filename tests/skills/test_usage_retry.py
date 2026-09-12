@@ -14,12 +14,12 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from skills import Skill
-from chain import Chain
-from agent import Agent
-from models import Model
-from tools._base import Tool
-from clients._errors import NetworkError, AuthenticationError
+from yait_aichain.skills import Skill
+from yait_aichain.chain import Chain
+from yait_aichain.agent import Agent
+from yait_aichain.models import Model
+from yait_aichain.tools._base import Tool
+from yait_aichain.clients._errors import NetworkError, AuthenticationError
 
 
 def _resp(content, tokens=0):

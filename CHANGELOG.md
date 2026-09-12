@@ -2,6 +2,75 @@
 
 ## [Unreleased]
 
+## [2.9.1] — 2026-09-12
+
+The five instruments `PLAN.md` has been asking for since the June audit, and
+the defect the third one found on its first run.
+
+### Fixed
+
+- **`format: {"type": "json"}` on Anthropic did nothing and said nothing.**
+  The request went out **byte-identical** to a plain-text one: the caller
+  asked for JSON, got prose, and `parse_response` was left digging an object
+  out of whatever came back. Anthropic has no JSON-mode field and every other
+  provider does, so by the universal-vs-local rule it is absorbed rather than
+  refused — carried as a system instruction and reported as `adapted`.
+  (`json_schema` was never affected: it is a forced tool call and works.)
+
+  Silence about a format is worse than silence about a sampling knob. A
+  dropped `temperature` gives a different answer; a dropped JSON mode gives
+  the wrong *type*.
+
+### Added — tests
+
+- **A lightness-invariant test.** `VISION.md` calls the README hello world an
+  architectural guarantee — no new mandatory parameter, ever — and says a
+  `Skill.run()` that got more complex is the signal that the environment
+  leaked into the scenario. Nothing watched for that signal, and the README's
+  *agent* example meanwhile carried a `TypeError` on its first line through
+  four minor versions. The hello world now runs against a fake transport with
+  exactly the arguments the page shows, and every other fenced example is
+  **bound** against the real signatures — required arguments supplied, arity
+  right, which is the half the existing docs test could not see.
+
+- **Lifecycle smokes** — create → save → load → run, for every primitive that
+  serialises. Each individual piece of the round trip worked when it was
+  broken last week; only running it in one breath showed that what came back
+  was not what went in. Where a primitive deliberately does not serialise,
+  that is asserted rather than skipped: a missing test and a deliberate
+  absence look identical in a run, and only one is a defect.
+
+- **One input across every text provider.** The instrument for the class where
+  a request works on six providers and quietly does something else on the
+  seventh. It asserts what must be true everywhere — the system prompt
+  travels, JSON is asked for, the answer has a ceiling — and separately pins
+  where they *legitimately* differ, so a check that had to be loosened until
+  it passed everywhere would be visible as such.
+
+- **The chunker's contract**, which is arithmetic and therefore the one part a
+  reader cannot verify by looking at output and finding it plausible. Every
+  assertion is a sentence already in the module docstring.
+
+### Changed — tests
+
+- **The legacy import bridge is gone.** `conftest.py` aliased every
+  sub-package into `sys.modules` under its pre-2.0 top-level name; written as
+  temporary, it lived three months and cost more than it looked. `tests/agent/`
+  is itself a package named `agent`, so inside that directory the alias lost
+  to the real one and an import resolved differently depending on where the
+  file sat; a module imported under two names is two module objects with two
+  copies of every module-level value; and nothing ever failed, so the
+  migration it existed to enable never happened. All 37 files import
+  `yait_aichain.*` now — the suite reaches the library the way its users do.
+
+  Two things the mechanical rewrite got wrong, both caught: `patch()` takes
+  its target as a **string**, so those were left behind (they raise, which is
+  the one mercy), and one search string inside a docs test was rewritten into
+  a module path, leaving a test that passed while looking for something no
+  page could contain. A blind rewrite is exactly as blind as `getattr` with a
+  default.
+
+
 ## [2.9.0] — 2026-09-11
 
 **Approval travels on the same channel.** R5 of

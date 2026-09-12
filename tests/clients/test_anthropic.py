@@ -20,9 +20,9 @@ import os
 import unittest
 from unittest.mock import patch, MagicMock
 
-from clients._base import APIError
-from clients._families.anthropic import AnthropicClient as _Family
-from models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.clients._base import APIError
+from yait_aichain.clients._families.anthropic import AnthropicClient as _Family
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
 def AnthropicClient(api_key, **kw):
     return _Family(api_key, data=_PROVIDERS['anthropic'], **kw)
 
@@ -145,7 +145,7 @@ class TestExtractFirstJson(unittest.TestCase):
     """Recover the first balanced JSON object when the model wraps it in prose."""
 
     def setUp(self):
-        from clients._families.anthropic import _extract_first_json
+        from yait_aichain.clients._families.anthropic import _extract_first_json
         self._x = _extract_first_json
 
     def test_trailing_prose(self):

@@ -35,7 +35,7 @@ for _k, _v in _TEST_KEYS.items():
     if not os.environ.get(_k):
         os.environ[_k] = _v
 
-from models import Model
+from yait_aichain.models import Model
 
 # ---------------------------------------------------------------------------
 # Shared test fixtures
@@ -454,7 +454,7 @@ class TestAnthropicFromResponse(unittest.TestCase):
         # silently skipped and the text returned. That silence is an action
         # dropped with no error anywhere, the exact failure native calling
         # exists to remove.
-        from models._calls import ToolCallRequest
+        from yait_aichain.models._calls import ToolCallRequest
         response = {
             "content": [
                 {"type": "tool_use", "id": "u1", "name": "search", "input": {}},
@@ -545,13 +545,13 @@ class TestModelOptions(unittest.TestCase):
         self.assertEqual(m.reasoning, "high")
 
     def test_default_temperature_applied(self):
-        from models._data import PROVIDERS
+        from yait_aichain.models._data import PROVIDERS
         m = Model("gpt-4o")
         self.assertEqual(
             m.temperature, PROVIDERS["openai"]["provider"]["defaults"]["temperature"])
 
     def test_default_max_tokens_applied(self):
-        from models._data import PROVIDERS
+        from yait_aichain.models._data import PROVIDERS
         m = Model("claude-opus-4-6")
         self.assertEqual(
             m.max_tokens, PROVIDERS["anthropic"]["provider"]["defaults"]["max_tokens"])
@@ -581,7 +581,7 @@ def _live_messages(prompt="Say 'ok' and nothing else."):
 
 def _make_skill_and_run(model_name, api_key_env):
     """Instantiate a Model and run a minimal Skill call end-to-end."""
-    from skills import Skill
+    from yait_aichain.skills import Skill
     skill = Skill(
         model         = Model(model_name),
         input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -593,7 +593,7 @@ def _make_skill_and_run(model_name, api_key_env):
 @unittest.skipUnless(_OPENAI_KEY, "Set a real OPENAI_API_KEY to run live tests")
 class TestOpenAILive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("gpt-4o-mini"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -607,7 +607,7 @@ class TestOpenAILive(unittest.TestCase):
 @unittest.skipUnless(_ANTHROPIC_KEY, "Set a real ANTHROPIC_API_KEY to run live tests")
 class TestAnthropicLive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("claude-haiku-4-5-20251001"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -621,7 +621,7 @@ class TestAnthropicLive(unittest.TestCase):
 @unittest.skipUnless(_GOOGLE_KEY, "Set a real GOOGLE_AI_API_KEY to run live tests")
 class TestGoogleLive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("gemini-2.5-flash"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -635,7 +635,7 @@ class TestGoogleLive(unittest.TestCase):
 @unittest.skipUnless(_XAI_KEY, "Set a real XAI_API_KEY to run live tests")
 class TestXAILive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("grok-3-fast"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -649,7 +649,7 @@ class TestXAILive(unittest.TestCase):
 @unittest.skipUnless(_DEEPSEEK_KEY, "Set a real DEEPSEEK_API_KEY to run live tests")
 class TestDeepSeekLive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("deepseek-chat"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -663,7 +663,7 @@ class TestDeepSeekLive(unittest.TestCase):
 @unittest.skipUnless(_KIMI_KEY, "Set a real MOONSHOT_API_KEY to run live tests")
 class TestKimiLive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("kimi-k2-0905-preview"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
@@ -677,7 +677,7 @@ class TestKimiLive(unittest.TestCase):
 @unittest.skipUnless(_QWEN_KEY, "Set a real DASHSCOPE_API_KEY to run live tests")
 class TestQwenLive(unittest.TestCase):
     def test_text_round_trip(self):
-        from skills import Skill
+        from yait_aichain.skills import Skill
         skill = Skill(
             model         = Model("qwen-turbo"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},

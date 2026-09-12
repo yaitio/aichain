@@ -35,7 +35,7 @@ def _agent(**kw):
 
 
 def _round_trip(agent):
-    path = os.path.join(tempfile.mkdtemp(), "chain.yaml")
+    path = os.path.join(tempfile.mkdtemp(), "yait_aichain.chain.yaml")
     chain = Chain(steps=[(agent, "out")])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -85,7 +85,7 @@ class TestWhatCannotComeBackIsSaidOutLoud(unittest.TestCase):
         round-trips would be worse than saying it does not — a chain that
         comes back quietly without its stop condition is the exact failure
         this whole repair is about."""
-        path = os.path.join(tempfile.mkdtemp(), "chain.yaml")
+        path = os.path.join(tempfile.mkdtemp(), "yait_aichain.chain.yaml")
         chain = Chain(steps=[(_agent(stop_when=[check(lambda s: False)]),
                               "out")])
         with warnings.catch_warnings(record=True) as caught:

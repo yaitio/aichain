@@ -10,9 +10,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from chain import Chain
-from tools import Wait
-from state import InMemoryStore, RunContext, SuspendedResult
+from yait_aichain.chain import Chain
+from yait_aichain.tools import Wait
+from yait_aichain.state import InMemoryStore, RunContext, SuspendedResult
 
 
 class TestRunContext(unittest.TestCase):

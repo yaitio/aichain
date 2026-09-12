@@ -26,9 +26,9 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from agent import Agent, step_count, token_budget, cost_budget, check
-from models import Model
-from tools._base import Tool
+from yait_aichain.agent import Agent, step_count, token_budget, cost_budget, check
+from yait_aichain.models import Model
+from yait_aichain.tools._base import Tool
 
 
 def _text(content, prompt_tokens=100, completion_tokens=20):

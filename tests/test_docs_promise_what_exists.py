@@ -98,6 +98,12 @@ class TestTheRemovedAgentStateApiStaysRemoved(unittest.TestCase):
     have copied, and because the reason they are gone is a design decision
     worth not re-losing: the agent's state is the conversation."""
 
+    # These are strings searched for *in documentation*, not module paths.
+    # The 2026-09-12 import migration rewrote the middle one to
+    # "yait_aichain.agent.context" — a search that matches nothing, so the
+    # test went on passing while checking for a string no page would ever
+    # contain. A mechanical rewrite is exactly as blind as `getattr` with a
+    # default.
     GONE = ("agent.resume(", "agent.context", "Agent(store=")
 
     def test_no_fenced_example_uses_it(self):

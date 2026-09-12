@@ -14,9 +14,9 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from clients._families.recraft import RecraftClient
-from models._data import PROVIDERS as _PROVIDERS
-from models import Model, registry
+from yait_aichain.clients._families.recraft import RecraftClient
+from yait_aichain.models._data import PROVIDERS as _PROVIDERS
+from yait_aichain.models import Model, registry
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 _B64 = base64.b64encode(_PNG).decode("ascii")
