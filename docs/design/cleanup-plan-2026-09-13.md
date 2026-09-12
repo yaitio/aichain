@@ -122,7 +122,7 @@ All true at once, and each is a test or a CI job rather than a claim:
 
 - [ ] a tag on a red commit cannot publish
 - [ ] CI covers 3.10 through 3.14 and is green
-- [ ] every fenced example in `docs/`, `README.md` and `examples/` binds
+- [x] every fenced example in `docs/`, `README.md` and `examples/` binds
 - [ ] every generated docs block equals its regeneration (`scripts/docs.py --check`)
 - [ ] no page contains the word "Skeleton"
 - [ ] no promoted cookbook lacks a test

@@ -1,30 +1,39 @@
 """
-20_observability.py — the step boundary (1.4.4): hooks, events, permissions.
+20_observability.py — The step boundary: hooks, events, and an approval gate.
 
-Runs with NO API key and NO network — a tiny scripted stand-in plays the
-orchestrator so the output is identical every time and you can verify it. The
-point of this example is the *harness* behavior around the model, not the model:
+Runs with NO API key and NO network — a tiny scripted stand-in plays the model
+so the output is identical every time and you can check it. The point is the
+harness around the model, not the model:
 
   1. A Tracer hook records a structured event at every boundary.
-  2. A PermissionPolicy gates a FINANCIAL tool: the run PAUSES for approval
-     (reusing suspend/resume), then you resume it with the decision.
-  3. The library's logging is routed to a handler the app controls.
+  2. A PermissionPolicy marks a FINANCIAL tool as needing approval, and
+     ``approve=`` is who answers. The run does not pause: the approver is an
+     ordinary callable, so the wait lives wherever your application already
+     waits — a console prompt, a queue, a UI.
+  3. A refusal carries its reason back to the model as a tool result.
+  4. The library's logging goes to a handler the application controls.
 
 Run it:
     python examples/20_observability.py
+
+Required env vars:
+    (none)
 """
 
 import json
 import logging
 import sys
 
-from yait_aichain.agent  import Agent
-from yait_aichain.tools  import Tool, PermissionPolicy, FINANCIAL
-from yait_aichain        import Tracer
-from yait_aichain.state  import SuspendedResult
+from yait_aichain import Tracer
+from yait_aichain.agent import Agent
+from yait_aichain.tools import (Tool, PermissionPolicy, ApprovalDecision,
+                                FINANCIAL)
+# The stand-in model below speaks in the library's own reply types. A real
+# Model produces these itself; nothing outside a test double imports them.
+from yait_aichain.models._calls import ToolCall, ToolCallRequest
 
 
-# ── A real tool, tagged with its risk class ─────────────────────────────────────
+# ── A real tool, tagged with its risk class ─────────────────────────────────
 
 class IssueRefund(Tool):
     name        = "issue_refund"
@@ -39,80 +48,83 @@ class IssueRefund(Tool):
         return f"refunded {amount}"
 
 
-# ── A scripted stand-in for the orchestrator LLM (so this runs offline) ─────────
-# A real Agent uses Model("gpt-4o-mini", ...) here; we feed canned plan/action/
-# reflection JSON through the same to_request → send → from_response seam.
+# ── A scripted stand-in for the model (so this runs offline) ────────────────
+# A real Agent takes Model("gpt-4o-mini") here. This one goes through the same
+# to_request → client.send → from_response seam and replays a script.
 
 class ScriptedModel:
-    name = "scripted-orchestrator"
+    name = "scripted"
 
     def __init__(self, replies):
-        self._replies, self._i = replies, 0
-
-    def to_request(self, messages, output):
-        return ("/noop", {})
+        self.replies = replies
+        self.client  = self._Client(self)
 
     class _Client:
-        def __init__(self, outer): self._outer = outer
-        def _auth_headers(self): return {}
-        def send(self, path, body, headers):
-            o = self._outer
-            reply = o._replies[min(o._i, len(o._replies) - 1)]
-            o._i += 1
-            return json.dumps({"text": reply,
-                               "usage": {"input_tokens": 6, "output_tokens": 6}})
+        def __init__(self, outer):
+            self.outer, self.i = outer, 0
 
-    @property
-    def client(self):
-        if not hasattr(self, "_c"): self._c = self._Client(self)
-        return self._c
+        def _auth_headers(self):
+            return {}
+
+        def send(self, path, body, headers):
+            i = min(self.i, len(self.outer.replies) - 1)
+            self.i += 1
+            return json.dumps({"i": i, "usage": {"input_tokens": 6,
+                                                 "output_tokens": 6}})
+
+    def to_request(self, messages, output, tools=None):
+        return ("/scripted", {})
 
     def from_response(self, response, output):
-        return response["text"]
+        return self.replies[response["i"]]
 
 
-# The orchestrator's three replies for a one-step plan that calls issue_refund:
-SCRIPT = [
-    json.dumps({"steps": [{"id": 1, "type": "tool",
-                           "tool_name": "issue_refund", "goal": "Refund order #123"}]}),
-    json.dumps({"type": "tool", "tool_name": "issue_refund", "kwargs": {"amount": 42}}),
-    json.dumps({"decision": "final_answer", "assessment": "done",
-                "final_answer": "Refund processed."}),
-]
+def script(amount):
+    """First turn: call the refund tool. Second turn: answer in prose."""
+    return ScriptedModel([
+        ToolCallRequest(calls=(ToolCall(id="call-1", name="issue_refund",
+                                        arguments={"amount": amount}),)),
+        "Done — I have reported the outcome of the refund.",
+    ])
 
 
-# ── 1. Route the library's logs to a handler we control ─────────────────────────
+# ── Who answers when the policy says "approve" ──────────────────────────────
+# Handed the tool, its risk class and the arguments it would run with:
+# approving a name is approving nothing, the amount is the decision.
+
+def manager(request):
+    amount = request.arguments["amount"]
+    print(f"    🙋 approver asked: {request.tool}({amount}) [{request.risk}]")
+    if amount <= 50:
+        return True
+    return ApprovalDecision(False, "refunds over $50 need a ticket number")
+
 
 logging.basicConfig(level=logging.INFO, format="    log │ %(message)s",
-                    stream=sys.stdout)        # → stdout so it reads in order
+                    stream=sys.stdout)              # stdout, so it reads in order
+policy = PermissionPolicy({"financial": "approve"})
 
-# ── 2. Build the agent with a Tracer (events) and a PermissionPolicy (gate) ─────
 
-tracer = Tracer()
-agent  = Agent(
-    orchestrator = ScriptedModel(SCRIPT),
-    tools        = [IssueRefund()],
-    hooks        = [tracer],                                  # observability
-    permissions  = PermissionPolicy({"financial": "approve"}),  # governance
-    max_steps    = 1,
-)
+def run(amount):
+    tracer = Tracer()
+    agent  = Agent(script(amount),
+                   tools       = [IssueRefund()],
+                   hooks       = [tracer],          # observability
+                   permissions = policy,            # governance
+                   approve     = manager)           # who answers "approve"
+    result = agent.run(f"Refund ${amount} for order #123.")
 
-print("\n=== run() — the financial tool pauses for approval ===")
-result = agent.run("Issue a refund of $42 for order #123.")
+    print("\n    event timeline:")
+    for e in tracer.events:
+        detail = e.payload.get("reason") or e.payload.get("granted", "")
+        print(f"      {e.type:<22} {e.name or '':<14} {detail}")
+    print(f"\n    success={result.success}  stopped_by={result.stopped_by}")
+    return result
 
-print("\n=== event timeline (from the Tracer hook) ===")
-for e in tracer.events:
-    print(f"    {e}")
 
-assert isinstance(result, SuspendedResult), "expected the run to pause for approval"
-print(f"\n⏸  Paused: {result.awaiting['reason']}")
-print("    (no refund executed yet — note there is no 💳 line above)")
+print("\n=== $42 — within the approver's limit, the tool runs ===")
+run(42)
 
-# ── 3. A decision arrives later; resume the SAME run with it ─────────────────────
-
-print("\n=== resume(approved=True) — now the tool actually runs ===")
-final = agent.resume(result.run_id, signal={"approved": True})
-print(f"\n✓  success={final.success}  output={final.output!r}")
-
-print("\nTry it: change 'approve' to 'deny' above — the refund is refused and the")
-print("run still completes with a denial result (every tool call returns a result).")
+print("\n=== $500 — refused, and the model is told why ===")
+run(500)
+print("    (no 💳 line in this run: the refund never executed)")

@@ -1,5 +1,8 @@
 """
 01_skill.py — Run a prompt against a model.
+
+Required env vars:
+    ANTHROPIC_API_KEY
 """
 
 import os

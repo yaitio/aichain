@@ -12,6 +12,9 @@ is restyled by every provider whose API key is present.
 
 Set whichever you have; the rest are skipped:
     OPENAI_API_KEY  GOOGLE_AI_API_KEY  XAI_API_KEY  DASHSCOPE_API_KEY
+
+Required env vars:
+    any one of OPENAI_API_KEY  GOOGLE_AI_API_KEY  XAI_API_KEY  DASHSCOPE_API_KEY
 """
 
 import base64

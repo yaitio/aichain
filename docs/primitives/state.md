@@ -36,7 +36,7 @@ if isinstance(result, SuspendedResult):
 ```
 
 ▶ Human-in-the-loop: [`examples/17_chain_human_input.py`](../../examples/17_chain_human_input.py) ·
-External trigger (cross-process): [`examples/18_agent_external_trigger.py`](../../examples/18_agent_external_trigger.py) ·
+External trigger (cross-process): [`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py) ·
 Deep dive ↓
 
 ---

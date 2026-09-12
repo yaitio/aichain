@@ -481,9 +481,11 @@ is no `Agent(store=...)` and no `Agent.resume()` — both were removed in
 
 ## Serverless note
 
-Approval (`approve`) and human-in-the-loop both ride the existing
-suspend/resume + `Store` machinery (see [state](../primitives/state.md)). The
-run parks in the store; a separate process resumes it with only the `run_id` and
-a shared store — the cross-process pattern from
-[`examples/18_agent_external_trigger.py`](../../examples/18_agent_external_trigger.py)
-and [`examples/20_observability.py`](../../examples/20_observability.py).
+An agent does not park. Its state is the conversation, so `approve=` is an
+ordinary callable and the wait lives wherever the application already waits —
+[`examples/20_observability.py`](../../examples/20_observability.py) runs it
+offline. A run that must stop, leave the process and be picked up by another
+one is a **Chain** with a `Wait` or `Gate` step and a shared store (see
+[state](../primitives/state.md)) —
+[`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py)
+is that pattern end to end.

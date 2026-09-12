@@ -37,6 +37,9 @@ binary search and opened the safe in 9 probes; ``gpt-4o-mini`` bisected for a
 while, then degenerated into +1 scanning and hit the iteration cap. The harness
 behaved identically in both runs — the stop rules are there precisely because
 the orchestrator cannot be assumed competent.
+
+Required env vars:
+    ANTHROPIC_API_KEY     (or set MODEL to a model you have a key for)
 """
 
 import random

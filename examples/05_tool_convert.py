@@ -3,6 +3,9 @@
 
 Required packages:
     pip install markitdown
+
+Required env vars:
+    (none)
 """
 
 from yait_aichain.tools import convertToMD
