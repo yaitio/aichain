@@ -48,7 +48,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from ....clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
-from .._base import VectorBackend, VectorRecord
+from .._base import VectorBackend, VectorRecord, normalise_score
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -99,6 +99,11 @@ class PineconeBackend(VectorBackend):
         results = store.query("greeting", n=3)
     """
 
+    #: Default at class level as well as in `__init__`: half-built instances
+    #: exist (a test constructs one with `__new__`), and a missing attribute
+    #: there would turn a scoring question into an AttributeError.
+    _metric = "cosine"
+
     provider = "pinecone"
 
     def __init__(
@@ -109,8 +114,14 @@ class PineconeBackend(VectorBackend):
         url:     str | None = None,
         cloud:   str        = "aws",
         region:  str        = "us-east-1",
+        metric:  str        = "cosine",
         **kwargs,
     ) -> None:
+        # Named here because the data plane cannot discover it: the metric is
+        # a property of the index, on the control plane. Without it `score`
+        # would carry a cosine similarity in [-1, 1] on one collection and a
+        # squared distance — lower is nearer — on another, under one name.
+        self._metric = metric
         resolved_key = api_key or os.environ.get("PINECONE_API_KEY", "")
         if not resolved_key:
             raise ValueError(
@@ -244,11 +255,19 @@ class PineconeBackend(VectorBackend):
             text = meta.pop("text", None)
             if text is None:
                 text = meta.pop("document", "")
+            raw = match.get("score")
             records.append(VectorRecord(
-                id       = match["id"],
-                text     = text,
-                score    = match.get("score"),
-                metadata = meta,
+                id        = match["id"],
+                text      = text,
+                # Pinecone's metric is a property of the index and lives on
+                # the control plane, which this data-plane host cannot ask.
+                # It is taken at construction (`metric=`) and defaults to the
+                # same cosine everything else defaults to; `raw_score` keeps
+                # the original either way, so a caller who set a different
+                # metric and did not say so can still see what came back.
+                score     = normalise_score(raw, self._metric),
+                raw_score = raw,
+                metadata  = meta,
             ))
         return records
 

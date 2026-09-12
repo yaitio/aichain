@@ -45,7 +45,7 @@ from __future__ import annotations
 import os
 import uuid
 
-from .._base import VectorBackend, VectorRecord
+from .._base import VectorBackend, VectorRecord, normalise_score
 
 # Payload key that preserves the caller's original record ID.  Qdrant only
 # accepts unsigned integers or UUIDs as point IDs, so arbitrary string IDs
@@ -124,12 +124,14 @@ class QdrantBackend(VectorBackend):
         *,
         url:     str | None = None,
         api_key: str | None = None,
+        metric:  str        = "cosine",
         **kwargs,
     ) -> None:
         super().__init__(
             url     = url     or os.environ.get("QDRANT_URL", self._DEFAULT_URL),
             api_key = api_key or os.environ.get("QDRANT_API_KEY"),
         )
+        self._metric = metric
 
     # ── Auth header override ───────────────────────────────────────────────────
 
@@ -186,13 +188,26 @@ class QdrantBackend(VectorBackend):
             if text is None:
                 text = payload.pop("document", "")
             original_id = payload.pop(_ORIGINAL_ID_KEY, None)
+            raw = point.get("score")
             records.append(VectorRecord(
-                id       = original_id or str(point["id"]),
-                text     = text,
-                score    = point.get("score"),
-                metadata = payload,
+                id        = original_id or str(point["id"]),
+                text      = text,
+                score     = normalise_score(raw, self._metric),
+                raw_score = raw,
+                metadata  = payload,
             ))
         return records
+
+    #: The metric this store was created with. Declared, not discovered.
+    #:
+    #: Asking the collection was tried and withdrawn the same hour: it adds a
+    #: network round trip with retries in front of the first query, and when
+    #: the host is unreachable that is a minute of backoff before a search
+    #: that would otherwise have failed fast. A hidden request is a bad trade
+    #: for a value the caller already knows — and `raw_score` keeps the
+    #: original either way, so a wrong declaration is visible rather than
+    #: baked into a number.
+    _metric = "cosine"
 
     def upsert(
         self,

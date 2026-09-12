@@ -110,19 +110,61 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
 
     _READS = re.compile(r'\bo(?:pts|ptions)?\.get\(\s*["\']([\w_]+)["\']')
 
+    @classmethod
+    def _reads(cls, tool):
+        """Every option key read anywhere in *tool*'s own MRO.
+
+        The MRO, not the class body. The first version of this looked at
+        `inspect.getsource(tool)` alone, and most of these tools implement
+        `run()` in a shared base — `sttOpenAI` in `_OpenAICompatSTT`,
+        `ttsOpenAI` in `convertToSpeech` — so a read in a base was invisible
+        and the check under-reported. It found `region` on `ttsQwen` only
+        because that one read happened to be in the subclass. An instrument
+        that can only see half of what it measures gives a clean answer for
+        the wrong reason.
+        """
+        found = set()
+        for base in tool.__mro__:
+            if base in (Tool, object):
+                continue
+            try:
+                found |= set(cls._READS.findall(inspect.getsource(base)))
+            except (OSError, TypeError):
+                continue
+        return found
+
     def test_no_tool_reads_an_option_it_does_not_declare(self):
         offenders = []
         for name, cls in sorted(_tool_classes().items()):
             declared = _declared_options(cls)
             if not declared:
                 continue
-            try:
-                source = inspect.getsource(cls)
-            except (OSError, TypeError):
-                continue
-            undeclared = sorted(set(self._READS.findall(source)) - declared)
+            undeclared = sorted(self._reads(cls) - declared)
             if undeclared:
                 offenders.append(f"{name}: {undeclared}")
+        self.assertEqual(offenders, [], "\n".join(offenders))
+
+    def test_no_tool_declares_an_option_nothing_reads(self):
+        """The other direction, and the one the plan calls "silently
+        dropped": an option a model can see, set, and have fall on the floor.
+        A claim not established by effect — the defect 2.3.0 cleared out of
+        the model layer, one floor down.
+
+        Abstract bases are exempt: they declare the schema their concrete
+        subclasses implement against, so having no reader of their own is
+        what they are for.
+        """
+        abstract = {"Search", "convertToSpeech", "convertToText"}
+        offenders = []
+        for name, cls in sorted(_tool_classes().items()):
+            if name in abstract:
+                continue
+            declared = _declared_options(cls)
+            if not declared:
+                continue
+            unread = sorted(declared - self._reads(cls))
+            if unread:
+                offenders.append(f"{name}: {unread}")
         self.assertEqual(offenders, [], "\n".join(offenders))
 
     def test_qwen_declares_its_region_and_its_siblings_do_not(self):

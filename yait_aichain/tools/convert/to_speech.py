@@ -64,6 +64,27 @@ def _auto_path(fmt: str) -> str:
 # ── Base class ────────────────────────────────────────────────────────────────
 
 
+def _without_options(parameters: dict, *keys: str) -> dict:
+    """A copy of *parameters* with option *keys* removed.
+
+    The mirror of `_deep_with_option`, and it exists for the same reason:
+    these subclasses share one schema and each honours a different part of
+    it. Declaring an option a provider has no control for advertises it to
+    the model, which then sets it and watches it fall on the floor — a claim
+    not established by effect, which is the defect 2.3.0 cleared out of the
+    model layer. Measured per tool by reading what its `run()` actually
+    consumes, not by reading the description.
+
+    A copy, because the schemas are class attributes shared by inheritance.
+    """
+    import copy
+    out = copy.deepcopy(parameters)
+    options = out.get("properties", {}).get("options", {}).get("properties", {})
+    for key in keys:
+        options.pop(key, None)
+    return out
+
+
 def _deep_with_option(parameters: dict, key: str, spec: dict) -> dict:
     """A copy of *parameters* with one more key under ``options``.
 
@@ -128,7 +149,9 @@ class convertToSpeech(Tool):
                         "type":        "string",
                         "description": (
                             "BCP-47 language code, e.g. 'en-US'.  "
-                            "Required for Google; optional for OpenAI and xAI."
+                            "Google only — it is required there and the "
+                            "other endpoints have no such field, so they "
+                            "do not declare this option at all."
                         ),
                     },
                     "output_path": {
@@ -197,6 +220,10 @@ class ttsOpenAI(convertToSpeech):
         # Direct run — returns path str, raises on error
         path = tool.run(input="Hello!", options={"voice": "echo"})
     """
+
+    # OpenAI's /v1/audio/speech has no language field — the voice and the
+    # model carry it. The shared description claimed otherwise.
+    parameters = _without_options(convertToSpeech.parameters, "language")
 
     name           = "ttsOpenAI"
     _DEFAULT_MODEL = "tts-1"
@@ -302,6 +329,10 @@ class ttsGoogle(convertToSpeech):
             },
         )
     """
+
+    # Google picks the synthesiser from the voice name; there is no model to
+    # name.
+    parameters = _without_options(convertToSpeech.parameters, "model")
 
     name              = "ttsGoogle"
     _DEFAULT_LANGUAGE = "en-US"
@@ -420,6 +451,9 @@ class ttsXAI(convertToSpeech):
             options={"output_path": "hello_xai.mp3"},
         )
     """
+
+    # Same as OpenAI's: the xAI speech endpoint takes no language.
+    parameters = _without_options(convertToSpeech.parameters, "language")
 
     name           = "ttsXAI"
     _BASE_URL      = "https://api.x.ai/v1"
@@ -554,8 +588,12 @@ class ttsQwen(convertToSpeech):
     # passing a key the schema calls unknown. Declared here rather than in the
     # parent, because advertising it on OpenAI, Google and xAI would be the
     # opposite defect: an option offered where nothing reads it.
+    # `language` and `speed` are dropped for the same reason `region` is
+    # added: this endpoint reads neither, and an option a model can set and
+    # watch vanish is worse than one it never saw.
     parameters = _deep_with_option(
-        convertToSpeech.parameters, "region",
+        _without_options(convertToSpeech.parameters, "language", "speed"),
+        "region",
         {"type": "string", "enum": ["ap", "us", "cn", "hk"],
          "description": "DashScope region for this call. Default: ap."})
 
