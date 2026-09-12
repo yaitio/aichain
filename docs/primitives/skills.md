@@ -50,6 +50,21 @@ Deep dive ↓
 
 ---
 
+## The short form
+
+One user message, one text part — the commonest shape there is:
+
+```python
+skill = Skill(Model("gpt-4o"), prompt="Summarise: {text}")
+skill.run(variables={"text": "..."})
+```
+
+`input=` stays the only way to say anything else: a system message, several
+turns, an image. That is deliberate — a shortcut that grows options becomes a
+second input format, and two ways to say one thing is how documentation and
+code drift apart. Passing both raises rather than merging, because which one
+the model should see would be a guess.
+
 ## A ceiling in money
 
 `max_tokens` bounds one reply; nobody budgets in replies. `max_cost` bounds
