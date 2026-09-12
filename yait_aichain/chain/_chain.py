@@ -99,7 +99,11 @@ import warnings
 from ..models._usage import Usage
 from .._events import Event, emit
 
-_VALID_ON_STEP_ERROR: frozenset[str] = frozenset({"raise", "stop", "skip"})
+# One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
+# is a silent `skip`: a chain of a hundred generated steps that expects a few
+# to fail should not have to choose between a warning per failure and no
+# record at all.
+from .._errors_policy import POLICIES as _VALID_ON_STEP_ERROR, describe as _describe
 
 # Default options applied to every Agent step unless overridden.
 _AGENT_DEFAULT_OPTIONS: dict = {
@@ -597,7 +601,11 @@ class Chain:
                     "output":     None,
                     "output_key": output_key,
                     "options":    options,
+                    # The type and the traceback, not just the message:
+                    # `KeyError('tenant')` renders as `'tenant'`, which reads
+                    # as a value rather than a fault.
                     "error":      str(exc),
+                    "failure":    _describe(exc),
                 })
 
                 if on_error in ("raise", "stop"):
@@ -613,18 +621,21 @@ class Chain:
                         raise
                     return last_output
 
-                # skip: record a terminal SKIPPED status so resume does not
+                # skip / collect: record a terminal SKIPPED status so resume
+                # does not
                 # re-run this step (first_pending would otherwise land on it).
                 doc.steps[idx]["status"] = StepStatus.SKIPPED
                 doc.steps[idx].pop("suspend", None)
                 doc.variables = dict(accumulated)
-                warnings.warn(
-                    f"Chain step {idx} ({name!r}) failed and was skipped: {exc}. "
-                    f"Downstream steps that read {output_key!r} will receive a "
-                    f"stale or absent value.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
+                if on_error == "skip":
+                    warnings.warn(
+                        f"Chain step {idx} ({name!r}) failed and was skipped: "
+                        f"{type(exc).__name__}: {exc}. Downstream steps that "
+                        f"read {output_key!r} will receive a stale or absent "
+                        "value.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
                 continue
 
             history.append({

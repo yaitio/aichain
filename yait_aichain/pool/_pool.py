@@ -57,7 +57,11 @@ RUNNING = 1
 DONE    = 2
 FAILED  = 3
 
-_VALID_ON_ERROR = frozenset({"raise", "collect", "skip"})
+# One vocabulary with Chain — see `_errors_policy`. `stop` is new here: it
+# means "start no more items", which is what a fan-out can offer where a
+# sequence stops running steps. The difference between the two is the
+# difference between a sequence and a fan-out, not between two vocabularies.
+from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +285,7 @@ class Pool:
                     contextvars.copy_context().run, self._run_one, i, merged)
                 future_to_idx[future] = i
 
+            stopped = False
             for future in as_completed(future_to_idx):
                 idx = future_to_idx[future]
                 try:
@@ -288,16 +293,25 @@ class Pool:
                 except Exception as exc:
                     if self._on_error == "raise":
                         raise
+                    if self._on_error == "stop":
+                        # Start no more items. The ones already in flight are
+                        # let finish rather than cancelled: killing a call
+                        # mid-request costs the tokens anyway and loses the
+                        # answer, so the only thing "stop" can honestly buy
+                        # is not beginning more.
+                        stopped = True
+                        for pending in future_to_idx:
+                            pending.cancel()
                     if self._on_error == "skip":
                         name = getattr(self._runner, "name", None) or \
                                type(self._runner).__name__
                         warnings.warn(
                             f"Pool item {idx} ({name!r}) failed and was "
-                            f"skipped: {exc}",
+                            f"skipped: {type(exc).__name__}: {exc}",
                             RuntimeWarning,
                             stacklevel=2,
                         )
-                    # "collect" or "skip": leave results[idx] as None
+                    # "collect", "skip" and "stop" all leave results[idx] None
 
         return results
 
@@ -400,7 +414,11 @@ class Pool:
             with self._lock:
                 self._history[index].update({
                     "status":   FAILED,
+                    # Type and traceback beside the message: a
+                    # `KeyError('tenant')` renders as `'tenant'`, which in a
+                    # run record reads as a value rather than a fault.
                     "error":    str(exc),
+                    "failure":  _describe(exc),
                     "duration": duration,
                 })
             raise
