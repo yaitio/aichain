@@ -99,6 +99,73 @@ def cost_budget(usd: float):
     return _c
 
 
+def nudge(predicate, message, name: str = "nudge"):
+    """
+    A condition that **speaks** instead of ending the run.
+
+    `stop_when` knew two kinds, and both ended the run: a ceiling ("hit it,
+    fail") and a check ("met it, succeed"). A stall needs neither. It needs
+    "change approach", and the loop had no way to say that — so a stuck run
+    either spun until a ceiling stopped it or was stopped early by a ceiling
+    set too low to let a real run finish.
+
+    When *predicate(state)* is true a user turn carrying *message* is
+    appended and the loop carries on. It enters the conversation as an
+    ordinary, logged message — not an invisible edit to the system prompt —
+    so a reader of the transcript can see exactly what the model was told
+    and when. *message* may be a string or a callable of `state`.
+
+    It fires **once per streak**: while the predicate stays true it stays
+    quiet, and it re-arms when the predicate clears. A reminder repeated
+    every turn is how a reminder stops being read.
+    """
+    def _c(state):
+        return f"nudge:{name}" if predicate(state) else None
+    _c.kind, _c.name, _c.message = "nudge", name, message
+    return _c
+
+
+def stalled(last_k: int = 5):
+    """Nudge when the last *last_k* attempts moved nothing.
+
+    `Journal.has_progress` has existed, been documented, and been called
+    from no library code at all — available only to someone writing their
+    own loop. It reads the journal, not the task metric, so it has nothing to
+    overfit to and applies to every task, verifiable or not.
+    """
+    def _stalled(state):
+        journal = state.get("journal")
+        return journal is not None and not journal.has_progress(last_k)
+
+    def _say(state):
+        text = (f"The last {last_k} attempts did not move the task forward. "
+                "Do not repeat them; change the approach, or conclude from "
+                "what you already have.")
+        ruled_out = state["journal"].do_not_redo()
+        return f"{text}\n\nAlready ruled out:\n{ruled_out}" if ruled_out else text
+
+    return nudge(_stalled, _say, name="stalled")
+
+
+def repeating(last_k: int = 5):
+    """Nudge when the last *last_k* attempts were the same move.
+
+    The other half of a stall: `has_progress` catches a run that is failing,
+    this catches one that is succeeding pointlessly — clean results that
+    carry no new information. Like `stalled`, it existed in the journal and
+    nothing called it.
+    """
+    def _repeating(state):
+        journal = state.get("journal")
+        return journal is not None and journal.is_repeating(last_k)
+
+    return nudge(_repeating,
+                 f"The last {last_k} actions were the same. Their results "
+                 "will not change. Either conclude from what they returned "
+                 "or try something different.",
+                 name="repeating")
+
+
 def check(fn, name: str = "check"):
     """
     Stop when *fn* says the objective is met — and call that a **success**.
@@ -587,7 +654,15 @@ class Agent:
                 yield from drain()
 
                 journal.append(
-                    call.name,
+                    # No intent. An intent is what an attempt was *for* — a
+                    # plan step's goal — and this loop has none to record.
+                    # It used to pass the tool's name here, which made every
+                    # call to one tool share an "intent", so the journal's
+                    # repetition check read ten different searches as one
+                    # search repeated ten times. Nothing called that check
+                    # until `repeating()` did, and it fired on genuinely
+                    # varied work. The action carries the tool name already.
+                    "",
                     action      = _safe({"name": call.name,
                                          "arguments": call.arguments}),
                     outcome     = _J_FAILED if error else _J_DONE,
@@ -613,6 +688,7 @@ class Agent:
                     call.id or call.name,
                     prompts.result_message(result, error)))
 
+            state["journal"] = journal
             if fired := self._fired(state):
                 kind = getattr(fired[1], "kind", "ceiling")
                 if kind == "check":
@@ -624,11 +700,43 @@ class Agent:
                     state, False, None, fired[0],
                     error=f"stopped by {fired[0]} after {state['steps']} step(s)")
 
+            # After the terminal conditions, never before: a ceiling that has
+            # been reached ends the run whatever a nudge would have said, so a
+            # nudge listed first in `stop_when` cannot talk the loop past its
+            # own budget.
+            for note in self._nudges(state):
+                messages.append({"role": "user",
+                                 "parts": [{"type": "text", "text": note}]})
+                yield from drain()
+
     def _fired(self, state: dict):
+        """The first terminal condition that fired. Nudges are not terminal."""
         for cond in self.stop_when:
+            if getattr(cond, "kind", "ceiling") == "nudge":
+                continue
             if fired := cond(state):
                 return fired, cond
         return None
+
+    def _nudges(self, state: dict) -> list:
+        """Messages from nudges that fired this turn — once per streak."""
+        latched = state.setdefault("nudged", set())
+        notes = []
+        for cond in self.stop_when:
+            if getattr(cond, "kind", None) != "nudge":
+                continue
+            if not cond(state):
+                latched.discard(cond.name)        # cleared: re-arm
+                continue
+            if cond.name in latched:
+                continue                          # said already, still true
+            latched.add(cond.name)
+            message = (cond.message(state) if callable(cond.message)
+                       else cond.message)
+            self._emit("nudge.fired", step=state.get("steps"),
+                       payload={"name": cond.name, "message": message})
+            notes.append(message)
+        return notes
 
     # ── One model call ───────────────────────────────────────────────────
 

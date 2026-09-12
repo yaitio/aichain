@@ -12,7 +12,26 @@ on:
       - "v*"
 
 jobs:
+  # The gate. It existed before 2.17.1 and ran on 3.12 only — the one version
+  # where the PEP 701 f-string that broke 3.10/3.11 is legal — so eleven
+  # unimportable releases passed through a gate that was standing. Every
+  # version `requires-python` covers now has to pass before anything is built.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[all]" pytest pytest-asyncio
+      - run: pytest -k "not Live"
+
   publish:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       id-token: write          # required for Trusted Publishing
@@ -33,11 +52,6 @@ jobs:
           if [ "$TAG" != "$PKG" ]; then
             echo "::error::tag v$TAG does not match yait_aichain.__version__ $PKG"; exit 1
           fi
-
-      - name: Install and test
-        run: |
-          pip install -e ".[all]" pytest pytest-asyncio
-          pytest -k "not Live"   # *Live* tests need real API keys; skip in CI
 
       - name: Build
         run: |
