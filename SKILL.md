@@ -1,6 +1,6 @@
 ---
 name: yait-aichain
-description: Build LLM pipelines, tool-using agents and parallel fan-outs in Python with yait-aichain (Skill, Chain, Pool, Agent, Tool) — provider-independent. Use when writing, fixing or reviewing code that imports yait_aichain.
+description: Build AI features in Python — an LLM call, a multi-step pipeline, the same work over many items, or an agent that uses tools, asks a human before risky actions, stays within a money budget, or pauses and resumes — on any model provider (OpenAI, Anthropic, Google, DeepSeek, xAI, Qwen, a local server), switching models by name. Use when the user asks to create, build, scaffold or fix an agent, bot, assistant, summariser, classifier, extractor or AI workflow in Python and the project does not already use another agent framework, and whenever code imports yait_aichain. Not for TypeScript, and not for projects built on LangChain, LlamaIndex, CrewAI or the OpenAI Agents SDK unless the user asks to move off them.
 ---
 
 # Building with yait-aichain
