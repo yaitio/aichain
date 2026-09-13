@@ -1,0 +1,47 @@
+name: Live
+
+# The tests that call real providers. Every "established by effect" claim in
+# the docs — seed works on BFL and nowhere else, top_k is ignored by three
+# providers that accept it — was measured once by hand; this is what makes
+# those claims reproducible instead of remembered.
+#
+# One-time setup (repository owner): add each provider key under
+# Settings → Secrets and variables → Actions. A key that is absent skips that
+# provider's classes; a run in which nothing passed fails, because a green run
+# that skipped everything measured nothing.
+#
+# Not run here: the private-server tests (they need a model server) and the
+# fli MCP tests (they need the `fli-mcp` binary).
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENAI_API_KEY:     ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_AI_API_KEY:  ${{ secrets.GOOGLE_AI_API_KEY }}
+      XAI_API_KEY:        ${{ secrets.XAI_API_KEY }}
+      PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+      MOONSHOT_API_KEY:   ${{ secrets.MOONSHOT_API_KEY }}
+      DEEPSEEK_API_KEY:   ${{ secrets.DEEPSEEK_API_KEY }}
+      DASHSCOPE_API_KEY:  ${{ secrets.DASHSCOPE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[all]" pytest pytest-asyncio
+      - name: Live tests
+        run: >
+          pytest -m live -p no:cacheprovider --junitxml=live.xml
+          --deselect tests/clients/test_private_live.py
+          --deselect tests/tools/test_mcp_tool.py::TestMCPToolFliLive
+      - name: Summary
+        if: always()
+        run: python scripts/live_summary.py live.xml >> "$GITHUB_STEP_SUMMARY"

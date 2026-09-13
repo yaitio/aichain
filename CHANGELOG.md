@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+**Tests that measure what they claim.** Stage 4 of
+`docs/design/cleanup-plan-2026-09-13.md`. No library code changed.
+
+### Fixed
+
+- **Two offline tests had never run in CI.** CI deselected the live suite with
+  `pytest -k "not Live"`, and `-k` is a case-insensitive substring match:
+  `test_nothing_claimed_goes_undelivered` and `test_a_refusal_is_not_a_delivery`
+  ("de*live*red") went with it. Live tests are now a marker — a test class whose
+  name ends in `Live` is marked `live` in `tests/conftest.py` — and every
+  workflow selects with `-m`. Both tests pass.
+
+### Added
+
+- **Coverage in CI, with a floor and a register.** 77.93% on 3.10 and 3.14;
+  `fail_under = 77.9` in `pyproject.toml`, and it only rises. `COVERAGE.md`
+  lists every module under 60% with a kind — external, optional-dependency,
+  legacy, debt — and a reason; `scripts/coverage_register.py` fails CI on a gap
+  with no entry, and on an entry whose module has climbed past the threshold.
+  Eleven modules are marked `debt`: offline-testable and not yet tested.
+- **A nightly live workflow** (`.github/workflows/live.yml`): the provider
+  tests on a schedule and on demand, with a per-class summary on the job page.
+  A run in which nothing passed fails — a green run that skipped every provider
+  measured nothing. It needs the provider keys added as repository secrets
+  before its first real run.
+- **`Pool` and `Chain` contract tests** — 29 and 30 more, making 40 and 58 in
+  their directories: every error policy including what `stop` leaves pending,
+  history and status, per-item usage, agent runners and agent steps, context
+  crossing into worker threads, beacons, a budget shared by reference and lent
+  and given back, untrusted `Chain.load` refusing foreign and lookalike class
+  paths, an agent step's save/load round trip, hooks at step boundaries.
+  Each property was checked by breaking the library and watching its test fail.
+
 ## [2.18.1] — 2026-09-13
 
 **The examples run, the docs are generated from the code, and two speech tools

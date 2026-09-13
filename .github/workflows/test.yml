@@ -22,7 +22,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[all]" pytest pytest-asyncio
       # *Live* tests hit real provider APIs (keys + network) — skipped in CI.
-      - run: pytest -k "not Live"
+      - run: pip install pytest-cov
+      - run: pytest -m "not live" --cov=yait_aichain --cov-report=term --cov-report=json:coverage.json
+      # The floor lives in pyproject.toml; the register of what is under it and
+      # why lives in COVERAGE.md. Both are held here.
+      - run: python scripts/coverage_register.py coverage.json
       # Generated pages: the tests hold them too, but a named step says which
       # page went stale and how to regenerate it, instead of a diff in a log.
       - run: python scripts/docs.py --check

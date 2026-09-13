@@ -126,7 +126,7 @@ All true at once, and each is a test or a CI job rather than a claim:
 - [x] every generated docs block equals its regeneration (`scripts/docs.py --check`)
 - [ ] no page contains the word "Skeleton"
 - [ ] no promoted cookbook lacks a test
-- [ ] a coverage number is printed by CI and cannot fall
+- [x] a coverage number is printed by CI and cannot fall
 - [ ] the live suite has run green on a schedule at least once
 - [ ] an agent given `llms.txt` and `SKILL.md` has a measured `Pass^3` on twenty tasks
 - [ ] `products/` is either non-empty or the goal is restated in writing
