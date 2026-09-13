@@ -135,7 +135,7 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.agent  import Agent, step_count, token_budget
 from yait_aichain.chain  import Chain
-from yait_aichain.tools  import PerplexitySearchTool, WeasyPrintTool
+from yait_aichain.tools  import PerplexitySearchTool, WeasyprintTool
 
 # Phase 1 — Agent: gather everything we need
 research_agent = Agent(
@@ -159,7 +159,7 @@ report_skill = Skill(
 )
 
 # Phase 3 — Tool: export to PDF
-pdf_tool = WeasyPrintTool()
+pdf_tool = WeasyprintTool()
 
 chain = Chain(steps=[
     (research_agent, "research_brief", {}, {"task_key": "research_task"}),

@@ -2,10 +2,58 @@
 
 ## [Unreleased]
 
-**Tests that measure what they claim.** Stage 4 of
-`docs/design/cleanup-plan-2026-09-13.md`. No library code changed.
+## [2.19.0] — 2026-09-13
 
-### Fixed
+**Can an agent build on this library from two files? Measured: `Pass^3` 0.60.**
+Stages 4 and 5 of `docs/design/cleanup-plan-2026-09-13.md`. Stage 4 changed
+no library code; stage 5 adds public exports, hence the minor version.
+
+### Added — stage 5
+
+- **`llms.txt`** at the repository root: the five primitives and `Model`, one
+  example each, generated constructor signatures, an imports block, and the
+  rules agents get wrong. Under 300 lines. **`SKILL.md`**: when to use which
+  primitive, the workflow, and a checklist.
+- **The driver surface is public.** `ToolCall`, `ToolCallRequest`,
+  `tool_result_turn` and `dangling_calls` are exported from
+  `yait_aichain.models`. `Agent.step()`'s own error message told a caller to
+  use `tool_result_turn`, whose only import path was the private
+  `models._calls`.
+- **`evals/agent_builds/`** — twenty tasks with automatic checks, run by a
+  mid-tier model given only `SKILL.md` and `llms.txt`. Each program runs in a
+  sandbox where every model call is scripted and everything the program built
+  is recorded; the check reads that record, not what the program printed.
+  Held offline by `tests/test_agent_builds_instrument.py`: every reference
+  solution passes, a program that builds nothing fails, and deliberate
+  mistakes in references are caught.
+
+### Measured — `gpt-5.4-mini`, 20 tasks × 3 prompt levels × 3 trials, $0.66
+
+`Pass^3` 0.65 supportive, **0.60 neutral**, 0.65 competing. Of 47 failed
+attempts, **41 were things `llms.txt` did not say**: that `chain.run()`
+returns the last step's output rather than a dict of steps (20), the message
+shape — `parts`, not `content` (9), where `Tracer` is imported from (8), the
+fields of a `SuspendedResult` (2), and where a tool option is declared (2).
+The rules it did state held: 35 of 36 attempts on the tasks that exercise
+them. Full
+analysis, generated from the committed ledger:
+`evals/agent_builds/RESULTS.md`.
+
+### Changed — stage 5
+
+- `llms.txt` covers every undocumented cause above. That change is **not**
+  measured: re-scoring the same twenty tasks would score the edit against the
+  questions it was written for. The next number needs a held-out task set.
+- Generated signatures render `typing.Optional` as `dict | None` rather than
+  the bare word `Union`, and `llms.txt` gets a compact form.
+
+### Tests — stage 5
+
+- Every `from yait_aichain… import …` shown in `docs/`, `README.md`,
+  `examples/`, `llms.txt` and `SKILL.md` must resolve.
+- The bind test reads `llms.txt` and `SKILL.md`.
+
+### Fixed — stage 4
 
 - **Two offline tests had never run in CI.** CI deselected the live suite with
   `pytest -k "not Live"`, and `-k` is a case-insensitive substring match:
@@ -14,7 +62,7 @@
   name ends in `Live` is marked `live` in `tests/conftest.py` — and every
   workflow selects with `-m`. Both tests pass.
 
-### Added
+### Added — stage 4
 
 - **Coverage in CI, with a floor and a register.** 77.93% on 3.10 and 3.14;
   `fail_under = 77.9` in `pyproject.toml`, and it only rises. `COVERAGE.md`

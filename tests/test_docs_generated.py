@@ -40,6 +40,22 @@ class TestGeneratedPagesAreCurrent(unittest.TestCase):
             docs.render(rel, text)
 
 
+class TestSignaturesRenderTheSameOnEveryVersion(unittest.TestCase):
+    """The generator runs in CI on 3.10 through 3.14, and its output is
+    compared with one committed page. A union rendered one way on 3.14 and
+    another on 3.10 makes that page stale on every version but one."""
+
+    def test_both_union_spellings_render_as_pep_604(self):
+        import typing
+        self.assertEqual(docs._annotation(typing.Optional[dict]), "dict | None")
+        self.assertEqual(docs._annotation(typing.Union[int, str]), "int | str")
+        self.assertEqual(docs._annotation(dict | None), "dict | None")
+        self.assertEqual(docs._annotation("dict | None"), "dict | None")
+
+    def test_a_generic_keeps_its_arguments(self):
+        self.assertEqual(docs._annotation(list[dict]), "list[dict]")
+
+
 class TestTheNumbersAreTheRegistry(unittest.TestCase):
     """The headline counts are the thing a reader quotes."""
 

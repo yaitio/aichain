@@ -37,7 +37,8 @@ from yait_aichain import Agent, Chain, Model, Pool, Skill
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = (sorted((ROOT / "docs").rglob("*.md"))
-         + [ROOT / "README.md", ROOT / "examples" / "README.md"])
+         + [ROOT / "README.md", ROOT / "examples" / "README.md",
+            ROOT / "llms.txt", ROOT / "SKILL.md"])
 
 #: Whole scripts, not fenced blocks. Three of them constructed an `Agent`
 #: with pre-2.0 keywords through the entire 2.x line, and the index described
@@ -165,3 +166,40 @@ class TestEveryExampleBindsToTheRealThing(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEveryImportShownExists(unittest.TestCase):
+    """Binding checks a call's shape; it cannot see an import that fails first.
+
+    Measured 2026-09-13: given `llms.txt`, a model wrote
+    `from yait_aichain.hooks import Tracer` in eight of nine attempts at one
+    task, because the page named `Tracer` and never said where it lives. An
+    import a page shows is the one thing a reader copies verbatim, so every
+    `from yait_aichain… import …` in the docs, the examples, `llms.txt` and
+    `SKILL.md` has to resolve."""
+
+    def test_every_import_resolves(self):
+        import importlib
+        failures = []
+        for rel, source in _sources():
+            try:
+                tree = ast.parse(source)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if not (isinstance(node, ast.ImportFrom) and node.module
+                        and node.module.split(".")[0] == "yait_aichain"):
+                    continue
+                try:
+                    module = importlib.import_module(node.module)
+                except ImportError as exc:
+                    failures.append(f"{rel}:{node.lineno}: {node.module} — {exc}")
+                    continue
+                for alias in node.names:
+                    if alias.name != "*" and not hasattr(module, alias.name):
+                        try:
+                            importlib.import_module(f"{node.module}.{alias.name}")
+                        except ImportError:
+                            failures.append(f"{rel}:{node.lineno}: "
+                                            f"{alias.name} is not in {node.module}")
+        self.assertEqual(sorted(set(failures)), [], "\n".join(sorted(set(failures))))
