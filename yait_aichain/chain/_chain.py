@@ -500,7 +500,7 @@ class Chain:
         suspended step). On ``resume``, *signal* is delivered to the step at
         *start_idx* (the suspended tool) via ``_signal=``.
         """
-        from ..state import StepStatus, Suspend, SuspendedResult
+        from ..state import StepStatus, Suspend
 
         # Expose the per-request context for the duration of the run and persist
         # it in the document so it survives suspend/resume.
@@ -528,30 +528,21 @@ class Chain:
                         output = runner.run(**kwargs)
 
                 elif kind == "agent":
-                    # On resume of a previously-suspended agent step, continue
-                    # the child run instead of starting a new one.
-                    child_id = (doc.steps[idx].get("suspend", {}).get("child_run_id")
-                                if step_signal is not None else None)
-                    if child_id is not None:
-                        agent_result = runner.resume(child_id, signal=step_signal)
-                    else:
-                        task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
-                        task     = accumulated.get(task_key, "")
-                        if not task:
-                            raise ValueError(
-                                f"Agent step {idx} ({name!r}): accumulated variable "
-                                f"{task_key!r} is empty or missing.  Set it in a "
-                                f"prior step or in the initial variables."
-                            )
-                        agent_result = runner.run(task=task, variables=accumulated)
-
-                    # The nested agent paused (Wait/Gate) — suspend the chain
-                    # too, recording the child run_id so resume can continue it.
-                    if isinstance(agent_result, SuspendedResult):
-                        awaiting = dict(agent_result.awaiting or {})
-                        awaiting["child_run_id"] = agent_result.run_id
-                        return self._park(doc, idx, awaiting, accumulated,
-                                          usage_total, history)
+                    # An agent does not suspend — its state is the
+                    # conversation, since 2.0 — so an agent step always
+                    # starts a run. Until 2.19.1 this branch also "resumed a
+                    # child run" through `runner.resume`, a method the agent
+                    # has not had since 2.0: unreachable, and mutation testing
+                    # showed no test could tell it from deleting it.
+                    task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
+                    task     = accumulated.get(task_key, "")
+                    if not task:
+                        raise ValueError(
+                            f"Agent step {idx} ({name!r}): accumulated variable "
+                            f"{task_key!r} is empty or missing.  Set it in a "
+                            f"prior step or in the initial variables."
+                        )
+                    agent_result = runner.run(task=task, variables=accumulated)
 
                     if not agent_result:
                         raise RuntimeError(

@@ -34,3 +34,6 @@ temp/
 .coverage.*
 coverage.json
 htmlcov/
+
+# mutation testing
+mutants/

@@ -34,6 +34,23 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+@pytest.fixture(autouse=True)
+def _environment_is_restored():
+    """Every test leaves `os.environ` as it found it.
+
+    A test that set a key and popped it in `finally` removed the key other
+    tests had set at import, and the suite passed only in the file order CI
+    happens to use — mutation testing, which runs a subset in another order,
+    was the first thing to notice. Restoring here makes order irrelevant for
+    the environment, whatever an individual test does.
+    """
+    saved = dict(os.environ)
+    yield
+    if os.environ != saved:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 def is_live(item) -> bool:
     cls = getattr(item, "cls", None)
     return cls is not None and cls.__name__.endswith("Live")

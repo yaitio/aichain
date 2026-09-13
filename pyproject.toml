@@ -52,6 +52,19 @@ source = ["yait_aichain"]
 # alike. It only rises. What is under it, and why, is in COVERAGE.md.
 fail_under = 77.9
 
+[tool.mutmut]
+# Which tests actually catch a broken line. A mutant is a one-token change to
+# the library; a mutant no test kills is a line the suite does not guard.
+paths_to_mutate = ["yait_aichain/pool/_pool.py", "yait_aichain/chain/_chain.py"]
+tests_dir = ["tests/"]
+# The sandbox is a copy, not a git checkout, so the one test that asks git is
+# out of place there; everything else runs as in CI.
+pytest_add_cli_args = ["-m", "not live", "-p", "no:warnings",
+                       "--deselect", "tests/test_changelog.py::TestTheChangelogCoversWhatShipped::test_it_is_tracked_by_git"]
+# The whole package, so the files not being mutated still import.
+also_copy = ["yait_aichain", "scripts", "examples", "docs", "evals", "README.md", "CHANGELOG.md",
+             "COVERAGE.md", "llms.txt", "SKILL.md", ".github"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

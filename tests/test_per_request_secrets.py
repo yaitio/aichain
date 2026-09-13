@@ -89,11 +89,12 @@ class TestTheKeyFollowsTheRun(unittest.TestCase):
         self.assertEqual(_model(api_key="sk-plain").client.api_key, "sk-plain")
 
     def test_the_environment_variable_still_works(self):
-        os.environ["OPENAI_API_KEY"] = "sk-env"
-        try:
+        # patch.dict, not set-then-pop: popping in `finally` deleted whatever
+        # key was there before, and every later test that needed one failed —
+        # invisible in CI only because the file order happened to be kind.
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-env"}):
             self.assertEqual(_model().client.api_key, "sk-env")
-        finally:
-            os.environ.pop("OPENAI_API_KEY", None)
 
 
 class TestTheSecretIsNotInTheContext(unittest.TestCase):
