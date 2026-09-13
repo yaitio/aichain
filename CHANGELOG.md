@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+**Tests chosen by what they catch.** Mutation testing on `Pool` and `Chain`:
+1,447 one-token changes to the library, 62% caught by the suite at the start,
+77% now.
+
+### Fixed
+
+- **A test deleted `OPENAI_API_KEY` for every test after it.** The suite passed
+  only in the file order CI uses; run in another order, 27 Chain tests failed.
+  The test uses `patch.dict` now, and `tests/conftest.py` restores the
+  environment after every test.
+
+### Removed
+
+- `Chain`'s branch that resumed a paused agent step through `runner.resume` —
+  a method the agent has not had since 2.0. Unreachable, and indistinguishable
+  from deleting it under mutation testing.
+
+### Tests
+
+- `tests/chain/test_chain_round_trip.py`: a saved chain compared field by field
+  with what went in. 225 changes to `save`/`load` survived before it; 81 now.
+- `tests/chain/test_chain_mutation_gaps.py`: usage and `RunContext` carried
+  across `resume`, a second `resume`, the step kind on events, `task_key`, and
+  what `Pool` hands an agent runner.
+- `[tool.mutmut]` in `pyproject.toml`: `mutmut run` reproduces the measurement.
+
 ## [2.19.0] — 2026-09-13
 
 **Can an agent build on this library from two files? Measured: `Pass^3` 0.60.**
