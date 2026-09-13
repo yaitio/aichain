@@ -19,7 +19,7 @@ run produces it. Everything tabular goes the same way.
 | 0.1 | **`publish.yml` gates on the floor.** It already runs `pytest` before publishing — **on 3.12 only**, where the PEP 701 line is legal, which is exactly why eleven broken releases got through a gate that existed. Run the pre-publish test on **3.10**, and additionally wait on the `Tests` workflow for the same SHA. | A tag pushed on a commit that fails on 3.10 does not reach PyPI. Verified by pushing a deliberately failing tag to a branch. |
 | 0.2 | **CI matrix: add 3.13 and 3.14.** Development is on 3.14; CI stops at 3.12. | `test.yml` matrix is `["3.10","3.11","3.12","3.13","3.14"]` and green. |
 | 0.3 | **Branch protection on `main`**: `Tests` required. | GitHub settings; a push that fails `Tests` cannot land. (Owner action — needs repo admin.) |
-| 0.4 | **Decide on yanking 2.7.0–2.17.0.** Eleven releases are unimportable on 3.10/3.11. | A decision recorded in `CHANGELOG.md` under 2.17.1 either way. (Owner action — PyPI web UI.) |
+| 0.4 | **Yank 2.7.0–2.17.0.** Eleven releases are unimportable on 3.10/3.11. | 2.7.0–2.17.0 yanked on PyPI. (Owner action — PyPI web UI.) |
 | 0.5 | **Land or shelve the `nudge` work in the tree.** It is implemented, tested, and found one real fix (the loop recorded the tool name as the intent, so `is_repeating` read ten different searches as one). | Either 2.18.0 released with the CI gate from 0.1 in place, or the diff moved to a branch and the tree clean. Recommendation: land it. |
 | 0.6 | **Commit the audit and this plan.** | Both files on `main`, linked from `CLAUDE.md` and `docs/design/`. |
 
@@ -139,8 +139,8 @@ cleanup. They wait until the stages above are done:
 
 All true at once, and each is a test or a CI job rather than a claim:
 
-- [ ] a tag on a red commit cannot publish
-- [ ] CI covers 3.10 through 3.14 and is green
+- [x] a tag on a red commit cannot publish
+- [x] CI covers 3.10 through 3.14 and is green
 - [x] every fenced example in `docs/`, `README.md` and `examples/` binds
 - [x] every generated docs block equals its regeneration (`scripts/docs.py --check`)
 - [ ] no page contains the word "Skeleton"
