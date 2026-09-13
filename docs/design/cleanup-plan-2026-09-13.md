@@ -148,7 +148,7 @@ All true at once, and each is a test or a CI job rather than a claim:
 - [x] a coverage number is printed by CI and cannot fall
 - [ ] the live suite has run green on a schedule at least once
 - [x] an agent given `llms.txt` and `SKILL.md` has a measured `Pass^3` on twenty tasks
-- [x] `products/` is either non-empty or the goal is restated in writing — option A, 2026-09-13: the product is `aichain-agents`, a separate repository
+- [x] `products/` is either non-empty or the goal is restated in writing — option A, 2026-09-13: the product is `agents` (yaitio/agents), a separate repository
 
 ## Order and cost
 
