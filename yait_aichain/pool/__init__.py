@@ -25,7 +25,7 @@ Runner support
 
 Result and memory
 -----------------
-``pool.run(variables={})``  → ``list``
+``pool.run(variables={})``  → ``PoolResult`` (outputs in item order)
     One output per item, same order as *items*.
     Failed items produce ``None`` (unless ``on_error="raise"``).
 
@@ -102,9 +102,11 @@ Use a Chain as runner (multi-step pipeline per item)::
 """
 
 from ._pool import Pool, PENDING, RUNNING, DONE, FAILED
+from ._result import PoolResult
 
 __all__ = [
     "Pool",
+    "PoolResult",
     "PENDING",
     "RUNNING",
     "DONE",

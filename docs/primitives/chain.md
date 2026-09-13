@@ -21,7 +21,8 @@ translate = Skill(model=Model("claude-sonnet-4-6"), name="final",
 
 chain = Chain(steps=[(summarise, "summary"), (translate, "final")])
 result = chain.run(variables={"article": "...", "language": "French"})
-print(chain.history)   # full per-step audit trail
+print(result.output)       # the last step's output
+print(result["summary"])   # any step's output, by its key
 ```
 
 The summariser writes `summary`; the translator reads `{summary}` automatically.
@@ -125,14 +126,22 @@ chain.run(variables={"language": "Spanish"})  # Spanish
 ### Inspecting a run
 
 ```python
-result = chain.run(variables={...})
-chain.accumulated   # full variable dict after the run (initial + every step output)
-chain.history       # one record per step: step, kind, name, input, output, output_key, options
+result = chain.run(variables={...})     # a ChainResult
+result.output       # the last successful step's output
+result["summary"]   # any step's output (or initial variable), by key
+result.success      # every step completed; False after a skipped failure
+result.error        # "step N (name): message", or None
+result.history      # one record per step: step, kind, name, input, output, output_key, options
+result.variables    # every variable at the end — what result["key"] reads
+result.usage, result.tokens_used, result.cost
 ```
 
-Both are shallow copies — mutating them doesn't affect the chain. `accumulated`
-is how you fan several step outputs into a final assembler (each step writes a
-distinct key, then you read them all at once).
+`bool(result)` is `result.success`, as it is on `PoolResult` and `AgentResult`.
+A chain used as a step inside another chain, or as a `Pool` runner, contributes
+its `.output`; if it did not complete, that step or item fails.
+
+> **Changed in 3.0.0.** `run()` returned the last step's output as a bare
+> value. Read it as `result.output`.
 
 ### Error handling
 
@@ -184,7 +193,7 @@ if isinstance(result, SuspendedResult):
 |---|---|
 | `Chain(store=...)` | Where suspended runs are parked. Default `InMemoryStore` (process-local); `FileStore(dir)` survives restart; subclass `StateStore` for S3/DB. |
 | `chain.run(..., context=RunContext(...))` | Per-request tenant + metadata threaded through the run (not secrets). |
-| `result` from `run()` | The final value, **or** a falsy `SuspendedResult` (`run_id`, `awaiting`) if a step paused. |
+| `result` from `run()` | A `ChainResult`, **or** a falsy `SuspendedResult` (`run_id`, `awaiting`, `document`) if a step paused. `resume()` returns the same. |
 | `chain.resume(run_id, signal)` | Continue from the paused step; completed steps are **not** re-run. Idempotent — a duplicate resume of a finished run raises `KeyError`. |
 
 ### Mixing Skills, Tools, and Agents

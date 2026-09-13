@@ -131,6 +131,16 @@ class AgentResult:
     #: blocker, a question, a contract that changed under the task.
     beacons:     list           = field(default_factory=list)
 
+    @property
+    def usage(self):
+        """Tokens and cost as a `Usage`, the field `ChainResult` and
+        `PoolResult` carry too. An agent sums only the total across its
+        turns, so the input/output split is left at zero rather than invented."""
+        from ..models._usage import Usage
+        if not self.tokens_used and self.cost is None:
+            return None
+        return Usage(total_tokens=self.tokens_used or 0, cost=self.cost)
+
     def __bool__(self) -> bool:
         return self.success
 

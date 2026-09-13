@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-09-13
+
+**Chain, Pool and Agent return one shape of result.** `.output`, `.success`,
+`.error`, `.history`, `.usage`, `.tokens_used`, `.cost`; `bool(result)` is
+`.success`. `skill.run()` still returns the value.
+
+### Changed — breaking
+
+- **`Chain.run()` and `Chain.resume()` return a `ChainResult`**, not the last
+  step's output. `result.output` is that output; `result["key"]` is any step's
+  output by its key; `result.success` is `False` when a step failed under
+  `skip`, `collect` or `stop`.
+- **`Pool.run()` returns a `PoolResult`**, not a `list`. Iterating, indexing and
+  `len()` are unchanged; comparing with a list needs `result.output`.
+- A Chain used as a step or as a Pool runner contributes its `.output`, and a
+  chain that did not complete fails that step or item.
+
+### Added
+
+- `ChainResult` and `PoolResult`, exported from `yait_aichain`.
+- `AgentResult.usage`.
+- `Eval` records a result object's `.output`, tokens and cost.
+
 **Tests chosen by what they catch.** Mutation testing on `Pool` and `Chain`:
 1,447 one-token changes to the library, 62% caught by the suite at the start,
 77% now.

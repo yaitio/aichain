@@ -90,12 +90,12 @@ result = skill.run(variables={"text": "..."})
 # Chain — sequential steps
 chain = Chain(steps=[skill_a, skill_b])
 result = chain.run(variables={"topic": "..."})
-print(chain.history)          # one record per step
+print(result.output, result["draft"])   # the last step, and any step by key
 
 # Pool — parallel execution
 pool = Pool(skill, items=[{"text": t} for t in texts], max_flows=10)
-results = pool.run()
-print(pool.status)            # {PENDING: 0, RUNNING: 0, DONE: 5, FAILED: 0}
+results = pool.run()          # outputs in item order
+print(results[0], results.success, results.cost)
 
 # Agent — one loop, tools or an answer each turn
 agent = Agent(Model("claude-sonnet-4-6"), tools=[...], stop_when=[step_count(10)])

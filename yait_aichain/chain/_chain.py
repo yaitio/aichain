@@ -98,6 +98,7 @@ import warnings
 
 from ..models._usage import Usage
 from .._events import Event, emit
+from ._result import ChainResult
 
 # One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
 # is a silent `skip`: a chain of a hundred generated steps that expects a few
@@ -345,9 +346,9 @@ class Chain:
         on_step_error: str  | None = None,
         *,
         context=None,
-    ) -> "str | dict | None":
+    ) -> "ChainResult":
         """
-        Execute all steps in order and return the final step's output.
+        Execute all steps in order and return a :class:`ChainResult`.
 
         Parameters
         ----------
@@ -360,10 +361,11 @@ class Chain:
 
         Returns
         -------
-        str | dict | None
-            Output of the last successful step.  ``None`` when
-            ``on_step_error`` is ``"stop"`` or ``"skip"`` and the pipeline
-            had no successful steps (e.g. step 0 failed).
+        ChainResult
+            ``.output`` is the last successful step's output, ``result["key"]``
+            any step's output by its key, ``.success`` whether every step
+            completed. A :class:`~state.SuspendedResult` instead when a step
+            paused the run.
 
         Raises
         ------
@@ -398,7 +400,7 @@ class Chain:
         *,
         on_step_error: str | None = None,
         context=None,
-    ) -> "str | dict | None":
+    ) -> "ChainResult | None":
         """
         Resume a previously suspended run.
 
@@ -494,7 +496,7 @@ class Chain:
                                document=doc.to_dict())
 
     def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
-                  on_error, context) -> "str | dict | None":
+                  on_error, context) -> "ChainResult":
         """
         Shared step loop for ``run()`` (from step 0) and ``resume()`` (from the
         suspended step). On ``resume``, *signal* is delivered to the step at
@@ -573,6 +575,14 @@ class Chain:
                         output = runner.run(variables=skill_vars)
                     else:
                         output = runner.run(variables=accumulated)
+                    # A chain used as a step contributes its output, and its
+                    # failure is this step's failure — the same contract an
+                    # agent step has.
+                    if isinstance(output, ChainResult):
+                        if not output:
+                            raise RuntimeError(
+                                f"Chain step {idx} ({name!r}) failed: {output.error}")
+                        output = output.output
 
             except Suspend as susp:
                 # A suspend tool paused the run: park the document and return a
@@ -610,7 +620,7 @@ class Chain:
                     self.last_usage   = usage_total
                     if on_error == "raise":
                         raise
-                    return last_output
+                    return self._result(doc, history, accumulated, usage_total, last_output)
 
                 # skip / collect: record a terminal SKIPPED status so resume
                 # does not
@@ -663,7 +673,16 @@ class Chain:
         self._history     = history
         self._accumulated = dict(accumulated)
         self.last_usage   = usage_total
-        return last_output
+        return self._result(doc, history, accumulated, usage_total, last_output)
+
+    @staticmethod
+    def _result(doc, history, accumulated, usage_total, last_output) -> "ChainResult":
+        failed = [r for r in history if r.get("error")]
+        error = (f"step {failed[0]['step']} ({failed[0]['name']}): {failed[0]['error']}"
+                 if failed else None)
+        return ChainResult(output=last_output, success=not failed, error=error,
+                           history=list(history), variables=dict(accumulated),
+                           usage=usage_total, run_id=doc.run_id)
 
     @property
     def accumulated(self) -> dict:

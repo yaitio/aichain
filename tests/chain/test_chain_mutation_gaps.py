@@ -71,20 +71,20 @@ class TestResume(unittest.TestCase):
         paused = _paused(self.store, [(Tenant(), "who")], context=RunContext(tenant="acme"))
         fresh = Chain(steps=[(Spends("before", 5), "a"), (Wait(reason="ok?"), "approval"),
                              (Tenant(), "who")], store=self.store)
-        self.assertEqual(fresh.resume(paused.run_id, signal={"approved": True}), "acme")
+        self.assertEqual(fresh.resume(paused.run_id, signal={"approved": True}).output, "acme")
 
     def test_a_context_passed_to_resume_replaces_the_saved_one(self):
         paused = _paused(self.store, [(Tenant(), "who")], context=RunContext(tenant="acme"))
         fresh = Chain(steps=[(Spends("before", 5), "a"), (Wait(reason="ok?"), "approval"),
                              (Tenant(), "who")], store=self.store)
         out = fresh.resume(paused.run_id, signal={"approved": True}, context=RunContext(tenant="beta"))
-        self.assertEqual(out, "beta")
+        self.assertEqual(out.output, "beta")
 
     def test_no_saved_context_means_none(self):
         paused = _paused(self.store, [(Tenant(), "who")])
         self.assertIsNone(Chain(steps=[(Spends("before", 5), "a"), (Wait(reason="ok?"), "approval"),
                                        (Tenant(), "who")], store=self.store)
-                          .resume(paused.run_id, signal={"approved": True}))
+                          .resume(paused.run_id, signal={"approved": True}).output)
 
     def test_a_finished_run_cannot_be_resumed_twice(self):
         paused = _paused(self.store, [(Spends("after", 7), "b")])
@@ -127,7 +127,7 @@ class TestChainSteps(unittest.TestCase):
     def test_task_key_names_the_variable_an_agent_reads(self):
         agent = Agent()
         out = Chain(steps=[(agent, "answer", {}, {"task_key": "question"})]).run({"question": "why?"})
-        self.assertEqual(out, "answered why?")
+        self.assertEqual(out.output, "answered why?")
 
 
 class Plain:

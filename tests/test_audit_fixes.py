@@ -691,7 +691,7 @@ class TestChainConcurrency(unittest.TestCase):
 
         # Every run returns its own output (no cross-item interleaving)
         for tag, out in results.items():
-            self.assertEqual(out, tag)
+            self.assertEqual(out.output, tag)
         # Instance attributes reflect exactly one finished run, not a mix
         self.assertEqual(len(chain.history), 1)
 

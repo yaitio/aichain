@@ -1,6 +1,6 @@
 # Coverage
 
-The floor is **77.9%**, set in `pyproject.toml`
+The floor is **78.4%** (78.40% measured at 3.0.0), set in `pyproject.toml`
 (`[tool.coverage.report] fail_under`). Measured 2026-09-13 at 77.07% on Python
 3.10 and 3.14 alike, and raised the same day when the `Pool` and `Chain`
 contract tests brought it to 77.93% on both. It only rises.

@@ -24,11 +24,11 @@ This is the 2.x API. Older tutorials use names that no longer exist —
    and a message is `{"role": "system" | "user" | "assistant", "parts": [...]}`
    — **`parts`, never `content`**. `{name}` placeholders are filled from
    `run(variables={...})`.
-3. **Know what `run()` returns.** `chain.run()` returns the **last step's
-   output** — a string, or the dict that step returned — not a dict of every
-   step; each step's output by its key is in `chain.accumulated`. `pool.run()`
-   returns a list in item order. `agent.run()` returns an `AgentResult`; the
-   answer is `.output`. `chain.resume()` returns what `run()` would.
+3. **`skill.run()` returns the value; Chain, Pool and Agent return a result.**
+   The three results share `.output`, `.success`, `.error`, `.history`,
+   `.usage`, `.tokens_used`, `.cost`, and `bool(result)` is `.success`. A
+   chain result also reads any step by its key: `result["tweet"]`. A pool
+   result iterates and indexes like the list of outputs.
 4. **Drive the loop yourself only if you answer every call.** After
    `agent.step()` returns a `ToolCallRequest`, append `reply.as_turn()` and
    then `tool_result_turn(call.id, result)` for **every** call — failed ones
@@ -144,12 +144,14 @@ draft  = Skill(Model("gpt-5.4-mini"), prompt="Write a tweet about {topic}.")
 polish = Skill(Model("claude-sonnet-4-6"), prompt="Tighten this tweet: {tweet}")
 
 chain = Chain(steps=[(draft, "tweet"), (polish, "final")])
-final = chain.run(variables={"topic": "solar power"})    # the LAST step's output
-first = chain.accumulated["tweet"]                       # any step's output, by key
+result = chain.run(variables={"topic": "solar power"})   # a ChainResult
+final  = result.output                                    # the last step's output
+first  = result["tweet"]                                  # any step's output, by key
 ```
 
 A string output is stored under its step's key; a dict output is merged into
-the variables. `chain.history` has one record per step.
+the variables. `result.history` has one record per step; `result.success` is
+False when a step failed under `on_step_error="skip"`.
 `chain.save("c.yaml")` / `Chain.load("c.yaml")`.
 
 ## Pool — one runner, many items, in parallel
@@ -157,11 +159,12 @@ the variables. `chain.history` has one record per step.
 ```python
 classify = Skill(Model("gpt-5.4-mini"), prompt="Positive or negative? {review}")
 pool = Pool(classify, items=[{"review": r} for r in reviews], max_flows=5)
-labels = pool.run()                  # a list in item order; a failed item is None
+labels = pool.run()                  # a PoolResult: outputs in item order
+print(labels[0], labels.success, labels.cost)
 ```
 
-The runner can be a Skill, a Chain (each item gets the chain's last output), a
-Tool, or an Agent (items then carry `task`). `pool.status`, `pool.usage`.
+The runner can be a Skill, a Chain or an Agent (items then carry `task`) — each
+item's output is that runner's `.output` — or a Tool. `pool.status`, `pool.usage`.
 
 ## Agent — a loop that calls tools until it is done
 
@@ -219,7 +222,7 @@ if isinstance(result, SuspendedResult):
     reason = result.awaiting["reason"]
     tweet  = result.document["variables"]["tweet"]  # everything computed so far
     # later, possibly in another process with the same store:
-    posted = chain.resume(result.run_id, signal={"tweet": tweet})
+    posted = chain.resume(result.run_id, signal={"tweet": tweet})   # a ChainResult
 ```
 
 ## Money and observability

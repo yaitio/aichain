@@ -136,14 +136,14 @@ class TestConstruction(unittest.TestCase):
 class TestVariablesAndOrder(unittest.TestCase):
 
     def test_shared_variables_reach_every_item(self):
-        self.assertEqual(Pool(Echo(), items("a", "b")).run({"suffix": "!"}), ["a!", "b!"])
+        self.assertEqual(Pool(Echo(), items("a", "b")).run({"suffix": "!"}).output, ["a!", "b!"])
 
     def test_the_item_wins_over_a_shared_variable(self):
         out = Pool(Echo(), [{"value": "a", "suffix": "?"}]).run({"suffix": "!"})
-        self.assertEqual(out, ["a?"])
+        self.assertEqual(out.output, ["a?"])
 
     def test_one_worker_still_returns_in_item_order(self):
-        self.assertEqual(Pool(Echo(), items(*"abcde"), max_flows=1).run(), list("abcde"))
+        self.assertEqual(Pool(Echo(), items(*"abcde"), max_flows=1).run().output, list("abcde"))
 
 
 class TestHistoryAndStatus(unittest.TestCase):
@@ -188,7 +188,7 @@ class TestErrorPolicies(unittest.TestCase):
 
     def test_collect_records_type_and_traceback_not_just_the_message(self):
         p = Pool(FailOn("b"), items("a", "b"))
-        self.assertEqual(p.run(), ["a", None])
+        self.assertEqual(p.run().output, ["a", None])
         failure = p.history[1]["failure"]
         self.assertEqual(failure["type"], "KeyError")
         self.assertIn("Traceback", failure["traceback"])
@@ -229,7 +229,7 @@ class TestUsage(unittest.TestCase):
 
     def test_usage_is_per_item_even_though_the_runner_is_shared(self):
         p = Pool(Counts(), items("a", "bbb"), max_flows=2)
-        self.assertEqual(p.run(), ["A", "BBB"])
+        self.assertEqual(p.run().output, ["A", "BBB"])
         self.assertEqual([r["usage"].total_tokens for r in p.history], [2, 6])
         self.assertEqual(p.usage.total_tokens, 8)
 
@@ -246,17 +246,17 @@ class TestAgentRunner(unittest.TestCase):
 
     def test_the_task_goes_in_and_the_output_comes_out(self):
         p = Pool(Agent(), [{"task": "x"}, {"task": "y"}])
-        self.assertEqual(p.run(), ["did x", "did y"])
+        self.assertEqual(p.run().output, ["did x", "did y"])
         self.assertEqual(p.usage.total_tokens, 14)
 
     def test_an_item_without_a_task_fails_and_says_why(self):
         p = Pool(Agent(), [{"value": "no task"}])
-        self.assertEqual(p.run(), [None])
+        self.assertEqual(p.run().output, [None])
         self.assertIn("task", p.history[0]["error"])
 
     def test_a_failed_agent_result_is_a_failure_not_an_output(self):
         p = Pool(Agent(ok=False), [{"task": "x"}])
-        self.assertEqual(p.run(), [None])
+        self.assertEqual(p.run().output, [None])
         self.assertEqual(p.history[0]["failure"]["type"], "RuntimeError")
         self.assertIn("gave up", p.history[0]["error"])
 
@@ -284,7 +284,7 @@ class TestBeacons(unittest.TestCase):
 
     def test_a_coordination_beacon_is_collected_and_does_not_stop_the_fan_out(self):
         p = Pool(Signals(), items("a", "b", "c"))
-        self.assertEqual(p.run({"kind": "fact"}), ["a", "b", "c"])
+        self.assertEqual(p.run({"kind": "fact"}).output, ["a", "b", "c"])
         self.assertEqual(len(p.beacons), 3)
         self.assertEqual({b.kind for b in p.beacons}, {"fact"})
 

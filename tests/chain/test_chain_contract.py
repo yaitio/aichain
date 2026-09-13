@@ -264,14 +264,14 @@ class TestPerCallPolicy(unittest.TestCase):
         chain = Chain(steps=[(Boom(), "x"), (Upper(), "y")])
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.assertEqual(chain.run({"text": "a"}, on_step_error="skip"), "A")
+            self.assertEqual(chain.run({"text": "a"}, on_step_error="skip").output, "A")
         with self.assertRaises(RuntimeError):
             chain.run({"text": "a"})
 
     def test_stop_returns_the_last_good_output(self):
         chain = Chain(steps=[(Upper(), "text"), (Boom(), "x"), (Upper(), "y")],
                       on_step_error="stop")
-        self.assertEqual(chain.run({"text": "a"}), "A")
+        self.assertEqual(chain.run({"text": "a"}).output, "A")
         self.assertEqual(chain.history[-1]["failure"]["type"], "RuntimeError")
 
     def test_resuming_an_unknown_run_is_a_key_error(self):
@@ -298,7 +298,7 @@ class TestContext(unittest.TestCase):
 
     def test_a_step_sees_the_run_context_and_it_ends_with_the_run(self):
         chain = Chain(steps=[(Tenant(), "who")])
-        self.assertEqual(chain.run({"text": "a"}, context=RunContext(tenant="acme")), "acme")
+        self.assertEqual(chain.run({"text": "a"}, context=RunContext(tenant="acme")).output, "acme")
         self.assertEqual(chain.context.tenant, "acme")
         self.assertIsNone(current())
 
@@ -307,7 +307,7 @@ class TestAgentAndSkillSteps(unittest.TestCase):
 
     def test_an_agent_step_answers_and_its_tokens_are_counted(self):
         chain = Chain(steps=[(Agent(), "answer")])
-        self.assertEqual(chain.run({"task": "summarise"}), "answered summarise")
+        self.assertEqual(chain.run({"task": "summarise"}).output, "answered summarise")
         self.assertEqual(chain.last_usage.total_tokens, 11)
 
     def test_an_agent_step_with_no_task_says_which_variable(self):
