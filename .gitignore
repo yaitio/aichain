@@ -28,3 +28,9 @@ researches/
 
 # Scratch artefacts kept between sessions, never shipped
 temp/
+
+# coverage artefacts
+.coverage
+.coverage.*
+coverage.json
+htmlcov/

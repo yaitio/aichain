@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[all]" pytest pytest-asyncio
-      - run: pytest -k "not Live"
+      - run: pytest -m "not live"
 
   publish:
     needs: test

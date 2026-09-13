@@ -39,6 +39,18 @@ version = { attr = "yait_aichain.__version__" }
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "live: calls a real provider API or server; needs keys and network (tests/conftest.py)",
+]
+
+[tool.coverage.run]
+source = ["yait_aichain"]
+
+[tool.coverage.report]
+# The floor. Measured 2026-09-13 at 77.07%, raised to 77.9 the same day when
+# the Pool and Chain contract tests brought it to 77.93% on 3.10 and 3.14
+# alike. It only rises. What is under it, and why, is in COVERAGE.md.
+fail_under = 77.9
 
 [tool.ruff]
 line-length = 100
