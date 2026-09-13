@@ -48,9 +48,8 @@ faster and more predictable than an Agent that rediscovers them.
 - [ ] No `orchestrator=`, `max_steps=`, `max_attempts=`, `memory=`, `executors=`.
 - [ ] Each `Skill` has exactly one of `prompt=` / `input=`, and messages use
       `parts`, never `content`.
-- [ ] `chain.run()` is read as the **last** step's output; other steps come
-      from `chain.accumulated["key"]`. `agent.run()` is an `AgentResult` —
-      the answer is `.output`.
+- [ ] Chain, Pool and Agent results are read through `.output` (and a chain's
+      steps as `result["key"]`); only `skill.run()` returns the bare value.
 - [ ] Every import is one `llms.txt` shows (`Tracer` and `Budget` come from
       `yait_aichain`).
 - [ ] Every `Agent` has a ceiling in `stop_when`.

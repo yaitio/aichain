@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "2.19.0"
+__version__ = "3.0.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -52,6 +52,8 @@ from .models._usage import Usage                                   # noqa: F401
 from .skills import Skill                                          # noqa: F401
 from .chain  import Chain                                          # noqa: F401
 from .pool   import Pool, PENDING, RUNNING, DONE, FAILED          # noqa: F401
+from .chain  import ChainResult                                    # noqa: F401
+from .pool   import PoolResult                                     # noqa: F401
 from .agent  import Agent                                          # noqa: F401
 
 # Observability events & lifecycle hooks (1.4.4).

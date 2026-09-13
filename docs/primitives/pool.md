@@ -20,9 +20,9 @@ summarise = Skill(
 )
 
 pool = Pool(summarise, items=[{"topic": t} for t in ["gravity", "entropy", "AI"]], max_flows=10)
-results = pool.run()          # list, one entry per item, same order
+results = pool.run()          # a PoolResult: one output per item, same order
 
-print(results)
+print(list(results), results.success)
 print(pool.status)            # {0: 0, 1: 0, 2: 3, 3: 0}  → 3 DONE
 ```
 
@@ -77,12 +77,18 @@ Pool(
 ### `run()`
 
 ```python
-results = pool.run(variables=None) -> list
+results = pool.run(variables=None) -> PoolResult
 ```
 
-Returns a list the same length and order as `items`; entry `i` is the runner's
-output for `items[i]` (or `None` if that item failed under
-`collect`/`skip`). The optional `variables` dict is **merged into every item** —
+Returns a `PoolResult` the same length and order as `items`: iterate it, index
+it, take its length. Entry `i` is the runner's output for `items[i]` — a Chain
+or Agent runner contributes its `.output` — or `None` if that item failed or
+was never started. Beside the outputs it carries `.output` (the list),
+`.success`, `.error`, `.errors`, `.history`, `.usage`, `.tokens_used` and
+`.cost`, and `bool(results)` is `.success`.
+
+> **Changed in 3.0.0.** `run()` returned a bare `list`. Iteration and indexing
+> are unchanged; compare with `results.output`. The optional `variables` dict is **merged into every item** —
 handy for values shared across all flows.
 
 ```python

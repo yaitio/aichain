@@ -69,7 +69,7 @@ class TestFanOut(unittest.TestCase):
 
     def test_runs_every_item_and_preserves_order(self):
         out = Pool(Echo(), items=[{"value": v} for v in "abcd"], max_flows=4).run()
-        self.assertEqual(out, ["got a", "got b", "got c", "got d"])
+        self.assertEqual(out.output, ["got a", "got b", "got c", "got d"])
 
     def test_order_holds_when_workers_finish_out_of_order(self):
         # One flow per item, with the first item slowest: if the pool returned
@@ -87,12 +87,12 @@ class TestFanOut(unittest.TestCase):
 
         items = [{"value": "a", "delay": 0.05}, {"value": "b", "delay": 0},
                  {"value": "c", "delay": 0}]
-        self.assertEqual(Pool(Slow(), items=items, max_flows=3).run(),
+        self.assertEqual(Pool(Slow(), items=items, max_flows=3).run().output,
                          ["a", "b", "c"])
 
     def test_tool_taking_no_arguments_is_called(self):
         out = Pool(NoArgs(), items=[{}, {}], max_flows=2).run()
-        self.assertEqual(out, ["fixed", "fixed"])
+        self.assertEqual(out.output, ["fixed", "fixed"])
 
     def test_empty_items_rejected(self):
         with self.assertRaises(ValueError):
@@ -129,14 +129,14 @@ class TestUndeclaredParameters(unittest.TestCase):
     def test_no_items_variables_means_no_complaint(self):
         # Nothing was passed, so nothing was dropped — a tool that needs no
         # arguments must not be second-guessed.
-        self.assertEqual(Pool(NoArgs(), items=[{}]).run(), ["fixed"])
+        self.assertEqual(Pool(NoArgs(), items=[{}]).run().output, ["fixed"])
 
 
 class TestErrorPolicy(unittest.TestCase):
 
     def test_collect_turns_a_failing_item_into_none(self):
         out = Pool(Explodes(), items=[{"value": "a"}], on_error="collect").run()
-        self.assertEqual(out, [None])
+        self.assertEqual(out.output, [None])
 
     def test_raise_propagates(self):
         with self.assertRaises(Exception):
@@ -149,7 +149,7 @@ class TestErrorPolicy(unittest.TestCase):
         items = [{"value": "a"}, {"value": "b"}]
         with self.assertWarns(RuntimeWarning):
             out = Pool(Explodes(), items=items, on_error="skip").run()
-        self.assertEqual(out, [None, None])
+        self.assertEqual(out.output, [None, None])
 
 
 if __name__ == "__main__":

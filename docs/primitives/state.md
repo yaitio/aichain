@@ -147,7 +147,7 @@ It is **falsy**, so an accidental `if result:` treats a pause as "not done".
 ### `resume()`
 
 ```python
-final = chain.resume(run_id, signal={...})        # Chain
+final = chain.resume(run_id, signal={...})        # Chain → a ChainResult
 ```
 
 Loads the parked document, injects `signal` into the suspended step, and runs to

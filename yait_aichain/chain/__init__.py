@@ -41,7 +41,9 @@ Typical usage — Skills only
     )
 
     chain = Chain([analyst, translator], name="analyse_and_translate")
-    output = chain.run(variables={"topic": "renewable energy", "language": "Spanish"})
+    result = chain.run(variables={"topic": "renewable energy", "language": "Spanish"})
+    print(result.output)            # the last step
+    print(result["summary"])        # any step, by its key
 
 Typical usage — Mixed Tool + Skill pipeline
 --------------------------------------------
@@ -109,5 +111,6 @@ at load time.
 """
 
 from ._chain import Chain
+from ._result import ChainResult
 
-__all__ = ["Chain"]
+__all__ = ["Chain", "ChainResult"]

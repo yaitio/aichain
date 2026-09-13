@@ -235,7 +235,7 @@ class Pool:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def run(self, variables: dict | None = None) -> list:
+    def run(self, variables: dict | None = None) -> "PoolResult":
         """
         Execute the runner for every item in parallel.
 
@@ -247,10 +247,10 @@ class Pool:
 
         Returns
         -------
-        list
-            Outputs in the same order as *items*.
-            Failed items produce ``None`` when ``on_error`` is
-            ``"collect"`` or ``"skip"``.
+        PoolResult
+            The outputs in item order — iterable and indexable — with
+            ``.success``, ``.error``, ``.history``, ``.usage`` and ``.cost``.
+            A failed or unstarted item's output is ``None``.
 
         Raises
         ------
@@ -334,7 +334,10 @@ class Pool:
                         # "collect", "skip" and "stop" all leave results[idx] None
         self._beacons = board.all()
 
-        return results
+        from ._result import PoolResult
+        history = self.history
+        return PoolResult(results, success=all(r["status"] == DONE for r in history),
+                          history=history, usage=self.usage, beacons=self._beacons)
 
     @property
     def beacons(self) -> list:
@@ -498,7 +501,15 @@ class Pool:
         # not a budget.
         if self.max_cost is not None and hasattr(own, "max_cost"):
             own.max_cost = self.max_cost
-        return own.run(variables=variables), getattr(own, "last_usage", None)
+        output = own.run(variables=variables)
+        # A chain as the runner contributes its output; a chain that did not
+        # complete is a failed item, exactly as a failed agent is.
+        from ..chain._result import ChainResult
+        if isinstance(output, ChainResult):
+            if not output:
+                raise RuntimeError(f"Chain failed: {output.error}")
+            return output.output, output.usage
+        return output, getattr(own, "last_usage", None)
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 

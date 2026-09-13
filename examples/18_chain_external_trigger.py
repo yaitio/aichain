@@ -91,9 +91,9 @@ def start(order_id: str) -> str:
 # ── Invocation 2 — the external trigger resumes the run ──────────────────────
 def approval_webhook(run_id: str, approved: bool):
     # A fresh chain, as a different process would build it — it shares ONLY the store.
-    output = build_chain().resume(run_id, signal={"approved": approved})
-    print(f"▶  Resumed by the trigger (approved={approved}) → {output!r}")
-    return output
+    result = build_chain().resume(run_id, signal={"approved": approved})
+    print(f"▶  Resumed by the trigger (approved={approved}) → {result.output!r}")
+    return result
 
 
 if __name__ == "__main__":

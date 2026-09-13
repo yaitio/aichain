@@ -151,7 +151,17 @@ class Eval:
             rec.seconds = time.monotonic() - started
             return rec
 
-        if isinstance(raw, dict) and "output" in raw:
+        # A primitive's result object — ChainResult, PoolResult, AgentResult
+        # — records its output, and what it cost, rather than the object: the
+        # ledger is JSON, and the object is not.
+        if (not isinstance(raw, dict) and hasattr(raw, "output")
+                and hasattr(raw, "success")):
+            rec.output = raw.output
+            rec.cost   = float(getattr(raw, "cost", 0.0) or 0.0)
+            rec.tokens = int(getattr(raw, "tokens_used", 0) or 0)
+            rec.meta   = {"success": bool(raw.success),
+                          "run_error": getattr(raw, "error", None)}
+        elif isinstance(raw, dict) and "output" in raw:
             rec.output = raw.get("output")
             rec.cost   = float(raw.get("cost") or 0.0)
             rec.tokens = int(raw.get("tokens") or 0)

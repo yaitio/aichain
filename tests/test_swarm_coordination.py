@@ -223,7 +223,7 @@ class TestAPoolLeavesItsWaitOnABlocker(unittest.TestCase):
 
         pool = Pool(runner=Worker(), items=[{"n": i} for i in range(5)],
                     max_flows=1)
-        self.assertEqual(pool.run(), [0, 1, 2, 3, 4])
+        self.assertEqual(pool.run().output, [0, 1, 2, 3, 4])
         self.assertEqual(len(started), 5)
 
 

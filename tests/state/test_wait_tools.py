@@ -42,7 +42,7 @@ class TestWait(unittest.TestCase):
         res = c.run()
         out = c.resume(res.run_id, signal={"approved": True})
         # the signal is the leaf step's output → merged into variables
-        self.assertEqual(out, {"approved": True})
+        self.assertEqual(out.output, {"approved": True})
 
 
 class TestGate(unittest.TestCase):
@@ -62,7 +62,7 @@ class TestGate(unittest.TestCase):
         res = c.run()
         self.assertEqual(res.awaiting["reason"], "Approve running 'send'?")
         out = c.resume(res.run_id, signal={"approved": True})
-        self.assertEqual(out, "sent")
+        self.assertEqual(out.output, "sent")
         self.assertEqual(ran["n"], 1)
 
     def test_denied_skips_wrapped_tool(self):

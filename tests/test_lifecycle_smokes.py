@@ -88,7 +88,7 @@ class TestChain(unittest.TestCase):
         # `run()` returns the last step's value, not the accumulated dict —
         # checked rather than assumed, because a smoke that asserts the wrong
         # shape fails on itself and teaches nothing.
-        self.assertEqual(back.run(variables={"name": "Ada"}), "ANSWER")
+        self.assertEqual(back.run(variables={"name": "Ada"}).output, "ANSWER")
 
     def test_an_agent_step_survives_it_too(self):
         """The case that was broken until 2.6.1. Kept here as well as in its
@@ -112,7 +112,7 @@ class TestPoolAndAgentDoNotSerialise(unittest.TestCase):
 
     def test_a_pool_runs_but_does_not_save(self):
         pool = Pool(runner=_skill(), items=[{"name": "Ada"}, {"name": "Ann"}])
-        self.assertEqual(pool.run(), ["ANSWER", "ANSWER"])
+        self.assertEqual(pool.run().output, ["ANSWER", "ANSWER"])
         self.assertFalse(hasattr(Pool, "save"),
                          "Pool gained serialisation — give it a lifecycle "
                          "smoke and delete this assertion.")

@@ -67,7 +67,7 @@ class TestChainSuspend(unittest.TestCase):
         # A chain without a suspend step behaves exactly as before.
         c = Chain([(_Amount(), "amt"), (_Reply(), "reply")])
         out = c.run()
-        self.assertEqual(out, "processed")
+        self.assertEqual(out.output, "processed")
 
 
 class TestChainResume(unittest.TestCase):
@@ -76,7 +76,7 @@ class TestChainResume(unittest.TestCase):
         c = _chain()
         res = c.run(variables={"request": "Refund $500"})
         out = c.resume(res.run_id, signal={"approved": True})
-        self.assertEqual(out, "processed")
+        self.assertEqual(out.output, "processed")
 
     def test_done_steps_not_rerun(self):
         # _Amount must run exactly once across run()+resume().
@@ -110,7 +110,7 @@ class TestChainResume(unittest.TestCase):
             res = _chain(store=FileStore(d)).run(variables={"request": "x"})
             self.assertIsInstance(res, SuspendedResult)
             out = _chain(store=FileStore(d)).resume(res.run_id, signal={"approved": True})
-            self.assertEqual(out, "processed")
+            self.assertEqual(out.output, "processed")
 
 
 if __name__ == "__main__":

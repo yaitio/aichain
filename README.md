@@ -117,7 +117,7 @@ chain = Chain(steps=[
     (translate,     "result"),
 ])
 result = chain.run(variables={"url": "https://…", "language": "French"})
-print(chain.history)   # full audit trail
+print(result.output, result["summary"])   # the last step, and any step by key
 ```
 
 ### Pool — parallel execution
@@ -125,6 +125,7 @@ print(chain.history)   # full audit trail
 ```python
 pool    = Pool(summarise_skill, items=[{"text": t} for t in documents], max_flows=10)
 results = pool.run()                    # all documents processed simultaneously
+print(results[0], results.success, results.cost)
 
 print(pool.status)   # {PENDING: 0, RUNNING: 0, DONE: 50, FAILED: 0}
 print(pool.history)  # per-item: status, output, error, duration

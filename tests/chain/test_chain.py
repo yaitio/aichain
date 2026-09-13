@@ -170,7 +170,7 @@ class TestChainRunSingleStep(unittest.TestCase):
         s = _make_skill("s1", "hello world", placeholder="x")
         c = Chain([s])
         result = c.run(variables={"x": "test"})
-        self.assertEqual(result, "hello world")
+        self.assertEqual(result.output, "hello world")
 
     def test_run_calls_skill_post_once(self):
         s = _make_skill("s1", "ok", placeholder="x")
@@ -259,7 +259,7 @@ class TestChainVariableFlow(unittest.TestCase):
     def test_final_return_is_last_step_output(self):
         chain, _ = self._two_step_chain("the summary")
         result = chain.run(variables={"article": "text", "language": "DE"})
-        self.assertEqual(result, "translated text")
+        self.assertEqual(result.output, "translated text")
 
     def test_custom_output_key_flows_to_next_step(self):
         # Step 1 uses output_key="analysis"
@@ -326,7 +326,7 @@ class TestChainThreeSteps(unittest.TestCase):
         s3 = _make_skill("s3", "out3", placeholder="result")
         chain = Chain([s1, s2, s3])
         result = chain.run(variables={"x": "start"})
-        self.assertEqual(result, "out3")
+        self.assertEqual(result.output, "out3")
         self.assertEqual(len(chain.history), 3)
 
     def test_history_order(self):
