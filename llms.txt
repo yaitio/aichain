@@ -1,0 +1,240 @@
+# yait-aichain
+
+> A small Python library for LLM pipelines and tool-using agents that do not
+> depend on one provider. Five primitives — Skill, Chain, Pool, Agent, Tool —
+> over one `Model` that speaks to 11 cloud providers and any OpenAI-compatible
+> server you run. Switching provider is changing the model name.
+
+Install: `pip install yait-aichain`. Keys come from the environment
+(`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, …).
+
+This is the 2.x API. Older tutorials use names that no longer exist —
+`orchestrator=`, `max_steps=`, `max_attempts=`, `executors=`, `memory=`,
+`agent.resume()`. None of them work.
+
+## The rules an agent gets wrong
+
+1. **An agent's limit is `stop_when`, never `max_steps`.**
+   `Agent(model, tools=[...], stop_when=[step_count(10)])`; the default is
+   `[step_count(30)]`. A ceiling ends the run as a failure; `check(fn)` ends it
+   on a fact your code verified; `stalled(k)` / `repeating(k)` nudge the model
+   and let it continue.
+2. **A Skill takes `prompt=` or `input=`, not both.** `prompt="Summarise:
+   {text}"` is one user message. `input={"messages": [...]}` is the full spec,
+   and a message is `{"role": "system" | "user" | "assistant", "parts": [...]}`
+   — **`parts`, never `content`**. `{name}` placeholders are filled from
+   `run(variables={...})`.
+3. **Know what `run()` returns.** `chain.run()` returns the **last step's
+   output** — a string, or the dict that step returned — not a dict of every
+   step; each step's output by its key is in `chain.accumulated`. `pool.run()`
+   returns a list in item order. `agent.run()` returns an `AgentResult`; the
+   answer is `.output`. `chain.resume()` returns what `run()` would.
+4. **Drive the loop yourself only if you answer every call.** After
+   `agent.step()` returns a `ToolCallRequest`, append `reply.as_turn()` and
+   then `tool_result_turn(call.id, result)` for **every** call — failed ones
+   too, with the error as the result — or the next `step()` raises.
+   `agent.run()` does this for you; prefer it.
+5. **A tool is called with `input=` and `options={...}`**, and an option is
+   declared under `parameters["properties"]["options"]["properties"]`. An
+   undeclared option is warned about and not used.
+6. **In a Chain, a Tool step receives the variables named like its
+   `parameters`**; rename with a third element — `(tool, "count", {"input":
+   "text"})`. An Agent step reads its task from the variable **`task`**.
+7. **Only a Chain can pause and resume**, with a `Wait`/`Gate` step and a
+   persistent `store=`. An agent has no suspend; gate a risky tool with
+   `permissions=` and `approve=`.
+8. **One error vocabulary**: `raise`, `stop`, `skip` (warn), `collect`
+   (silent). `Chain(on_step_error=...)` defaults to `raise`, `Pool(on_error=...)`
+   to `collect`.
+
+## Signatures
+
+<!-- g:signatures -->
+```python
+Model(name: str, options: dict | None = None, client_options: dict | None = None,
+      api_key: str | None = None, on_unsupported: str = 'warn')
+Skill(model: Model | list[Model], input: dict | None = None, *,
+      prompt: str | None = None, output: dict | None = None,
+      variables: dict | None = None, options: dict | None = None,
+      name: str | None = None, description: str | None = None, max_retries: int = 0,
+      retry_delay: float = 2.0, hooks: list | None = None,
+      max_cost: float | object | None = None)
+Chain(steps, variables: dict | None = None, name: str | None = None,
+      description: str | None = None, on_step_error: str = 'raise', store = None,
+      hooks: list | None = None, max_cost = None)
+Pool(runner, items: list[dict], max_flows: int = 10, on_error: str = 'collect',
+     name: str | None = None, description: str | None = None, max_cost = None)
+Agent(model, tools: list | None = None, instructions: str = '', mode: str = 'agile',
+      team = None, planner_model = None, stop_when: list | None = None,
+      hooks: list | None = None, permissions = None, approve = None, max_cost = None,
+      name: str | None = None, description: str | None = None, verbose: int = 0)
+```
+<!-- /g:signatures -->
+
+## Imports
+
+```python
+from yait_aichain import Agent, Budget, Chain, Model, Pool, Skill, Tracer
+from yait_aichain.agent import check, stalled, step_count, token_budget
+from yait_aichain.models import ToolCallRequest, tool_result_turn
+from yait_aichain.state import FileStore, RunContext, SuspendedResult
+from yait_aichain.tools import ApprovalDecision, Gate, PermissionPolicy, Tool, Wait
+```
+
+## Model
+
+```python
+Model("claude-sonnet-4-6")                          # provider from the name
+Model("gpt-5.4-mini", options={"temperature": 0.2, "max_tokens": 800})
+Model("private/Qwen/Qwen3-8B")                      # your own vLLM / Ollama server
+```
+
+An option a provider has no control for is declined with a warning and
+recorded on `skill.last_adaptations`; an option name that does not exist raises.
+
+## Skill — one model call
+
+```python
+summarise = Skill(Model("claude-sonnet-4-6"), prompt="Summarise in one line: {text}")
+line = summarise.run(variables={"text": "…"})                   # a string
+
+extract = Skill(Model("gpt-5.4-mini"), prompt="City and date in: {text}",
+                output={"format": {"type": "json_schema", "schema": {
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}, "date": {"type": "string"}},
+                    "required": ["city", "date"]}}})
+data = extract.run(variables={"text": "See you in Lisbon on 3 May."})   # a dict
+
+# Several turns in one Skill: an assistant turn with no parts means "generate here".
+ideas = Skill(Model("claude-sonnet-4-6"), input={"messages": [
+    {"role": "user", "parts": ["Five names for a water bottle."]},
+    {"role": "assistant"},
+    {"role": "user", "parts": ["Pick the best one."]},
+]})
+best = ideas.run()                                               # the last reply
+```
+
+## Tool — a function with a schema
+
+```python
+class FirstWords(Tool):
+    name        = "first_words"
+    description = "Return the first N words of a text."
+    parameters  = {"type": "object",
+                   "properties": {"input":   {"type": "string"},
+                                  "options": {"type": "object",
+                                              "properties": {"n": {"type": "integer"}}}},
+                   "required": ["input"]}
+
+    def run(self, input, options=None):
+        return " ".join(input.split()[: (options or {}).get("n", 3)])
+
+result = FirstWords()(input="a b c d", options={"n": 2})   # ToolResult: .success .output .error
+words  = FirstWords().run(input="a b c d")                 # the bare value; raises on error
+```
+
+Built-in tools (search, conversion, speech, local files, vector stores, REST,
+MCP) are in `docs/tools-reference/index.md`. Mark a risky tool with
+`risk = "financial"` (or `external`, `destructive`, `privileged`).
+
+## Chain — steps in order
+
+```python
+draft  = Skill(Model("gpt-5.4-mini"), prompt="Write a tweet about {topic}.")
+polish = Skill(Model("claude-sonnet-4-6"), prompt="Tighten this tweet: {tweet}")
+
+chain = Chain(steps=[(draft, "tweet"), (polish, "final")])
+final = chain.run(variables={"topic": "solar power"})    # the LAST step's output
+first = chain.accumulated["tweet"]                       # any step's output, by key
+```
+
+A string output is stored under its step's key; a dict output is merged into
+the variables. `chain.history` has one record per step.
+`chain.save("c.yaml")` / `Chain.load("c.yaml")`.
+
+## Pool — one runner, many items, in parallel
+
+```python
+classify = Skill(Model("gpt-5.4-mini"), prompt="Positive or negative? {review}")
+pool = Pool(classify, items=[{"review": r} for r in reviews], max_flows=5)
+labels = pool.run()                  # a list in item order; a failed item is None
+```
+
+The runner can be a Skill, a Chain (each item gets the chain's last output), a
+Tool, or an Agent (items then carry `task`). `pool.status`, `pool.usage`.
+
+## Agent — a loop that calls tools until it is done
+
+```python
+agent = Agent(Model("claude-sonnet-4-6"), tools=[FirstWords()],
+              instructions="Be exact.", stop_when=[step_count(8), stalled(3)])
+result = agent.run("What are the first two words of 'the quick brown fox'?")
+print(result.success, result.output, result.stopped_by, result.cost)
+```
+
+Add `check(fn, name="…")` to `stop_when` when success can be verified in code:
+`fn(state)` returning True ends the run and `result.stopped_by` reads
+`check:<name>`. `result.journal` records what was attempted.
+`agent.stream(task)` yields events for a UI.
+
+### Permissions
+
+```python
+def approve(request):                   # request.tool, .risk, .arguments
+    if request.arguments.get("amount", 0) <= 50:
+        return True
+    return ApprovalDecision(False, "over the limit")
+
+agent = Agent(Model("gpt-5.4-mini"), tools=[refund_tool],
+              permissions=PermissionPolicy({"financial": "approve"}), approve=approve)
+```
+
+Without `approve=`, an `approve` rule refuses the call; the refusal reaches the
+model as a tool result carrying the reason.
+
+### Driving the loop yourself
+
+```python
+agent    = Agent(Model("gpt-5.4-mini"), tools=[FirstWords()])
+state    = agent.new_state()
+messages = agent.opening("First two words of 'a b c'?")
+while True:
+    reply = agent.step(messages, state)
+    if not isinstance(reply, ToolCallRequest):
+        print(reply)                               # the answer
+        break
+    messages.append(reply.as_turn())
+    for call in reply.calls:                       # every call, failed ones too
+        result, error = agent.execute(call, state)
+        messages.append(tool_result_turn(call.id, error or result))
+```
+
+## Pause and resume — Chain only
+
+```python
+chain = Chain(steps=[(draft, "tweet"), (Wait(reason="approve?"), "approval"),
+                     (publish, "posted")], store=FileStore("runs/"))
+result = chain.run(variables={"topic": "solar power"})
+if isinstance(result, SuspendedResult):
+    reason = result.awaiting["reason"]
+    tweet  = result.document["variables"]["tweet"]  # everything computed so far
+    # later, possibly in another process with the same store:
+    posted = chain.resume(result.run_id, signal={"tweet": tweet})
+```
+
+## Money and observability
+
+`max_cost=0.50` on Skill, Chain, Pool or Agent refuses to *begin* a call once
+that much is spent; one `Budget(0.50)` passed to several primitives is shared.
+
+```python
+tracer = Tracer()
+agent  = Agent(Model("gpt-5.4-mini"), tools=[FirstWords()], hooks=[tracer])
+agent.run("First word of 'hello world'?")
+print([event.type for event in tracer.events])  # run.started, tool_call.started, …
+```
+
+## More
+
+Docs `docs/index.md` · models and prices `docs/reference/model-registry.md` ·
+options per provider `docs/reference/parameters.md` · examples `examples/README.md`

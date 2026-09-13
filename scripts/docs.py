@@ -117,6 +117,66 @@ def headline(obj) -> str:
     return re.sub(r":(?:class|func|meth|attr):`~?([^`]+)`", r"`\1`", text)
 
 
+def _annotation(ann) -> str:
+    """`dict | None`, whichever way the source spelled it.
+
+    Most signatures here are strings under `from __future__ import annotations`
+    and render as written. A few modules annotate with `typing.Optional`, and
+    `getattr(ann, "__name__")` rendered those as the bare word `Union` — in a
+    file written for agents to copy from.
+    """
+    import types
+    import typing
+    if isinstance(ann, str):
+        return ann.strip("'\"")
+    if ann is type(None):
+        return "None"
+    # Two union types before 3.14: `typing.Union[...]` and the `X | Y` of
+    # PEP 604, which is `types.UnionType`. 3.14 made them one, so a renderer
+    # that knew only the first passed on 3.14 and printed `UnionType[dict,
+    # None]` on 3.10 — caught by running the generator on the floor version.
+    unions = (typing.Union, getattr(types, "UnionType", typing.Union))
+    if typing.get_origin(ann) in unions:
+        return " | ".join(_annotation(a) for a in typing.get_args(ann))
+    if typing.get_origin(ann) is not None:
+        args = ", ".join(_annotation(a) for a in typing.get_args(ann))
+        return f"{getattr(typing.get_origin(ann), '__name__', str(typing.get_origin(ann)))}[{args}]"
+    return getattr(ann, "__name__", str(ann))
+
+
+def _param_texts(cls) -> list:
+    parts, star = [], False
+    for p in list(inspect.signature(cls.__init__).parameters.values())[1:]:
+        if p.name.startswith("_"):
+            continue
+        if p.kind is p.KEYWORD_ONLY and not star:
+            parts.append("*"); star = True
+        if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
+            parts.append(("*" if p.kind is p.VAR_POSITIONAL else "**") + p.name); continue
+        ann = "" if p.annotation is p.empty else _annotation(p.annotation)
+        text = p.name + (f": {ann}" if ann else "")
+        if p.default is not p.empty:
+            text += f" = {p.default!r}"
+        parts.append(text)
+    return parts
+
+
+def signature_compact(cls, shown: str, width: int = 86) -> str:
+    """One call, wrapped — for a page where every line is budgeted."""
+    lines, current, indent = [], f"{shown}(", " " * (len(shown) + 1)
+    for i, part in enumerate(_param_texts(cls)):
+        piece = part + ("," if i < len(_param_texts(cls)) - 1 else ")")
+        if len(current) + len(piece) + 1 > width and current.strip() not in (f"{shown}(",):
+            lines.append(current.rstrip())
+            current = indent + piece
+        else:
+            current += ("" if current.endswith("(") else " ") + piece
+    if not _param_texts(cls):
+        current += ")"
+    lines.append(current)
+    return "\n".join(lines)
+
+
 def signature(cls, shown: str) -> str:
     parts, star = [], False
     for p in list(inspect.signature(cls.__init__).parameters.values())[1:]:
@@ -126,9 +186,7 @@ def signature(cls, shown: str) -> str:
             parts.append("*"); star = True
         if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
             parts.append(("*" if p.kind is p.VAR_POSITIONAL else "**") + p.name); continue
-        ann = p.annotation
-        ann = "" if ann is p.empty else (ann if isinstance(ann, str) else getattr(ann, "__name__", str(ann)))
-        ann = ann.strip("'\"")
+        ann = "" if p.annotation is p.empty else _annotation(p.annotation)
         text = p.name + (f": {ann}" if ann else "")
         if p.default is not p.empty:
             text += f" = {p.default!r}"
@@ -476,11 +534,19 @@ def b_model_options() -> str:
     return "\n".join(rows)
 
 
+def b_signatures() -> str:
+    """The constructors an agent will call, rendered from the code."""
+    from yait_aichain import Agent, Model, Skill
+    blocks = [signature_compact(cls, cls.__name__) for cls in (Model, Skill, Chain, Pool, Agent)]
+    return "```python\n" + "\n".join(blocks) + "\n```"
+
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
 PAGES = {
     "README.md": {"count-models": b_count_models, "count-providers": b_count_providers,
                   "exports": b_exports},
+    "llms.txt": {"signatures": b_signatures},
     "docs/index.md": {"provider-list": b_provider_list, "modalities": b_modalities},
     "docs/reference/model-registry.md": {"registry-models": b_registry_models,
                                          "registry-constants": b_registry_constants},

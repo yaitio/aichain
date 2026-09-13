@@ -90,6 +90,25 @@ matrix.
 | 5.2 | **`SKILL.md`** for Claude/Codex: how to build a Skill, a Chain, an Agent with tools, from `llms.txt`. | File exists. |
 | 5.3 | **Twenty tasks with auto-checks**, run with a mid-tier model given only `SKILL.md` and `llms.txt`. Measured with `eval/` — `Pass^3`, three prompt-support levels per the measurement rules. | A number. If it is low, goal 2 is not met and the plan says so; if it is high, that is the headline for the README. |
 
+### Stage 5 result, 2026-09-13
+
+`gpt-5.4-mini`, given only `SKILL.md` and `llms.txt`: **`Pass^3` 0.60** on the
+neutral level (0.65 supportive, 0.65 competing), 180 attempts, $0.66.
+Analysis: [`evals/agent_builds/RESULTS.md`](../../evals/agent_builds/RESULTS.md).
+
+**Goal 2 is partly met, and the gap is documentation, not the library.** 41 of
+47 failures were things the page did not say; the rules it stated held — 35 of
+36 attempts on the tasks that exercise them. The
+largest single cause — `chain.run()` returning the last step's output where a
+model expected a dict keyed by step names — is also an API question for the
+owner: the docs now say it, but a return value that trips a careful reader in
+six tasks out of twenty may be the wrong return value. Changing it is breaking.
+
+Not yet measured, and named before anyone runs it: the rewritten `llms.txt`
+on a **held-out** set of twenty tasks, same model, same levels. The threshold is
+stated in advance — if neutral `Pass^3` does not rise above 0.60, the rewrite
+did not help and the result is recorded as such.
+
 ## Stage 6 — the product decision (owner; not engineering)
 
 `products/` has been empty since 17 May. Goal 1 is unmet until one of these
@@ -128,7 +147,7 @@ All true at once, and each is a test or a CI job rather than a claim:
 - [ ] no promoted cookbook lacks a test
 - [x] a coverage number is printed by CI and cannot fall
 - [ ] the live suite has run green on a schedule at least once
-- [ ] an agent given `llms.txt` and `SKILL.md` has a measured `Pass^3` on twenty tasks
+- [x] an agent given `llms.txt` and `SKILL.md` has a measured `Pass^3` on twenty tasks
 - [ ] `products/` is either non-empty or the goal is restated in writing
 
 ## Order and cost

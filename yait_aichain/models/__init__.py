@@ -70,6 +70,10 @@ registry = SimpleNamespace(
 )
 
 from ._schema import portable_schema, check_structure
+# What an external driver of `Agent.step()` needs, public because `step()`'s
+# own error message tells the caller to use `tool_result_turn` — and until
+# 2.19.0 the only import path for it was the private `models._calls`.
+from ._calls import ToolCall, ToolCallRequest, tool_result_turn, dangling_calls
 
 __all__ = [
     "Model",
@@ -77,4 +81,8 @@ __all__ = [
     "portable_schema",
     "check_structure",
     "UNIVERSAL_OPTIONS",
+    "ToolCall",
+    "ToolCallRequest",
+    "tool_result_turn",
+    "dangling_calls",
 ]
