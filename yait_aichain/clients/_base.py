@@ -2,6 +2,7 @@ import os
 import urllib3
 import json
 import base64
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from ._constants import (
     DEFAULT_TIMEOUT,
@@ -30,7 +31,10 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
 
         {"url": "http://host:3128", "username": "u", "password": "p"}
 
-    Basic ``Proxy-Authorization`` is added when username + password are given.
+    Basic ``Proxy-Authorization`` is added when username + password are given,
+    or when the URL carries them — ``http://user:pass@host:3128``, which is how
+    ``HTTPS_PROXY`` usually holds credentials. urllib3 does not read the userinfo
+    of a proxy URL, so without this every such proxy answers 407.
     """
     if proxy is None:
         proxy = _proxy_from_env()
@@ -38,13 +42,24 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
         return urllib3.PoolManager(timeout=timeout, retries=retries)
 
     proxy_headers: dict = {}
+    url      = proxy["url"]
     username = proxy.get("username")
     password = proxy.get("password")
+    parts = urlsplit(url)
+    if parts.username is not None:
+        if not username:
+            username, password = unquote(parts.username), unquote(parts.password or "")
+        host = parts.hostname or ""
+        if ":" in host:                                   # IPv6 literal
+            host = f"[{host}]"
+        if parts.port:
+            host = f"{host}:{parts.port}"
+        url = urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
     if username and password:
         encoded = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
         proxy_headers["Proxy-Authorization"] = f"Basic {encoded}"
     return urllib3.ProxyManager(
-        proxy_url=proxy["url"],
+        proxy_url=url,
         proxy_headers=proxy_headers,
         timeout=timeout,
         retries=retries,

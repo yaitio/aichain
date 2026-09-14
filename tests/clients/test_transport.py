@@ -34,6 +34,24 @@ class TestMakeHttp(unittest.TestCase):
         self.assertIsInstance(http, urllib3.ProxyManager)
         self.assertIn("Proxy-Authorization", http.proxy_headers)
 
+    def test_credentials_in_the_env_url_become_proxy_authorization(self):
+        # The HTTPS_PROXY convention carries credentials in the URL. urllib3
+        # ignores them, and every such proxy answered 407.
+        import base64
+        os.environ["HTTPS_PROXY"] = "http://us%40er:p%3Ass@corp-proxy:3128"
+        http = make_http()
+        self.assertIsInstance(http, urllib3.ProxyManager)
+        expected = "Basic " + base64.b64encode(b"us@er:p:ss").decode()
+        self.assertEqual(http.proxy_headers.get("Proxy-Authorization"), expected)
+        self.assertEqual(http.proxy.auth, None)
+        self.assertEqual((http.proxy.host, http.proxy.port), ("corp-proxy", 3128))
+
+    def test_explicit_credentials_win_over_the_url(self):
+        import base64
+        http = make_http({"url": "http://a:b@p:3128", "username": "u", "password": "p"})
+        self.assertEqual(http.proxy_headers["Proxy-Authorization"],
+                         "Basic " + base64.b64encode(b"u:p").decode())
+
     def test_model_client_uses_factory(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
         from yait_aichain.models import Model
