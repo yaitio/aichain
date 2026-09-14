@@ -96,6 +96,7 @@ import importlib
 import os
 import warnings
 
+from .. import _hints
 from ..models._usage import Usage
 from .._events import Event, emit
 from ._result import ChainResult
@@ -267,6 +268,7 @@ class Chain:
                                       "language": "Spanish"})
     """
 
+    @_hints.refuse("Chain")
     def __init__(
         self,
         steps,
@@ -541,8 +543,10 @@ class Chain:
                     if not task:
                         raise ValueError(
                             f"Agent step {idx} ({name!r}): accumulated variable "
-                            f"{task_key!r} is empty or missing.  Set it in a "
-                            f"prior step or in the initial variables."
+                            f"{task_key!r} is empty or missing — an Agent step reads its "
+                            f"task from {task_key!r}: store the previous step under the key "
+                            f"{task_key!r}, e.g. (question_skill, {task_key!r}), or pass "
+                            f"run(variables={{{task_key!r}: ...}})."
                         )
                     agent_result = runner.run(task=task, variables=accumulated)
 

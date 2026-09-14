@@ -18,6 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import _hints
+
 
 @dataclass
 class ChainResult:
@@ -52,6 +54,9 @@ class ChainResult:
     variables: dict = field(default_factory=dict)
     usage:     Any = None
     run_id:    str = ""
+
+    def __getattr__(self, name):
+        raise _hints.missing(self, name)
 
     @property
     def tokens_used(self) -> int:

@@ -39,6 +39,7 @@ import os
 import re
 from typing import TYPE_CHECKING
 
+from .. import _hints
 from ._data import PROVIDERS
 
 if TYPE_CHECKING:
@@ -331,6 +332,7 @@ class Model:
     # Data-driven initialiser
     # ------------------------------------------------------------------
 
+    @_hints.refuse("Model")
     def __init__(
         self,
         name: str,

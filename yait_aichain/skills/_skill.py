@@ -24,6 +24,7 @@ import os
 import time
 from typing import TYPE_CHECKING
 
+from .. import _hints
 from ..clients._base import APIError
 from ..clients._errors import (
     RateLimitError, ServerError, NetworkError, TaskFailedError,
@@ -165,6 +166,7 @@ class Skill:
         loaded = Skill.load("skills/explainer.yaml")   # model re-created from YAML
     """
 
+    @_hints.refuse("Skill")
     def __init__(
         self,
         model:        "Model | list[Model]",
@@ -261,6 +263,9 @@ class Skill:
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
+
+    def __getattr__(self, name):
+        raise _hints.missing(self, name)
 
     def run(
         self,

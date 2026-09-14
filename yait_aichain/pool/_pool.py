@@ -62,6 +62,7 @@ FAILED  = 3
 # sequence stops running steps. The difference between the two is the
 # difference between a sequence and a fan-out, not between two vocabularies.
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
+from .. import _hints
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ class Pool:
     own Agent instance if isolated memory matters.
     """
 
+    @_hints.refuse("Pool")
     def __init__(
         self,
         runner,

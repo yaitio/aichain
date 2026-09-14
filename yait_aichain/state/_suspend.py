@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .. import _hints
+
 
 class Suspend(Exception):
     """
@@ -60,6 +62,9 @@ class SuspendedResult:
     run_id:   str
     awaiting: dict  = field(default_factory=dict)
     document: dict  = field(default_factory=dict)
+
+    def __getattr__(self, name):
+        raise _hints.missing(self, name)
 
     def __bool__(self) -> bool:
         return False

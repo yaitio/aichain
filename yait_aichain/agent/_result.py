@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import _hints
+
 
 @dataclass
 class AgentResult:
@@ -130,6 +132,9 @@ class AgentResult:
     #: Beacons raised during the run, including by delegated workers — a
     #: blocker, a question, a contract that changed under the task.
     beacons:     list           = field(default_factory=list)
+
+    def __getattr__(self, name):
+        raise _hints.missing(self, name)
 
     @property
     def usage(self):

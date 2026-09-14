@@ -38,6 +38,11 @@ __author__  = "YAIT"
 import logging as _logging
 _logging.getLogger("yait_aichain").addHandler(_logging.NullHandler())
 
+# A module that does not exist names where its contents live
+# (`yait_aichain.hooks` → `from yait_aichain import Tracer`). See _hints.py.
+from ._hints import install_module_hints as _install_module_hints
+_install_module_hints()
+
 # ── Convenience re-exports ─────────────────────────────────────────────────────
 
 from .models import Model                                          # noqa: F401

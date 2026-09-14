@@ -43,6 +43,7 @@ import time
 import uuid
 from typing import Any
 
+from .. import _hints
 from ._swarm import acceptance_from, collecting_beacons
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
                       DONE as _J_DONE, FAILED as _J_FAILED, SKIPPED as _J_SKIPPED
@@ -309,6 +310,7 @@ class Agent:
 
     MODES = ("agile", "waterfall")
 
+    @_hints.refuse("Agent")
     def __init__(
         self,
         model,
@@ -394,6 +396,9 @@ class Agent:
             _install_console_handler(verbose)
 
     # ── Public API ───────────────────────────────────────────────────────
+
+    def __getattr__(self, name):
+        raise _hints.missing(self, name)
 
     def run(self, task: str, variables: "dict | None" = None) -> AgentResult:
         """

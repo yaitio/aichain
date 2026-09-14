@@ -224,6 +224,8 @@ def normalize_input(input_: dict) -> dict:
             ]
         }
     """
+    if not isinstance(input_, dict):
+        validate_input(input_)                  # raises, naming the shape expected
     result = copy.deepcopy(input_)
     for msg in result.get("messages", []):
         if not isinstance(msg, dict):
@@ -320,6 +322,9 @@ def validate_input(input_: dict) -> None:
       field; media parts have a ``source`` dict with a valid ``kind``.
     """
     if not isinstance(input_, dict):
+        if isinstance(input_, list):
+            raise ValueError("input must be a dict with a 'messages' list: "
+                             "input={'messages': [...]}; got a bare list")
         raise ValueError("input must be a dict")
     messages = input_.get("messages")
     if not isinstance(messages, list) or not messages:
@@ -327,6 +332,13 @@ def validate_input(input_: dict) -> None:
     for i, msg in enumerate(messages):
         if not isinstance(msg, dict):
             raise ValueError(f"messages[{i}] must be a dict")
+        # `content` is every other API's word. An assistant turn written that
+        # way used to be read as the "generate here" marker, silently.
+        if "content" in msg and "parts" not in msg:
+            raise ValueError(
+                f"messages[{i}] has 'content'; messages here carry 'parts': "
+                f"{{'role': {msg.get('role', 'user')!r}, 'parts': [<text or part>, ...]}}"
+            )
         if msg.get("role") not in ("system", "user", "assistant", "tool"):
             raise ValueError(
                 f"messages[{i}]['role'] must be 'system', 'user', 'assistant', "

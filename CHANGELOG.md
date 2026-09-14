@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+
+- **An error names the call that works** for the names programs most often
+  reach for, taken from what a model wrote in `evals/agent_builds`: keyword
+  arguments that do not exist on `Model`, `Skill`, `Agent`, `Chain` and `Pool`
+  (`max_steps=`, `orchestrator=`, `memory=`, `temperature=` outside the model,
+  `system=` on a Skill, `on_error=` on a Chain, `concurrency=` on a Pool, …);
+  messages written with `content`; a bare list passed as `input=`;
+  `agent.chat()`, `agent.resume()`, `skill.invoke()`; `SuspendedResult.variables`
+  and `.output`; `result.text` and `result.content`; and imports of modules that
+  do not exist (`yait_aichain.hooks`, `yait_aichain.tracing`, …). The wrong
+  name is still refused.
+- An Agent step whose `task` variable is missing says how to provide it.
+
+### Changed
+
+- A message with `content` and no `parts` raises. An `assistant` turn written
+  that way was read as the "generate here" marker.
+
 ## [3.0.0] — 2026-09-13
 
 **Chain, Pool and Agent return one shape of result.** `.output`, `.success`,
