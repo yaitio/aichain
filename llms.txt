@@ -148,9 +148,11 @@ words  = FirstWords().run(input="a b c d")                 # the bare value; rai
 ```
 
 Calling the tool object catches an exception and returns it as `.error`;
-`.run()` lets it raise. `run()` receives every property of `parameters` as a
-keyword argument — `def run(self, amount, options=None)` — and may return any
-value; a dict stays a dict.
+`.run()` lets it raise. Called directly, the object takes only `input=` and
+`options=`. Inside an Agent or a Chain, `run()` receives every property of
+`parameters` as a keyword argument — `def run(self, amount, options=None)` — so
+call such a tool yourself with `.run(amount=20)`. `run()` may return any value;
+a dict stays a dict.
 
 Built-in tools (search, conversion, speech, local files, vector stores, REST,
 MCP) are in `docs/tools-reference/index.md`. Mark a risky tool with
