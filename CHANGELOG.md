@@ -15,6 +15,15 @@
   do not exist (`yait_aichain.hooks`, `yait_aichain.tracing`, …). The wrong
   name is still refused.
 - An Agent step whose `task` variable is missing says how to provide it.
+- A tool with its own parameters is called by name, `tool(email="a@b.c")`,
+  and returns a `ToolResult` like any other call; a missing required parameter
+  is named. It raised a bare `TypeError`.
+- `llms.txt` adds what the second held-out set found missing: a system message
+  and `variables=` defaults on a `Skill`, the risk classes, what a `ToolCall`
+  and an event carry, `mode="waterfall"` as the only mode that takes
+  `planner_model=`, how a worker is picked and bounded, what `Gate` returns on
+  approval, `result.output` when the last step returns a dict, and
+  `token_budget` as a `stopped_by` value.
 - `llms.txt` shows what twenty held-out tasks found missing: an image part,
   `Skill.stream()` and `last_result`, what `agent.stream()` yields and where the
   answer is, `team=`, `Gate(tool)` and its signal, `"deny"`, a failed Pool

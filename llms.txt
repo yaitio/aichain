@@ -102,6 +102,14 @@ recorded on `skill.last_adaptations`; an option name that does not exist raises.
 summarise = Skill(Model("claude-sonnet-4-6"), prompt="Summarise in one line: {text}")
 line = summarise.run(variables={"text": "…"})                   # a string
 
+# A system message is a standing instruction; variables= on the Skill are defaults.
+brief = Skill(Model("gpt-5.4-mini"), input={"messages": [
+    {"role": "system", "parts": ["Reply only in French."]},
+    {"role": "user", "parts": ["What is the capital of {country}?"]},
+]}, variables={"country": "Canada"})
+brief.run()                                     # asks about Canada, the default
+brief.run(variables={"country": "Peru"})        # asks about Peru, for this call only
+
 extract = Skill(Model("gpt-5.4-mini"), prompt="City and date in: {text}",
                 output={"format": {"type": "json_schema", "schema": {
                     "type": "object",
@@ -148,15 +156,15 @@ words  = FirstWords().run(input="a b c d")                 # the bare value; rai
 ```
 
 Calling the tool object catches an exception and returns it as `.error`;
-`.run()` lets it raise. Called directly, the object takes only `input=` and
-`options=`. Inside an Agent or a Chain, `run()` receives every property of
-`parameters` as a keyword argument — `def run(self, amount, options=None)` — so
-call such a tool yourself with `.run(amount=20)`. `run()` may return any value;
-a dict stays a dict.
+`.run()` lets it raise. `run()` receives every property of `parameters` as a keyword argument —
+`def run(self, amount, options=None)` — and the object is called the same way,
+`Refund()(amount=20)`, still returning a `ToolResult`. `run()` may return any
+value; a dict stays a dict.
 
 Built-in tools (search, conversion, speech, local files, vector stores, REST,
-MCP) are in `docs/tools-reference/index.md`. Mark a risky tool with
-`risk = "financial"` (or `external`, `destructive`, `privileged`).
+MCP) are in `docs/tools-reference/index.md`. A tool's `risk` is
+one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
+`privileged`. A tool may keep state on its instance and define its own `__init__`.
 
 ## Chain — steps in order
 
@@ -170,7 +178,8 @@ final  = result.output                                    # the last step's outp
 first  = result["tweet"]                                  # any step's output, by key
 ```
 
-A dict output is merged into the variables and is not stored under its key;
+A dict output is merged into the variables and is not stored under its key
+(as the last step, it is `result.output`);
 any other output — a string, a number — is stored under the key. A rename maps
 **the tool's parameter on the left to the chain variable on the right**:
 `(CharCount(), "chars", {"text": "draft"})`. `result.history` has one record
@@ -207,7 +216,8 @@ print(result.success, result.output, result.stopped_by, result.cost)
 Add `check(fn, name="…")` to `stop_when` when success can be verified in code:
 `fn(state)` returning True ends the run and `result.stopped_by` reads
 `check:<name>`. Otherwise `stopped_by` is `answered` (the model gave its final
-answer), the name of the ceiling that ended it (`step_count`), or `llm_error`.
+answer), the name of the ceiling that ended it (`step_count`, `token_budget`),
+or `llm_error`.
 `result.journal` records what was attempted. Each `run()` is a new
 conversation: to follow up, put the earlier answer in the next task.
 
@@ -217,6 +227,14 @@ for event in agent.stream("What are the first two words of 'a b c'?"):
 print(agent.last_result.output)        # the AgentResult, once the stream is exhausted
 ```
 
+An event has `type`, `name` (the tool or model), `payload` — for `tool_call.*`
+the call's `id` and `arguments`, and on `ended` its result — plus `run_id`,
+`step`, `usage`, `cost` and `error`.
+
+`mode="agile"` (the default) decides every step as it goes; `mode="waterfall"`
+writes a plan first and follows it, and only a waterfall agent takes
+`planner_model=Model(…)` to write that plan with a different model.
+
 ### Delegation
 
 ```python
@@ -224,6 +242,9 @@ chemist = Agent(Model("gpt-5.4-mini"), name="chemist", description="Answers chem
 lead    = Agent(Model("claude-sonnet-4-6"), team=[chemist])   # the lead gets a `delegate` tool
 answer  = lead.run("The history and the chemistry of coffee.").output
 ```
+
+The lead picks a worker by its `name`; each worker keeps its own `stop_when`
+(default `[step_count(30)]`).
 
 ### Permissions
 
@@ -258,6 +279,9 @@ while True:
         messages.append(tool_result_turn(call.id, error or result))
 ```
 
+A `ToolCall` has `id`, `name` and `arguments`. The result you append can come
+from anywhere — a person, another system — not only from `agent.execute()`.
+
 ## Pause and resume — Chain only
 
 ```python
@@ -282,6 +306,8 @@ paused = chain.run(variables={"news": "new office hours"})
 final  = chain.resume(paused.run_id, signal={"approved": False})
 final.output                            # {"approved": False, "skipped": True}; publish never ran
 ```
+
+Approved (`{"approved": True}`), the step's output is the tool's own output.
 
 ## Money and observability
 

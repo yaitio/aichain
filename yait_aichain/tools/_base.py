@@ -218,7 +218,7 @@ class Tool:
             f"{type(self).__name__} must implement run()"
         )
 
-    def __call__(self, input=None, options=None) -> ToolResult:
+    def __call__(self, input=None, options=None, **kwargs) -> ToolResult:
         """
         Validate inputs, run the tool, and return a :class:`ToolResult`.
 
@@ -226,12 +226,21 @@ class Tool:
         (including ``ValueError`` from validation) is caught and returned
         as ``ToolResult(success=False, error=...)``.
 
+        A tool with its own parameters — ``def run(self, email, options=None)``
+        — is called by name, ``tool(email="a@b.c")``, the way an Agent or a
+        Chain calls ``run(**kwargs)``. Until this, only ``input=`` and
+        ``options=`` were accepted, so such a tool could not be called safely
+        at all: ``tool(email=...)`` raised a bare ``TypeError``. `MCPTool`
+        already forwarded keywords the same way.
+
         Parameters
         ----------
         input : Any
             Primary input for the tool.
         options : dict | None
             Optional configuration dict.
+        **kwargs
+            The tool's own parameters, by name.
 
         Returns
         -------
@@ -240,8 +249,19 @@ class Tool:
             ``success=False`` + error message on failure.
         """
         try:
-            self._validate(input, options)
-            output = self.run(input, options)
+            if kwargs:
+                if input is not None:
+                    kwargs["input"] = input
+                if options is not None:
+                    kwargs["options"] = options
+                missing = [k for k in self.parameters.get("required", []) if k not in kwargs]
+                if missing:
+                    raise ValueError(f"Tool '{self.name}' missing required parameter(s): "
+                                     + ", ".join(repr(k) for k in missing))
+                output = self.run(**kwargs)
+            else:
+                self._validate(input, options)
+                output = self.run(input, options)
             return ToolResult(success=True, output=output)
         except Exception as exc:
             return ToolResult(success=False, output=None, error=str(exc))
