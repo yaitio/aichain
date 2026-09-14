@@ -5,7 +5,7 @@ description: Build AI features in Python — an LLM call, a multi-step pipeline,
 
 # Building with yait-aichain
 
-Read `llms.txt` in this repository before writing code. It holds the real
+Read `llms.txt` next to this file before writing code. It holds the real
 constructor signatures, one working example per primitive, and the rules that
 agents most often get wrong. The library changed its agent API in 2.0; code
 from older tutorials (`orchestrator=`, `max_steps=`, `agent.resume()`) does not

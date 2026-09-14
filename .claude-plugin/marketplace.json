@@ -1,0 +1,14 @@
+{
+  "name": "yait",
+  "owner": {
+    "name": "YAIT"
+  },
+  "plugins": [
+    {
+      "name": "yait-aichain",
+      "source": "./plugin",
+      "description": "Build AI features in Python with yait-aichain \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
+      "version": "3.0.0"
+    }
+  ]
+}

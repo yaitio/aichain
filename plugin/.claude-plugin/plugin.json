@@ -1,0 +1,17 @@
+{
+  "name": "yait-aichain",
+  "version": "3.0.0",
+  "description": "Build AI features in Python with yait-aichain \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
+  "author": {
+    "name": "YAIT"
+  },
+  "homepage": "https://github.com/yaitio/aichain",
+  "repository": "https://github.com/yaitio/aichain",
+  "license": "MIT",
+  "keywords": [
+    "llm",
+    "agents",
+    "python",
+    "yait-aichain"
+  ]
+}
