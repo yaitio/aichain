@@ -67,6 +67,34 @@ class TestKeywords(unittest.TestCase):
         self.assertNotIn("—", str(ctx.exception))
 
 
+class TestClientOptions(unittest.TestCase):
+    """Found by a Claude agent on the held-out set: `client_options={"base_url": ...}`
+    was accepted and dropped, so every request went to the default address."""
+
+    def test_base_url_is_refused_with_url_named(self):
+        with self.assertRaisesRegex(ValueError, r"'base_url' — use 'url'"):
+            Model("private/Qwen/Qwen3-8B", client_options={"base_url": "http://gpu.internal:8000/v1"})
+
+    def test_an_api_key_there_points_at_api_key(self):
+        with self.assertRaisesRegex(ValueError, r"Model\(name, api_key=\.\.\.\)"):
+            Model("gpt-5.4-mini", api_key="k", client_options={"api_key": "k"})
+
+    def test_an_unknown_key_lists_what_the_client_reads(self):
+        with self.assertRaisesRegex(ValueError, r"reads url, timeout, retries, proxy"):
+            Model("gpt-5.4-mini", api_key="k", client_options={"frobnicate": 1})
+
+    def test_the_keys_clients_read_still_work(self):
+        model = Model("private/Qwen/Qwen3-8B", client_options={"url": "http://gpu.internal:8000"})
+        self.assertEqual(model.client._base_url, "http://gpu.internal:8000")
+        Model("gpt-5.4-mini", api_key="k", client_options={"timeout": 30, "retries": 1,
+                                                          "proxy": {"url": "http://p:3128"}})
+
+    def test_region_is_qwens_alone(self):
+        Model("qwen-max", api_key="k", client_options={"region": "us"})
+        with self.assertRaisesRegex(ValueError, r"'region'"):
+            Model("gpt-5.4-mini", api_key="k", client_options={"region": "us"})
+
+
 class TestMessages(unittest.TestCase):
 
     def test_content_is_refused_with_parts_named(self):

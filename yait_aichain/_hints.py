@@ -182,6 +182,36 @@ MODULES: dict = {
 }
 
 
+#: What a model client reads from ``Model(client_options=...)``. Every family
+#: passes ``url`` to the transport and ``timeout``, ``retries`` and ``proxy``
+#: through; anything else used to be accepted and dropped in silence — a
+#: ``base_url`` sent every request to the provider's default address.
+CLIENT_OPTIONS = ("url", "timeout", "retries", "proxy")
+FAMILY_CLIENT_OPTIONS = {"qwen": ("region",)}
+CLIENT_OPTION_HINTS = {
+    "base_url": "url", "api_base": "url", "endpoint": "url", "host": "url",
+    "base": "url", "server": "url", "address": "url",
+    "max_retries": "retries", "request_timeout": "timeout",
+    "proxies": "proxy", "http_proxy": "proxy", "https_proxy": "proxy",
+}
+
+
+def check_client_options(family: str, options: dict) -> None:
+    """Raise when ``client_options`` holds a key the client would not read."""
+    allowed = CLIENT_OPTIONS + FAMILY_CLIENT_OPTIONS.get(family, ())
+    for key in options:
+        if key in allowed:
+            continue
+        if key == "api_key":
+            hint = " — the key is Model(name, api_key=...), not a client option"
+        elif key in CLIENT_OPTION_HINTS:
+            hint = f" — use {CLIENT_OPTION_HINTS[key]!r}"
+        else:
+            hint = ""
+        raise ValueError(f"client_options has an unknown key {key!r}{hint}; "
+                         f"this client reads {', '.join(allowed)}")
+
+
 def refuse(owner: str):
     """Guard *owner*'s ``__init__``: a keyword from ``KEYWORDS[owner]`` raises the
     ``TypeError`` Python would, with the right call named. The signature seen by

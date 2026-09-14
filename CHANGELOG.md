@@ -15,9 +15,19 @@
   do not exist (`yait_aichain.hooks`, `yait_aichain.tracing`, …). The wrong
   name is still refused.
 - An Agent step whose `task` variable is missing says how to provide it.
+- `llms.txt` shows what twenty held-out tasks found missing: an image part,
+  `Skill.stream()` and `last_result`, what `agent.stream()` yields and where the
+  answer is, `team=`, `Gate(tool)` and its signal, `"deny"`, a failed Pool
+  item, the direction of a Chain rename, what a Tool step's output becomes,
+  where a resume signal goes, the values of `stopped_by`, what `max_cost` does
+  when it is reached, and how to point a `private/` model at a server.
 
 ### Changed
 
+- `Model(client_options=...)` raises on a key its client does not read, naming
+  the ones it does (`url`, `timeout`, `retries`, `proxy`, and `region` for
+  Qwen). `base_url` was accepted and dropped, so requests went to the default
+  address.
 - A message with `content` and no `parts` raises. An `assistant` turn written
   that way was read as the "generate here" marker.
 

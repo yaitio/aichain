@@ -83,6 +83,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
         "bfl":        BFLClient,
         "reve":       ReveClient,
     }[ctype]
+    _hints.check_client_options(ctype, client_options)
     return family(api_key, data=data, **client_options)
 
 
