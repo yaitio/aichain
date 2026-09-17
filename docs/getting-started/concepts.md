@@ -160,9 +160,12 @@ so the model chooses content, not control flow.
 | `agile` (default) | Decides one action at a time from what the last one returned. |
 | `waterfall` | Writes a plan at step 0 and holds to it; `planner_model` can be a stronger model for that one turn. |
 
-An agent has no suspend: its state is the conversation, a message list. A tool
-that needs a person is gated with `approve=`. Agents run standalone or as a
-step inside a Chain (`kind="agent"`).
+Nothing suspends an agent from outside it: its state is the conversation, a
+message list. It parks only where a tool the model called asks the world for an
+answer — a `Wait` or a `Gate`, with `store=` — and `agent.resume(run_id,
+signal=...)` carries on. A person deciding within one invocation is cheaper
+through `approve=`. Agents run standalone or as a step inside a Chain
+(`kind="agent"`).
 
 ---
 

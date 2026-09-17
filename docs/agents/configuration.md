@@ -191,7 +191,9 @@ available as an iterator through `agent.stream(task)`.
 
 There is no `memory=` parameter, and the agent has no memory subsystem. Its
 state **is** the conversation: a message list, serialisable by construction,
-which is also why `2.0.0` removed suspend/resume from the agent. `AgentMemory`
+which is also why `2.0.0` removed the agent's *snapshot* mechanism — a run
+parks only where a tool the model called asked for an answer, and then it is
+the conversation that is stored. `AgentMemory`
 survives as a standalone store you can use from your own tools; nothing in the
 loop reads or writes it.
 

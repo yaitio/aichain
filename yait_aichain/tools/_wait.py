@@ -44,6 +44,8 @@ class Wait(Tool):
     On resume the ``signal`` passed to ``resume()`` becomes this step's output.
     """
 
+    suspends = True
+
     def __init__(self, reason: str = "", resume_with: "dict | None" = None,
                  *, name: str = "wait", hint: "dict | None" = None) -> None:
         self.name        = name
@@ -83,6 +85,8 @@ class Gate(Tool):
     hint : dict | None
         Optional external-scheduler hint.
     """
+
+    suspends = True
 
     def __init__(self, tool: Tool, *, reason: str = "",
                  resume_with: "dict | None" = None,

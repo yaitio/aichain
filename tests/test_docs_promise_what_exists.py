@@ -96,15 +96,25 @@ class TestEveryDocumentedParameterExists(unittest.TestCase):
 class TestTheRemovedAgentStateApiStaysRemoved(unittest.TestCase):
     """Named individually because each was a worked example a reader would
     have copied, and because the reason they are gone is a design decision
-    worth not re-losing: the agent's state is the conversation."""
+    worth not re-losing: the agent's state is the conversation.
+
+    **Reopened 2026-09-18, deliberately and in part.** `agent.resume(run_id,
+    signal=...)` and `Agent(store=...)` are real again — but they are not the
+    2.0 API coming back. That one was a snapshot mechanism: an agent could be
+    frozen from outside at any moment. This one has no snapshot in it. A run
+    parks only where a tool the model called asked the world for an answer,
+    what travels is the conversation the agent already had, and the store
+    holds it only while an answer is owed. `context` stays gone, `save` stays
+    gone, and nothing stops a run from outside it.
+    """
 
     # These are strings searched for *in documentation*, not module paths.
-    # The 2026-09-12 import migration rewrote the middle one to
+    # The 2026-09-12 import migration rewrote this one to
     # "yait_aichain.agent.context" — a search that matches nothing, so the
     # test went on passing while checking for a string no page would ever
     # contain. A mechanical rewrite is exactly as blind as `getattr` with a
     # default.
-    GONE = ("agent.resume(", "agent.context", "Agent(store=")
+    GONE = ("agent.context",)
 
     def test_no_fenced_example_uses_it(self):
         offenders = []
@@ -120,10 +130,26 @@ class TestTheRemovedAgentStateApiStaysRemoved(unittest.TestCase):
                          "\n".join(sorted(set(offenders))))
 
     def test_and_the_agent_really_does_not_have_it(self):
-        """The other direction: if suspend/resume ever comes back to the
-        agent, this test is the place the decision gets reopened out loud."""
-        self.assertFalse(hasattr(Agent, "resume"))
+        """The other direction: what is still absent, and what the one
+        readmitted piece costs to use."""
         self.assertFalse(hasattr(Agent, "context"))
+        self.assertFalse(hasattr(Agent, "save"))
+        self.assertFalse(hasattr(Agent, "suspend"))
+
+    def test_the_readmitted_piece_is_not_the_old_one(self):
+        """A pause needs a tool that asks for one and a place to keep the run;
+        neither is something the caller can do to a run from outside."""
+        import os
+        os.environ.setdefault("OPENAI_API_KEY", "test-key")
+        from yait_aichain.models import Model
+        from yait_aichain.tools import Wait
+
+        self.assertTrue(hasattr(Agent, "resume"))
+        # No suspend tool: nothing to park with, and no store demanded.
+        self.assertIsNone(Agent(Model("gpt-4o", api_key="k")).store)
+        # A tool that can park requires somewhere to keep the parked run.
+        with self.assertRaises(ValueError):
+            Agent(Model("gpt-4o", api_key="k"), tools=[Wait(reason="?")])
 
 
 if __name__ == "__main__":

@@ -9,8 +9,8 @@ Install: `pip install yait-aichain`. Keys come from the environment
 (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, …).
 
 This is the 2.x API. Older tutorials use names that no longer exist —
-`orchestrator=`, `max_steps=`, `max_attempts=`, `executors=`, `memory=`,
-`agent.resume()`. None of them work.
+`orchestrator=`, `max_steps=`, `max_attempts=`, `executors=`, `memory=`.
+None of them work.
 
 ## The rules an agent gets wrong
 
@@ -40,9 +40,11 @@ This is the 2.x API. Older tutorials use names that no longer exist —
 6. **In a Chain, a Tool step receives the variables named like its
    `parameters`**; rename with a third element — `(tool, "count", {"input":
    "text"})`. An Agent step reads its task from the variable **`task`**.
-7. **Only a Chain can pause and resume**, with a `Wait`/`Gate` step and a
-   persistent `store=`. An agent has no suspend; gate a risky tool with
-   `permissions=` and `approve=`.
+7. **A run pauses only where a `Wait`/`Gate` asks it to**, and it needs a
+   `store=`. In a Chain that is a step; for an agent it is a tool the model
+   may call — `Agent(tools=[Gate(publish)], store=FileStore("runs/"))` — and
+   an agent given one of those tools **without** a store is refused at
+   construction. Nothing pauses a run from outside it.
 8. **One error vocabulary**: `raise`, `stop`, `skip` (warn), `collect`
    (silent). `Chain(on_step_error=...)` defaults to `raise`, `Pool(on_error=...)`
    to `collect`.
@@ -66,8 +68,9 @@ Pool(runner, items: list[dict], max_flows: int = 10, on_error: str = 'collect',
      name: str | None = None, description: str | None = None, max_cost = None)
 Agent(model, tools: list | None = None, instructions: str = '', mode: str = 'agile',
       team = None, planner_model = None, stop_when: list | None = None,
-      hooks: list | None = None, permissions = None, approve = None, max_cost = None,
-      name: str | None = None, description: str | None = None, verbose: int = 0)
+      hooks: list | None = None, permissions = None, approve = None, store = None,
+      max_cost = None, name: str | None = None, description: str | None = None,
+      verbose: int = 0)
 ```
 <!-- /g:signatures -->
 
@@ -282,7 +285,7 @@ while True:
 A `ToolCall` has `id`, `name` and `arguments`. The result you append can come
 from anywhere — a person, another system — not only from `agent.execute()`.
 
-## Pause and resume — Chain only
+## Pause and resume
 
 ```python
 chain = Chain(steps=[(draft, "tweet"), (Wait(reason="approve?"), "approval"),
@@ -308,6 +311,28 @@ final.output                            # {"approved": False, "skipped": True}; 
 ```
 
 Approved (`{"approved": True}`), the step's output is the tool's own output.
+
+An **agent** pauses the same way, except that the model decides when: give it
+a `Wait` or a `Gate` as an ordinary tool, plus a store.
+
+```python
+agent  = Agent(model, tools=[Gate(refund, reason="Approve this refund?")],
+               store=FileStore("runs/"))
+result = agent.run("refund order 4417 if the policy allows it")
+if isinstance(result, SuspendedResult):
+    result.run_id, result.awaiting            # {"reason": ..., "resume_with": ...}
+    # later, another process, same store:
+    done = agent.resume(result.run_id, signal={"approved": True})  # an AgentResult
+```
+
+The signal completes the tool that asked for the pause — a `Gate` runs the
+guarded tool when approved and skips it otherwise — and its result goes back to
+the model as that call's tool result, so the run continues where it stopped.
+`resume()` returns an `AgentResult`, or another `SuspendedResult` under the
+**same** `run_id` if the model pauses again. A `run_id` the store no longer
+holds raises `KeyError`, so a trigger that delivers twice cannot run the tail
+twice. There is still no `agent.save()` and no way to stop a run from outside
+it: what is written down is the conversation, and only while an answer is owed.
 
 ## Money and observability
 

@@ -103,7 +103,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 **[Agent](agents/overview.md)** — one loop: each turn the model calls tools or answers, and `stop_when` decides when the run ends. Runs inside a Chain or standalone.
 
-**[State](primitives/state.md)** — park a Chain until an external signal (human, webhook, cron) and resume it later, even in another process. An agent's state is its conversation, so it needs no suspend.
+**[State](primitives/state.md)** — park a run until an external signal (human, webhook, cron) and resume it later, even in another process: a `Wait`/`Gate` step in a Chain, or the same tool in an agent's hands, with a `store=`.
 
 **[Eval](primitives/eval.md)** — run the same cases through several models, prompts or modes, several times each, and get accuracy, reliability and cost side by side. Reports on other benchmarks' data too.
 

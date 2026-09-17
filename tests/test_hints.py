@@ -122,8 +122,11 @@ class TestAttributes(unittest.TestCase):
         agent = Agent(_model())
         with self.assertRaisesRegex(AttributeError, r"'chat'.*agent\.run\(task\)"):
             agent.chat("hi")
-        with self.assertRaisesRegex(AttributeError, r"'resume'.*Chain pauses"):
-            agent.resume()
+        # `resume` is real since 2026-09-18 — an agent parks when a tool the
+        # model called asks the world for an answer. `suspend` is still not,
+        # because nothing stops a run from outside it.
+        with self.assertRaisesRegex(AttributeError, r"'suspend'.*Wait or Gate"):
+            agent.suspend()
         self.assertFalse(hasattr(agent, "chat"))
         self.assertTrue(hasattr(agent, "run"))
 

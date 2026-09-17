@@ -120,9 +120,12 @@ class TestPoolAndAgentDoNotSerialise(unittest.TestCase):
     def test_an_agent_saves_only_as_a_chain_step(self):
         """Its state is the conversation — a message list the caller can park
         and hand back — so there is nothing for the library to store. The
-        configuration still travels, inside a Chain."""
+        configuration still travels, inside a Chain.
+
+        `resume` exists since 2026-09-18 and does not change that: what is
+        written down when a run parks is the conversation, not the agent, and
+        it is deleted the moment the run ends. There is still no `save`."""
         self.assertFalse(hasattr(Agent, "save"))
-        self.assertFalse(hasattr(Agent, "resume"))
 
 
 if __name__ == "__main__":

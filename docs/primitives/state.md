@@ -129,7 +129,8 @@ in-memory), so the engine has a single uniform path.
 ```python
 from yait_aichain.state import InMemoryStore, FileStore
 
-Chain(steps=[...], store=FileStore("runs/"))     # Chain only
+Chain(steps=[...], store=FileStore("runs/"))         # a Wait/Gate step
+Agent(model, tools=[Gate(publish)], store=FileStore("runs/"))   # a tool the model may call
 ```
 
 ### `SuspendedResult`
@@ -230,14 +231,20 @@ def approval_webhook(run_id, approved):
 The trigger needs only the `run_id`, the shared store, and the signal — no
 reference to the original object.
 
-> **Corrected in 2.6.0.** This pattern was written with an `Agent` on both
-> sides. `2.0.0` removed the agent's suspend/resume — its state **is** the
-> conversation, a message list the caller can park and hand back — so
-> `Agent(store=...)`, `Agent.resume()` and `agent.context` do not exist, and a
-> `Gate` tool inside an agent does not pause it: the `Suspend` it raises is
-> caught like any other tool failure and reported to the model as an error.
-> For a human deciding before a tool runs, the agent's mechanism is
-> `approve=` — see [Permissions](../agents/observability.md#permission-matrix).
+> **An agent parks the same way — since 2026-09-18.** `Agent(store=...)` and
+> `agent.resume(run_id, signal=...)` exist, and a `Wait` or `Gate` in the tool
+> list is a tool the **model** may call when it decides the world has to
+> answer. Before that date the `Suspend` such a tool raises was caught like
+> any other tool failure and reported to the model as an error, so the run
+> never parked. What `2.0.0` removed is still removed: there is no snapshot
+> mechanism, no `agent.save()` and no `agent.context`, and nothing stops a run
+> from outside it — the agent's state **is** the conversation, and that is
+> precisely what the store keeps while an answer is owed.
+>
+> For a human deciding **inside** an invocation that can afford to wait, the
+> cheaper mechanism is still `approve=` — see
+> [Permissions](../agents/observability.md#permission-matrix). Park when the
+> waiting cannot be held: a Lambda cannot sit in front of a person.
 
 ---
 

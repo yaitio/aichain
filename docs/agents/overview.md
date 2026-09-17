@@ -232,18 +232,37 @@ for rec in result.history:
 
 ### Suspend & resume
 
-**This is a `Chain` capability, not an agent one.** A chain can pause for an
-external signal and continue later, in another process, through `Wait`/`Gate`
-and a persistent store — see [State](../primitives/state.md).
+**A run parks only where a tool asked it to.** In a `Chain` that tool is a
+`Wait`/`Gate` step the author placed; in an agent it is the same tool in the
+model's own hands, offered like any other:
 
-The agent deliberately has none of that. `2.0.0` removed its suspend/resume
-because its state **is** the conversation: a message list, serialisable by
-construction, which a caller can put away and hand back to a new `Agent`
-without the library owning a store. There is no `Agent(store=...)` and no
-`Agent.resume()`.
+```python
+agent = Agent(Model("gpt-4o"), tools=[Gate(IssueRefund(), reason="Approve this refund?")],
+              store=FileStore("runs/"))
+parked = agent.run("refund order 4417 if the policy allows it")
+parked.run_id, parked.awaiting          # {"reason": ..., "resume_with": {"approved": "bool"}}
+done = agent.resume(parked.run_id, signal={"approved": True})   # an AgentResult
+```
 
-What that leaves for a human in the loop is `approve=`, which decides
-**before** the tool runs rather than by pausing after the model asked:
+`Agent(store=...)` is **required** when a tool can park — an agent given one
+without a store is refused at construction, because a pause nobody can resume
+is otherwise discovered after the model has asked for it. The signal completes
+the tool that asked: an approved `Gate` runs the guarded tool, a refused one
+skips it, and either result goes back to the model as that call's tool result.
+Parking again keeps the same `run_id`; a `run_id` the store no longer holds
+raises `KeyError`, so an at-least-once trigger cannot run the tail twice.
+
+What `2.0.0` removed is still removed, and the distinction is the whole of it:
+there is **no snapshot mechanism**. Nothing stops a run from outside it, there
+is no `agent.save()` and no `agent.context`. The agent's state **is** the
+conversation — a message list, serialisable by construction — and that is
+exactly what the store holds while an answer is owed, and deletes when the run
+ends.
+
+For a human in the loop inside one invocation, `approve=` remains cheaper: it
+decides **before** the tool runs, without parking anything. Park when the
+waiting cannot be held — a serverless invocation cannot sit in front of a
+person:
 
 ```python
 agent = Agent(Model("gpt-4o"), tools=[IssueRefund()],

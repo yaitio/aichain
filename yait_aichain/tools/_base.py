@@ -185,6 +185,14 @@ class Tool:
     # no policy attached this attribute is inert.
     risk:        str  = "write"
 
+    # Declares that this tool can park the run by raising ``state.Suspend``
+    # (``Wait``, ``Gate``). An engine reads it *before* the run: a `Chain`
+    # always has a store, an `Agent` must be given one, and a `Pool` cannot
+    # park a fan-out at all. Declared rather than discovered, because the
+    # alternative is finding out at the moment the pause is needed and the
+    # place to keep it does not exist.
+    suspends:    bool = False
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------

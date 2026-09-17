@@ -4,13 +4,25 @@
 
 ### Added
 
+- **An agent can park its own run.** A `Wait` or a `Gate` in an agent's tool
+  list is a tool the model may call, and calling it ends the invocation:
+  `run()` returns a `SuspendedResult` with the run id and what is awaited, the
+  conversation goes to the store, and `agent.resume(run_id, signal={...})`
+  completes that tool with the signal — a `Gate` runs the guarded tool when
+  approved — feeds its result back as the call's tool result and continues.
+  Resuming a run that is no longer in the store raises `KeyError`, so a trigger
+  delivering twice does not run the tail twice; a run that parks again keeps
+  its run id. `Agent(store=...)` is new and is **required** when a tool can
+  park: without it the agent is refused at construction.
+- `Tool.suspends` declares that a tool can park a run. `Wait` and `Gate` set it;
+  it is what the refusal above reads.
 - **An error names the call that works** for the names programs most often
   reach for, taken from what a model wrote in `evals/agent_builds`: keyword
   arguments that do not exist on `Model`, `Skill`, `Agent`, `Chain` and `Pool`
   (`max_steps=`, `orchestrator=`, `memory=`, `temperature=` outside the model,
   `system=` on a Skill, `on_error=` on a Chain, `concurrency=` on a Pool, …);
   messages written with `content`; a bare list passed as `input=`;
-  `agent.chat()`, `agent.resume()`, `skill.invoke()`; `SuspendedResult.variables`
+  `agent.chat()`, `agent.suspend()`, `skill.invoke()`; `SuspendedResult.variables`
   and `.output`; `result.text` and `result.content`; and imports of modules that
   do not exist (`yait_aichain.hooks`, `yait_aichain.tracing`, …). The wrong
   name is still refused.
@@ -35,6 +47,16 @@
   item, the direction of a Chain rename, what a Tool step's output becomes,
   where a resume signal goes, the values of `stopped_by`, what `max_cost` does
   when it is reached, and how to point a `private/` model at a server.
+
+### Fixed
+
+- **A tool's request to pause is no longer flattened into an error.** Inside an
+  Agent, `Suspend` was caught with every other exception and reached the model
+  as the tool result `"Suspend: ..."`: the run did not park, the store was
+  never written, and nothing outside the loop learned that an answer was owed.
+- A `Pool` item that asks to pause fails with the two shapes that do work — the
+  `Gate` around the Pool, or an `Agent` with a store parking its own run — 
+  instead of a bare `Suspend: ...` beside the other items' results.
 
 ### Changed
 

@@ -53,6 +53,7 @@ from .._events import Event, emit
 from ..models._calls import (ToolCallRequest, dangling_calls,
                              tool_result_turn)
 from ..pool    import Pool
+from ..state   import Suspend, SuspendedResult
 from ..tools._base import Tool
 
 _logger = logging.getLogger("yait_aichain.agent")
@@ -323,6 +324,7 @@ class Agent:
         hooks:        "list | None" = None,
         permissions                 = None,
         approve                     = None,
+        store                       = None,
         max_cost                    = None,
         name:         "str | None"  = None,
         description:  "str | None"  = None,
@@ -375,6 +377,24 @@ class Agent:
         # ask a human; it can only make sure one is asked when a policy said
         # to. Absent, an `approve` decision refuses — see `_permit`.
         self.approve      = approve
+        # Where a parked run is kept. A tool that declares `suspends` can end
+        # a turn with "the world must answer this before I go on", and the
+        # conversation — which is the whole of an agent's state — has to
+        # survive until it does. Demanded at construction rather than at the
+        # pause, because a pause nobody can resume is otherwise discovered at
+        # the worst possible moment: after the model asked.
+        self.store        = store
+        if (parked := [t.name or type(t).__name__ for t in self.tools
+                       if getattr(t, "suspends", False)]) and store is None:
+            raise ValueError(
+                f"tool(s) {parked} can park this run and there is nowhere to "
+                "keep it. Pass store=InMemoryStore() to resume inside this "
+                "process, or store=FileStore(path) — or your own StateStore — "
+                "to resume from another one. A serverless invocation cannot "
+                "hold the wait, so the run has to outlive it.")
+        #: The document id while a parked run is carried, so a second pause
+        #: overwrites the first instead of leaking a second run id.
+        self._doc_id: "str | None" = None
         # A ceiling in money for everything this agent spends, shared with the
         # Skills it builds and with any worker it delegates to. `cost_budget`
         # in `stop_when` stops the loop between turns; this stops a call from
@@ -414,15 +434,10 @@ class Agent:
         self._run_id = uuid.uuid4().hex
         self._emit("run.started", payload={"task": task, "mode": self.mode})
 
+        self._doc_id = None
         with collecting_beacons() as board:
             result = self._loop(messages, state, journal)
-        result.journal = journal.to_list()
-        result.beacons = board.all()
-        result.acceptance = acceptance_from(result.journal)
-        self._emit("run.finished", payload={"success": result.success,
-                                            "stopped_by": result.stopped_by},
-                   usage=result.tokens_used, error=result.error)
-        return result
+        return self._finished(result, journal, board)
 
     def stream(self, task: str, variables: "dict | None" = None):
         """
@@ -475,13 +490,7 @@ class Agent:
                     result = done.value
                     break
 
-            result.journal = journal.to_list()
-            result.beacons = board.all()
-            result.acceptance = acceptance_from(result.journal)
-            self._emit("run.finished",
-                       payload={"success": result.success,
-                                "stopped_by": result.stopped_by},
-                       usage=result.tokens_used, error=result.error)
+            result = self._finished(result, journal, board)
             while sink:
                 yield sink.pop(0)
             self.last_result = result
@@ -492,6 +501,80 @@ class Agent:
                 self.hooks.remove(collect)
             except ValueError:                       # already gone; fine
                 pass
+
+    def resume(self, run_id: str, signal=None) -> "AgentResult | SuspendedResult":
+        """
+        Continue a run this agent parked, delivering *signal* as the answer.
+
+        The pause and this call are the same seam the externally driven path
+        already has: a parked run is a history whose last tool call has no
+        result, and *signal* is that result. Nothing is restored that was not
+        written down — the conversation **is** the state, which is why 2.0
+        removed the agent's snapshot mechanism and why none is needed here.
+
+        Idempotent in the way a trigger needs: a ``run_id`` the store no
+        longer holds raises ``KeyError``, so an at-least-once delivery can
+        read that as "already handled" instead of running the tail twice.
+
+        Returns an :class:`AgentResult` when the run finishes, or another
+        :class:`~..state.SuspendedResult` when it parks again — under the same
+        ``run_id``, so a caller tracks one identifier for the whole
+        conversation however many times it waits.
+        """
+        from ..state import RunDocument
+
+        if self.store is None:
+            raise ValueError(f"agent {self.name or ''!r} has no store, so it "
+                             "never parked a run. Pass Agent(store=...).")
+        raw = self.store.load(run_id)
+        if raw is None:
+            raise KeyError(
+                f"no suspended run {run_id!r} in the store — it has already "
+                "been resumed to completion, or it was never parked here.")
+
+        doc      = RunDocument.from_dict(raw)
+        parked   = doc.steps[0].get("suspend") or {}
+        messages = list(doc.variables.get("messages") or [])
+        journal  = Journal.from_list(doc.variables.get("journal"))
+        state    = self.new_state()
+        state.update(doc.variables.get("state") or {})
+
+        self._run_id = doc.variables.get("run_id") or uuid.uuid4().hex
+        self._doc_id = run_id
+        call_id      = parked.get("call_id") or ""
+        self._emit("run.resumed", name=parked.get("tool"),
+                   step=state.get("steps"),
+                   payload={"run_id": run_id, "tool": parked.get("tool"),
+                            "signal": signal, "agent": self.name or ""})
+
+        # The parked tool is *completed*, not bypassed: it is re-invoked with
+        # the signal, exactly as a Chain re-invokes its suspended step. For a
+        # `Wait` that returns the signal; for a `Gate` it is where the guarded
+        # action finally runs, or does not. Answering the call from here
+        # instead would make every gate a rubber stamp.
+        result, error = self._complete(parked, signal)
+        messages.append(tool_result_turn(call_id,
+                                         prompts.result_message(result, error)))
+        journal.append(
+            "",
+            action      = _safe({"name": parked.get("tool"),
+                                 "arguments": parked.get("arguments") or {}}),
+            outcome     = _J_FAILED if error else _J_DONE,
+            evidence    = _evidence(CHECK, error or
+                                    "resumed with an external signal"),
+            reason      = error or "",
+            observation = prompts.observation_text(result, error),
+            step        = state.get("steps"),
+        )
+        self._emit("tool_call.ended", name=parked.get("tool"),
+                   step=state.get("steps"),
+                   payload={"id": call_id, "result": result,
+                            "agent": self.name or ""},
+                   error=error)
+
+        with collecting_beacons() as board:
+            result = self._loop(messages, state, journal)
+        return self._finished(result, journal, board)
 
     # ── Externally driven: one turn at a time ────────────────────────────
     #
@@ -649,8 +732,14 @@ class Agent:
                     denial = self._resolve_permission(state)
                     yield from drain()
 
-                result, error = ((None, denial) if denial
-                                 else self._execute(call, state))
+                try:
+                    result, error = ((None, denial) if denial
+                                     else self._execute(call, state))
+                except Suspend as susp:
+                    parked = self._park(susp, call, reply, messages,
+                                        state, journal)
+                    yield from drain()
+                    return parked
                 self._emit("tool_call.ended", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "", "result": result,
@@ -815,6 +904,13 @@ class Agent:
             if call.name == "write_plan":
                 return self._do_plan(call.arguments, state), None
             return self._do_tool(call, state), None
+        except Suspend:
+            # Not a failure, and the one exception this must not flatten: the
+            # tool is saying the world has to answer before the run goes on.
+            # Caught here until 2026-09-18, it reached the model as the string
+            # "Suspend: ..." in a tool result — the request for a pause became
+            # a puzzling error and the run carried on as if nothing was owed.
+            raise
         except Exception as exc:
             return None, f"{type(exc).__name__}: {exc}"
 
@@ -1025,6 +1121,107 @@ class Agent:
             plan=[{"goal": g} for g in (state["plan"] or [])],
             adaptations=list(state.get("adaptations") or []),
         )
+
+    def _finished(self, result, journal, board):
+        """Attach the run's records and announce the end — unless it parked.
+
+        A :class:`~..state.SuspendedResult` is not an end: ``run.suspended``
+        went out when the run parked, the document is in the store, and none
+        of the closing records apply to a run that is still owed an answer.
+        """
+        if isinstance(result, SuspendedResult):
+            return result
+        result.journal = journal.to_list()
+        result.beacons = board.all()
+        result.acceptance = acceptance_from(result.journal)
+        self._emit("run.finished", payload={"success": result.success,
+                                            "stopped_by": result.stopped_by},
+                   usage=result.tokens_used, error=result.error)
+        if self._doc_id is not None:
+            # The parked run reached its end; the store holds suspended runs
+            # only, and a document left behind is a run a trigger can wake a
+            # second time.
+            self.store.delete(self._doc_id)
+            self._doc_id = None
+        return result
+
+    def _park(self, susp, call, reply, messages, state, journal):
+        """Write the parked run to the store and return a SuspendedResult.
+
+        Two things are settled here rather than left to the resume. The other
+        calls of the same turn — a provider may ask for several — are answered
+        as not executed, because a history with calls nobody answered is the
+        one shape every provider handles differently. And the parked call is
+        deliberately left **unanswered**: that gap is what the run is waiting
+        for, and `resume()` fills exactly it.
+        """
+        from ..state import RunDocument, StepStatus
+
+        for other in reply.calls[reply.calls.index(call) + 1:]:
+            messages.append(tool_result_turn(
+                other.id or other.name,
+                prompts.result_message(None, f"not executed: the run paused at "
+                                             f"{call.name!r} before this call")))
+
+        awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with)}
+        doc = RunDocument.new(
+            "agent", [self.name or "agent"],
+            variables={"messages": messages,
+                       "state":    self._portable_state(state),
+                       "journal":  journal.to_list(),
+                       "run_id":   self._run_id},
+        )
+        if self._doc_id is not None:
+            doc.run_id = self._doc_id            # parked again: one identifier
+        doc.steps[0]["status"]  = StepStatus.SUSPENDED
+        doc.steps[0]["suspend"] = {**awaiting, "hint": susp.hint,
+                                   "call_id": call.id or call.name,
+                                   "tool": call.name,
+                                   "arguments": dict(call.arguments or {})}
+        self.store.save(doc.run_id, doc.to_dict())
+        self._doc_id = doc.run_id
+
+        self._emit("run.suspended", name=call.name, step=state.get("steps"),
+                   payload={"run_id": doc.run_id, "tool": call.name,
+                            "hint": susp.hint, "agent": self.name or "",
+                            **awaiting})
+        self._log(1, f"\n[Paused] … {susp.reason or call.name} · {doc.run_id}")
+        return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
+                               document=doc.to_dict())
+
+    def _complete(self, parked: dict, signal):
+        """Run the parked tool with the signal. Returns ``(result, error)``.
+
+        A tool that parks and a tool that resumes are the same object called
+        twice — `_signal=None` the first time, the world's answer the second.
+        A second `Suspend` from here would be a tool that cannot be completed
+        by the signal it asked for, so it is reported rather than parked
+        again: the run would otherwise wait for the same answer forever.
+        """
+        tool = self._tool_map.get(parked.get("tool"))
+        if tool is None:
+            return None, (f"no tool named {parked.get('tool')!r} on this agent "
+                          "any more; the run was parked by a different "
+                          "configuration")
+        try:
+            return tool.run(_signal=signal, **(parked.get("arguments") or {})), None
+        except Suspend as susp:
+            return None, (f"tool {parked.get('tool')!r} asked to pause again on "
+                          f"resume ({susp.reason or 'no reason given'}); a "
+                          "signal must complete the tool that asked for it")
+        except Exception as exc:
+            return None, f"{type(exc).__name__}: {exc}"
+
+    @staticmethod
+    def _portable_state(state: dict) -> dict:
+        """The counters that survive a pause, and only those.
+
+        The journal travels beside this, in its own serialised form. What is
+        dropped is dropped on purpose: `nudged` is a latch for one process's
+        loop, and `adaptations` are per-request notices about what went on the
+        wire — neither describes the conversation, which is what resumes.
+        """
+        return {k: state.get(k) for k in ("steps", "tokens", "cost", "plan")}
 
     def _note_unfinished(self, journal, state, why: str) -> None:
         """A ceiling reached with a plan outstanding is a plan not finished."""

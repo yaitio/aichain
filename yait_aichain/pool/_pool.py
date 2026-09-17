@@ -63,6 +63,7 @@ FAILED  = 3
 # difference between a sequence and a fan-out, not between two vocabularies.
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 from .. import _hints
+from ..state import Suspend
 
 
 # ---------------------------------------------------------------------------
@@ -428,7 +429,21 @@ class Pool:
 
         start = time.monotonic()
         try:
-            output, usage = self._dispatch(merged)
+            try:
+                output, usage = self._dispatch(merged)
+            except Suspend as susp:
+                # A fan-out has no single run to park: the other items are in
+                # flight and there is no identifier the world could resume.
+                # Said here, with the shapes that do work, rather than arriving
+                # as a bare "Suspend: approve?" beside nine results.
+                reason = susp.reason or "no reason given"
+                raise RuntimeError(
+                    f"a Pool item asked to pause ({reason}) and a fan-out "
+                    "cannot park. Put the Gate around the Pool — one Chain "
+                    "step that pauses, then the fan-out — or give the item's "
+                    "Agent a store, so it parks its own run and returns a "
+                    "SuspendedResult as this item's output."
+                ) from susp
             duration = round(time.monotonic() - start, 3)
 
             with self._lock:

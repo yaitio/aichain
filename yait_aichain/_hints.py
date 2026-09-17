@@ -132,9 +132,10 @@ _SO_FAR = "what the run computed so far is result.document['variables']"
 ATTRIBUTES: dict = {
     "Agent": {
         "chat": _RUN_AGENT, "invoke": _RUN_AGENT, "ask": _RUN_AGENT, "query": _RUN_AGENT,
-        "resume": ("an agent does not pause (removed in 2.0); a Chain pauses and resumes, "
-                   "with a Wait or Gate step and store=FileStore('dir')"),
-        "suspend": "an agent does not pause; a Chain does, with a Wait or Gate step",
+        "suspend": ("nothing suspends a run from outside it; a run parks when a tool "
+                    "the model called asks the world for an answer — give the agent a "
+                    "Wait or Gate tool and store=FileStore('dir'), then resume it with "
+                    "agent.resume(run_id, signal={...})"),
         "arun": "there is no async API; run agents in parallel with Pool(agent, items=[{'task': ...}])",
         "ainvoke": "there is no async API; run agents in parallel with Pool(agent, items=[{'task': ...}])",
     },
