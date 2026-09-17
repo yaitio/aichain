@@ -502,6 +502,50 @@ class Agent:
             except ValueError:                       # already gone; fine
                 pass
 
+    def arm(self, reason: str = "", resume_with: "dict | None" = None, *,
+            hint: "dict | None" = None,
+            variables: "dict | None" = None) -> "SuspendedResult":
+        """
+        Create the run **without starting it**, and return it parked.
+
+        The run exists before it has a task: a ``run_id``, a document in the
+        store, and a declared shape for the signal that will start it. That is
+        a subscription — what a trigger waits on, and what a person is shown a
+        form for — and it is the same object a pause mid-run produces, so
+        "an email arrived", "the human pressed start" and "the gate was
+        approved" all arrive as ``resume(run_id, signal)``.
+
+        Nothing is scheduled here. ``hint`` is recorded for whatever does the
+        waking: ``{"on": "email.received"}``, ``{"wake_at": "..."}``.
+
+        The signal carries the task: a string is the task, a dict gives it
+        under ``"task"`` and every other key seeds the conversation the way
+        ``run(task, variables=...)`` does.
+        """
+        from ..state import RunDocument, StepStatus
+
+        if self.store is None:
+            raise ValueError(
+                "arming needs somewhere to keep the run: pass "
+                "Agent(store=FileStore('runs/')) — or InMemoryStore() when the "
+                "signal arrives in this same process.")
+
+        doc = RunDocument.new(
+            "agent", [self.name or "agent"],
+            variables={"messages": [], "journal": [],
+                       "state": self._portable_state(self.new_state()),
+                       "variables": dict(variables or {})},
+        )
+        awaiting = {"reason": reason, "resume_with": dict(resume_with or {}),
+                    "hint": hint, "at": "start"}
+        doc.steps[0]["status"]  = StepStatus.SUSPENDED
+        doc.steps[0]["suspend"] = awaiting
+        self.store.save(doc.run_id, doc.to_dict())
+        self._emit("run.armed", payload={"run_id": doc.run_id,
+                                         "agent": self.name or "", **awaiting})
+        return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
+                               document=doc.to_dict())
+
     def resume(self, run_id: str, signal=None) -> "AgentResult | SuspendedResult":
         """
         Continue a run this agent parked, delivering *signal* as the answer.
@@ -534,6 +578,23 @@ class Agent:
 
         doc      = RunDocument.from_dict(raw)
         parked   = doc.steps[0].get("suspend") or {}
+
+        if parked.get("at") == "start":
+            # Armed, never run: there is no tool to complete and no history to
+            # continue. The signal is the task, and this is an ordinary run
+            # that happens to have been waiting for its input.
+            task, seeded = self._task_from_signal(signal, parked, doc)
+            self._run_id = uuid.uuid4().hex
+            self._doc_id = run_id
+            self._emit("run.started", payload={"task": task, "mode": self.mode,
+                                               "run_id": run_id})
+            journal  = Journal()
+            state    = self.new_state()
+            messages = self.opening(task, seeded, ground_rules=True)
+            with collecting_beacons() as board:
+                result = self._loop(messages, state, journal)
+            return self._finished(result, journal, board)
+
         messages = list(doc.variables.get("messages") or [])
         journal  = Journal.from_list(doc.variables.get("journal"))
         state    = self.new_state()
@@ -1188,6 +1249,22 @@ class Agent:
         self._log(1, f"\n[Paused] … {susp.reason or call.name} · {doc.run_id}")
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
+
+    @staticmethod
+    def _task_from_signal(signal, parked: dict, doc):
+        """What an armed run was waiting for: its task, and its variables."""
+        seeded = dict(doc.variables.get("variables") or {})
+        if isinstance(signal, str) and signal.strip():
+            return signal, seeded
+        if isinstance(signal, dict) and str(signal.get("task") or "").strip():
+            seeded.update({k: v for k, v in signal.items() if k != "task"})
+            return str(signal["task"]), seeded
+        raise ValueError(
+            "an armed run is started by its task: pass resume(run_id, "
+            "signal=\"...\") or signal={\"task\": \"...\", ...}, where the "
+            "other keys seed the conversation. This run was armed asking for "
+            f"{parked.get('resume_with') or '{}'}"
+            + (f" — {parked['reason']}" if parked.get("reason") else "") + ".")
 
     def _complete(self, parked: dict, signal):
         """Run the parked tool with the signal. Returns ``(result, error)``.

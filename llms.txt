@@ -325,6 +325,21 @@ if isinstance(result, SuspendedResult):
     done = agent.resume(result.run_id, signal={"approved": True})  # an AgentResult
 ```
 
+A run can also be parked **before it starts** — `arm()` — which is how a
+subscription is expressed: a run that exists, waits, and has taken no step.
+
+```python
+armed = chain.arm(reason="waiting for an order", resume_with={"topic": "str"},
+                  hint={"on": "order.created"})     # or agent.arm(...)
+armed.run_id                                        # store it; that is the subscription
+chain.resume(armed.run_id, signal={"topic": "solar power"})   # the signal seeds the variables
+agent.resume(armed.run_id, signal={"task": "refund order 4417"})  # for an agent it is the task
+```
+
+`hint` is recorded and never acted on — the library schedules nothing; a cron,
+a webhook or a person brings the signal. An agent's signal may also be a bare
+string, and any other key seeds the conversation like `variables=`.
+
 The signal completes the tool that asked for the pause — a `Gate` runs the
 guarded tool when approved and skips it otherwise — and its result goes back to
 the model as that call's tool result, so the run continues where it stopped.

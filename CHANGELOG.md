@@ -14,6 +14,14 @@
   delivering twice does not run the tail twice; a run that parks again keeps
   its run id. `Agent(store=...)` is new and is **required** when a tool can
   park: without it the agent is refused at construction.
+- **`Chain.arm()` and `Agent.arm()` — a run that exists and has taken no
+  step.** It returns the same `SuspendedResult` a pause does, with a `run_id`,
+  a document in the store, `reason`, `resume_with` and the scheduler `hint`,
+  so a subscription, a human form and a gate are one shape: whatever brings
+  the signal, it arrives as `resume(run_id, signal)`. For a chain the signal
+  seeds the variables; for an agent it is the task, as a string or under
+  `"task"`, with the other keys seeding the conversation. `hint` is recorded
+  and never acted on — the library parks runs and schedules nothing.
 - `Tool.suspends` declares that a tool can park a run. `Wait` and `Gate` set it;
   it is what the refusal above reads.
 - **An error names the call that works** for the names programs most often

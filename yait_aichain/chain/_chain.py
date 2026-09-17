@@ -395,6 +395,46 @@ class Chain:
                                   usage_in=None, on_error=_on_error,
                                   context=context)
 
+    def arm(self, reason: str = "", resume_with: "dict | None" = None, *,
+            hint: "dict | None" = None, variables: "dict | None" = None,
+            context=None) -> "SuspendedResult":
+        """
+        Create the run **without starting it**, and return it parked.
+
+        The run exists before it runs: it has a ``run_id``, a durable document
+        in the store, the variables it was seeded with, and a declared shape
+        for the signal that will start it. That is a subscription — the thing
+        a trigger waits on and a person is shown a form for — expressed as the
+        same object every other pause produces, so a webhook, a cron tick and
+        a human clicking *start* all end in ``resume(run_id, signal)``.
+
+        The engine still schedules nothing. ``hint`` is recorded for whatever
+        does: ``{"on": "order.created"}``, ``{"wake_at": "2026-06-15T09:00"}``.
+
+        On resume the signal **seeds the variables** rather than being handed
+        to a step, because nothing has run yet and there is no suspended tool
+        to complete.
+        """
+        from ..state import RunDocument, StepStatus, SuspendedResult
+
+        if not self._steps:
+            raise ValueError("a chain with no steps has nothing to arm")
+
+        accumulated = {**self.variables, **(variables or {})}
+        step_names  = [getattr(r, "name", None) or f"step_{i}"
+                       for i, (r, *_rest) in enumerate(self._steps)]
+        doc = RunDocument.new("chain", step_names, variables=accumulated)
+        doc.context = context.to_dict() if context is not None else None
+
+        awaiting = {"reason": reason, "resume_with": dict(resume_with or {}),
+                    "hint": hint, "at": "start"}
+        doc.steps[0]["status"]  = StepStatus.SUSPENDED
+        doc.steps[0]["suspend"] = awaiting
+        self._store.save(doc.run_id, doc.to_dict())
+        self._emit("run.armed", step=0, payload={"run_id": doc.run_id, **awaiting})
+        return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
+                               document=doc.to_dict())
+
     def resume(
         self,
         run_id:        str,
@@ -440,6 +480,17 @@ class Chain:
             return None   # not actually suspended → idempotent no-op
 
         accumulated = dict(doc.variables)
+        if ((doc.suspended_step() or {}).get("suspend") or {}).get("at") == "start":
+            # Armed rather than paused inside a step: nothing has run, so there
+            # is no suspended tool to complete. The signal is the run's input.
+            if signal is not None and not isinstance(signal, dict):
+                raise TypeError(
+                    f"an armed chain starts from variables, so the signal must "
+                    f"be a dict; got {type(signal).__name__}. The shape it was "
+                    f"armed with is "
+                    f"{((doc.suspended_step() or {}).get('suspend') or {}).get('resume_with')}.")
+            accumulated.update(signal or {})
+            signal = None
         u = doc.usage or {}
         usage_in = Usage(
             input_tokens  = u.get("input_tokens", 0),
@@ -504,7 +555,7 @@ class Chain:
         suspended step). On ``resume``, *signal* is delivered to the step at
         *start_idx* (the suspended tool) via ``_signal=``.
         """
-        from ..state import StepStatus, Suspend
+        from ..state import StepStatus, Suspend, SuspendedResult
 
         # Expose the per-request context for the duration of the run and persist
         # it in the document so it survives suspend/resume.
@@ -532,12 +583,15 @@ class Chain:
                         output = runner.run(**kwargs)
 
                 elif kind == "agent":
-                    # An agent does not suspend — its state is the
-                    # conversation, since 2.0 — so an agent step always
-                    # starts a run. Until 2.19.1 this branch also "resumed a
-                    # child run" through `runner.resume`, a method the agent
-                    # has not had since 2.0: unreachable, and mutation testing
-                    # showed no test could tell it from deleting it.
+                    # An agent step always starts a run. An agent can park
+                    # its own run since 2026-09-18, but the chain does not
+                    # carry that pause: two levels of resume would need the
+                    # child's run id threaded through this document, and the
+                    # pause belongs in the chain as a step when the chain is
+                    # what waits. Until 2.19.1 this branch also "resumed a
+                    # child run" through `runner.resume`, which at the time
+                    # did not exist: unreachable, and mutation testing showed
+                    # no test could tell it from deleting it.
                     task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
                     task     = accumulated.get(task_key, "")
                     if not task:
@@ -550,6 +604,15 @@ class Chain:
                         )
                     agent_result = runner.run(task=task, variables=accumulated)
 
+                    if isinstance(agent_result, SuspendedResult):
+                        raise RuntimeError(
+                            f"Agent step {idx} ({name!r}) parked its own run "
+                            f"({agent_result.awaiting.get('reason') or 'no reason given'}) "
+                            f"and a chain cannot carry a child's pause. Put the "
+                            f"Wait/Gate in this chain as its own step, or drive "
+                            f"that agent outside the chain and resume it with "
+                            f"agent.resume({agent_result.run_id!r}, signal=...)."
+                        )
                     if not agent_result:
                         raise RuntimeError(
                             f"Agent step {idx} ({name!r}) failed: "

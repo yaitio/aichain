@@ -231,6 +231,32 @@ def approval_webhook(run_id, approved):
 The trigger needs only the `run_id`, the shared store, and the signal — no
 reference to the original object.
 
+### A run that has not started — `arm()`
+
+A subscription is a parked run that has taken no step. `arm()` creates one:
+
+```python
+armed = chain.arm(reason="waiting for an order", resume_with={"topic": "str"},
+                  hint={"on": "order.created"})
+armed.run_id                       # store this; it *is* the subscription
+armed.awaiting                     # what a person is shown a form for
+
+# whatever wakes it — a webhook, a cron tick, a human pressing start:
+chain.resume(armed.run_id, signal={"topic": "solar power"})
+```
+
+The signal seeds the variables, because nothing has run and there is no
+suspended tool to hand it to. `Agent.arm()` is the same, except that the signal
+is the **task** — a bare string, or `{"task": ..., ...}` whose other keys seed
+the conversation as `variables=` does.
+
+`hint` is recorded and never acted upon: the library parks runs and does not
+schedule them. What this buys is one shape for two things that are usually
+built separately — the trigger and the human form are both
+`resume(run_id, signal)` against a `SuspendedResult`, whether the run is
+waiting to start, waiting at a gate, or waiting for an answer the model asked
+for.
+
 > **An agent parks the same way — since 2026-09-18.** `Agent(store=...)` and
 > `agent.resume(run_id, signal=...)` exist, and a `Wait` or `Gate` in the tool
 > list is a tool the **model** may call when it decides the world has to
