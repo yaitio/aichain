@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-10-01
+
+**A run can wait for the world, and an agent can be the one who asks.** A
+`Wait` or a `Gate` in an agent's tool list is a tool the model may call; the
+invocation ends, the conversation goes to the store, and the signal that
+answers it resumes the run. `arm()` is the same thing before the first step —
+a run that exists and waits, which is what a subscription is. Plus the errors
+the eval sets asked for, a Claude Code plugin, and two capabilities the library
+claimed and did not have: a tool called by name, and tools on Qwen.
+
 ### Added
 
 - **An agent can park its own run.** A `Wait` or a `Gate` in an agent's tool
