@@ -8,7 +8,9 @@ Two shapes live in one family and they are not interchangeable:
   Responses API      flat tools; calls as output items of type "function_call";
                      results as input items of type "function_call_output"
 
-gpt-5.x routes through the second, everything else through the first. A tool
+gpt-5.x routes through the second, everything else through the first — which
+includes every OpenAI-compatible provider in the family, DashScope among them
+(its compatible mode is the same shape under a different path). A tool
 conversation serialized in the wrong shape is a provider 400 at best and a
 model that silently never calls anything at worst — which is why these are
 golden tests and not smoke tests.
@@ -222,6 +224,76 @@ class TestGates(unittest.TestCase):
                            "parts": [{"type": "text", "text": "a cat"}]}],
                          {"modalities": ["image"], "format": {"type": "image"}},
                          tools=[SEARCH])
+
+
+class TestQwenWire(unittest.TestCase):
+    """DashScope's compatible mode is the chat-completions shape — and the
+    client that overrode `build_request` dropped the `tools` parameter, so it
+    claimed the capability through inheritance and raised `TypeError` when
+    anyone used it. Found 2026-10-01 in the tool evals, where the model had to
+    be routed through OpenRouter instead of DashScope.
+    """
+
+    def test_tools_ride_the_compatible_mode_body(self):
+        m = Model("qwen3-max", api_key="k")
+        path, body = m.to_request(CONVO, OUT, tools=[SEARCH])
+        self.assertIn("compatible-mode", path)
+        self.assertEqual(body["tools"], [SEARCH])
+
+    def test_the_conversation_serialises_like_chat_completions(self):
+        m = Model("qwen3-max", api_key="k")
+        _, body = m.to_request(CONVO, OUT, tools=[SEARCH])
+        call_turn, result_turn = body["messages"][2], body["messages"][3]
+        self.assertEqual(call_turn["tool_calls"][0]["function"]["name"], "search")
+        self.assertEqual(json.loads(call_turn["tool_calls"][0]["function"]["arguments"]),
+                         {"q": "it"})
+        self.assertEqual(result_turn["role"], "tool")
+        self.assertEqual(result_turn["tool_call_id"], "c1")
+
+    def test_a_reply_with_tool_calls_parses_to_typed_calls(self):
+        m = Model("qwen3-max", api_key="k")
+        reply = m.from_response({
+            "choices": [{"message": {
+                "content": None,
+                "tool_calls": [{"id": "q1", "type": "function",
+                                "function": {"name": "search",
+                                             "arguments": '{"q": "tea"}'}}],
+            }}],
+        }, OUT)
+        self.assertIsInstance(reply, ToolCallRequest)
+        self.assertEqual(reply.calls[0],
+                         ToolCall(id="q1", name="search", arguments={"q": "tea"}))
+
+    def test_a_stream_keeps_the_tools(self):
+        # The seam that used to raise TypeError: `build_stream_request`
+        # forwarded `tools` into an override that had no such parameter.
+        m = Model("qwen3-max", api_key="k")
+        path, body = m.client.build_stream_request(
+            CONVO, OUT, m._params(), tools=[SEARCH])
+        self.assertIn("compatible-mode", path)
+        self.assertEqual(body["tools"], [SEARCH])
+        self.assertTrue(body["stream"])
+
+    def test_an_image_model_still_refuses_tools(self):
+        image = [{"role": "user", "parts": [{"type": "text", "text": "a cat"}]}]
+        out   = {"modalities": ["image"], "format": {"type": "image"}}
+        for name in ("wan2.2-t2i-flash", "qwen-image-edit"):
+            with self.subTest(model=name):
+                with self.assertRaises(ValueError) as ctx:
+                    Model(name, api_key="k").to_request(image, out, tools=[SEARCH])
+                self.assertIn("image model", str(ctx.exception))
+
+    def test_an_image_only_family_refuses_at_the_gate(self):
+        # Recraft inherits from the OpenAI client and therefore inherited a
+        # claim to tools it cannot honour. The refusal belongs at the gate,
+        # with the family named, not inside the builder.
+        m = Model("recraftv3", api_key="k")
+        self.assertFalse(m.client.supports_tools)
+        with self.assertRaises(ValueError) as ctx:
+            m.to_request([{"role": "user", "parts": [{"type": "text", "text": "a cat"}]}],
+                         {"modalities": ["image"], "format": {"type": "image"}},
+                         tools=[SEARCH])
+        self.assertIn("does not support native tool calling", str(ctx.exception))
 
 
 class TestTurnHelpers(unittest.TestCase):

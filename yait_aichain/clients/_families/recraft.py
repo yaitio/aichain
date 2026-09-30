@@ -198,12 +198,25 @@ class RecraftClient(OpenAIClient):
     #: class hierarchy instead of through the data.
     supports_streaming = False
 
+    #: And it takes no tools, for the same reason and by the same accident:
+    #: `OpenAIClient.supports_tools` is `True`, so this image-only client
+    #: claimed native tool calling until 2026-10-01 and then failed inside
+    #: `build_request` rather than at the gate in `Model.to_request`.
+    supports_tools = False
+
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:
         super().__init__(api_key, data=data, **client_opts)
         self._vectorize_path = data["provider"].get(
             "images_vectorize_path", "/v1/images/vectorize")
 
-    def build_request(self, messages, output, params) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+        # The parameter exists to keep the signature substitutable for the
+        # parent's; `supports_tools = False` means the gate above refuses
+        # first, so reaching here with tools would be a library defect.
+        if tools:
+            raise ValueError(
+                f"model {params['name']!r} renders images — it cannot take "
+                "tool declarations")
         name = params["name"]
         if name == "recraft-vectorize":
             return _build_recraft_vectorize_request(messages, output, self._vectorize_path)

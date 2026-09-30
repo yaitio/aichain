@@ -165,15 +165,13 @@ class OpenAIClient(BaseClient):
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         if fmt == "image":
             raise NotImplementedError("an image is not delivered progressively")
-        # `tools=` is passed only when there are tools: two subclasses of
-        # this class override `build_request` without that parameter at all,
-        # so forwarding it unconditionally raised TypeError — not the
-        # NotImplementedError the fallback catches — and every Qwen stream
-        # crashed instead of degrading. Those two render images and declare
-        # no streaming, so they never reach here with tools.
-        path, body = (self.build_request(messages, output, params, tools=tools)
-                      if tools else
-                      self.build_request(messages, output, params))
+        # Forwarded unconditionally since 2026-10-01. Before that the two
+        # subclasses that override `build_request` — Qwen and Recraft — did so
+        # without the parameter, and passing it raised TypeError instead of
+        # the NotImplementedError the fallback catches, so a Qwen stream with
+        # tools crashed rather than degraded. The workaround lived here; the
+        # cause was one class down, and that is where it was fixed.
+        path, body = self.build_request(messages, output, params, tools=tools)
         # `include_usage` is what makes the provider send a final event with
         # the token counts in it. Without it a streamed call reports no usage
         # at all, and a run that cannot price itself is the one thing this

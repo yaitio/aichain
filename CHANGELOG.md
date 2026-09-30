@@ -58,6 +58,20 @@
 
 ### Fixed
 
+- **Qwen takes tools.** DashScope's compatible mode speaks the chat-completions
+  tool format, and the format was already implemented one class up — but
+  `QwenClient.build_request` overrode it **without** the `tools` parameter,
+  while `supports_tools` inherited `True` from the OpenAI family. So the
+  library claimed native tool calling for Qwen and answered an `Agent` with
+  tools with `TypeError: build_request() got an unexpected keyword argument
+  'tools'`. Verified live on `qwen3-max` and `qwen3.8-flash`, buffered and
+  streamed. The workaround this caused in `build_stream_request` — forwarding
+  `tools` only when there were any — is gone with its cause. An image model
+  (`wan*-t2i-*`, `qwen-image-edit*`) still refuses tools by name.
+- **Recraft no longer claims native tool calling.** The same accident one door
+  along: an image-only client inheriting `supports_tools = True` from
+  `OpenAIClient`, exactly as it once inherited streaming. It now refuses at the
+  gate, with the family named, instead of failing inside the builder.
 - **A tool's request to pause is no longer flattened into an error.** Inside an
   Agent, `Suspend` was caught with every other exception and reached the model
   as the tool result `"Suspend: ..."`: the run did not park, the store was

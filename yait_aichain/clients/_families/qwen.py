@@ -150,13 +150,32 @@ class QwenClient(OpenAIClient):
         super().__init__(api_key, data=data, **client_opts)
 
     # ── format ───────────────────────────────────────────────────────
-    def build_request(self, messages, output, params) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+        """Text and vision defer to the OpenAI-compatible builder, tools included.
+
+        `tools=` was missing from this override until 2026-10-01, and the
+        parameter is the whole feature: DashScope's compatible mode speaks the
+        chat-completions tool format — `tools`, `tool_calls`, `role: "tool"` —
+        so the format was already implemented one class up and reachable for
+        every other provider in the family. Here an `Agent` with tools on a
+        Qwen model died with `TypeError: build_request() got an unexpected
+        keyword argument 'tools'`, and `supports_tools` inherited `True` from
+        `OpenAIClient` said the opposite. A capability claimed by inheritance
+        and refused by a signature is the same defect as an option accepted
+        and dropped: the library knew and did not say.
+        """
         m = self._wrap(params)
-        if _is_qwen_image_edit(m.name):
-            return _build_qwen_image_edit_request(m, messages, output)
-        if _is_qwen_image(m.name):
+        if _is_qwen_image_edit(m.name) or _is_qwen_image(m.name):
+            if tools:
+                # The image endpoints are a different API with no tool
+                # channel at all, so this is a refusal and not an adaptation.
+                raise ValueError(
+                    f"model {m.name!r} is an image model — it cannot take tool "
+                    "declarations")
+            if _is_qwen_image_edit(m.name):
+                return _build_qwen_image_edit_request(m, messages, output)
             return _build_qwen_image_request(m, messages, output)
-        return super().build_request(messages, output, params)
+        return super().build_request(messages, output, params, tools=tools)
 
     # ── request lifecycle ────────────────────────────────────────────
     def send(self, path: str, body: dict, headers: dict) -> bytes:
