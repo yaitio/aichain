@@ -51,7 +51,8 @@ UNIVERSAL_OPTIONS: dict = {
         "instead": None,
     },
     "cache_control": {
-        "what": "cache the stable prefix so a repeated one is not re-billed",
+        "what": "cache the stable prefix so a repeated one is not re-billed: "
+                "True, an int, or 'last' for an agent loop",
         "instead": "this provider caches automatically, with nothing to turn "
                    "on — the saving is in the usage report, not in a setting",
     },

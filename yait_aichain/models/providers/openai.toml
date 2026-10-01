@@ -65,6 +65,22 @@ low = "low"
 medium = "medium"
 high = "high"
 
+# GPT-6 — the same three-tier shape as 5.6 under new names, at a fraction of
+# its prices. Rates given by the yait agents team on 2026-10-01, USD per 1M
+# tokens. `caps` mirror 5.6 and are an assumption, not a measurement: nobody
+# here has sent an image to one yet.
+[models."gpt-6-luna"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.10, output = 0.50 }
+
+[models."gpt-6-sol"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 10.0 }
+
+[models."gpt-6-astra"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 10.0, output = 50.0 }
+
 # GPT-5.6 — three tiers of one family rather than a size ladder; all three
 # carry the same 1.05M context and 128K output, and differ only in price and
 # depth. Terra and Luna were cut on 2026-07-30; these are the rates after.

@@ -117,10 +117,18 @@ def extract_usage(response: dict) -> Usage:
         if isinstance(details, dict) and not read:
             read = details.get("cached_tokens") or 0
             inp  = max(0, inp - read)
+        idet = u.get("input_tokens_details")
+        # The Responses API reports the same thing under its own names —
+        # ``input_tokens_details.cached_tokens``, a subset of ``input_tokens``.
+        # Only the Chat Completions spelling was read until 2026-10-01, so
+        # every gpt-5.x and gpt-6 call reported its reused prefix as full-price
+        # input: the cache worked and the bill said it had not.
+        if isinstance(idet, dict) and not read:
+            read = idet.get("cached_tokens") or 0
+            inp  = max(0, inp - read)
         # The images API reports the modality split of its input. Image tokens
         # are dearer than text, so they are taken out here and priced apart.
         img_in = 0
-        idet = u.get("input_tokens_details")
         if isinstance(idet, dict):
             img_in = idet.get("image_tokens") or 0
             inp    = max(0, inp - img_in)

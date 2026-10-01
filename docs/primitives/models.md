@@ -102,7 +102,7 @@ option, the library declines it and says so — it is never dropped silently.
 | `top_k` | sample only from the k most likely tokens | Anthropic, Google AI |
 | `max_tokens` | ceiling on the answer's length | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
 | `reasoning` | how much deliberation before answering: low / medium / high | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
-| `cache_control` | cache the stable prefix so a repeated one is not re-billed | Anthropic |
+| `cache_control` | cache the stable prefix so a repeated one is not re-billed: True, an int, or 'last' for an agent loop | Anthropic |
 | `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | Anthropic |
 
 `output["format"]` keys, asked per call rather than per model. ✓ marks a key whose loss changes *what* you get rather than how good it is — the set `Model(on_unsupported="requirements")` raises for.
@@ -168,7 +168,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (<!-- g:count-models -->90 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
+and is tested with (<!-- g:count-models -->93 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
 deliberately lists none, because its catalogue belongs to your server):
 
 ```python

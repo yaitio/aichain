@@ -39,7 +39,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | DeepSeek | 2 | — | — | — |
 | Google AI | 6 | 3 | 6 | 3 |
 | Kimi (Moonshot AI) | 8 | — | 2 | — |
-| OpenAI | 11 | 7 | 11 | 7 |
+| OpenAI | 14 | 7 | 14 | 7 |
 | Perplexity | 5 | — | — | — |
 | Qwen (DashScope) | 9 | 2 | 3 | 3 |
 | Recraft | — | 8 | — | 3 |
@@ -205,6 +205,9 @@ gpt-5.5-pro    # $30 in / $180 out per 1M tokens
 gpt-5.6-luna   # $0.2 in / $1.2 out per 1M tokens
 gpt-5.6-sol    # $5 in / $30 out per 1M tokens
 gpt-5.6-terra  # $2 in / $12 out per 1M tokens
+gpt-6-astra    # $10 in / $50 out per 1M tokens
+gpt-6-luna     # $0.1 in / $0.5 out per 1M tokens
+gpt-6-sol      # $2 in / $10 out per 1M tokens
 ```
 
 ### `text-to-image`
@@ -233,6 +236,9 @@ gpt-5.5-pro    # $30 in / $180 out per 1M tokens
 gpt-5.6-luna   # $0.2 in / $1.2 out per 1M tokens
 gpt-5.6-sol    # $5 in / $30 out per 1M tokens
 gpt-5.6-terra  # $2 in / $12 out per 1M tokens
+gpt-6-astra    # $10 in / $50 out per 1M tokens
+gpt-6-luna     # $0.1 in / $0.5 out per 1M tokens
+gpt-6-sol      # $2 in / $10 out per 1M tokens
 ```
 
 ### `image-to-image`

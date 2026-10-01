@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+## [3.2.0] — 2026-10-01
+
+**What the yait agents tool evals needed from the library, five items.** Each
+had a workaround in the product; each can now be removed.
+
+1. **gpt-6 goes to the Responses API** — and so does every GPT generation after
+   gpt-4, without an edit when the next one ships.
+2. **gpt-6 has prices** — `gpt-6-luna`, `gpt-6-sol`, `gpt-6-astra`.
+3. **Cached tokens are read from the Responses API.**
+4. **`cache_control="last"`** — the Anthropic cache breakpoint an agent loop
+   needs.
+5. **Tools on Qwen** — shipped in 3.1.0; this release adds the live test the
+   eval asked for.
+
+### Added
+
+- `gpt-6-luna` (0.10 / 0.50), `gpt-6-sol` (2 / 10) and `gpt-6-astra` (10 / 50),
+  USD per 1M tokens, in `providers/openai.toml`; `estimate_cost` prices them.
+  Their `caps` mirror gpt-5.6 — an assumption, not yet a measurement.
+- `cache_control="last"` on Anthropic marks the newest block of the history,
+  whatever its type, so a history ending in a `tool_result` is cached on that
+  block and the next turn reads it back. Measured live on an agent-loop
+  history: `"last"` wrote 3 921 tokens on the first tool turn and read all 3 921
+  back on the next; `True` wrote nothing on the same turn. `True` and an
+  integer index keep their meaning.
+- `tests/clients/test_tools_live.py` — gpt-6-luna and qwen3.8-flash each call a
+  function tool on their provider's own endpoint. Live-marked: the nightly job
+  runs them, CI does not.
+- `llms.txt` says which cache placement an agent loop wants.
+
+### Fixed
+
+- **gpt-6 was routed to Chat Completions**, which answers function tools
+  together with reasoning with HTTP 400. Responses models were listed by
+  prefix — `("gpt-5",)` — so every new generation arrived on the old endpoint
+  by default. Now the exceptions are listed instead: the gpt-4 and gpt-3.5
+  generations stay on Chat Completions, every other `gpt-<N>` model goes to
+  `/v1/responses`. `gpt-image-*` and `gpt-oss-*` only share the prefix and are
+  untouched. Verified live: gpt-6-luna calls a tool.
+- **Responses API cached tokens were reported as full-price input.** The usage
+  reader knew only the Chat Completions spelling,
+  `prompt_tokens_details.cached_tokens`; the Responses API reports
+  `input_tokens_details.cached_tokens`. Now both are read and subtracted from
+  the input count — 1 000 input with 800 cached is `input_tokens=200`,
+  `cache_read_tokens=800`. Measured live on gpt-6-luna: the second identical
+  call reads 3 090 of 3 093 tokens from cache, which was billed as 3 093 fresh.
+
+### Changed
+
+- **`cache_control` refuses a string it does not know.** Any string went
+  through `bool()` and became `True`, so a misspelt placement silently chose a
+  different one; now only `"last"` is accepted, and anything else raises naming
+  the three placements.
+
 ## [3.1.0] — 2026-10-01
 
 **A run can wait for the world, and an agent can be the one who asks.** A

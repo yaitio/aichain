@@ -245,8 +245,11 @@ class Model:
         ``top_p``         float     Nucleus-sampling probability mass.
         ``top_k``         int       Top-K sampling (provider-dependent).
         ``cache_control`` bool|int  Prompt caching. True marks the
-                                    second-to-last message; an int names
-                                    the message the stable prefix ends at.
+                          |str      second-to-last message; an int names
+                                    the message the stable prefix ends at;
+                                    ``"last"`` marks the newest block, for
+                                    agent loops whose history ends in a
+                                    tool turn.
         ``cache_ttl``     str       How long the mark lives: ``"5m"``
                                     (default) or ``"1h"``.
         ``reasoning``     str|None  Universal reasoning depth (see below).
@@ -310,7 +313,7 @@ class Model:
     max_tokens    : int
     top_p         : float | None
     top_k         : int | None
-    cache_control : bool
+    cache_control : bool | int | "last"
     reasoning     : str | None  (None | "low" | "medium" | "high")
     client        : family client (ready to use)
 
@@ -435,8 +438,21 @@ class Model:
         # to store, so it only pays back when the same prefix is sent again.
         # True marks the second-to-last message; an int names the message the
         # stable prefix ends at, for callers that know where that is.
+        # ``"last"`` marks the newest block, for agent loops (see the
+        # Anthropic client). Any other string is refused: until 2026-10-01 a
+        # string went through ``bool()`` and became ``True``, so a misspelt
+        # placement silently chose a different one.
         cc = opts.get("cache_control", defaults.get("cache_control", False))
-        self.cache_control = cc if isinstance(cc, int) and not isinstance(cc, bool) else bool(cc)
+        if isinstance(cc, str):
+            if cc != "last":
+                raise ValueError(
+                    f"cache_control={cc!r} is not a placement. It takes True "
+                    "(the second-to-last message), an int (the message the "
+                    "stable prefix ends at), or \"last\" (the newest block, "
+                    "for an agent loop).")
+            self.cache_control = cc
+        else:
+            self.cache_control = cc if isinstance(cc, int) and not isinstance(cc, bool) else bool(cc)
         # How long the stored prefix lives. Which one is right is a property of
         # the caller's cadence, not of the library: a write costs 1.25x at five
         # minutes and 2x at an hour, against 0.1x per read, so 5m pays back on
@@ -818,8 +834,8 @@ class Model:
             parts.append(f"top_p={self.top_p}")
         if self.top_k is not None:
             parts.append(f"top_k={self.top_k}")
-        if self.cache_control:
-            parts.append("cache_control=True")
+        if self.cache_control is not False:
+            parts.append(f"cache_control={self.cache_control!r}")
         if self.reasoning is not None:
             parts.append(f"reasoning={self.reasoning!r}")
         return f"{type(self).__name__}({', '.join(parts)})"

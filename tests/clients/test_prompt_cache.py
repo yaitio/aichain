@@ -118,6 +118,53 @@ class TestPlacement(unittest.TestCase):
         self.assertEqual(marks(body_for([SYS, U1], cache_control=False)), [])
 
 
+class TestPlacementForAnAgentLoop(unittest.TestCase):
+    """``cache_control="last"`` — the newest block, whatever its type.
+
+    An agent loop's history ends in a tool turn: assistant ``tool_use``, then
+    user ``tool_result``. ``True`` looks for a *text* block in the
+    second-to-last message — the ``tool_use`` turn, which has none — so it
+    marked nothing on every turn of every loop. Asked for by the yait agents
+    tool evals on 2026-10-01.
+    """
+
+    TOOL_TURNS = [
+        SYS, U1,
+        {"role": "assistant",
+         "tool_calls": [{"id": "c1", "name": "search", "arguments": {"q": "it"}}]},
+        {"role": "tool", "call_id": "c1",
+         "parts": [{"type": "text", "text": "found: it"}]},
+    ]
+
+    def test_a_history_ending_in_a_tool_result_is_marked_on_that_block(self):
+        body = body_for(self.TOOL_TURNS, cache_control="last")
+        last = body["messages"][-1]["content"][-1]
+        self.assertEqual(last["type"], "tool_result")
+        self.assertEqual(last["cache_control"], {"type": "ephemeral"})
+        self.assertEqual(len(marks(body)), 1)
+
+    def test_true_keeps_its_meaning_and_its_gap(self):
+        # Kept as it behaves today, gap included, so a caller relying on it is
+        # not moved; the gap is what "last" exists for.
+        self.assertEqual(marks(body_for(self.TOOL_TURNS, cache_control=True)), [])
+
+    def test_last_marks_a_plain_chat_on_its_newest_message(self):
+        self.assertEqual(marks(body_for([SYS, U1, A1, U2], cache_control="last")),
+                         [("messages[2]", {"type": "ephemeral"})])
+
+    def test_the_hour_long_lifetime_reaches_the_last_block(self):
+        body = body_for(self.TOOL_TURNS, cache_control="last", cache_ttl="1h")
+        self.assertEqual(body["messages"][-1]["content"][-1]["cache_control"],
+                         {"type": "ephemeral", "ttl": "1h"})
+
+    def test_any_other_string_is_refused(self):
+        # It used to go through bool() and become True: a misspelt placement
+        # silently chose a different one.
+        with self.assertRaises(ValueError) as ctx:
+            Model("claude-sonnet-4-6", api_key="k", options={"cache_control": "lats"})
+        self.assertIn('"last"', str(ctx.exception))
+
+
 class TestLifetime(unittest.TestCase):
 
     def test_default_is_the_five_minute_cache(self):
@@ -157,6 +204,19 @@ class TestUsageAccounting(unittest.TestCase):
         }})
         self.assertEqual(u.cache_read_tokens, 4608)
         self.assertEqual(u.input_tokens, 392)
+
+    def test_responses_api_cached_tokens_are_taken_out_of_the_input_count(self):
+        """
+        The Responses API spells it ``input_tokens_details.cached_tokens``. Only
+        the Chat Completions spelling was read until 2026-10-01, so every
+        gpt-5.x call reported its reused prefix as full-price input.
+        """
+        u = extract_usage({"usage": {
+            "input_tokens": 1000, "output_tokens": 50, "total_tokens": 1050,
+            "input_tokens_details": {"cached_tokens": 800},
+        }})
+        self.assertEqual(u.input_tokens, 200)
+        self.assertEqual(u.cache_read_tokens, 800)
 
     def test_google_cached_content_is_taken_out_of_the_input_count(self):
         """

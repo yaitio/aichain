@@ -226,6 +226,50 @@ class TestGates(unittest.TestCase):
                          tools=[SEARCH])
 
 
+class TestResponsesRouting(unittest.TestCase):
+    """Every GPT generation after gpt-4 goes to /v1/responses.
+
+    Until 2026-10-01 the Responses models were listed by prefix — ``gpt-5`` —
+    so gpt-6 landed on Chat Completions, which answers function tools together
+    with reasoning with HTTP 400. Now the exceptions are listed and the new
+    endpoint is the default.
+    """
+
+    def test_gpt6_with_a_tool_goes_to_the_responses_api(self):
+        m = Model("gpt-6-luna", api_key="k", options={"reasoning": "low"})
+        path, body = m.to_request(CONVO, OUT, tools=[SEARCH])
+        self.assertIn("/responses", path)
+        # The Responses shape: tools flat, not nested under "function".
+        self.assertEqual(body["tools"][0]["name"], "search")
+        self.assertNotIn("function", body["tools"][0])
+
+    def test_a_later_generation_needs_no_edit(self):
+        from yait_aichain.clients._families._openai_compat import _should_use_responses_api
+        for name in ("gpt-5.6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-7"):
+            with self.subTest(model=name):
+                self.assertTrue(_should_use_responses_api(name))
+
+    def test_the_exceptions_stay_on_chat_completions(self):
+        from yait_aichain.clients._families._openai_compat import _should_use_responses_api
+        for name in ("gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-3.5-turbo",
+                     # Not chat generations at all — other APIs sharing a prefix.
+                     "gpt-image-2", "gpt-image-2.5-flare", "gpt-oss-120b"):
+            with self.subTest(model=name):
+                self.assertFalse(_should_use_responses_api(name))
+
+
+class TestGpt6Prices(unittest.TestCase):
+
+    def test_every_gpt6_tier_has_a_price(self):
+        from yait_aichain.models._usage import Usage, estimate_cost
+        million = Usage(input_tokens=1_000_000, output_tokens=1_000_000)
+        for name, expected in (("gpt-6-luna", 0.10 + 0.50),
+                               ("gpt-6-sol", 2.0 + 10.0),
+                               ("gpt-6-astra", 10.0 + 50.0)):
+            with self.subTest(model=name):
+                self.assertAlmostEqual(estimate_cost(million, name), expected)
+
+
 class TestQwenWire(unittest.TestCase):
     """DashScope's compatible mode is the chat-completions shape — and the
     client that overrode `build_request` dropped the `tools` parameter, so it

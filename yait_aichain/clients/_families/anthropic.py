@@ -269,7 +269,36 @@ class AnthropicClient(BaseClient):
         # a composed prompt whose first 29 of 36 messages were byte-identical
         # turn after turn got a cache read of zero, because the mark sat on
         # message 34.
+        #
+        # ``cache_control="last"`` is the third placement, and the one an agent
+        # loop needs. It marks the last block of the last message, whatever
+        # its type — a ``tool_result`` as readily as text. ``True`` looks for a
+        # *text* block in the second-to-last message, and in a tool loop that
+        # message is the assistant's ``tool_use`` turn, which has none: so
+        # nothing was marked at all, every turn, and the only trace was a
+        # ``declined`` notice. Marking the newest block is right here, unlike
+        # in a chat, because the next call sends exactly this history plus one
+        # more turn — the whole of it is the stable prefix. Added 2026-10-01
+        # for the yait agents tool evals; ``True`` keeps its meaning.
         mark = params.get("cache_control")
+        if mark == "last":
+            target = amsgs[-1]["content"] if amsgs else None
+            if target:
+                control = {"type": "ephemeral"}
+                if params.get("cache_ttl") == "1h":
+                    control["ttl"] = "1h"
+                for blk in reversed(target):
+                    # A thinking block cannot carry a mark; anything else can.
+                    if isinstance(blk, dict) and blk.get("type") not in (
+                            "thinking", "redacted_thinking"):
+                        blk["cache_control"] = control
+                        record(Adaptation(
+                            kind=ADAPTED, option="cache_control", asked=mark,
+                            sent="cache_control breakpoint",
+                            model=params["name"],
+                            why="marked the newest block, so the next call "
+                                "reads this whole history back"))
+                        break
         by_index = isinstance(mark, int) and not isinstance(mark, bool)
         if mark is True or by_index:
             target = None

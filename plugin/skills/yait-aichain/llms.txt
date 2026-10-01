@@ -349,6 +349,14 @@ holds raises `KeyError`, so a trigger that delivers twice cannot run the tail
 twice. There is still no `agent.save()` and no way to stop a run from outside
 it: what is written down is the conversation, and only while an answer is owed.
 
+## Prompt cache in an agent loop
+
+On Anthropic, `Model("claude-sonnet-4-6", options={"cache_control": "last"})`
+marks the newest block of the history — a `tool_result` as readily as text — so
+each turn reads the previous one back. `True` marks the second-to-last message's
+text, which a tool turn does not have, and caches nothing in a loop. OpenAI and
+Google cache on their own; the saving shows in `usage.cache_read_tokens`.
+
 ## Money and observability
 
 `max_cost=0.50` on Skill, Chain, Pool or Agent refuses to *begin* a call once

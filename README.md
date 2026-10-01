@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **<!-- g:count-models -->90 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
+All of these work identically across **<!-- g:count-models -->93 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
 
 ---
 

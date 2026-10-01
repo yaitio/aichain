@@ -881,16 +881,33 @@ def _build_xai_image_edit_request(
 
 
 # ---------------------------------------------------------------------------
-# Responses API helpers  (for gpt-5 and future models on /v1/responses)
+# Responses API helpers  (every GPT model newer than gpt-4)
 # ---------------------------------------------------------------------------
 
-# Model name prefixes that require the Responses API instead of Chat Completions.
-_RESPONSES_API_PREFIXES = ("gpt-5",)
+#: GPT models that stay on Chat Completions. Everything else named ``gpt-<N>``
+#: goes to the Responses API.
+#:
+#: The list is of the exceptions, not of the Responses models, and that is the
+#: whole change. Until 2026-10-01 it was the other way round —
+#: ``_RESPONSES_API_PREFIXES = ("gpt-5",)`` — so every new generation arrived on
+#: the old endpoint by default, and gpt-6 did: Chat Completions refuses function
+#: tools together with reasoning on it, HTTP 400, and the agent could not call a
+#: tool at all until someone noticed. New models ship on the new endpoint, so
+#: the new endpoint is the default and the old one is what has to be named.
+#: The gpt-4 and gpt-3.5 generations are a closed set; nothing will be added
+#: to them.
+_CHAT_COMPLETIONS_MODELS = ("gpt-4", "gpt-3.5")
+
+#: ``gpt-<digit>`` — the generation number names a chat model. It deliberately
+#: does not match ``gpt-image-*``, ``gpt-oss-*`` or ``gpt-realtime-*``, which
+#: are other APIs that only share the prefix.
+_GPT_GENERATION = re.compile(r"^gpt-\d")
 
 
 def _should_use_responses_api(model_name: str) -> bool:
     """Return True when *model_name* must be called via /v1/responses."""
-    return any(model_name.startswith(p) for p in _RESPONSES_API_PREFIXES)
+    return (bool(_GPT_GENERATION.match(model_name))
+            and not model_name.startswith(_CHAT_COMPLETIONS_MODELS))
 
 
 def _build_responses_api_request(
