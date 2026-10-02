@@ -101,6 +101,9 @@ from .search import (
     SerpApiTool,
 )
 
+# ── Decide ────────────────────────────────────────────────────────────────────
+from .decide import decideTypeSafe
+
 # ── Embedding ─────────────────────────────────────────────────────────────────
 from .embedding import (
     Embedding,
@@ -192,6 +195,7 @@ from .mcp import MCPTool, MCPTools
 
 
 __all__ = [
+    "decideTypeSafe",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",

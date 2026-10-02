@@ -77,8 +77,10 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
     nothing checked the pages against that. Thirty-six calls, seven pages.
 
     Checked here: every call to a tool constructed in the same block passes only
-    `input`/`options`; a literal `options` dict names only keys the tool's schema
-    declares; a Chain step's input map names only parameters the tool has."""
+    `input`/`options` or a parameter its schema declares (tools are called by
+    name since 3.1.0); a literal `options` dict names only keys the tool's
+    schema declares; a Chain step's input map names only parameters the tool
+    has."""
 
     PAGES = sorted((ROOT / "docs" / "tools-reference").glob("*.md"))
 
@@ -103,7 +105,10 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
         params = inspect.signature(cls.__init__).parameters
         if any(p.default is p.empty and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
                for p in list(params.values())[1:]):
-            return None
+            # Cannot be built bare (decideTypeSafe needs its questions); the
+            # class-level schema is still the call schema when it declares one.
+            declared = getattr(cls, "parameters", None)
+            return declared if declared and declared.get("properties") else None
         keys = {k: "doc" for k in ("OPENAI_API_KEY", "PERPLEXITY_API_KEY",
                                    "BRAVE_SEARCH_API_KEY", "SERPAPI_API_KEY",
                                    "XAI_API_KEY", "DASHSCOPE_API_KEY", "GOOGLE_AI_API_KEY")}
@@ -138,8 +143,12 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
                         cls = getattr(tools, f.func.id)         # Tool()(...)
                     if cls is not None:
                         schema = self._schema(cls)
+                        # Since 3.1.0 a tool is also called by its own
+                        # parameter names — `Domain()(email=...)` — so a keyword
+                        # the schema declares is a real call, not a doc error.
+                        named = set((schema or {}).get("properties", {})) - {"options"}
                         for kw in node.keywords:
-                            if kw.arg not in ("input", "options"):
+                            if kw.arg not in ("input", "options") and kw.arg not in named:
                                 problems.append(f"{page.name}:{node.lineno}: {kw.arg}=")
                             elif (kw.arg == "options" and schema and isinstance(kw.value, ast.Dict)):
                                 declared = schema["properties"].get("options", {}).get("properties", {})

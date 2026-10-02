@@ -79,6 +79,7 @@ yourself needs no key and sends nothing outside your network. See
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
 | SerpAPI | `SERPAPI_API_KEY` | <https://serpapi.com> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
+| TypeSafe | `TYPESAFE_API_KEY` | <https://console.typesafe.ai> |
 | Voyage | `VOYAGE_API_KEY` | <https://dash.voyageai.com> |
 <!-- /g:install-keys -->
 

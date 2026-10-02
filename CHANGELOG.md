@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`decideTypeSafe` — a decision with probabilities, not prose.** TypeSafe's
+  Jev (`TYPESAFE_API_KEY`) answers typed questions about a text: `noul` (the
+  probability a statement is true), `choice` (one option, a probability for
+  each, `confidence`) and `score` (a value over ordered levels, `confidence`),
+  all in one call. The questions are fixed when the tool is made and the caller
+  — or an agent — passes only the text as `state`; the description the model
+  sees is written from the questions. `run()` returns the answers untouched,
+  the version that answered and the cost, input only. A dict or a list is
+  passed through as structured state. Verified live: a `gpt-6-luna` agent
+  called `triage(state=...)` by itself, read `urgent` = 0.06 and routed the
+  ticket without escalating.
+
+  A tool and not a `Model`, decided the same day after trying it as one: every
+  specialised model here that does not converse is a tool, as a model it bent
+  ten places outside its own client, and an `Agent` could not use it at all.
+
+### Changed
+
+- The tool-page check in `tests/test_docs_generated.py` accepts a keyword the
+  tool's schema declares. It allowed only `input`/`options`, which stopped being
+  the whole truth in 3.1.0 when tools became callable by their own parameter
+  names.
+
 ## [3.2.0] — 2026-10-01
 
 **What the yait agents tool evals needed from the library, five items.** Each

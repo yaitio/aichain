@@ -70,6 +70,7 @@ export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export GOOGLE_API_KEY="…"
 export SERPAPI_API_KEY="…"
+export TYPESAFE_API_KEY="…"
 export VOYAGE_API_KEY="…"
 ```
 <!-- /g:exports -->

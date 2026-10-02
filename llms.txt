@@ -164,10 +164,34 @@ Calling the tool object catches an exception and returns it as `.error`;
 `Refund()(amount=20)`, still returning a `ToolResult`. `run()` may return any
 value; a dict stays a dict.
 
-Built-in tools (search, conversion, speech, local files, vector stores, REST,
-MCP) are in `docs/tools-reference/index.md`. A tool's `risk` is
+Built-in tools (search, conversion, speech, decisions, local files, vector
+stores, REST, MCP) are in `docs/tools-reference/index.md`. A tool's `risk` is
 one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
 `privileged`. A tool may keep state on its instance and define its own `__init__`.
+
+**A decision with probabilities, not prose** — `decideTypeSafe`, TypeSafe's Jev
+(`TYPESAFE_API_KEY`). It writes no text: it answers questions fixed when the
+tool is made, about a text passed as `state`.
+
+```python
+from yait_aichain.tools import decideTypeSafe
+
+triage = decideTypeSafe(name="triage", questions={
+    "urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
+    "team":   {"type": "choice", "instructions": "Which team should handle it?",
+               "criteria": {"billing": "Payments, refunds", "technical": "Bugs, outages"}},
+    "anger":  {"type": "score", "instructions": "How frustrated is the customer?",
+               "criteria": ["Calm", "Frustrated", "Very angry"]},
+})
+out = triage.run(state="Help! My payouts have been failing for 3 days.")
+out["answers"]["urgent"]["noul"]        # 0.95 — a probability, not a bool
+out["answers"]["team"]["choice"]        # "billing"; also "probabilities", "confidence"
+out["answers"]["anger"]["score"]        # 1.04 on 0..2; also "legend", "confidence"
+out["model"], out["cost"]               # the version that answered; USD, input only
+Agent(model, tools=[triage])            # the agent calls triage(state) by itself
+```
+
+Thresholds are yours: compare `noul` or `confidence` to a number in code.
 
 ## Chain — steps in order
 

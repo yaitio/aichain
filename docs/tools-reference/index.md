@@ -45,6 +45,7 @@ Chains and Agents identically.
 | MCP | [`MCPTool`](mcp.md) | `MCPTool` | A single tool from an MCP server, exposed as a standard aichain Tool. | — | `write` |
 | Pause | [`wait`](wait-gate.md#wait) | `Wait` | Pause the run until an external signal arrives. | — | `write` |
 | Pause | [`Gate`](wait-gate.md#gate) | `Gate` | Gate any Tool behind an external signal. | — | `write` |
+| Decision | [`decideTypeSafe`](typesafe-decide.md) | `decideTypeSafe` | Typed questions about a text, answered with probabilities, by TypeSafe's Jev. | `TYPESAFE_API_KEY` | `read` |
 <!-- /g:tools-index -->
 
 ---
