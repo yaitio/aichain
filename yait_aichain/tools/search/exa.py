@@ -15,6 +15,14 @@ can return query-relevant **highlights** from each one, so the agent reads the
 part that answers it without fetching the page. Highlights are on by default
 here; ``text_chars`` adds the page text itself, cut to a length.
 
+**Highlights are capped, at 1 000 characters a result by default.** Exa sizes
+them to relevance and left alone that size is most of the page — measured
+2026-10-02: 5 000 to 8 000 characters for each of three results, about 20 000
+characters for a three-result search, which an agent then carries in its
+context for the rest of the run. ``highlights.maxCharacters`` bounds the whole
+of a result's highlights, and the price does not move with it.
+``highlight_chars`` sets the cap; ``0`` turns highlights off.
+
 The result is the same numbered plain text the other search tools return, so
 an orchestrating model reads titles and URLs directly::
 
@@ -55,6 +63,12 @@ _RECENCY = {"hour": timedelta(hours=1), "day": timedelta(days=1),
 
 #: The API's own documented ceiling on ``numResults``.
 _MAX_RESULTS = 100
+
+#: Characters of highlights per result unless asked otherwise. Ten results at
+#: this size are about 10 000 characters — a search an agent can afford to
+#: keep in its context; uncapped, the same search was measured at about six
+#: times that.
+_HIGHLIGHT_CHARS = 1000
 
 
 class searchExa(Search):
@@ -152,6 +166,11 @@ class searchExa(Search):
                         "type":        "string",
                         "description": "Only pages published before this ISO 8601 date.",
                     },
+                    "highlight_chars": {
+                        "type":        "integer",
+                        "description": (f"Most characters of highlights per result "
+                                        f"(default {_HIGHLIGHT_CHARS}); 0 turns them off."),
+                    },
                     "text_chars": {
                         "type":        "integer",
                         "description": ("Also return each page's text, cut to this many "
@@ -187,8 +206,11 @@ class searchExa(Search):
             "query":      query,
             "type":       opts.get("search_type", "auto"),
             "numResults": max(1, min(int(count), _MAX_RESULTS)),
-            "contents":   {"highlights": True},
+            "contents":   {},
         }
+        cap = opts.get("highlight_chars", _HIGHLIGHT_CHARS)
+        if cap:
+            body["contents"]["highlights"] = {"maxCharacters": int(cap)}
         if opts.get("text_chars"):
             body["contents"]["text"] = {"maxCharacters": int(opts["text_chars"])}
         if opts.get("domains"):

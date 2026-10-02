@@ -7,7 +7,11 @@
 - **`searchExa` — Exa's search, built for agents.** `EXA_API_KEY`. Each result
   comes with the passages of the page most relevant to the query (highlights,
   on by default), so an agent reads the answer without fetching the page;
-  `text_chars` adds the page text, cut to a length. The standard search options
+  `text_chars` adds the page text, cut to a length. Highlights are capped at
+  1 000 characters a result (`highlight_chars`; `0` turns them off): Exa sizes
+  them to relevance, and uncapped they were measured at 5 000–8 000 characters
+  for each result — most of every page, in the agent's context, at the same
+  price. The standard search options
   reach Exa's own fields — `recency`, which Exa has no word for, becomes a
   published-after date — and Exa's own are offered: `category`, `search_type`
   (`instant` to `deep-reasoning`), `exclude_domains`, `start_date`/`end_date`.

@@ -77,7 +77,7 @@ class TestTheRequest(unittest.TestCase):
         self.assertEqual(kw["headers"]["x-api-key"], "k")
         self.assertEqual(json.loads(kw["body"]),
                          {"query": QUERY, "type": "auto", "numResults": 10,
-                          "contents": {"highlights": True}})
+                          "contents": {"highlights": {"maxCharacters": 1000}}})
 
     def test_every_standard_option_reaches_its_field(self):
         body = searchExa._body(QUERY, {
@@ -92,8 +92,19 @@ class TestTheRequest(unittest.TestCase):
         self.assertEqual(body["category"], "news")
         self.assertEqual(body["type"], "fast")
         self.assertEqual(body["endPublishedDate"], "2026-09-01")
-        self.assertEqual(body["contents"], {"highlights": True,
+        self.assertEqual(body["contents"], {"highlights": {"maxCharacters": 1000},
                                             "text": {"maxCharacters": 2000}})
+
+    def test_highlights_are_capped_by_default(self):
+        # Uncapped, Exa returned 5 000–8 000 characters of highlights for each
+        # result, measured 2026-10-02 — most of each page, in the agent's context.
+        self.assertEqual(searchExa._body(QUERY, {})["contents"]["highlights"],
+                         {"maxCharacters": 1000})
+
+    def test_the_cap_can_be_moved_or_highlights_turned_off(self):
+        self.assertEqual(searchExa._body(QUERY, {"highlight_chars": 300})["contents"],
+                         {"highlights": {"maxCharacters": 300}})
+        self.assertEqual(searchExa._body(QUERY, {"highlight_chars": 0})["contents"], {})
 
     def test_the_count_is_kept_inside_what_the_api_takes(self):
         self.assertEqual(searchExa._body(QUERY, {"max_results": 500})["numResults"], 100)
@@ -174,6 +185,14 @@ class TestSearchExaLive(unittest.TestCase):
         self.assertIn("(3 results)", text)
         self.assertIn("URL: https://", text)
         self.assertIn("    · ", text)
+
+    def test_the_cap_holds_on_the_real_api(self):
+        text = searchExa().run(input=QUERY, options={"max_results": 3,
+                                                     "highlight_chars": 300})
+        highlights = [line for line in text.splitlines() if line.startswith("    · ")]
+        self.assertTrue(highlights)
+        # Joined on one line per highlight, so a result's lines sum to its cap.
+        self.assertLessEqual(max(len(h) for h in highlights), 300 + len("    · "))
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ searchExa(
 | `options.search_type` | `string` |  | 'auto' (default) balances quality and speed; 'instant'/'fast' trade quality for latency; the 'deep' modes search iteratively and cost more. One of `instant`, `fast`, `auto`, `deep-lite`, `deep`, `deep-reasoning`. |
 | `options.start_date` | `string` |  | Only pages published after this ISO 8601 date. |
 | `options.end_date` | `string` |  | Only pages published before this ISO 8601 date. |
+| `options.highlight_chars` | `integer` |  | Most characters of highlights per result (default 1000); 0 turns them off. |
 | `options.text_chars` | `integer` |  | Also return each page's text, cut to this many characters. Off by default — highlights usually carry the answer. |
 
 ```python
