@@ -64,6 +64,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `BRAVE_SEARCH_API_KEY` | `searchBrave` | — |
 | `COHERE_API_KEY` | `CohereEmbedder`, `EmbeddingCohere`, `RerankCohere` | — |
 | `DASHSCOPE_API_KEY` | `EmbeddingQwen`, `RerankQwen`, `sttQwen`, `ttsQwen` | yes |
+| `EXA_API_KEY` | `searchExa` | — |
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | yes |
 | `GOOGLE_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | — |
 | `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `searchOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
@@ -99,6 +100,7 @@ export REVE_API_KEY="…"
 export XAI_API_KEY="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
+export EXA_API_KEY="…"
 export GOOGLE_API_KEY="…"
 export SERPAPI_API_KEY="…"
 export TYPESAFE_API_KEY="…"

@@ -4,6 +4,16 @@
 
 ### Added
 
+- **`searchExa` — Exa's search, built for agents.** `EXA_API_KEY`. Each result
+  comes with the passages of the page most relevant to the query (highlights,
+  on by default), so an agent reads the answer without fetching the page;
+  `text_chars` adds the page text, cut to a length. The standard search options
+  reach Exa's own fields — `recency`, which Exa has no word for, becomes a
+  published-after date — and Exa's own are offered: `category`, `search_type`
+  (`instant` to `deep-reasoning`), `exclude_domains`, `start_date`/`end_date`.
+  `language` has no field on this API and is not declared, so asking for it is
+  reported rather than dropped. Verified live, alone and inside a `gpt-6-luna`
+  agent that searched, answered and cited a URL.
 - **`convertToDecision` — a decision with probabilities, not prose.** TypeSafe's
   Jev (`TYPESAFE_API_KEY`) answers typed questions about a text: `noul` (the
   probability a statement is true), `choice` (one option, a probability for

@@ -21,6 +21,7 @@ from .perplexity import searchPerplexity
 from .brave      import searchBrave
 from .openai     import searchOpenAI
 from .serp       import searchSerp
+from .exa        import searchExa
 
 # ── Backward-compatible aliases ──────────────────────────────────────────────
 PerplexitySearchTool = searchPerplexity
@@ -34,6 +35,7 @@ __all__ = [
     "searchBrave",
     "searchOpenAI",
     "searchSerp",
+    "searchExa",
     # aliases
     "PerplexitySearchTool",
     "BraveSearchTool",

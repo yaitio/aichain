@@ -94,6 +94,7 @@ from .search import (
     searchBrave,
     searchOpenAI,
     searchSerp,
+    searchExa,
     # aliases
     PerplexitySearchTool,
     BraveSearchTool,
@@ -194,6 +195,7 @@ from .mcp import MCPTool, MCPTools
 
 __all__ = [
     "convertToDecision",
+    "searchExa",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",

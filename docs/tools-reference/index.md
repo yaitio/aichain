@@ -21,6 +21,7 @@ Chains and Agents identically.
 | Search | [`searchBrave`](brave-search.md) | `BraveSearchTool` | Web search powered by the Brave Search API. | `BRAVE_SEARCH_API_KEY` | `write` |
 | Search | [`searchSerp`](serp-api.md) | `SerpApiTool` | Multi-engine web search powered by SerpAPI. | `SERPAPI_API_KEY` | `write` |
 | Search | [`searchOpenAI`](openai-web-search.md) | `OpenAIWebSearchTool` | Web search powered by OpenAI's built-in `web_search_preview` tool. | `OPENAI_API_KEY` | `write` |
+| Search | [`searchExa`](exa-search.md) | `searchExa` | Web search powered by the Exa Search API — results with the passages that answer the query. | `EXA_API_KEY` | `write` |
 | Conversion | [`convertToMD`](markitdown.md) | `MarkItDownTool` | Convert a file or URL to Markdown text. | — | `write` |
 | Conversion | [`convertToHTML`](mistletoe.md) | `MistletoeTool` | Convert Markdown text to HTML, LaTeX, or normalised Markdown. | — | `write` |
 | Conversion | [`convertToPDF`](weasyprint.md) | `WeasyprintTool` | Render an HTML document to PDF. | — | `write` |
