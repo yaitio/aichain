@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`decideTypeSafe` — a decision with probabilities, not prose.** TypeSafe's
+- **`convertToDecision` — a decision with probabilities, not prose.** TypeSafe's
   Jev (`TYPESAFE_API_KEY`) answers typed questions about a text: `noul` (the
   probability a statement is true), `choice` (one option, a probability for
   each, `confidence`) and `score` (a value over ordered levels, `confidence`),

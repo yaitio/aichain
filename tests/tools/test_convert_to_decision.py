@@ -1,5 +1,5 @@
 """
-decideTypeSafe — TypeSafe's Jev as a tool.
+convertToDecision — TypeSafe's Jev as a tool (`tools/convert/to_decision.py`).
 
 Jev writes no text: it answers typed questions about a state with
 probabilities. Tried first as a `Model` on 2026-10-02 and moved here the same
@@ -33,7 +33,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from yait_aichain.tools import decideTypeSafe
+from yait_aichain.tools import convertToDecision
 
 QUESTIONS = {
     "urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
@@ -62,7 +62,7 @@ LIVE = {
 
 
 def _tool(response=LIVE, status=200, **kw):
-    tool = decideTypeSafe(QUESTIONS, api_key="k", **kw)
+    tool = convertToDecision(QUESTIONS, api_key="k", **kw)
     reply = MagicMock()
     reply.status = status
     reply.data = (json.dumps(response) if isinstance(response, dict) else response).encode()
@@ -89,14 +89,14 @@ class TestConstruction(unittest.TestCase):
         for label, (questions, named) in cases.items():
             with self.subTest(case=label):
                 with self.assertRaises(ValueError) as ctx:
-                    decideTypeSafe(questions, api_key="k")
+                    convertToDecision(questions, api_key="k")
                 self.assertIn(named, str(ctx.exception))
 
     def test_no_key_is_refused_at_construction(self):
         saved = os.environ.pop("TYPESAFE_API_KEY", None)
         try:
             with self.assertRaises(ValueError) as ctx:
-                decideTypeSafe(QUESTIONS)
+                convertToDecision(QUESTIONS)
             self.assertIn("TYPESAFE_API_KEY", str(ctx.exception))
         finally:
             if saved is not None:
@@ -104,30 +104,30 @@ class TestConstruction(unittest.TestCase):
 
     def test_an_overloaded_answer_is_retried(self):
         # 529 is refused before inference, like the 429 and 503 already retried.
-        tool = decideTypeSafe(QUESTIONS, api_key="k")
+        tool = convertToDecision(QUESTIONS, api_key="k")
         self.assertIn(529, tool._http.connection_pool_kw["retries"].status_forcelist)
 
 
 class TestWhatTheModelSees(unittest.TestCase):
 
     def test_the_only_argument_is_the_text(self):
-        schema = decideTypeSafe(QUESTIONS, api_key="k").parameters
+        schema = convertToDecision(QUESTIONS, api_key="k").parameters
         self.assertEqual(list(schema["properties"]), ["state"])
         self.assertEqual(schema["required"], ["state"])
 
     def test_the_description_says_what_each_question_answers(self):
-        d = decideTypeSafe(QUESTIONS, api_key="k").description
+        d = convertToDecision(QUESTIONS, api_key="k").description
         self.assertIn("urgent: Does this convey urgency? → probability", d)
         self.assertIn("one of billing, technical, sales", d)
         self.assertIn("Calm < Frustrated < Very angry", d)
 
     def test_it_is_named_by_what_it_decides(self):
-        tool = decideTypeSafe(QUESTIONS, name="triage", api_key="k")
+        tool = convertToDecision(QUESTIONS, name="triage", api_key="k")
         self.assertEqual(tool.name, "triage")
         self.assertEqual(tool.schema()["function"]["name"], "triage")
 
     def test_it_reads_and_changes_nothing(self):
-        self.assertEqual(decideTypeSafe(QUESTIONS, api_key="k").risk, "read")
+        self.assertEqual(convertToDecision(QUESTIONS, api_key="k").risk, "read")
 
 
 class TestTheRequest(unittest.TestCase):
@@ -222,7 +222,7 @@ class TestInsideAnAgent(unittest.TestCase):
         self.assertIn("billing", json.dumps(sent[-1]))
 
 
-class TestDecideTypeSafeLive(unittest.TestCase):
+class TestConvertToDecisionLive(unittest.TestCase):
     """Real calls: three question types, and an agent that uses the tool."""
 
     def setUp(self):
@@ -230,7 +230,7 @@ class TestDecideTypeSafeLive(unittest.TestCase):
             self.skipTest("TYPESAFE_API_KEY not set to a real key")
 
     def test_three_typed_answers(self):
-        out = decideTypeSafe(QUESTIONS).run(state=TICKET)
+        out = convertToDecision(QUESTIONS).run(state=TICKET)
         a = out["answers"]
         self.assertEqual(set(a), set(QUESTIONS))
         self.assertGreater(a["urgent"]["noul"], 0.5)

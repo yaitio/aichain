@@ -1,6 +1,6 @@
 """
-tools.decide.typesafe — decideTypeSafe
-======================================
+tools.convert.to_decision — convertToDecision
+=============================================
 
 TypeSafe AI's Jev as a tool: a text in, typed answers out — with a probability
 for every option.
@@ -23,10 +23,15 @@ in ten places outside its own client, and an ``Agent`` could not use it at all.
 As a tool it touches nothing else, and an agent gets the one thing Jev is for:
 a calibrated decision it can act on, or decline to act on, by the number.
 
+**Named beside its siblings**, `convertToMD`, `convertToSpeech`, `convertToText`:
+it converts a text into a decision. It is the one implementation today, the way
+`convertToMD` is; if a second decision provider arrives it becomes the base, as
+`convertToSpeech` is the base of the `tts*` tools.
+
 **The questions are fixed when the tool is made.** The agent passes only the
 text to judge. Letting the model write the questions would let it write them
 badly, and the reliability that is the reason to reach for Jev would go with
-them. Name each tool by what it decides — ``decideTypeSafe(name="triage",
+them. Name each tool by what it decides — ``convertToDecision(name="triage",
 questions=...)`` — and the agent sees ``triage(state)``.
 
 **Answers come back untouched.** A ``noul`` of 0.95 stays 0.95: the
@@ -73,7 +78,7 @@ def _check_questions(questions) -> None:
     """Refuse a malformed question here, naming it, rather than as a 422."""
     if not isinstance(questions, dict) or not questions:
         raise ValueError(
-            "decideTypeSafe needs at least one question, as a map of id → "
+            "convertToDecision needs at least one question, as a map of id → "
             "question, e.g. {'urgent': {'type': 'noul', 'instructions': "
             "'Is this urgent?'}}")
     for qid, q in questions.items():
@@ -122,7 +127,7 @@ def _describe(questions: dict) -> str:
             + "\n".join(lines))
 
 
-class decideTypeSafe(Tool):
+class convertToDecision(Tool):
     """
     Typed questions about a text, answered with probabilities, by TypeSafe's Jev.
 
@@ -132,7 +137,7 @@ class decideTypeSafe(Tool):
         Map of id → question, in the API's own shape. Fixed for the life of
         the tool; the caller passes only the text.
     name : str, optional
-        The name the model sees. Default ``"decideTypeSafe"``; name it by what
+        The name the model sees. Default ``"convertToDecision"``; name it by what
         it decides (``"triage"``, ``"is_duplicate"``).
     description : str, optional
         Default: written from the questions, so the model knows what it will
@@ -148,9 +153,9 @@ class decideTypeSafe(Tool):
     --------
     ::
 
-        from yait_aichain.tools import decideTypeSafe
+        from yait_aichain.tools import convertToDecision
 
-        triage = decideTypeSafe(name="triage", questions={
+        triage = convertToDecision(name="triage", questions={
             "urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
             "team":   {"type": "choice", "instructions": "Which team should handle it?",
                        "criteria": {"billing": "Payments, refunds",
@@ -164,7 +169,7 @@ class decideTypeSafe(Tool):
         Agent(model, tools=[triage])              # the agent calls triage(state)
     """
 
-    name        = "decideTypeSafe"
+    name        = "convertToDecision"
     description = "Judge a text against fixed typed questions; returns probabilities."
     # It reads the text it is given and changes nothing anywhere.
     risk        = "read"
@@ -207,7 +212,7 @@ class decideTypeSafe(Tool):
         answer, with the status and the API's own message.
         """
         if state is None or (isinstance(state, str) and not state.strip()):
-            raise ValueError("decideTypeSafe needs a state to judge — it was empty")
+            raise ValueError("convertToDecision needs a state to judge — it was empty")
         body = {"state": state, "model": self.model, "questions": self.questions}
         response = self._http.request(
             "POST", _ENDPOINT,

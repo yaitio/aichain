@@ -34,6 +34,7 @@ from .to_html   import convertToHTML
 from .to_pdf    import convertToPDF
 from .to_speech import convertToSpeech, ttsOpenAI, ttsGoogle, ttsXAI, ttsQwen
 from .to_text   import convertToText,   sttOpenAI, sttGoogle, sttXAI, sttQwen
+from .to_decision import convertToDecision
 
 # Backward-compatible aliases
 MarkItDownTool = convertToMD
@@ -47,6 +48,7 @@ __all__ = [
     "convertToPDF",
     "convertToSpeech",
     "convertToText",
+    "convertToDecision",
     # ── TTS providers ─────────────────────────────────────────────────────
     "ttsOpenAI",
     "ttsGoogle",

@@ -1,16 +1,16 @@
 <!-- g:tool -->
-# `decideTypeSafe`
+# `convertToDecision`
 
 Typed questions about a text, answered with probabilities, by TypeSafe's Jev.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import decideTypeSafe` |
+| Import | `from yait_aichain.tools import convertToDecision` |
 | Risk class | `read` |
 | Key | `TYPESAFE_API_KEY` |
 
 ```python
-decideTypeSafe(
+convertToDecision(
     questions: dict,
     *,
     name: str | None = None,
@@ -45,9 +45,9 @@ agent passes only the text, so the model cannot write a question badly.
 ```python
 from yait_aichain.agent import Agent
 from yait_aichain.models import Model
-from yait_aichain.tools import decideTypeSafe
+from yait_aichain.tools import convertToDecision
 
-triage = decideTypeSafe(name="triage", questions={
+triage = convertToDecision(name="triage", questions={
     "urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
     "team":   {"type": "choice", "instructions": "Which team should handle it?",
                "criteria": {"billing": "Payments, invoicing, refunds",

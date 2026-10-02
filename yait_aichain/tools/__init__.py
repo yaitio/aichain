@@ -101,9 +101,6 @@ from .search import (
     SerpApiTool,
 )
 
-# ── Decide ────────────────────────────────────────────────────────────────────
-from .decide import decideTypeSafe
-
 # ── Embedding ─────────────────────────────────────────────────────────────────
 from .embedding import (
     Embedding,
@@ -128,6 +125,7 @@ from .convert import (
     convertToPDF,
     convertToSpeech,
     convertToText,
+    convertToDecision,
     # TTS providers
     ttsOpenAI,
     ttsGoogle,
@@ -195,7 +193,7 @@ from .mcp import MCPTool, MCPTools
 
 
 __all__ = [
-    "decideTypeSafe",
+    "convertToDecision",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",
