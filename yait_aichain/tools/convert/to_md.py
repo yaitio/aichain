@@ -51,6 +51,29 @@ from typing import Any
 from .._base import Tool
 from .._security import assert_safe_url, confine_output_path, has_url_scheme
 
+#: ``(connect, read)`` seconds for a URL. MarkItDown calls ``requests`` with
+#: no timeout at all, so without one a silent server is a call that never ends.
+DEFAULT_TIMEOUT = (10.0, 30.0)
+
+#: The ``Accept`` header MarkItDown sets on the session it builds itself —
+#: kept, since passing our own session would otherwise drop it.
+_ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"
+
+
+def _session(timeout):
+    """A ``requests`` session that applies *timeout* to every request it makes
+    unless the caller gave one."""
+    import requests
+
+    class _TimeoutSession(requests.Session):
+        def request(self, *args, **kwargs):
+            kwargs.setdefault("timeout", timeout)
+            return super().request(*args, **kwargs)
+
+    session = _TimeoutSession()
+    session.headers.update({"Accept": _ACCEPT})
+    return session
+
 
 class convertToMD(Tool):
     """
@@ -74,6 +97,13 @@ class convertToMD(Tool):
     enable_plugins : bool | None, optional
         Passed directly to ``MarkItDown(enable_plugins=...)``.
         ``None`` (default) uses MarkItDown's own default.
+
+    timeout : float | tuple[float, float] | None, optional
+        Network timeout for a URL, in seconds — one number for both, or
+        ``(connect, read)``. The read timeout bounds the wait between bytes,
+        not the whole download. Default ``(10, 30)``; ``None`` waits forever,
+        which MarkItDown alone does: measured 2026-10-06, a site that holds
+        the connection open and never answers hung a conversion for hours.
 
     Examples
     --------
@@ -143,11 +173,13 @@ class convertToMD(Tool):
         llm_model:       str | None = None,
         enable_builtins: bool | None = None,
         enable_plugins:  bool | None = None,
+        timeout:         "float | tuple[float, float] | None" = DEFAULT_TIMEOUT,
     ) -> None:
         self._llm_client      = llm_client
         self._llm_model       = llm_model
         self._enable_builtins = enable_builtins
         self._enable_plugins  = enable_plugins
+        self._timeout         = timeout
         self._md              = None   # lazily initialised
 
     # ------------------------------------------------------------------
@@ -238,6 +270,8 @@ class convertToMD(Tool):
             kwargs["llm_client"] = self._llm_client
         if self._llm_model is not None:
             kwargs["llm_model"] = self._llm_model
+        if self._timeout is not None:
+            kwargs["requests_session"] = _session(self._timeout)
 
         self._md = MarkItDown(**kwargs)
         return self._md

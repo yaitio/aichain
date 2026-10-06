@@ -41,6 +41,15 @@
   the whole truth in 3.1.0 when tools became callable by their own parameter
   names.
 
+### Fixed
+
+- **`convertToMD` no longer waits forever on a URL.** MarkItDown fetches with
+  `requests` and no timeout, so a server that held the connection open and
+  never answered hung the call — measured 2026-10-06 on www.mckinsey.com, for
+  hours. The tool now gives MarkItDown a session with a timeout, `(10, 30)`
+  seconds (connect, read) by default; `timeout=` sets it and `None` restores
+  the old behaviour. A timeout is a failed call, reported like any other.
+
 ## [3.2.0] — 2026-10-01
 
 **What the yait agents tool evals needed from the library, five items.** Each

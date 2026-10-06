@@ -15,6 +15,7 @@ MarkItDownTool(
     llm_model: str | None = None,
     enable_builtins: bool | None = None,
     enable_plugins: bool | None = None,
+    timeout: float | tuple[float, float] | None = (10.0, 30.0),
 )
 ```
 
