@@ -4,6 +4,17 @@
 
 ### Added
 
+- **`convertToMD` returns a web page's metadata and sends the caller's
+  headers.** MarkItDown keeps only the body, and some sites state the
+  publication date nowhere else — library.hbs.edu, checked 2026-10-07. After
+  each call `last_metadata` holds the page's title, publication and
+  modification dates, author, description, site name, canonical and final
+  URL, read from JSON-LD and the common meta tags; a field the page lacks is
+  left out. `options={"metadata": true}` puts it on top of the Markdown as
+  front matter. The page is fetched once and read for both. `headers=` sends,
+  say, a browser's `User-Agent`: blogs.lse.ac.uk answers 403 to the default
+  agent and 200 to a browser's, and www.bcg.com does the reverse, so the
+  default is unchanged.
 - **`searchExa` — Exa's search, built for agents.** `EXA_API_KEY`. Each result
   comes with the passages of the page most relevant to the query (highlights,
   on by default), so an agent reads the answer without fetching the page;

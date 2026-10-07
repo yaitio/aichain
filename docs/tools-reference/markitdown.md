@@ -16,6 +16,7 @@ MarkItDownTool(
     enable_builtins: bool | None = None,
     enable_plugins: bool | None = None,
     timeout: float | tuple[float, float] | None = (10.0, 30.0),
+    headers: dict | None = None,
 )
 ```
 
@@ -23,6 +24,7 @@ MarkItDownTool(
 |---|---|---|---|
 | `input` | `string` | ✓ | Absolute or relative file path, or a URL, to convert to Markdown. |
 | `options.output_path` | `string` |  | Optional file path to write the result. Parent dirs created automatically. |
+| `options.metadata` | `boolean` |  | For a web page, start the result with its title, publication date, author and canonical URL as front matter. Default false. |
 
 ```python
 result = MarkItDownTool()(
@@ -132,6 +134,35 @@ agent = Agent(
     stop_when = [step_count(10)],
 )
 ```
+
+### Web pages: headers, timeout and the date
+
+MarkItDown fetches a URL with `requests` and keeps only the page body. Three
+things the tool adds for the web:
+
+```python
+tool = MarkItDownTool(
+    timeout=(10, 30),                         # connect, read — the default
+    headers={"User-Agent": "Mozilla/5.0 …"},  # sent with every request
+)
+text = tool.run(input="https://blogs.lse.ac.uk/businessreview/…",
+                options={"metadata": True})
+tool.last_metadata
+# {"title": "…", "published": "2026-09-28T09:26:06+01:00",
+#  "author": "…", "site": "LSE Business Review", "canonical": "…", "url": "…"}
+```
+
+- **`timeout`** — without one a server that holds the connection and never
+  answers hangs the call (www.mckinsey.com, 2026-10-06). `None` waits forever.
+- **`headers`** — sites disagree on who they let in, so this is per site and
+  the default is unchanged. Measured 2026-10-07: blogs.lse.ac.uk answers 403 to
+  the default `python-requests` agent and 200 to a browser's; www.bcg.com does
+  the reverse.
+- **`last_metadata`** — what the page's `<head>` says: JSON-LD first, then
+  Open Graph, Dublin Core and the other common meta tags. A field the page
+  does not carry is left out. MarkItDown drops the head, and on some sites
+  (library.hbs.edu) the publication date is nowhere else. `{"metadata": true}`
+  also puts it on top of the Markdown as front matter, for a model to read.
 
 ---
 

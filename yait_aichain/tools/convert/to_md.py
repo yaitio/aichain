@@ -45,7 +45,9 @@ None required.  Pass API keys to the LLM client you supply, not here.
 
 from __future__ import annotations
 
+import json
 import os
+from html.parser import HTMLParser
 from typing import Any
 
 from .._base import Tool
@@ -60,19 +62,160 @@ DEFAULT_TIMEOUT = (10.0, 30.0)
 _ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"
 
 
-def _session(timeout):
+def _session(timeout, headers=None):
     """A ``requests`` session that applies *timeout* to every request it makes
-    unless the caller gave one."""
+    unless the caller gave one, and sends *headers* on each."""
     import requests
 
     class _TimeoutSession(requests.Session):
         def request(self, *args, **kwargs):
-            kwargs.setdefault("timeout", timeout)
+            if timeout is not None:
+                kwargs.setdefault("timeout", timeout)
             return super().request(*args, **kwargs)
 
     session = _TimeoutSession()
     session.headers.update({"Accept": _ACCEPT})
+    session.headers.update(headers or {})
     return session
+
+
+# ----------------------------------------------------------------------
+# Page metadata
+# ----------------------------------------------------------------------
+
+#: Meta names that carry a publication date, best first. Publishers disagree
+#: on the word; these are the ones in common use (Open Graph, Dublin Core,
+#: Google Scholar, Parse.ly, Sailthru, and the bare ``date``).
+_PUBLISHED = ("article:published_time", "datepublished", "citation_publication_date",
+              "dc.date", "dc.date.issued", "dcterms.date", "dcterms.issued",
+              "parsely-pub-date", "sailthru.date", "publish_date", "publication_date",
+              "pubdate", "date")
+_MODIFIED  = ("article:modified_time", "datemodified", "og:updated_time", "dcterms.modified")
+_AUTHOR    = ("author", "article:author", "citation_author", "dc.creator", "parsely-author")
+_TITLE     = ("og:title", "twitter:title", "citation_title", "dc.title")
+_DESC      = ("description", "og:description", "twitter:description")
+
+
+class _HeadReader(HTMLParser):
+    """Collects what MarkItDown throws away: ``<meta>``, ``<title>``, the
+    canonical link and JSON-LD blocks."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.meta: dict[str, str] = {}
+        self.title = ""
+        self.canonical = ""
+        self.ld: list = []
+        self._in = None
+        self._buf: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        a = {k.lower(): (v or "") for k, v in attrs}
+        if tag == "meta":
+            key = (a.get("property") or a.get("name") or a.get("itemprop") or "").strip().lower()
+            if key and a.get("content", "").strip() and key not in self.meta:
+                self.meta[key] = a["content"].strip()
+        elif tag == "link" and "canonical" in a.get("rel", "").lower().split():
+            self.canonical = self.canonical or a.get("href", "").strip()
+        elif tag == "title" and not self.title:
+            self._in, self._buf = "title", []
+        elif tag == "script" and a.get("type", "").lower() == "application/ld+json":
+            self._in, self._buf = "ld", []
+
+    def handle_data(self, data):
+        if self._in:
+            self._buf.append(data)
+
+    def handle_endtag(self, tag):
+        if self._in == "title" and tag == "title":
+            self.title = " ".join("".join(self._buf).split())
+            self._in = None
+        elif self._in == "ld" and tag == "script":
+            try:
+                self.ld.append(json.loads("".join(self._buf)))
+            except ValueError:
+                pass
+            self._in = None
+
+
+def _ld_objects(node):
+    """Every dict in a JSON-LD tree, ``@graph`` included."""
+    if isinstance(node, list):
+        for item in node:
+            yield from _ld_objects(item)
+    elif isinstance(node, dict):
+        yield node
+        for value in node.values():
+            if isinstance(value, (list, dict)):
+                yield from _ld_objects(value)
+
+
+def _ld_name(value) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        return str(value.get("name") or "").strip()
+    if isinstance(value, list):
+        return ", ".join(n for n in (_ld_name(v) for v in value) if n)
+    return ""
+
+
+def page_metadata(html: str) -> dict:
+    """
+    Title, publication and modification dates, author, description, site name
+    and canonical URL of an HTML page — the ``<head>`` MarkItDown drops.
+
+    JSON-LD is read first, because a publisher who writes it means it; then
+    the meta tags. Values are returned as the page states them, dates
+    included, and a field the page does not carry is left out rather than
+    guessed.
+    """
+    reader = _HeadReader()
+    try:
+        reader.feed(html)
+    except Exception:  # a malformed page still yields what was read before it
+        pass
+    meta, out = reader.meta, {}
+
+    article = None
+    for obj in _ld_objects(reader.ld):
+        if obj.get("datePublished") or obj.get("headline"):
+            kind = obj.get("@type")
+            kinds = kind if isinstance(kind, list) else [kind]
+            if any(isinstance(k, str) and ("Article" in k or "Posting" in k or k == "Report")
+                   for k in kinds):
+                article = obj
+                break
+            article = article or obj
+    if article:
+        for key, field in (("title", "headline"), ("published", "datePublished"),
+                           ("modified", "dateModified"), ("description", "description")):
+            if isinstance(article.get(field), str) and article[field].strip():
+                out[key] = article[field].strip()
+        if _ld_name(article.get("author")):
+            out["author"] = _ld_name(article.get("author"))
+
+    def first(keys):
+        return next((meta[k] for k in keys if meta.get(k)), "")
+
+    for key, keys in (("title", _TITLE), ("published", _PUBLISHED), ("modified", _MODIFIED),
+                      ("author", _AUTHOR), ("description", _DESC)):
+        if key not in out and first(keys):
+            out[key] = first(keys)
+    if "title" not in out and reader.title:
+        out["title"] = reader.title
+    if meta.get("og:site_name"):
+        out["site"] = meta["og:site_name"]
+    if reader.canonical:
+        out["canonical"] = reader.canonical
+    return out
+
+
+def _front_matter(metadata: dict) -> str:
+    """The metadata as a front-matter block; values JSON-quoted so a colon or
+    a quote in a title cannot break it."""
+    lines = [f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in metadata.items()]
+    return "---\n" + "\n".join(lines) + "\n---\n\n"
 
 
 class convertToMD(Tool):
@@ -104,6 +247,21 @@ class convertToMD(Tool):
         not the whole download. Default ``(10, 30)``; ``None`` waits forever,
         which MarkItDown alone does: measured 2026-10-06, a site that holds
         the connection open and never answers hung a conversion for hours.
+
+    headers : dict | None, optional
+        HTTP headers sent with every request for a URL, on top of the
+        ``Accept`` header MarkItDown asks for. The usual one is
+        ``User-Agent``: measured 2026-10-07, blogs.lse.ac.uk answers 403 to
+        the ``python-requests`` agent on every path and 200 to a browser's.
+
+    After every call, ``last_metadata`` holds what the page's ``<head>`` says
+    about it — ``title``, ``published``, ``modified``, ``author``,
+    ``description``, ``site``, ``canonical`` and the final ``url`` — for an
+    HTML page fetched by URL or read from a local ``.html`` file, and ``{}``
+    for anything else. MarkItDown drops the head, and with it the
+    publication date, which on some sites appears nowhere in the body
+    (library.hbs.edu, checked 2026-10-07). ``options={"metadata": True}``
+    also puts it at the top of the returned Markdown as front matter.
 
     Examples
     --------
@@ -157,6 +315,12 @@ class convertToMD(Tool):
                         "type": "string",
                         "description": "Optional file path to write the result. Parent dirs created automatically.",
                     },
+                    "metadata": {
+                        "type": "boolean",
+                        "description": ("For a web page, start the result with its title, "
+                                        "publication date, author and canonical URL as front "
+                                        "matter. Default false."),
+                    },
                 },
             },
         },
@@ -174,13 +338,17 @@ class convertToMD(Tool):
         enable_builtins: bool | None = None,
         enable_plugins:  bool | None = None,
         timeout:         "float | tuple[float, float] | None" = DEFAULT_TIMEOUT,
+        headers:         "dict | None" = None,
     ) -> None:
         self._llm_client      = llm_client
         self._llm_model       = llm_model
         self._enable_builtins = enable_builtins
         self._enable_plugins  = enable_plugins
         self._timeout         = timeout
+        self._headers         = dict(headers or {})
         self._md              = None   # lazily initialised
+        self._session         = None
+        self.last_metadata: dict = {}
 
     # ------------------------------------------------------------------
     # Public
@@ -203,6 +371,8 @@ class convertToMD(Tool):
               ``output_path`` — destination file path for the Markdown output.
               Parent directories are created if they do not exist.  When
               omitted the result is only returned, not written to disk.
+              ``metadata`` — when true, the page's metadata (see the class
+              docstring) is put at the top as front matter.
 
         Returns
         -------
@@ -221,12 +391,35 @@ class convertToMD(Tool):
 
         # If the input is a URL, only allow public http(s) targets — this blocks
         # SSRF to internal/metadata hosts and file:// local-file disclosure.
-        if has_url_scheme(input):
+        is_url = has_url_scheme(input)
+        if is_url:
             assert_safe_url(input)
 
-        md     = self._get_converter()
-        result = md.convert(input)
-        text   = result.text_content
+        md = self._get_converter()
+        self.last_metadata = {}
+        if is_url and input.strip().lower().startswith(("http:", "https:")):
+            # Fetched here rather than by MarkItDown so the <head> it drops can
+            # be read from the same response — one request, not two.
+            response = self._session.get(input.strip(), stream=True)
+            response.raise_for_status()
+            ctype = response.headers.get("content-type", "").lower()
+            if "html" in ctype:
+                # requests assumes Latin-1 for text/* without a charset; the
+                # web is UTF-8 unless it says otherwise.
+                charset = response.encoding if "charset=" in ctype else "utf-8"
+                self.last_metadata = page_metadata(
+                    response.content.decode(charset or "utf-8", errors="replace"))
+                self.last_metadata["url"] = response.url
+            result = md.convert_response(response)
+        else:
+            if (not is_url and os.path.splitext(input)[1].lower() in (".html", ".htm")
+                    and os.path.isfile(input)):
+                with open(input, encoding="utf-8", errors="replace") as fh:
+                    self.last_metadata = page_metadata(fh.read())
+            result = md.convert(input)
+        text = result.text_content
+        if opts.get("metadata") and self.last_metadata:
+            text = _front_matter(self.last_metadata) + text
 
         if output_path:
             output_path = confine_output_path(output_path)
@@ -270,8 +463,8 @@ class convertToMD(Tool):
             kwargs["llm_client"] = self._llm_client
         if self._llm_model is not None:
             kwargs["llm_model"] = self._llm_model
-        if self._timeout is not None:
-            kwargs["requests_session"] = _session(self._timeout)
+        self._session = _session(self._timeout, self._headers)
+        kwargs["requests_session"] = self._session
 
         self._md = MarkItDown(**kwargs)
         return self._md

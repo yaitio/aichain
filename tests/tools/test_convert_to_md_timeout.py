@@ -8,7 +8,7 @@ session that applies a timeout to every request; what is pinned here, offline:
 
   * the default reaches the request, and an explicit one replaces it;
   * a caller's own per-request timeout is not overridden;
-  * ``timeout=None`` leaves MarkItDown's own session in place;
+  * ``timeout=None`` sends no timeout, as MarkItDown alone does;
   * the ``Accept`` header MarkItDown sets on its own session survives ours;
   * a timeout becomes a failed call, not a hang.
 """
@@ -47,9 +47,8 @@ class TestTheTimeoutReachesTheRequest(unittest.TestCase):
     def test_a_per_request_timeout_is_not_overridden(self):
         self.assertEqual(self._timeout_sent(convertToMD(), timeout=1), 1)
 
-    def test_none_leaves_markitdowns_own_session(self):
-        session = convertToMD(timeout=None)._get_converter()._requests_session
-        self.assertIs(type(session), requests.Session)
+    def test_none_sends_no_timeout(self):
+        self.assertIsNone(self._timeout_sent(convertToMD(timeout=None)))
 
     def test_markitdowns_accept_header_survives(self):
         session = convertToMD()._get_converter()._requests_session
