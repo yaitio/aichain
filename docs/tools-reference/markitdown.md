@@ -176,5 +176,5 @@ tool.last_metadata
 
 ## See also
 
-- Search tools: [`searchBrave`](brave-search.md), [`searchSerp`](serp-api.md), [`searchPerplexity`](perplexity-search.md)
+- [Search tools](search.md): `searchPerplexity`, `searchBrave`, `searchSerp`, `searchExa`
 - [`convertToHTML`](mistletoe.md) — the other direction: Markdown → HTML / LaTeX.

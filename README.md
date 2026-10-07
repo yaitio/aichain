@@ -256,7 +256,10 @@ registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
 ## Built-in tools
 
 ### Search
-`searchPerplexity` · `searchBrave` · `searchSerp` · `searchOpenAI`
+`searchPerplexity` · `searchBrave` · `searchSerp` · `searchExa`
+
+### Decision
+`decisionOpenAI` · `decisionTypeSafe`
 
 ### Convert
 `convertToMD` · `convertToHTML` · `convertToPDF` · `TTS(provider)` · `STT(provider)`

@@ -162,7 +162,9 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
             declared = _declared_options(cls)
             if not declared:
                 continue
-            unread = sorted(declared - self._reads(cls))
+            # A standard search option a provider declines is read by the base,
+            # which turns it into a notice — declared so a model is told, not refused.
+            unread = sorted(declared - self._reads(cls) - set(getattr(cls, "declines", {})))
             if unread:
                 offenders.append(f"{name}: {unread}")
         self.assertEqual(offenders, [], "\n".join(offenders))

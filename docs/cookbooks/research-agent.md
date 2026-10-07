@@ -22,6 +22,6 @@ An `Agent` equipped with search and fetch tools that autonomously investigates a
 
 - [Agent overview](../agents/overview.md)
 - [Agent configuration](../agents/configuration.md)
-- [perplexity_search](../tools-reference/perplexity-search.md)
-- [brave_search](../tools-reference/brave-search.md)
+- [perplexity_search](../tools-reference/search.md#searchperplexity)
+- [brave_search](../tools-reference/search.md#searchbrave)
 - [markitdown](../tools-reference/markitdown.md)

@@ -2,32 +2,62 @@
 tools.search._base
 ==================
 
-``Search`` — abstract base class for all web search tool implementations.
+``Search`` — one format of options and results for every web search provider.
 
-Every concrete search tool:
-  1. Inherits from ``Search``.
-  2. Sets ``name``, ``description``, and optionally extends ``parameters``
-     (the base already declares ``input`` + ``options``).
-  3. Implements ``run(input, options=None) -> str`` — executes the search
-     and returns a human-readable numbered plain-text result string.
+The providers sell the same thing — ranked pages for a query, filtered by
+time, place and site — and spell every part of it differently: Brave filters
+time with ``freshness``, SerpAPI with Google's ``tbs``, Perplexity with
+``search_recency_filter`` and MM/DD/YYYY dates, Exa with ISO dates; two of the
+four have no site filter and take ``site:`` in the query. This class holds the
+meaning; each provider translates it.
 
-The ``parameters`` schema defined here is the *minimum* contract shared by
-all providers.  Individual implementations may extend the ``options``
-sub-schema with provider-specific keys.
+Options — one vocabulary
+------------------------
+``max_results``  how many results; kept inside the provider's ceiling.
+``recency``      ``hour`` | ``day`` | ``week`` | ``month`` | ``year``.
+``start_date``   only pages published on or after this ``YYYY-MM-DD``.
+``end_date``     only pages published on or before this ``YYYY-MM-DD``.
+``country``      ISO 3166-1 alpha-2, e.g. ``"GB"``.
+``language``     ISO 639-1, e.g. ``"en"``.
+``domains``      only these sites — a domain, or a domain with a path prefix.
 
-Standard ``options`` keys (all optional)
------------------------------------------
-  ``max_results``   int   — maximum number of results to return
-  ``recency``       str   — freshness filter: "hour", "day", "week", "month", "year"
-  ``country``       str   — ISO 3166-1 alpha-2 country code
-  ``language``      str   — ISO 639-1 language code
-  ``domains``       list  — restrict results to these domains
+``recency`` and ``start_date`` both bound the same side; the later of the two
+is the one both promises keep. A provider adds its own options beside these
+(``extra_options``), and keeps them.
+
+An option a provider cannot honour is never dropped in silence: it is
+reported — as a warning once per provider and option, as a line at the end of
+the text the model reads, and in ``notices`` of :meth:`Search.search`. An
+option it honours differently (``hour`` on a provider whose finest window is a
+day) is adapted and reported the same way.
+
+Results — one record
+--------------------
+``search()`` returns ``{"query", "provider", "results", "notices"}``; each
+result is::
+
+    {"title": str, "url": str, "date": "YYYY-MM-DD" or "", "author": str,
+     "snippets": [str, ...], "text": str}
+
+``date`` is the publication date as the provider reports it, normalised to a
+calendar day, or empty — not a fact about the page: providers date pages
+wrongly, and a caller that needs the true date reads it from the page
+(``convertToMD().last_metadata``). ``text`` is the page's own text when the
+provider returned it (Exa, on request), else empty.
+
+``run()`` — what an agent calls — returns the same results as numbered text.
 """
 
 from __future__ import annotations
 
+import os
+import re
+import warnings
+from datetime import date, datetime, timedelta, timezone
+
 import urllib3
 
+from ...clients._base import make_http
 from .._base import Tool
 
 # ---------------------------------------------------------------------------
@@ -46,59 +76,199 @@ SEARCH_RETRIES = urllib3.Retry(
     raise_on_status=False,
 )
 
+RECENCY = {"hour": timedelta(hours=1), "day": timedelta(days=1), "week": timedelta(weeks=1),
+           "month": timedelta(days=31), "year": timedelta(days=366)}
+
+STANDARD_OPTIONS = {
+    "max_results": {"type": "integer", "description": "How many results to return (default 10)."},
+    "recency":     {"type": "string", "enum": list(RECENCY),
+                    "description": "Only pages published within this window."},
+    "start_date":  {"type": "string", "description": "Only pages published on or after this date, YYYY-MM-DD."},
+    "end_date":    {"type": "string", "description": "Only pages published on or before this date, YYYY-MM-DD."},
+    "country":     {"type": "string", "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."},
+    "language":    {"type": "string", "description": "ISO 639-1 language code, e.g. 'en'."},
+    "domains":     {"type": "array", "items": {"type": "string"},
+                    "description": "Only these sites — a domain, or a domain with a path prefix."},
+}
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+
+def day(value) -> str:
+    """A provider's date as ``YYYY-MM-DD``, or ``""`` when it is not one.
+
+    Takes ISO dates and timestamps, ``Sep 30, 2026``, ``30 Sep 2026`` and the
+    relative ``3 days ago`` that Google answers with for recent pages.
+    """
+    if not value:
+        return ""
+    s = str(value).strip()
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
+    if m:
+        return "-".join(m.groups())
+    m = re.match(r"([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})", s) or None
+    if m and m.group(1).lower() in _MONTHS:
+        return f"{m.group(3)}-{_MONTHS[m.group(1).lower()]:02d}-{int(m.group(2)):02d}"
+    m = re.match(r"(\d{1,2}) ([A-Za-z]{3})[a-z]*\.? (\d{4})", s)
+    if m and m.group(2).lower() in _MONTHS:
+        return f"{m.group(3)}-{_MONTHS[m.group(2).lower()]:02d}-{int(m.group(1)):02d}"
+    m = re.match(r"(\d+) (minute|hour|day|week|month)s? ago", s)
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        span = {"minute": timedelta(minutes=n), "hour": timedelta(hours=n), "day": timedelta(days=n),
+                "week": timedelta(weeks=n), "month": timedelta(days=30 * n)}[unit]
+        return (datetime.now(timezone.utc) - span).date().isoformat()
+    return ""
+
+
+def _check_day(name: str, value) -> str:
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except ValueError:
+        raise ValueError(f"{name} must be a date, YYYY-MM-DD; got {value!r}") from None
+
 
 class Search(Tool):
     """
-    Abstract base class for web search tools.
+    Base of the web search tools: one vocabulary of options, one record of
+    results, a provider per subclass.
 
-    All providers share the same ``run(input, options)`` interface so they
-    are interchangeable inside Agent / Chain pipelines.
-
-    Parameters
-    ----------
-    None at the base level — concrete subclasses accept ``api_key``.
+    A subclass sets ``name``, ``description``, ``max_results`` (its ceiling),
+    ``extra_options`` (its own schema entries) and ``declines`` — standard
+    options it cannot honour, each with the reason the caller is told — and
+    implements ``_search(query, opts, window, notices) -> list[dict]``,
+    returning results in the common record. ``window`` is the resolved
+    ``(start, end)`` dates (each ``""`` when open) and ``opts["recency"]`` the
+    window word when no explicit date narrowed it, for providers that take the
+    word natively.
     """
 
     name        = "search"
     description = "Search the web and return a plain-text numbered list of results."
-    parameters  = {
+    # It reads the web and changes nothing anywhere.
+    risk        = "read"
+    #: The provider's own ceiling on results per call.
+    max_results: int = 20
+    #: Provider-only option schemas, added beside the standard ones.
+    extra_options: dict = {}
+    #: Standard options this provider cannot honour → why.
+    declines: dict = {}
+    #: The provider's key variable; a tuple here so the base names none.
+    _ENV_KEY: "str | tuple" = ()
+    _PROVIDER: str = ""
+
+    def __init__(self, api_key: "str | None" = None) -> None:
+        key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
+        if not key:
+            raise ValueError(f"No {self._PROVIDER} API key found. Pass api_key= or set the "
+                             f"{self._ENV_KEY} environment variable.")
+        self._api_key = key
+        self._http = make_http(timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES)
+
+    parameters = {
         "type": "object",
         "properties": {
-            "input": {
-                "type":        "string",
-                "description": "The search query.",
-            },
-            "options": {
-                "type":        "object",
-                "description": "Optional search filters and configuration.",
-                "properties": {
-                    "max_results": {
-                        "type":        "integer",
-                        "description": "Maximum number of results to return (default 10).",
-                    },
-                    "recency": {
-                        "type":        "string",
-                        "enum":        ["hour", "day", "week", "month", "year"],
-                        "description": "Filter results by recency.",
-                    },
-                    "country": {
-                        "type":        "string",
-                        "description": "ISO 3166-1 alpha-2 country code to localise results.",
-                    },
-                    "language": {
-                        "type":        "string",
-                        "description": "ISO 639-1 language code for results.",
-                    },
-                    "domains": {
-                        "type":        "array",
-                        "items":       {"type": "string"},
-                        "description": "Restrict results to these domains only.",
-                    },
-                },
-            },
+            "input":   {"type": "string", "description": "The search query, in natural language."},
+            "options": {"type": "object", "description": "Optional search filters.",
+                        "properties": dict(STANDARD_OPTIONS)},
         },
         "required": ["input"],
     }
 
+    def __init_subclass__(cls, **kw):
+        super().__init_subclass__(**kw)
+        # Every standard option is declared on every provider — a declined one
+        # says so in its description, and asking for it is answered with a notice.
+        props = {k: (v if k not in cls.declines else
+                     {**v, "description": f"{v['description']} Not applied here: {cls.declines[k]}."})
+                 for k, v in STANDARD_OPTIONS.items()}
+        props.update(cls.extra_options)
+        cls.parameters = {
+            "type": "object",
+            "properties": {
+                "input":   {"type": "string", "description": "The search query, in natural language."},
+                "options": {"type": "object", "description": "Optional search filters.",
+                            "properties": props},
+            },
+            "required": ["input"],
+        }
+
+    # ------------------------------------------------------------------
+
+    def search(self, input: str, options: "dict | None" = None) -> dict:
+        """Search for *input*; the results as records, with any notices."""
+        if not isinstance(input, str) or not input.strip():
+            raise ValueError(f"{type(self).__name__} needs a query — it was empty")
+        opts = dict(options or {})
+        notices: list = []
+        for key in [k for k in opts if k in self.declines and opts[k] not in (None, "", [])]:
+            self._notice(notices, f"{key} is not supported by {self.name} and was not applied: "
+                                  f"{self.declines[key]}")
+            opts.pop(key)
+        count = int(opts.get("max_results") or 10)
+        if count > self.max_results:
+            self._notice(notices, f"max_results {count} is above {self.name}'s ceiling; "
+                                  f"{self.max_results} were asked for")
+        opts["max_results"] = max(1, min(count, self.max_results))
+        window = self._window(opts)
+        results = self._search(input.strip(), opts, window, notices)
+        return {"query": input.strip(), "provider": self.name, "results": results, "notices": notices}
+
     def run(self, input: str, options: "dict | None" = None) -> str:  # type: ignore[override]
-        raise NotImplementedError(f"{type(self).__name__} must implement run()")
+        """Search for *input*; the results as numbered text a model reads."""
+        return self.format(self.search(input, options))
+
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def format(found: dict) -> str:
+        results = found["results"]
+        lines = [f'Search results for "{found["query"]}" ({len(results)} results):\n']
+        for i, r in enumerate(results, 1):
+            lines.append(f"[{i}] {r['title'] or '(untitled)'}")
+            lines.append(f"    URL: {r['url']}")
+            meta = ([f"Published: {r['date']}"] if r["date"] else []) + \
+                   ([f"Author: {r['author']}"] if r["author"] else [])
+            if meta:
+                lines.append("    " + " · ".join(meta))
+            # one line each: the page's own line breaks would break the list
+            lines += ["    · " + " ".join(s.split()) for s in r["snippets"] if s and s.strip()]
+            if r["text"]:
+                lines.append("    Text: " + " ".join(r["text"].split()))
+            lines.append("")
+        for n in found["notices"]:
+            lines.append(f"Note: {n}")
+        return "\n".join(lines).rstrip()
+
+    @staticmethod
+    def record(title="", url="", date_="", author="", snippets=(), text="") -> dict:
+        """One result in the common shape — every key present."""
+        return {"title": (title or "").strip(), "url": url or "", "date": day(date_),
+                "author": (author or "").strip() if isinstance(author, str) else "",
+                "snippets": [s for s in snippets if isinstance(s, str) and s.strip()],
+                "text": text or ""}
+
+    def _window(self, opts: dict, now: "datetime | None" = None) -> tuple:
+        """The (start, end) days the options ask for; the later start wins."""
+        start = _check_day("start_date", opts["start_date"]) if opts.get("start_date") else ""
+        end = _check_day("end_date", opts["end_date"]) if opts.get("end_date") else ""
+        rec = opts.get("recency")
+        if rec:
+            if rec not in RECENCY:
+                raise ValueError(f"recency must be one of {', '.join(RECENCY)}; got {rec!r}")
+            since = ((now or datetime.now(timezone.utc)) - RECENCY[rec]).date().isoformat()
+            if start and start >= since:
+                opts.pop("recency")          # the explicit date is the tighter bound
+            else:
+                start = since
+        if start and end and start > end:
+            raise ValueError(f"start_date {start} is after end_date {end}")
+        return start, end
+
+    def _notice(self, notices: list, text: str) -> None:
+        notices.append(text)
+        warnings.warn(f"{self.name}: {text}", stacklevel=4)
+
+    def _search(self, query: str, opts: dict, window: tuple, notices: list) -> list:  # pragma: no cover
+        raise NotImplementedError(f"{type(self).__name__} must implement _search()")

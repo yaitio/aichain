@@ -23,6 +23,6 @@ A `Chain` or `Agent` pattern that grounds generation in retrieved source materia
 ## See also
 
 - [Research agent pattern](research-agent.md)
-- [perplexity_search](../tools-reference/perplexity-search.md)
+- [perplexity_search](../tools-reference/search.md#searchperplexity)
 - [markitdown](../tools-reference/markitdown.md)
 - [Agent memory](../agents/memory.md)

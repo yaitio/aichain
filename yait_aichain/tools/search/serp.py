@@ -1,343 +1,125 @@
 """
 tools.search.serp — searchSerp
-================================
+==============================
 
-Wraps the SerpAPI (https://serpapi.com/search) behind the standard
-:class:`~tools.search.Search` interface.
-
-The key differentiator from other search tools: the ``engine`` option
-lets callers choose from 50+ underlying search engines — Google, Bing,
-Yahoo, DuckDuckGo, Baidu, Yandex, and many more — via a single tool.
+SerpAPI behind the common :class:`~tools.search.Search` format — one key for
+Google, Bing, DuckDuckGo, Baidu, Yandex and the other engines it scrapes.
 
 Endpoint  : GET https://serpapi.com/search
 Auth      : ``api_key`` query parameter
 Docs      : https://serpapi.com/search-api
 
-The tool returns a human-readable plain-text string so that an orchestrating
-LLM can read page titles and **URLs directly** from the context variable
-preview without needing JSON parsing or variable injection::
+Translated for the Google engines: ``recency`` → ``tbs=qdr:h|d|w|m|y``, dates →
+``tbs=cdr:1,cd_min:…,cd_max:…``, ``country`` → ``gl``, ``language`` → ``hl``.
+``domains`` → ``site:`` in the query on every engine. On an engine that is not
+Google the time, country and language filters are not applied, and the caller
+is told. At most 100 results.
 
-    Search results for "query text" via google (5 results):
+SerpAPI's own options stay: ``engine``, ``location``, ``safe``, ``start``,
+``no_cache`` and ``time_filter`` (a raw ``tbs``, which wins over the standard
+time options).
 
-    [1] Page Title
-        URL: https://example.com/page
-        Date: Mar 15, 2025
-        Summary: Brief excerpt describing the page content.
-
-    [2] Another Title
-        URL: https://another.com/article
-        Summary: …
+Result dates are what Google prints — ``Sep 30, 2026`` or ``3 days ago`` —
+normalised to a day.
 
 Environment variable
----------------------
-``SERPAPI_API_KEY`` — API key obtained from https://serpapi.com/manage-api-key
+--------------------
+``SERPAPI_API_KEY`` — from https://serpapi.com/manage-api-key
 """
 
 from __future__ import annotations
 
 import json
-import os
 import urllib.parse
 
-import urllib3
-from yait_aichain.clients._base import make_http
-
-from ._base import Search, SEARCH_RETRIES, SEARCH_TIMEOUT
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from ._base import Search
+from .brave import site_query
 
 _ENDPOINT = "https://serpapi.com/search"
-_ENV_KEY  = "SERPAPI_API_KEY"
-
-_SUPPORTED_ENGINES = [
-    "google", "bing", "yahoo", "duckduckgo", "baidu", "yandex",
-    "google_news", "bing_news", "google_images", "google_shopping",
-    "google_maps", "google_jobs", "google_scholar",
-]
+_QDR = {"hour": "h", "day": "d", "week": "w", "month": "m", "year": "y"}
 
 
-# ---------------------------------------------------------------------------
-# searchSerp
-# ---------------------------------------------------------------------------
+def _mdy(iso: str) -> str:
+    y, m, d = iso.split("-")
+    return f"{int(m)}/{int(d)}/{y}"
+
 
 class searchSerp(Search):
     """
-    Multi-engine web search powered by SerpAPI.
-
-    The ``engine`` option selects which underlying search engine to use
-    (Google, Bing, Yahoo, DuckDuckGo, Baidu, Yandex, and 50+ others).
-
-    Parameters
-    ----------
-    api_key : str | None, optional
-        SerpAPI key.  When omitted the value of the ``SERPAPI_API_KEY``
-        environment variable is used.
-
-    Raises
-    ------
-    ValueError
-        At construction time if no API key is found in either the argument
-        or the environment.
+    Web search through SerpAPI — Google by default, or any engine it supports.
 
     Examples
     --------
-    Google search (default engine)::
+    ::
 
-        from yait_aichain.tools.search import searchSerp
+        from yait_aichain.tools import searchSerp
 
-        tool   = searchSerp()
-        result = tool(input="Python asyncio tutorial",
-                      options={"max_results": 5})
-
-        if result:
-            print(result.output)
-        else:
-            print("Error:", result.error)
-
-    DuckDuckGo search::
-
-        text = tool.run(
-            input   = "climate change 2025",
-            options = {"engine": "duckduckgo", "max_results": 10},
-        )
-        print(text)
-
-    Baidu search in Chinese::
-
-        text = tool.run(input="人工智能 2025", options={"engine": "baidu"})
-        print(text)
+        tool = searchSerp()
+        tool.run(input="Python asyncio tutorial", options={"recency": "week", "country": "GB"})
+        tool.run(input="人工智能", options={"engine": "baidu"})
     """
 
     name        = "searchSerp"
-    description = (
-        "Search the web via SerpAPI supporting multiple engines "
-        "(Google, Bing, DuckDuckGo, Baidu, Yandex, etc.)."
-    )
-    parameters  = {
-        "type": "object",
-        "properties": {
-            "input": {
-                "type":        "string",
-                "description": "The search query (required).",
-            },
-            "options": {
-                "type":        "object",
-                "description": "Optional search filters and configuration.",
-                "properties": {
-                    "engine": {
-                        "type":        "string",
-                        "description": (
-                            "The search engine to use.  Common values: 'google' (default), "
-                            "'bing', 'yahoo', 'duckduckgo', 'baidu', 'yandex', "
-                            "'google_news', 'bing_news', 'google_images', "
-                            "'google_shopping', 'google_scholar', 'google_maps', "
-                            "'google_jobs'.  Defaults to 'google'."
-                        ),
-                    },
-                    "max_results": {
-                        "type":        "integer",
-                        "description": "Number of results to return (default 10, max 100).",
-                    },
-                    "location": {
-                        "type":        "string",
-                        "description": (
-                            "Geographic location to use for localised results "
-                            "(e.g. 'Austin, Texas', 'Paris, France').  "
-                            "Supported by Google, Bing, and Yahoo."
-                        ),
-                    },
-                    "country": {
-                        "type":        "string",
-                        "description": (
-                            "Two-letter ISO 3166-1 country code that biases results "
-                            "(e.g. 'us', 'gb', 'de').  Google engine only."
-                        ),
-                    },
-                    "language": {
-                        "type":        "string",
-                        "description": (
-                            "Language code for the interface/results "
-                            "(e.g. 'en', 'fr', 'de').  Google engine only."
-                        ),
-                    },
-                    "safe": {
-                        "type":        "string",
-                        "enum":        ["active", "off"],
-                        "description": (
-                            "Safe search filter.  'active' enables filtering; "
-                            "'off' disables it.  Google engine only."
-                        ),
-                    },
-                    "time_filter": {
-                        "type":        "string",
-                        "description": (
-                            "Advanced time-based search filter.  "
-                            "Use 'qdr:d' (past day), 'qdr:w' (past week), "
-                            "'qdr:m' (past month), 'qdr:y' (past year).  "
-                            "Google engine only."
-                        ),
-                    },
-                    "start": {
-                        "type":        "integer",
-                        "description": (
-                            "Offset for pagination — the index of the first result "
-                            "to return.  Default 0.  Google engine only."
-                        ),
-                    },
-                    "no_cache": {
-                        "type":        "boolean",
-                        "description": (
-                            "When True, forces a live search and bypasses SerpAPI's "
-                            "cached results.  Useful for real-time data.  Default False."
-                        ),
-                    },
-                },
-            },
-        },
-        "required": ["input"],
+    description = ("Search the web through SerpAPI — Google by default, or Bing, "
+                   "DuckDuckGo, Baidu, Yandex and others. Returns titles, URLs, dates and snippets.")
+    max_results = 100
+    _ENV_KEY    = "SERPAPI_API_KEY"
+    _PROVIDER   = "SerpAPI"
+    extra_options = {
+        "engine":      {"type": "string",
+                        "description": "The engine: 'google' (default), 'bing', 'duckduckgo', 'baidu', "
+                                       "'yandex', 'google_news', 'google_scholar' and others."},
+        "location":    {"type": "string", "description": "A place to search from, e.g. 'Austin, Texas'."},
+        "safe":        {"type": "string", "enum": ["active", "off"], "description": "Google SafeSearch."},
+        "start":       {"type": "integer", "description": "Offset of the first result, for paging."},
+        "no_cache":    {"type": "boolean", "description": "Bypass SerpAPI's cache."},
+        "time_filter": {"type": "string",
+                        "description": "A raw Google 'tbs', e.g. 'qdr:w'; wins over recency and the dates."},
     }
 
-    # ------------------------------------------------------------------
+    def _params(self, query: str, opts: dict, window: tuple, notices: list) -> dict:
+        engine = opts.get("engine", "google")
+        p = {"q": site_query(query, opts.get("domains")), "engine": engine,
+             "num": opts["max_results"], "api_key": self._api_key}
+        google = engine.startswith("google")
+        start, end = window
+        tbs = opts.get("time_filter")
+        if not tbs and opts.get("recency") and not end:
+            tbs = f"qdr:{_QDR[opts['recency']]}"
+        elif not tbs and (start or end):
+            tbs = "cdr:1" + (f",cd_min:{_mdy(start)}" if start else "") + (f",cd_max:{_mdy(end)}" if end else "")
+        for key, field, value in (("time", "tbs", tbs), ("country", "gl", opts.get("country")),
+                                  ("language", "hl", opts.get("language"))):
+            if not value:
+                continue
+            if google:
+                p[field] = value.lower() if field in ("gl", "hl") else value
+            else:
+                self._notice(notices, f"the {key} filter was not applied: SerpAPI takes it on the "
+                                      f"Google engines, and this search used {engine}")
+        if opts.get("location"):
+            p["location"] = opts["location"]
+        if opts.get("safe"):
+            p["safe"] = opts["safe"]
+        if opts.get("start") is not None:
+            p["start"] = opts["start"]
+        if opts.get("no_cache"):
+            p["no_cache"] = "true"
+        return p
 
-    def __init__(self, api_key: str | None = None) -> None:
-        key = api_key or os.environ.get(_ENV_KEY)
-        if not key:
-            raise ValueError(
-                f"No SerpAPI key found.  Pass api_key= or set the "
-                f"{_ENV_KEY} environment variable."
-            )
-        self._api_key = key
-        self._http    = make_http(
-            timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES
-        )
-
-    # ------------------------------------------------------------------
-    # Core logic
-    # ------------------------------------------------------------------
-
-    def run(self, input: str, options: "dict | None" = None) -> str:
-        """
-        Execute a SerpAPI search and return a formatted plain-text string.
-
-        The result is formatted so that an LLM orchestrator can read page
-        titles and URLs directly from the text without any JSON parsing::
-
-            Search results for "query text" via google (5 results):
-
-            [1] Page Title
-                URL: https://example.com/page
-                Date: Mar 15, 2025
-                Summary: Brief excerpt…
-
-        Parameters
-        ----------
-        input : str
-            Search query (required).
-        options : dict | None
-            Optional configuration keys:
-              ``engine``      — search engine name (default ``"google"``).
-              ``max_results`` — number of results (default 10).
-              ``location``    — geographic location for localised results.
-              ``country``     — two-letter country code → ``gl`` param (Google only).
-              ``language``    — language code → ``hl`` param (Google only).
-              ``safe``        — safe-search filter ``"active"`` / ``"off"`` (Google only).
-              ``time_filter`` — time-based filter e.g. ``"qdr:w"`` → ``tbs`` (Google only).
-              ``start``       — pagination offset (Google only).
-              ``no_cache``    — skip SerpAPI cache and force a live search.
-
-        Returns
-        -------
-        str
-            Human-readable search results with numbered entries, titles,
-            URLs, optional dates, and description snippets.
-
-        Raises
-        ------
-        RuntimeError
-            On any non-2xx HTTP response from the SerpAPI.
-        """
-        opts = options or {}
-
-        engine   = opts.get("engine", "google")
-        num      = opts.get("max_results", 10)
-        location = opts.get("location")
-        gl       = opts.get("country")
-        hl       = opts.get("language")
-        safe     = opts.get("safe")
-        tbs      = opts.get("time_filter")
-        start    = opts.get("start")
-        no_cache = opts.get("no_cache", False)
-
-        # ── Build query parameters ────────────────────────────────────
-        params: dict = {
-            "q":       input,
-            "engine":  engine,
-            "num":     num,
-            "api_key": self._api_key,
-        }
-
-        if location is not None:  params["location"] = location
-        if gl       is not None:  params["gl"]       = gl
-        if hl       is not None:  params["hl"]       = hl
-        if safe     is not None:  params["safe"]     = safe
-        if tbs      is not None:  params["tbs"]      = tbs
-        if start    is not None:  params["start"]    = start
-        if no_cache:              params["no_cache"] = "true"
-
-        url = f"{_ENDPOINT}?{urllib.parse.urlencode(params)}"
-
-        # ── Send request ──────────────────────────────────────────────
+    def _search(self, query, opts, window, notices):
+        url = f"{_ENDPOINT}?{urllib.parse.urlencode(self._params(query, opts, window, notices))}"
         response = self._http.request("GET", url)
-
         raw = response.data.decode("utf-8", errors="replace")
-
-        if not (200 <= response.status < 300):
-            raise RuntimeError(
-                f"SerpAPI error [{response.status}]: {raw[:400]}"
-            )
-
+        if not 200 <= response.status < 300:
+            raise RuntimeError(f"SerpAPI error [{response.status}]: {raw[:400]}")
         data = json.loads(raw)
-
-        # ── Check for API-level errors ────────────────────────────────
         if "error" in data:
+            # "Google hasn't returned any results" is an answer, not a failure.
+            if "hasn't returned any results" in str(data["error"]):
+                return []
             raise RuntimeError(f"SerpAPI error: {data['error']}")
-
-        # ── Parse organic results ─────────────────────────────────────
-        organic = data.get("organic_results", [])
-
-        # Some engines (Google News, Bing News) use a different key
-        if not organic:
-            organic = data.get("news_results", [])
-
-        results = []
-        for item in organic:
-            entry: dict = {
-                "title":   item.get("title", ""),
-                "url":     item.get("link", ""),
-                "snippet": item.get("snippet", ""),
-            }
-            if item.get("date"):
-                entry["date"] = item["date"]
-            if item.get("source"):
-                entry["source"] = item["source"]
-            results.append(entry)
-
-        # ── Format as readable text ───────────────────────────────────
-        lines = [f'Search results for "{input}" via {engine} ({len(results)} results):\n']
-        for i, r in enumerate(results, 1):
-            lines.append(f"[{i}] {r['title']}")
-            lines.append(f"    URL: {r['url']}")
-            if r.get("date"):
-                lines.append(f"    Date: {r['date']}")
-            if r.get("source"):
-                lines.append(f"    Source: {r['source']}")
-            if r["snippet"]:
-                lines.append(f"    Summary: {r['snippet']}")
-            lines.append("")   # blank line between results
-
-        if not results:
-            lines.append("(no results found)")
-
-        return "\n".join(lines).rstrip()
+        items = data.get("organic_results") or data.get("news_results") or []
+        return [self.record(it.get("title"), it.get("link"), it.get("date"),
+                            (it.get("source") or "") if isinstance(it.get("source"), str) else "",
+                            [it.get("snippet") or ""]) for it in items][:opts["max_results"]]

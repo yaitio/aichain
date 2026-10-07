@@ -1,306 +1,129 @@
 """
 tools.search.brave — searchBrave
-=================================
+================================
 
-Wraps the Brave Search API (POST /res/v1/web/search) behind the standard
-:class:`~tools.search.Search` interface.
+The Brave Search API behind the common :class:`~tools.search.Search` format.
 
 Endpoint  : POST https://api.search.brave.com/res/v1/web/search
 Auth      : ``x-subscription-token`` header
 Docs      : https://api-dashboard.search.brave.com/api-reference/web/search/post
 
-The tool returns a human-readable plain-text string so that an orchestrating
-LLM can read page titles and **URLs directly** from the context variable
-preview without needing JSON parsing or variable injection::
+Translated: ``recency`` → ``freshness`` (``pd``/``pw``/``pm``/``py``; Brave has
+no hour, so ``hour`` is adapted to a day and said so), dates → a
+``YYYY-MM-DDtoYYYY-MM-DD`` range, ``domains`` → ``site:`` in the query (Brave
+has no site field), ``language`` → ``search_lang``. At most 20 results.
 
-    Search results for "query text" (5 results):
-
-    [1] Page Title
-        URL: https://example.com/page
-        Summary: Brief excerpt describing the page content.
-
-    [2] Another Title
-        URL: https://another.com/article
-        Summary: …
-
-This format makes it straightforward for the agent to extract a specific
-URL and pass it as a literal string to MarkItDownTool.
+Brave's own options stay: ``safe_search``, ``extra_snippets`` (up to five more
+passages per result), ``result_filter``, and ``freshness`` itself, which wins
+over the standard time options when given.
 
 Environment variable
----------------------
-``BRAVE_SEARCH_API_KEY`` — API key obtained from
-https://api-dashboard.search.brave.com
+--------------------
+``BRAVE_SEARCH_API_KEY`` — from https://api-dashboard.search.brave.com
 """
 
 from __future__ import annotations
 
+import html
 import json
-import os
+import re
+from datetime import date
 
-import urllib3
-from yait_aichain.clients._base import make_http
-
-from ._base import Search, SEARCH_RETRIES, SEARCH_TIMEOUT
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from ._base import Search
 
 _ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
-_ENV_KEY   = "BRAVE_SEARCH_API_KEY"
+_FRESHNESS = {"hour": "pd", "day": "pd", "week": "pw", "month": "pm", "year": "py"}
 
 
-# ---------------------------------------------------------------------------
-# searchBrave
-# ---------------------------------------------------------------------------
+def site_query(query: str, domains) -> str:
+    """*query* restricted to *domains* with ``site:`` — for providers with no site field."""
+    if not domains:
+        return query
+    sites = " OR ".join(f"site:{d}" for d in domains)
+    return f"{query} ({sites})" if len(domains) > 1 else f"{query} {sites}"
+
 
 class searchBrave(Search):
     """
-    Web search powered by the Brave Search API.
-
-    Parameters
-    ----------
-    api_key : str | None, optional
-        Brave Search subscription token.  When omitted the value of the
-        ``BRAVE_SEARCH_API_KEY`` environment variable is used.
-
-    Raises
-    ------
-    ValueError
-        At construction time if no API key is found in either the argument
-        or the environment.
+    Web search powered by the Brave Search API — titles, URLs, the page's
+    description and, with ``extra_snippets``, more passages from it.
 
     Examples
     --------
-    Basic search::
+    ::
 
-        from yait_aichain.tools.search import searchBrave
+        from yait_aichain.tools import searchBrave
 
-        tool   = searchBrave()
-        result = tool(input="Python asyncio tutorial",
-                      options={"max_results": 5})
-
-        if result:
-            print(result.output)   # plain-text numbered list with URLs
-        else:
-            print("Error:", result.error)
-
-    Direct call with all options::
-
-        text = tool.run(
-            input   = "climate change solutions",
-            options = {
-                "max_results":    10,
-                "country":        "GB",
-                "language":       "en",
-                "safe_search":    "moderate",
-                "freshness":      "pw",
-                "extra_snippets": True,
-            },
-        )
-        print(text)
+        tool = searchBrave()
+        tool.run(input="Python asyncio tutorial", options={"max_results": 5, "recency": "month"})
+        tool.search(input="AI agents", options={"domains": ["hbr.org"]})["results"]
     """
 
     name        = "searchBrave"
-    description = (
-        "Search the web using the Brave Search engine. "
-        "Returns titles, URLs, and description snippets."
-    )
-    parameters  = {
-        "type": "object",
-        "properties": {
-            "input": {
-                "type":        "string",
-                "description": "The search query (required, 1–400 characters).",
-            },
-            "options": {
-                "type":        "object",
-                "description": "Optional search filters and configuration.",
-                "properties": {
-                    "max_results": {
-                        "type":        "integer",
-                        "description": "Number of results to return (1–20, default 10).",
-                    },
-                    "country": {
-                        "type":        "string",
-                        "description": (
-                            "Two-letter ISO 3166-1 country code that biases results "
-                            "(e.g. 'US', 'GB', 'DE').  Defaults to 'US'."
-                        ),
-                    },
-                    "language": {
-                        "type":        "string",
-                        "description": (
-                            "Language code for results (e.g. 'en', 'de', 'fr').  "
-                            "Defaults to 'en'."
-                        ),
-                    },
-                    "safe_search": {
-                        "type":        "string",
-                        "enum":        ["off", "moderate", "strict"],
-                        "description": "Adult-content filter level.  Defaults to 'moderate'.",
-                    },
-                    "freshness": {
-                        "type":        "string",
-                        "description": (
-                            "Filter results by page age.  "
-                            "Use 'pd' (past day), 'pw' (past week), 'pm' (past month), "
-                            "'py' (past year), or a date range 'YYYY-MM-DDtoYYYY-MM-DD'."
-                        ),
-                    },
-                    "extra_snippets": {
-                        "type":        "boolean",
-                        "description": (
-                            "When True, up to 5 additional excerpt snippets are "
-                            "included per result.  Defaults to False."
-                        ),
-                    },
-                    "result_filter": {
-                        "type":        "string",
-                        "description": (
-                            "Comma-separated list of result types to include.  "
-                            "Allowed values: discussions, faq, infobox, news, query, "
-                            "summarizer, videos, web, locations.  "
-                            "Defaults to all types."
-                        ),
-                    },
-                },
-            },
-        },
-        "required": ["input"],
+    description = ("Search the web with Brave. Returns titles, URLs, dates and a "
+                   "description of each page.")
+    max_results = 20
+    _ENV_KEY    = "BRAVE_SEARCH_API_KEY"
+    _PROVIDER   = "Brave Search"
+    extra_options = {
+        "safe_search":    {"type": "string", "enum": ["off", "moderate", "strict"],
+                           "description": "Adult-content filter. Default 'moderate'."},
+        "extra_snippets": {"type": "boolean",
+                           "description": "Up to five more passages from each page. Default false."},
+        "result_filter":  {"type": "string",
+                           "description": "Comma-separated result types: discussions, faq, infobox, "
+                                          "news, query, summarizer, videos, web, locations."},
+        "freshness":      {"type": "string",
+                           "description": "Brave's own time filter — 'pd', 'pw', 'pm', 'py' or "
+                                          "'YYYY-MM-DDtoYYYY-MM-DD'; wins over recency and the dates."},
     }
 
-    # ------------------------------------------------------------------
+    def _body(self, query: str, opts: dict, window: tuple, notices: list) -> dict:
+        body = {"q": site_query(query, opts.get("domains")), "count": opts["max_results"]}
+        start, end = window
+        if opts.get("freshness"):
+            body["freshness"] = opts["freshness"]
+        elif opts.get("recency") and not end:
+            if opts["recency"] == "hour":
+                self._notice(notices, "recency 'hour' was widened to a day: Brave's finest window is a day")
+            body["freshness"] = _FRESHNESS[opts["recency"]]
+        elif start or end:
+            body["freshness"] = f"{start or '1970-01-01'}to{end or date.today().isoformat()}"
+        if opts.get("country"):
+            body["country"] = opts["country"]
+        if opts.get("language"):
+            body["search_lang"] = opts["language"]
+        if opts.get("safe_search"):
+            body["safesearch"] = opts["safe_search"]
+        if opts.get("result_filter"):
+            body["result_filter"] = opts["result_filter"]
+        if opts.get("extra_snippets"):
+            body["extra_snippets"] = True
+        return body
 
-    def __init__(self, api_key: str | None = None) -> None:
-        key = api_key or os.environ.get(_ENV_KEY)
-        if not key:
-            raise ValueError(
-                f"No Brave Search API key found.  Pass api_key= or set the "
-                f"{_ENV_KEY} environment variable."
-            )
-        self._api_key = key
-        self._http    = make_http(
-            timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES
-        )
-
-    # ------------------------------------------------------------------
-    # Core logic
-    # ------------------------------------------------------------------
-
-    def run(self, input: str, options: "dict | None" = None) -> str:
-        """
-        Execute a Brave Search query and return a formatted plain-text string.
-
-        The result is formatted so that an LLM orchestrator can read page
-        titles and URLs directly from the text without any JSON parsing::
-
-            Search results for "query text" (5 results):
-
-            [1] Page Title
-                URL: https://example.com/page
-                Summary: Brief excerpt…
-
-        Parameters
-        ----------
-        input : str
-            Search query (required).
-        options : dict | None
-            Optional configuration keys:
-              ``max_results``    — number of results (1–20, default 10).
-              ``country``        — ISO 3166-1 alpha-2 country code.
-              ``language``       — language code for results (e.g. ``"en"``).
-              ``safe_search``    — ``"off"``, ``"moderate"``, or ``"strict"``.
-              ``freshness``      — ``"pd"`` / ``"pw"`` / ``"pm"`` / ``"py"`` or
-                                   ``"YYYY-MM-DDtoYYYY-MM-DD"``.
-              ``extra_snippets`` — include up to 5 extra snippet excerpts per result.
-              ``result_filter``  — comma-separated result type names to include.
-
-        Returns
-        -------
-        str
-            Human-readable search results with numbered entries, titles,
-            URLs, and description snippets.
-
-        Raises
-        ------
-        RuntimeError
-            On any non-2xx HTTP response from the Brave API.
-        """
-        opts = options or {}
-
-        count          = opts.get("max_results", 10)
-        country        = opts.get("country")
-        search_lang    = opts.get("language")
-        safesearch     = opts.get("safe_search")
-        freshness      = opts.get("freshness")
-        extra_snippets = opts.get("extra_snippets", False)
-        result_filter  = opts.get("result_filter")
-
-        # ── Build request body ────────────────────────────────────────
-        body: dict = {"q": input, "count": count}
-
-        if country        is not None:  body["country"]        = country
-        if search_lang    is not None:  body["search_lang"]    = search_lang
-        if safesearch     is not None:  body["safesearch"]     = safesearch
-        if freshness      is not None:  body["freshness"]      = freshness
-        if result_filter  is not None:  body["result_filter"]  = result_filter
-        if extra_snippets:              body["extra_snippets"] = True
-
-        headers = {
-            "x-subscription-token": self._api_key,
-            "Content-Type":         "application/json",
-            "Accept":               "application/json",
-        }
-
-        # ── Send request ──────────────────────────────────────────────
+    def _search(self, query, opts, window, notices):
         response = self._http.request(
-            "POST",
-            _ENDPOINT,
-            body    = json.dumps(body).encode("utf-8"),
-            headers = headers,
-        )
-
+            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
+            headers={"x-subscription-token": self._api_key, "Content-Type": "application/json",
+                     "Accept": "application/json"})
         raw = response.data.decode("utf-8", errors="replace")
-
-        if not (200 <= response.status < 300):
-            raise RuntimeError(
-                f"Brave Search API error [{response.status}]: {raw}"
-            )
-
+        if not 200 <= response.status < 300:
+            raise RuntimeError(f"Brave Search API error [{response.status}]: {raw}")
         data = json.loads(raw)
+        items = (data.get("web") or {}).get("results") or data.get("results") or []
+        out = []
+        for it in items:
+            article = it.get("article") or {}
+            authors = article.get("author") or []
+            author = ", ".join(a.get("name", "") for a in authors if isinstance(a, dict)) if isinstance(authors, list) else ""
+            # article.date is the publication date the page declares; page_age is
+            # when Brave saw the page — 2026-09-30 for an HBR article of 09-01.
+            out.append(self.record(it.get("title"), it.get("url"), article.get("date") or it.get("page_age"),
+                                   author, [_plain(it.get("description"))] +
+                                   [_plain(s) for s in it.get("extra_snippets") or []]))
+        return out
 
-        # ── Parse results ─────────────────────────────────────────────
-        web_results = (
-            data.get("web", {}).get("results", [])
-            or data.get("results", [])
-        )
 
-        results = []
-        for item in web_results:
-            entry: dict = {
-                "title":       item.get("title", ""),
-                "url":         item.get("url", ""),
-                "description": item.get("description", ""),
-            }
-            if "page_age" in item:
-                entry["age"] = item["page_age"]
-            if extra_snippets and item.get("extra_snippets"):
-                entry["extra_snippets"] = item["extra_snippets"]
-            results.append(entry)
-
-        # ── Format as readable text ───────────────────────────────────
-        lines = [f'Search results for "{input}" ({len(results)} results):\n']
-        for i, r in enumerate(results, 1):
-            lines.append(f"[{i}] {r['title']}")
-            lines.append(f"    URL: {r['url']}")
-            if r["description"]:
-                lines.append(f"    Summary: {r['description']}")
-            if "age" in r:
-                lines.append(f"    Age: {r['age']}")
-            if "extra_snippets" in r:
-                for snip in r["extra_snippets"]:
-                    lines.append(f"    · {snip}")
-            lines.append("")   # blank line between results
-
-        return "\n".join(lines).rstrip()
+def _plain(s: "str | None") -> str:
+    """Brave marks the query's words with <strong> and escapes entities."""
+    return html.unescape(re.sub(r"<[^>]+>", "", s or ""))

@@ -361,10 +361,10 @@ class TestSearchNetworkPolicy(unittest.TestCase):
         from yait_aichain.tools.search.serp       import searchSerp
         from yait_aichain.tools.search.perplexity import searchPerplexity
         from yait_aichain.tools.search.brave      import searchBrave
-        from yait_aichain.tools.search.openai     import searchOpenAI
+        from yait_aichain.tools.search.exa        import searchExa
 
         for tool in (searchSerp(), searchPerplexity(),
-                     searchBrave(api_key="k"), searchOpenAI(api_key="k")):
+                     searchBrave(api_key="k"), searchExa(api_key="k")):
             kw      = tool._http.connection_pool_kw
             timeout = kw.get("timeout")
             retries = kw.get("retries")

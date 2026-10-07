@@ -195,6 +195,25 @@ Agent(model, tools=[triage])               # the agent calls triage(state) by it
 
 Thresholds are yours: compare `probability` or `confidence` to a number in code.
 
+**Web search, one format** — `searchPerplexity`, `searchBrave`, `searchSerp`, `searchExa`
+take the same options and return the same records; a provider that cannot honour an
+option says so in `notices` and in a `Note:` line, never silently.
+
+```python
+from yait_aichain.tools import searchPerplexity
+
+tool  = searchPerplexity()
+found = tool.search("AI and leadership", {"max_results": 5, "domains": ["hbr.org"],
+                    "start_date": "2026-09-28", "end_date": "2026-10-04"})
+found["results"][0]      # {"title", "url", "date", "author", "snippets", "text"}
+found["notices"]         # options not applied here, and why
+tool.run(input="AI and leadership")   # the same as numbered text; what an agent calls
+```
+
+Options: `max_results`, `recency` (hour/day/week/month/year), `start_date`, `end_date`
+(YYYY-MM-DD), `country`, `language`, `domains`. A result's `date` is the provider's
+claim; read the page's own with `convertToMD().last_metadata["published"]`.
+
 ## Chain — steps in order
 
 ```python

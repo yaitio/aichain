@@ -17,11 +17,10 @@ Chains and Agents identically.
 <!-- g:tools-index -->
 | Group | Tool | Class | What it does | Key | Risk |
 |---|---|---|---|---|---|
-| Search | [`searchPerplexity`](perplexity-search.md) | `PerplexitySearchTool` | Web search powered by the Perplexity Search API. | `PERPLEXITY_API_KEY` | `write` |
-| Search | [`searchBrave`](brave-search.md) | `BraveSearchTool` | Web search powered by the Brave Search API. | `BRAVE_SEARCH_API_KEY` | `write` |
-| Search | [`searchSerp`](serp-api.md) | `SerpApiTool` | Multi-engine web search powered by SerpAPI. | `SERPAPI_API_KEY` | `write` |
-| Search | [`searchOpenAI`](openai-web-search.md) | `OpenAIWebSearchTool` | Web search powered by OpenAI's built-in `web_search_preview` tool. | `OPENAI_API_KEY` | `write` |
-| Search | [`searchExa`](exa-search.md) | `searchExa` | Web search powered by the Exa Search API — results with the passages that answer the query. | `EXA_API_KEY` | `write` |
+| Search | [`searchPerplexity`](search.md#searchperplexity) | `PerplexitySearchTool` | Web search powered by the Perplexity Search API — each result with a substantive passage from the page. | `PERPLEXITY_API_KEY` | `read` |
+| Search | [`searchBrave`](search.md#searchbrave) | `BraveSearchTool` | Web search powered by the Brave Search API — titles, URLs, the page's description and, with `extra_snippets`, more passages from it. | `BRAVE_SEARCH_API_KEY` | `read` |
+| Search | [`searchSerp`](search.md#searchserp) | `SerpApiTool` | Web search through SerpAPI — Google by default, or any engine it supports. | `SERPAPI_API_KEY` | `read` |
+| Search | [`searchExa`](search.md#searchexa) | `searchExa` | Web search powered by the Exa Search API — results with the passages that answer the query. | `EXA_API_KEY` | `read` |
 | Conversion | [`convertToMD`](markitdown.md) | `MarkItDownTool` | Convert a file or URL to Markdown text. | — | `write` |
 | Conversion | [`convertToHTML`](mistletoe.md) | `MistletoeTool` | Convert Markdown text to HTML, LaTeX, or normalised Markdown. | — | `write` |
 | Conversion | [`convertToPDF`](weasyprint.md) | `WeasyprintTool` | Render an HTML document to PDF. | — | `write` |
