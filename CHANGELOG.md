@@ -29,21 +29,30 @@
   `language` has no field on this API and is not declared, so asking for it is
   reported rather than dropped. Verified live, alone and inside a `gpt-6-luna`
   agent that searched, answered and cited a URL.
-- **`convertToDecision` — a decision with probabilities, not prose.** TypeSafe's
-  Jev (`TYPESAFE_API_KEY`) answers typed questions about a text: `noul` (the
+- **Decision tools — a decision with probabilities, not prose, from two
+  providers in one format.** `decisionOpenAI` (OpenAI's Decisions API,
+  `gpt-6-luna`, `OPENAI_API_KEY`) and `decisionTypeSafe` (TypeSafe's Jev,
+  `TYPESAFE_API_KEY`) answer typed questions about a text: `predicate` (the
   probability a statement is true), `choice` (one option, a probability for
   each, `confidence`) and `score` (a value over ordered levels, `confidence`),
-  all in one call. The questions are fixed when the tool is made and the caller
-  — or an agent — passes only the text as `state`; the description the model
-  sees is written from the questions. `run()` returns the answers untouched,
-  the version that answered and the cost, input only. A dict or a list is
-  passed through as structured state. Verified live: a `gpt-6-luna` agent
-  called `triage(state=...)` by itself, read `urgent` = 0.06 and routed the
-  ticket without escalating.
+  all in one call. The two APIs differ in every wire detail — a map against a
+  list, `noul` against `predicate`, probabilities keyed by index against
+  objects — and the tools take and return one format, the way the search tools
+  do; `Decision` is the base a third provider subclasses. The questions are
+  fixed when the tool is made and checked there, and an agent passes only the
+  text as `state`; the description the model sees is written from the
+  questions. `run()` returns the answers, the version that answered and the
+  cost, input only — $0.10 and $0.042 per million tokens. `decisionOpenAI`
+  also takes images, as base64 data URLs, and `decisionTypeSafe` refuses them
+  by name; a dict state reaches Jev as structure and OpenAI as JSON text. Both
+  verified live with the same questions, and images on OpenAI; a `gpt-6-luna`
+  agent called `triage(state=...)` by itself and routed by the number.
 
-  A tool and not a `Model`, decided the same day after trying it as one: every
+  A tool and not a `Model`, decided 2026-10-02 after trying Jev as one: every
   specialised model here that does not converse is a tool, as a model it bent
   ten places outside its own client, and an `Agent` could not use it at all.
+  Built first as `convertToDecision` for Jev alone and replaced before release,
+  when OpenAI shipped the same three question types on 2026-10-08.
 
 ### Changed
 

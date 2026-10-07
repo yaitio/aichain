@@ -67,10 +67,10 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `EXA_API_KEY` | `searchExa` | — |
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | yes |
 | `GOOGLE_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | — |
-| `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `searchOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
+| `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `decisionOpenAI`, `searchOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
 | `PERPLEXITY_API_KEY` | `searchPerplexity` | yes |
 | `SERPAPI_API_KEY` | `searchSerp` | — |
-| `TYPESAFE_API_KEY` | `convertToDecision` | — |
+| `TYPESAFE_API_KEY` | `decisionTypeSafe` | — |
 | `VOYAGE_API_KEY` | `EmbeddingVoyage`, `RerankVoyage`, `VoyageEmbedder` | — |
 | `XAI_API_KEY` | `sttXAI`, `ttsXAI` | yes |
 <!-- /g:env-tools -->

@@ -105,7 +105,7 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
         params = inspect.signature(cls.__init__).parameters
         if any(p.default is p.empty and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
                for p in list(params.values())[1:]):
-            # Cannot be built bare (convertToDecision needs its questions); the
+            # Cannot be built bare (a decision tool needs its questions); the
             # class-level schema is still the call schema when it declares one.
             declared = getattr(cls, "parameters", None)
             return declared if declared and declared.get("properties") else None

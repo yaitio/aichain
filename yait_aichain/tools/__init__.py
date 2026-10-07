@@ -31,6 +31,9 @@ convert/         Format conversion — all return str (path or content).
   TTS(provider)     factory → ttsOpenAI | ttsGoogle | ttsXAI | ttsQwen
   STT(provider)     factory → sttOpenAI | sttGoogle | sttXAI | sttQwen
 
+decision/        Typed questions about a text, answered with probabilities.
+  decisionOpenAI, decisionTypeSafe — one format of questions and answers
+
 rest_api         Universal REST endpoint tool.
   RestApiTool       one instance = one configured endpoint; drop any REST
                     call into a Chain, Agent, or script with no boilerplate.
@@ -126,7 +129,6 @@ from .convert import (
     convertToPDF,
     convertToSpeech,
     convertToText,
-    convertToDecision,
     # TTS providers
     ttsOpenAI,
     ttsGoogle,
@@ -145,6 +147,9 @@ from .convert import (
     MistletoeTool,
     WeasyprintTool,
 )
+
+# ── Decision ──────────────────────────────────────────────────────────────────
+from .decision import Decision, decisionOpenAI, decisionTypeSafe
 
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
@@ -194,7 +199,9 @@ from .mcp import MCPTool, MCPTools
 
 
 __all__ = [
-    "convertToDecision",
+    "Decision",
+    "decisionOpenAI",
+    "decisionTypeSafe",
     "searchExa",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
