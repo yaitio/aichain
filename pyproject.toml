@@ -19,6 +19,7 @@ dependencies = [
 convert = ["markitdown"]
 yaml    = ["pyyaml"]
 mcp     = ["fastmcp"]
+fetch   = ["markitdown"]
 all     = ["markitdown", "pyyaml", "fastmcp"]
 
 [project.urls]

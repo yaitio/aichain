@@ -4,6 +4,23 @@
 
 ### Added
 
+- **`fetch` — a web page's text from its URL, one record from five tools.**
+  `fetchFirecrawl` (Scrape, one URL a call), `fetchTavily` (Extract, ≤ 20),
+  `fetchExa` (Contents, ≤ 100) and `fetchParallel` (Extract, ≤ 20) use the
+  same keys as their search tools; `fetchLocal` runs MarkItDown on this
+  machine, costs nothing and comes only with the new `fetch` extra —
+  `pip install "yait-aichain[fetch]"`; without it, construction raises with
+  that line. `fetch(url_or_list, options)` returns `pages` — `url`,
+  `final_url`, `title`, `published`, `author`, `text`, `error` — with
+  `notices`, `cost`, `cost_basis` and `usage` as the search tools do; a URL
+  that failed is a page with `error`, not a failed call. `run(url)` returns one
+  page as text and raises with the reason. A list is split into each
+  provider's batch size. One standard option, `max_chars` (default 20 000),
+  and each provider's own: `only_main_content`, `extract_depth`,
+  `max_age_hours`, `max_age_seconds`. `fetchLocal` reads `robots.txt` once per
+  host and skips a page it disallows for `*` or the Claude crawlers, without
+  requesting it (RFC 9309: 4xx allows, 5xx disallows); `respect_robots=False`
+  turns that off. Verified live on all five, 2026-10-09.
 - **`convertToMD` returns a web page's metadata and sends the caller's
   headers.** MarkItDown keeps only the body, and some sites state the
   publication date nowhere else — library.hbs.edu, checked 2026-10-07. After

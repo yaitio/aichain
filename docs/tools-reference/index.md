@@ -23,6 +23,11 @@ Chains and Agents identically.
 | Search | [`searchFirecrawl`](search.md#searchfirecrawl) | `searchFirecrawl` | Web search powered by Firecrawl — results with a description and, on request, each page's content as Markdown. | `FIRECRAWL_API_KEY` | `read` |
 | Search | [`searchTavily`](search.md#searchtavily) | `searchTavily` | Web search powered by Tavily — each page with the passages chosen for the query, and on request the page itself. | `TAVILY_API_KEY` | `read` |
 | Search | [`searchParallel`](search.md#searchparallel) | `searchParallel` | Web search powered by Parallel — the excerpts of each page that serve the objective of the search. | `PARALLEL_API_KEY` | `read` |
+| Fetch | [`fetchFirecrawl`](fetch.md#fetchfirecrawl) | `fetchFirecrawl` | A web page's text by Firecrawl Scrape — the main content, as Markdown, with the page's metadata. | `FIRECRAWL_API_KEY` | `read` |
+| Fetch | [`fetchTavily`](fetch.md#fetchtavily) | `fetchTavily` | Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown. | `TAVILY_API_KEY` | `read` |
+| Fetch | [`fetchExa`](fetch.md#fetchexa) | `fetchExa` | Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and author. | `EXA_API_KEY` | `read` |
+| Fetch | [`fetchParallel`](fetch.md#fetchparallel) | `fetchParallel` | Web pages' full content by Parallel Extract — up to 20 URLs a call, with title and date. | `PARALLEL_API_KEY` | `read` |
+| Fetch | [`fetchLocal`](fetch.md#fetchlocal) | `fetchLocal` | A web page's text fetched from this machine and converted by MarkItDown — free. | — | `read` |
 | Conversion | [`convertToMD`](markitdown.md) | `MarkItDownTool` | Convert a file or URL to Markdown text. | — | `write` |
 | Conversion | [`convertToHTML`](mistletoe.md) | `MistletoeTool` | Convert Markdown text to HTML, LaTeX, or normalised Markdown. | — | `write` |
 | Conversion | [`convertToPDF`](weasyprint.md) | `WeasyprintTool` | Render an HTML document to PDF. | — | `write` |

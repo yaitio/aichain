@@ -64,14 +64,14 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `BRAVE_SEARCH_API_KEY` | `searchBrave` | — |
 | `COHERE_API_KEY` | `CohereEmbedder`, `EmbeddingCohere`, `RerankCohere` | — |
 | `DASHSCOPE_API_KEY` | `EmbeddingQwen`, `RerankQwen`, `sttQwen`, `ttsQwen` | yes |
-| `EXA_API_KEY` | `searchExa` | — |
-| `FIRECRAWL_API_KEY` | `searchFirecrawl` | — |
+| `EXA_API_KEY` | `fetchExa`, `searchExa` | — |
+| `FIRECRAWL_API_KEY` | `fetchFirecrawl`, `searchFirecrawl` | — |
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | yes |
 | `GOOGLE_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | — |
 | `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `decisionOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
-| `PARALLEL_API_KEY` | `searchParallel` | — |
+| `PARALLEL_API_KEY` | `fetchParallel`, `searchParallel` | — |
 | `PERPLEXITY_API_KEY` | `searchPerplexity` | yes |
-| `TAVILY_API_KEY` | `searchTavily` | — |
+| `TAVILY_API_KEY` | `fetchTavily`, `searchTavily` | — |
 | `TYPESAFE_API_KEY` | `decisionTypeSafe` | — |
 | `VOYAGE_API_KEY` | `EmbeddingVoyage`, `RerankVoyage`, `VoyageEmbedder` | — |
 | `XAI_API_KEY` | `sttXAI`, `ttsXAI` | yes |

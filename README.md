@@ -260,6 +260,9 @@ registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
 ### Search
 `searchPerplexity` · `searchBrave` · `searchExa` · `searchFirecrawl` · `searchTavily` · `searchParallel`
 
+### Fetch
+`fetchFirecrawl` · `fetchTavily` · `fetchExa` · `fetchParallel` · `fetchLocal` (free; `pip install "yait-aichain[fetch]"`)
+
 ### Decision
 `decisionOpenAI` · `decisionTypeSafe`
 

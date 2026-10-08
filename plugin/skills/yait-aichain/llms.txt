@@ -216,6 +216,23 @@ Options: `max_results`, `recency` (hour/day/week/month/year), `start_date`, `end
 (YYYY-MM-DD), `country`, `language`, `domains`. A result's `date` is the provider's
 claim; read the page's own with `convertToMD().last_metadata["published"]`.
 
+**A page from its link, one format** — `fetchFirecrawl`, `fetchTavily`, `fetchExa`,
+`fetchParallel` (each with its search tool's key) and `fetchLocal` (MarkItDown on this
+machine, free, respects robots.txt; needs `pip install "yait-aichain[fetch]"`).
+
+```python
+from yait_aichain.tools import fetchExa
+
+found = fetchExa().fetch(["https://example.com/a", "https://example.com/b"], {"max_chars": 20000})
+found["pages"][0]        # {"url", "final_url", "title", "published", "author", "text", "error"}
+found["cost"]            # USD, as for search
+fetchExa().run(input="https://example.com/a")   # one page as text; raises with the reason
+```
+
+A URL that failed is a page with `error` set, not a failed call. Search finds the
+link, fetch brings the page: `searchPerplexity` + `fetchFirecrawl` is the pair that
+reached the most in our measurement (2026-10-08).
+
 ## Chain — steps in order
 
 ```python

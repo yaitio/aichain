@@ -16,6 +16,10 @@ search/          Web search — all return plain-text result strings.
   searchPerplexity, searchBrave, searchExa, searchFirecrawl, searchTavily,
   searchParallel — one format of options and results
 
+fetch/           A web page's text from its URL — one record for every provider.
+  fetchFirecrawl, fetchTavily, fetchExa, fetchParallel, and fetchLocal
+  (MarkItDown, free; needs pip install "yait-aichain[fetch]")
+
 embedding/       Text embeddings — returns EmbeddingResult with float vectors.
   Embedding(model)  factory → EmbeddingOpenAI | EmbeddingCohere |
                               EmbeddingVoyage | EmbeddingGoogle | EmbeddingQwen
@@ -103,6 +107,16 @@ from .search import (
     # aliases
     PerplexitySearchTool,
     BraveSearchTool,
+)
+
+# ── Fetch ─────────────────────────────────────────────────────────────────────
+from .fetch import (
+    Fetch,
+    fetchFirecrawl,
+    fetchTavily,
+    fetchExa,
+    fetchParallel,
+    fetchLocal,
 )
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
@@ -206,6 +220,12 @@ __all__ = [
     "searchFirecrawl",
     "searchTavily",
     "searchParallel",
+    "Fetch",
+    "fetchFirecrawl",
+    "fetchTavily",
+    "fetchExa",
+    "fetchParallel",
+    "fetchLocal",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",
