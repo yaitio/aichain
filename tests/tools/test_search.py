@@ -22,8 +22,8 @@ What is pinned, offline, for every provider:
 Fixtures: Brave's and Perplexity's are real answers captured 2026-10-06 and
 trimmed; Exa's real, 2026-10-02; Firecrawl's in its documented shape,
 and Tavily's in their documented shapes, checked against live answers on
-2026-10-08; SerpAPI's built from its documented shape — no key was
-available to capture one.
+2026-10-08, as is Parallel's; SerpAPI's built from its documented shape —
+no key was available to capture one.
 """
 
 import json
@@ -38,7 +38,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from yait_aichain.tools import (Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity,
-                                searchSerp, searchTavily)
+                                searchParallel, searchSerp, searchTavily)
 from yait_aichain.tools.search._base import day
 
 #: Captured live 2026-10-06, query "site:hbr.org article", trimmed.
@@ -103,8 +103,16 @@ TAVILY = {"query": "Who is Leo Messi?", "images": [], "response_time": "1.67", "
                "content": "Lionel Andrés Messi is an Argentine professional footballer.", "score": 0.7,
                "raw_content": None, "published_date": None}]}
 
+#: Parallel's documented answer shape, two results; the live shape matched it on 2026-10-08.
+PARALLEL = {"search_id": "search_fcb2b4f3c75e418687bccaa1a8381331",
+            "session_id": "session_fcb2b4f3c75e418687bccaa1a8381331",
+            "results": [{"url": "https://www.example.com", "title": "Sample webpage title",
+                         "publish_date": "2024-01-15", "excerpts": ["Sample excerpt 1", "Sample excerpt 2"]},
+                        {"url": "https://www.example.org/two", "title": "Second page", "publish_date": None,
+                         "excerpts": ["Only excerpt"]}]}
+
 FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA, searchSerp: SERP,
-           searchFirecrawl: FIRECRAWL, searchTavily: TAVILY}
+           searchFirecrawl: FIRECRAWL, searchTavily: TAVILY, searchParallel: PARALLEL}
 QUERY = "AI and strategy"
 
 
@@ -333,6 +341,53 @@ class TestTavily(unittest.TestCase):
         self.assertEqual(second["date"], "")
 
 
+class TestParallel(unittest.TestCase):
+
+    def test_the_query_is_the_objective_and_a_keyword_query(self):
+        tool, _, _ = _search(searchParallel, {"max_results": 7, "search_queries": ["AI strategy 2026", QUERY]})
+        sent = _sent(tool)
+        self.assertEqual(sent["objective"], QUERY)
+        self.assertEqual(sent["search_queries"], [QUERY, "AI strategy 2026"])     # no duplicate
+        self.assertEqual(sent["advanced_settings"]["max_results"], 7)
+        tool, _, _ = _search(searchParallel, {"objective": "Find what HBR published on AI this week"})
+        self.assertEqual(_sent(tool)["objective"], "Find what HBR published on AI this week")
+
+    def test_domains_with_paths_a_start_date_and_a_country(self):
+        tool, _, _ = _search(searchParallel, {"domains": ["bcg.com/publications", ".edu"],
+                                              "start_date": "2026-09-28", "country": "GB"})
+        s = _sent(tool)["advanced_settings"]
+        self.assertEqual(s["source_policy"], {"include_domains": ["bcg.com/publications", ".edu"],
+                                              "after_date": "2026-09-28"})
+        self.assertEqual(s["location"], "gb")
+
+    def test_recency_is_a_start_date_and_an_hour_is_said_to_be_a_day(self):
+        tool, found, _ = _search(searchParallel, {"recency": "week"})
+        week_ago = (datetime.now(timezone.utc) - timedelta(weeks=1)).date().isoformat()
+        self.assertEqual(_sent(tool)["advanced_settings"]["source_policy"]["after_date"], week_ago)
+        self.assertEqual(found["notices"], [])
+        _, found, _ = _search(searchParallel, {"recency": "hour"})
+        self.assertTrue(any("widened to a day" in n for n in found["notices"]))
+
+    def test_an_end_date_is_declined_and_said(self):
+        tool, found, _ = _search(searchParallel, {"start_date": "2026-09-28", "end_date": "2026-10-04"})
+        self.assertNotIn("before_date", json.dumps(_sent(tool)))
+        self.assertTrue(any("end_date" in n and "start date only" in n for n in found["notices"]))
+
+    def test_domains_and_exclusions_together_are_refused(self):
+        tool = _tool(searchParallel)
+        with self.assertRaises(ValueError):
+            tool.search(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
+        tool._http.request.assert_not_called()
+
+    def test_excerpts_are_the_snippets_and_a_warning_is_a_notice(self):
+        resp = dict(PARALLEL, warnings=[{"type": "warning", "message": "objective was truncated"}])
+        tool, found, _ = _search(searchParallel, None, resp)
+        self.assertEqual(found["results"][0]["snippets"], ["Sample excerpt 1", "Sample excerpt 2"])
+        self.assertEqual([r["date"] for r in found["results"]], ["2024-01-15", ""])
+        self.assertTrue(any("objective was truncated" in n for n in found["notices"]))
+        self.assertEqual(tool._http.request.call_args.kwargs["headers"]["x-api-key"], "k")
+
+
 class TestOneRecord(unittest.TestCase):
 
     KEYS = {"title", "url", "date", "author", "snippets", "text"}
@@ -400,7 +455,8 @@ class TestContract(unittest.TestCase):
     def test_read_risk_a_shared_base_and_a_named_key(self):
         for cls, var in ((searchBrave, "BRAVE_SEARCH_API_KEY"), (searchPerplexity, "PERPLEXITY_API_KEY"),
                          (searchExa, "EXA_API_KEY"), (searchSerp, "SERPAPI_API_KEY"),
-                         (searchFirecrawl, "FIRECRAWL_API_KEY"), (searchTavily, "TAVILY_API_KEY")):
+                         (searchFirecrawl, "FIRECRAWL_API_KEY"), (searchTavily, "TAVILY_API_KEY"),
+                         (searchParallel, "PARALLEL_API_KEY")):
             with self.subTest(provider=cls.__name__):
                 self.assertTrue(issubclass(cls, Search))
                 self.assertEqual(cls.risk, "read")
@@ -456,6 +512,7 @@ class TestSearchLive(unittest.TestCase):
     def test_serp(self): self._check(searchSerp, "SERPAPI_API_KEY")
     def test_firecrawl(self): self._check(searchFirecrawl, "FIRECRAWL_API_KEY")
     def test_tavily(self): self._check(searchTavily, "TAVILY_API_KEY")
+    def test_parallel(self): self._check(searchParallel, "PARALLEL_API_KEY")
 
 
 if __name__ == "__main__":

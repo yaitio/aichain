@@ -69,6 +69,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | yes |
 | `GOOGLE_API_KEY` | `EmbeddingGoogle`, `GoogleEmbedder`, `sttGoogle`, `ttsGoogle` | — |
 | `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `decisionOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
+| `PARALLEL_API_KEY` | `searchParallel` | — |
 | `PERPLEXITY_API_KEY` | `searchPerplexity` | yes |
 | `SERPAPI_API_KEY` | `searchSerp` | — |
 | `TAVILY_API_KEY` | `searchTavily` | — |
@@ -105,6 +106,7 @@ export COHERE_API_KEY="…"
 export EXA_API_KEY="…"
 export FIRECRAWL_API_KEY="…"
 export GOOGLE_API_KEY="…"
+export PARALLEL_API_KEY="…"
 export SERPAPI_API_KEY="…"
 export TAVILY_API_KEY="…"
 export TYPESAFE_API_KEY="…"

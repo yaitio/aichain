@@ -240,9 +240,49 @@ result = searchTavily()(
     options={"max_results": …},
 )
 ```
+
+## `searchParallel`
+
+Web search powered by Parallel — the excerpts of each page that serve the objective of the search.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import searchParallel` |
+| Risk class | `read` |
+| Key | `PARALLEL_API_KEY` |
+
+```python
+searchParallel(
+    api_key: str | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | The search query, in natural language. |
+| `options.max_results` | `integer` |  | How many results to return (default 10). |
+| `options.recency` | `string` |  | Only pages published within this window. One of `hour`, `day`, `week`, `month`, `year`. |
+| `options.start_date` | `string` |  | Only pages published on or after this date, YYYY-MM-DD. |
+| `options.end_date` | `string` |  | Only pages published on or before this date, YYYY-MM-DD. Not applied here: Parallel filters from a start date only. |
+| `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
+| `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. Not applied here: Parallel has no language filter. |
+| `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.objective` | `string` |  | The goal of the search in natural language; default: the query. |
+| `options.search_queries` | `list[string]` |  | Short keyword queries, three to six words, to run beside the query. |
+| `options.mode` | `string` |  | 'advanced' (default) is the most thorough; 'turbo' the fastest. One of `turbo`, `fast`, `basic`, `advanced`. |
+| `options.exclude_domains` | `list[string]` |  | Leave out these domains or domain/path prefixes. Not with domains. |
+| `options.max_chars_total` | `integer` |  | Upper bound on characters of excerpts across all results. |
+| `options.max_age_seconds` | `integer` |  | Fetch a page live when the cached copy is older than this (600 or more). Slower. |
+
+```python
+result = searchParallel()(
+    input="…",
+    options={"max_results": …},
+)
+```
 <!-- /g:tool -->
 
-## One format, six providers
+## One format, seven providers
 
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently. The library
@@ -257,17 +297,18 @@ tool translates them, the way the [decision tools](decision.md) work.
 | `searchExa` | the passages that answer the query; the page's own text on request | ≤ 100 | `EXA_API_KEY` |
 | `searchFirecrawl` | a scraper first: each page as Markdown in the same call; news and PDF/research/gov indexes | ≤ 100 | `FIRECRAWL_API_KEY` |
 | `searchTavily` | up to three passages chosen for the query per page; news and finance topics; page as Markdown on request | ≤ 20 | `TAVILY_API_KEY` |
+| `searchParallel` | built for agents: an objective beside keyword queries, excerpts that serve it | ≤ 20 | `PARALLEL_API_KEY` |
 
 ## Options
 
-| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl | Tavily |
-|---|---|---|---|---|---|---|---|
-| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` | native |
-| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so | `time_range`; `hour` widened to a day, said so |
-| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so | native; undated pages pass unless `filter_by_published_date` |
-| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native | the country's name; general topic only, said so |
-| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` |
-| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` |
+| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl | Tavily | Parallel |
+|---|---|---|---|---|---|---|---|---|
+| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` | native | `advanced_settings.max_results` |
+| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so | `time_range`; `hour` widened to a day, said so | `after_date`; `hour` widened to a day, said so |
+| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so | native; undated pages pass unless `filter_by_published_date` | `after_date`; **`end_date` not applied** — said so |
+| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native | the country's name; general topic only, said so | `location` |
+| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` | **not applied** — said so |
+| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` | `include_domains`; paths and `.edu`-style extensions work |
 
 `recency` and `start_date` bound the same side; the later is kept. Each
 provider keeps its own options beside these — Brave `extra_snippets`,
@@ -277,7 +318,9 @@ provider keeps its own options beside these — Brave `extra_snippets`,
 `highlight_chars`, `text_chars`; Firecrawl `exclude_domains`, `categories`,
 `sources`, `location`, `safe`, `tbs`, `text_chars`; Tavily `topic`,
 `search_depth`, `chunks_per_source`, `exclude_domains`, `exact_match`,
-`safe_search`, `filter_by_published_date`, `filter_by_language`, `text_chars`. A provider's own time option wins over the
+`safe_search`, `filter_by_published_date`, `filter_by_language`, `text_chars`;
+Parallel `objective`, `search_queries`, `mode`, `exclude_domains`,
+`max_chars_total`, `max_age_seconds`. A provider's own time option wins over the
 standard ones.
 
 **Nothing is dropped in silence.** An option a provider cannot honour, or
@@ -325,6 +368,10 @@ tool.run(input="AI and leadership", options={...})   # the same, as numbered tex
   `hbr.org` all five fell between 2025-11 and 2026-08. The filter is sent and
   every such search carries a notice. Its web results carry no date unless the
   page is scraped (`text_chars`), so ask for text when the date matters.
+- **Parallel takes an objective, not just a query.** The query an agent
+  passes is both the objective and the one keyword query; `search_queries`
+  adds two or three short ones, which Parallel advises. Its date filter lets
+  undated pages through, as Exa's does (2026-10-08).
 - **Exa's highlights are capped** at 1 000 characters a result by default
   (`highlight_chars`; `0` turns them off): uncapped they were 5 000–8 000
   characters each, most of every page, in the agent's context.

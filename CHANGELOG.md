@@ -44,6 +44,16 @@
   `filter_by_published_date` is offered because without it undated pages pass
   a date filter. Verified live 2026-10-08: a week's window on `hbr.org` returned
   five pages, all dated inside it, with or without the strict filter.
+- **`searchParallel` — Parallel's search, a seventh provider in the common
+  format.** `PARALLEL_API_KEY`. Built for agents: it takes an objective beside
+  short keyword queries, and returns the excerpts of each page that serve it.
+  The query is both, and `search_queries` and `objective` add or replace
+  them. Domains with paths and bare extensions such as `.edu` reach its source
+  policy; `start_date` and `recency` become `after_date`, and `hour` is a day
+  there, said so. Parallel filters from a start date only, so `end_date` is
+  declined with a notice, as `language` is. Verified live 2026-10-08: the start
+  date and a path prefix held; undated pages pass the date filter; the ceiling
+  on results is 20, which the documentation does not state.
 - **Decision tools — a decision with probabilities, not prose, from two
   providers in one format.** `decisionOpenAI` (OpenAI's Decisions API,
   `gpt-6-luna`, `OPENAI_API_KEY`) and `decisionTypeSafe` (TypeSafe's Jev,

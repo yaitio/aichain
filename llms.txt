@@ -196,7 +196,7 @@ Agent(model, tools=[triage])               # the agent calls triage(state) by it
 Thresholds are yours: compare `probability` or `confidence` to a number in code.
 
 **Web search, one format** — `searchPerplexity`, `searchBrave`, `searchSerp`, `searchExa`,
-`searchFirecrawl`, `searchTavily`
+`searchFirecrawl`, `searchTavily`, `searchParallel`
 take the same options and return the same records; a provider that cannot honour an
 option says so in `notices` and in a `Note:` line, never silently.
 
