@@ -83,22 +83,21 @@
 
 - **Search tools: one vocabulary of options, one record of results.** The base
   declared five standard options and one provider of five honoured all of them
-  — Brave and SerpAPI had neither `domains` nor `recency` — and results were
+  — Brave had neither `domains` nor `recency` — and results were
   text alone, in each provider's own layout. Now `searchPerplexity`,
-  `searchBrave`, `searchSerp` and `searchExa` take `max_results`, `recency`,
+  `searchBrave` and `searchExa` take `max_results`, `recency`,
   `start_date`, `end_date`, `country`, `language` and `domains`, each translated
   to the provider's own field or to `site:` in the query where there is none,
   and keep their own options beside them. An option a provider cannot honour,
   or honours differently, is reported as a warning, a `Note:` line the model
   reads and an entry in `notices` — Exa has no language filter, Brave's
-  finest window is a day, SerpAPI filters time, country and language on the
-  Google engines only. `search()` returns `{"query", "provider", "results",
+  finest window is a day. `search()` returns `{"query", "provider", "results",
   "notices"}`, every result `{title, url, date, author, snippets, text}` from
   every provider, dates normalised to a day; `run()` returns the same results
   as one numbered layout. Brave's result date is the article's own rather than
   `page_age`, which is when Brave saw the page — 09-30 for an HBR article of
   09-01. Risk is `read`. Verified live on Brave, Perplexity and Exa with one
-  query and one week's window; SerpAPI against its documented response, no key.
+  query and one week's window.
 - The tool-page check in `tests/test_docs_generated.py` accepts a keyword the
   tool's schema declares. It allowed only `input`/`options`, which stopped being
   the whole truth in 3.1.0 when tools became callable by their own parameter
@@ -106,11 +105,16 @@
 
 ### Removed
 
+- **`searchSerp` and its alias `SerpApiTool`.** SerpAPI resells scraped
+  Google, Bing and other engines' result pages rather than an API those
+  engines offer, which is not a footing the library will stand a tool on. It
+  was also the one search provider never called live here. **A breaking change**: code importing either name
+  fails.
 - **`searchOpenAI` and its alias `OpenAIWebSearchTool`.** It answered with a
   paragraph the model wrote and its citations, not with results — a different
   contract under the same name, which the common search format could not hold.
   For an answer with sources, ask a model with web search; for results, use
-  one of the four search tools. **A breaking change**: code importing either
+  one of the search tools. **A breaking change**: code importing either
   name fails.
 
 ### Fixed

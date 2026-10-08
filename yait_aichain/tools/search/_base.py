@@ -6,7 +6,7 @@ tools.search._base
 
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently: Brave filters
-time with ``freshness``, SerpAPI with Google's ``tbs``, Perplexity with
+time with ``freshness``, Firecrawl with Google's ``tbs``, Perplexity with
 ``search_recency_filter`` and MM/DD/YYYY dates, Exa with ISO dates; two of the
 four have no site filter and take ``site:`` in the query. This class holds the
 meaning; each provider translates it.

@@ -3,7 +3,7 @@ Search tools — one vocabulary of options, one record of results.
 
 Rebuilt 2026-10-08 to the standard the decision tools set the same day. Before
 it, the base declared five standard options and only one provider of five
-honoured all of them — Brave and SerpAPI had neither ``domains`` nor
+honoured all of them — Brave had neither ``domains`` nor
 ``recency``, OpenAI's had no ``max_results``, Exa no ``language`` — and the
 results were text alone, each provider's in its own layout. ``searchOpenAI``
 answered with a synthesised paragraph rather than results, a different
@@ -22,8 +22,7 @@ What is pinned, offline, for every provider:
 Fixtures: Brave's and Perplexity's are real answers captured 2026-10-06 and
 trimmed; Exa's real, 2026-10-02; Firecrawl's in its documented shape,
 and Tavily's in their documented shapes, checked against live answers on
-2026-10-08, as is Parallel's; SerpAPI's built from its documented shape —
-no key was available to capture one.
+2026-10-08, as is Parallel's.
 """
 
 import json
@@ -38,7 +37,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from yait_aichain.tools import (Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity,
-                                searchParallel, searchSerp, searchTavily)
+                                searchParallel, searchTavily)
 from yait_aichain.tools.search._base import day
 
 #: Captured live 2026-10-06, query "site:hbr.org article", trimmed.
@@ -75,13 +74,6 @@ EXA = {"results": [
      "highlights": ["Published January 30, 2025 \n\n Introduction \n\nWhen AI models generate text."]}],
     "costDollars": {"total": 0.007}}
 
-#: SerpAPI's documented organic_results shape (no key to capture a real one).
-SERP = {"organic_results": [
-    {"position": 1, "title": "Python asyncio — official docs", "link": "https://docs.python.org/3/library/asyncio.html",
-     "snippet": "asyncio is a library to write concurrent code.", "date": "Sep 30, 2026", "source": "Python"},
-    {"position": 2, "title": "Asyncio tutorial", "link": "https://realpython.com/async-io-python/",
-     "snippet": "A walkthrough of async IO.", "date": "3 days ago"}]}
-
 #: Firecrawl's v2 response shape, as documented and as answered live on 2026-10-08:
 #: web results carry no date; a news result does; a scraped page has markdown.
 FIRECRAWL = {"success": True, "creditsUsed": 2, "data": {
@@ -111,7 +103,7 @@ PARALLEL = {"search_id": "search_fcb2b4f3c75e418687bccaa1a8381331",
                         {"url": "https://www.example.org/two", "title": "Second page", "publish_date": None,
                          "excerpts": ["Only excerpt"]}]}
 
-FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA, searchSerp: SERP,
+FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA,
            searchFirecrawl: FIRECRAWL, searchTavily: TAVILY, searchParallel: PARALLEL}
 QUERY = "AI and strategy"
 
@@ -128,7 +120,7 @@ def _tool(cls, response=None, status=200):
 
 
 def _sent(tool):
-    """What went on the wire: a JSON body, or SerpAPI's query string."""
+    """What went on the wire: the JSON body."""
     args, kw = tool._http.request.call_args
     if args[0] == "GET":
         return dict(urllib.parse.parse_qsl(urllib.parse.urlparse(args[1]).query))
@@ -150,7 +142,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
 
     def test_max_results(self):
         for cls, field in ((searchBrave, "count"), (searchPerplexity, "max_results"),
-                           (searchExa, "numResults"), (searchSerp, "num"), (searchFirecrawl, "limit"),
+                           (searchExa, "numResults"), (searchFirecrawl, "limit"),
                            (searchTavily, "max_results")):
             with self.subTest(provider=cls.__name__):
                 tool, _, _ = _search(cls, {"max_results": 7})
@@ -160,7 +152,6 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         week_ago = (datetime.now(timezone.utc) - timedelta(weeks=1)).date().isoformat()
         tool, _, _ = _search(searchBrave, {"recency": "week"}); self.assertEqual(_sent(tool)["freshness"], "pw")
         tool, _, _ = _search(searchPerplexity, {"recency": "week"}); self.assertEqual(_sent(tool)["search_recency_filter"], "week")
-        tool, _, _ = _search(searchSerp, {"recency": "week"}); self.assertEqual(_sent(tool)["tbs"], "qdr:w")
         tool, _, _ = _search(searchFirecrawl, {"recency": "hour"}); self.assertEqual(_sent(tool)["tbs"], "qdr:h")
         tool, _, _ = _search(searchTavily, {"recency": "week"}); self.assertEqual(_sent(tool)["time_range"], "week")
         tool, _, _ = _search(searchExa, {"recency": "week"})
@@ -172,7 +163,6 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchPerplexity, w)
         self.assertEqual((_sent(tool)["search_after_date_filter"], _sent(tool)["search_before_date_filter"]),
                          ("09/28/2026", "10/04/2026"))
-        tool, _, _ = _search(searchSerp, w); self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:9/28/2026,cd_max:10/4/2026")
         tool, _, _ = _search(searchFirecrawl, w)
         self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:09/28/2026,cd_max:10/04/2026")
         tool, _, _ = _search(searchTavily, w)
@@ -194,17 +184,14 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchExa, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
         tool, _, _ = _search(searchFirecrawl, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
         tool, _, _ = _search(searchTavily, d); self.assertEqual(_sent(tool)["include_domains"], d["domains"])
-        for cls, field in ((searchBrave, "q"), (searchSerp, "q")):
-            with self.subTest(provider=cls.__name__):
-                tool, _, _ = _search(cls, d)
-                self.assertEqual(_sent(tool)[field], f"{QUERY} (site:hbr.org OR site:sloanreview.mit.edu)")
+        tool, _, _ = _search(searchBrave, d)
+        self.assertEqual(_sent(tool)["q"], f"{QUERY} (site:hbr.org OR site:sloanreview.mit.edu)")
 
     def test_country_and_language(self):
         o = {"country": "GB", "language": "en"}
         tool, _, _ = _search(searchBrave, o); self.assertEqual((_sent(tool)["country"], _sent(tool)["search_lang"]), ("GB", "en"))
         tool, _, _ = _search(searchPerplexity, o)
         self.assertEqual((_sent(tool)["country"], _sent(tool)["search_language_filter"]), ("GB", ["en"]))
-        tool, _, _ = _search(searchSerp, o); self.assertEqual((_sent(tool)["gl"], _sent(tool)["hl"]), ("gb", "en"))
         tool, _, notes = _search(searchExa, o)
         self.assertEqual(_sent(tool)["userLocation"], "GB")
         self.assertNotIn("language", json.dumps(_sent(tool)))
@@ -238,12 +225,6 @@ class TestNothingIsDroppedInSilence(unittest.TestCase):
         tool, found, _ = _search(searchBrave, {"recency": "hour"})
         self.assertEqual(_sent(tool)["freshness"], "pd")
         self.assertTrue(any("widened to a day" in n for n in found["notices"]))
-
-    def test_serp_on_another_engine_says_which_filters_it_did_not_apply(self):
-        tool, found, _ = _search(searchSerp, {"engine": "duckduckgo", "recency": "week", "country": "GB"})
-        sent = _sent(tool)
-        self.assertNotIn("tbs", sent); self.assertNotIn("gl", sent)
-        self.assertEqual(sum("was not applied" in n for n in found["notices"]), 2)
 
     def test_a_count_above_the_ceiling_is_capped_and_said(self):
         tool, found, _ = _search(searchBrave, {"max_results": 50})
@@ -416,9 +397,8 @@ class TestOneRecord(unittest.TestCase):
         self.assertEqual(day("Sep 30, 2026"), "2026-09-30")
         self.assertEqual(day("30 September 2026"), "2026-09-30")
         self.assertEqual(day("3 days ago"), (TODAY - timedelta(days=3)).isoformat())
+        self.assertEqual(day("Tue, 11 Mar 2025 17:00:00 GMT"), "2025-03-11")
         self.assertEqual(day("last week"), "")
-        _, found, _ = _search(searchSerp)
-        self.assertEqual([r["date"] for r in found["results"]], ["2026-09-30", (TODAY - timedelta(days=3)).isoformat()])
 
     def test_exa_carries_author_highlights_and_text_on_request(self):
         resp = json.loads(json.dumps(EXA)); resp["results"][0]["text"] = "Full page text."
@@ -454,7 +434,7 @@ class TestContract(unittest.TestCase):
 
     def test_read_risk_a_shared_base_and_a_named_key(self):
         for cls, var in ((searchBrave, "BRAVE_SEARCH_API_KEY"), (searchPerplexity, "PERPLEXITY_API_KEY"),
-                         (searchExa, "EXA_API_KEY"), (searchSerp, "SERPAPI_API_KEY"),
+                         (searchExa, "EXA_API_KEY"),
                          (searchFirecrawl, "FIRECRAWL_API_KEY"), (searchTavily, "TAVILY_API_KEY"),
                          (searchParallel, "PARALLEL_API_KEY")):
             with self.subTest(provider=cls.__name__):
@@ -483,10 +463,6 @@ class TestContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             _tool(searchBrave).search("  ")
 
-    def test_serp_with_no_results_is_an_empty_list_not_an_error(self):
-        _, found, _ = _search(searchSerp, response={"error": "Google hasn't returned any results for this query."})
-        self.assertEqual(found["results"], [])
-
 
 def _real(var):
     return os.environ.get(var, "") not in ("", "test-key", "k")
@@ -509,7 +485,6 @@ class TestSearchLive(unittest.TestCase):
     def test_brave(self): self._check(searchBrave, "BRAVE_SEARCH_API_KEY")
     def test_perplexity(self): self._check(searchPerplexity, "PERPLEXITY_API_KEY")
     def test_exa(self): self._check(searchExa, "EXA_API_KEY")
-    def test_serp(self): self._check(searchSerp, "SERPAPI_API_KEY")
     def test_firecrawl(self): self._check(searchFirecrawl, "FIRECRAWL_API_KEY")
     def test_tavily(self): self._check(searchTavily, "TAVILY_API_KEY")
     def test_parallel(self): self._check(searchParallel, "PARALLEL_API_KEY")

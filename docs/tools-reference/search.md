@@ -77,47 +77,6 @@ result = BraveSearchTool()(
 )
 ```
 
-## `searchSerp` — `SerpApiTool`
-
-Web search through SerpAPI — Google by default, or any engine it supports.
-
-| | |
-|---|---|
-| Import | `from yait_aichain.tools import SerpApiTool` |
-| Risk class | `read` |
-| Also exported as | `searchSerp` |
-| Key | `SERPAPI_API_KEY` |
-
-```python
-SerpApiTool(
-    api_key: str | None = None,
-)
-```
-
-| Name | Type | Required | Description |
-|---|---|---|---|
-| `input` | `string` | ✓ | The search query, in natural language. |
-| `options.max_results` | `integer` |  | How many results to return (default 10). |
-| `options.recency` | `string` |  | Only pages published within this window. One of `hour`, `day`, `week`, `month`, `year`. |
-| `options.start_date` | `string` |  | Only pages published on or after this date, YYYY-MM-DD. |
-| `options.end_date` | `string` |  | Only pages published on or before this date, YYYY-MM-DD. |
-| `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
-| `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. |
-| `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
-| `options.engine` | `string` |  | The engine: 'google' (default), 'bing', 'duckduckgo', 'baidu', 'yandex', 'google_news', 'google_scholar' and others. |
-| `options.location` | `string` |  | A place to search from, e.g. 'Austin, Texas'. |
-| `options.safe` | `string` |  | Google SafeSearch. One of `active`, `off`. |
-| `options.start` | `integer` |  | Offset of the first result, for paging. |
-| `options.no_cache` | `boolean` |  | Bypass SerpAPI's cache. |
-| `options.time_filter` | `string` |  | A raw Google 'tbs', e.g. 'qdr:w'; wins over recency and the dates. |
-
-```python
-result = SerpApiTool()(
-    input="…",
-    options={"max_results": …},
-)
-```
-
 ## `searchExa`
 
 Web search powered by the Exa Search API — results with the passages that answer the query.
@@ -282,7 +241,7 @@ result = searchParallel()(
 ```
 <!-- /g:tool -->
 
-## One format, seven providers
+## One format, six providers
 
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently. The library
@@ -293,7 +252,6 @@ tool translates them, the way the [decision tools](decision.md) work.
 |---|---|---|---|
 | `searchPerplexity` | a substantive passage from each page; dates on every result | ≤ 20 | `PERPLEXITY_API_KEY` |
 | `searchBrave` | ranked links and descriptions; more passages with `extra_snippets` | ≤ 20 | `BRAVE_SEARCH_API_KEY` |
-| `searchSerp` | Google — or Bing, DuckDuckGo, Baidu, Yandex — through SerpAPI | ≤ 100 | `SERPAPI_API_KEY` |
 | `searchExa` | the passages that answer the query; the page's own text on request | ≤ 100 | `EXA_API_KEY` |
 | `searchFirecrawl` | a scraper first: each page as Markdown in the same call; news and PDF/research/gov indexes | ≤ 100 | `FIRECRAWL_API_KEY` |
 | `searchTavily` | up to three passages chosen for the query per page; news and finance topics; page as Markdown on request | ≤ 20 | `TAVILY_API_KEY` |
@@ -301,19 +259,18 @@ tool translates them, the way the [decision tools](decision.md) work.
 
 ## Options
 
-| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl | Tavily | Parallel |
-|---|---|---|---|---|---|---|---|---|
-| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` | native | `advanced_settings.max_results` |
-| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so | `time_range`; `hour` widened to a day, said so | `after_date`; `hour` widened to a day, said so |
-| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so | native; undated pages pass unless `filter_by_published_date` | `after_date`; **`end_date` not applied** — said so |
-| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native | the country's name; general topic only, said so | `location` |
-| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` | **not applied** — said so |
-| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` | `include_domains`; paths and `.edu`-style extensions work |
+| Option | Meaning | Perplexity | Brave | Exa | Firecrawl | Tavily | Parallel |
+|---|---|---|---|---|---|---|---|
+| `max_results` | how many | `max_results` | `count` | `numResults` | `limit` | native | `advanced_settings.max_results` |
+| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | a start date | `tbs=qdr:` — **not enforced**, said so | `time_range`; `hour` widened to a day, said so | `after_date`; `hour` widened to a day, said so |
+| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | ISO dates | `tbs=cdr:` — **not enforced**, said so | native; undated pages pass unless `filter_by_published_date` | `after_date`; **`end_date` not applied** — said so |
+| `country` | ISO alpha-2 | native | native | `userLocation` | native | the country's name; general topic only, said so | `location` |
+| `language` | ISO 639-1 | native | `search_lang` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` | **not applied** — said so |
+| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` | `include_domains`; paths and `.edu`-style extensions work |
 
 `recency` and `start_date` bound the same side; the later is kept. Each
 provider keeps its own options beside these — Brave `extra_snippets`,
-`safe_search`, `result_filter`, `freshness`; SerpAPI `engine`, `location`,
-`safe`, `start`, `no_cache`, `time_filter`; Perplexity `after_date`,
+`safe_search`, `result_filter`, `freshness`; Perplexity `after_date`,
 `before_date`; Exa `category`, `search_type`, `exclude_domains`,
 `highlight_chars`, `text_chars`; Firecrawl `exclude_domains`, `categories`,
 `sources`, `location`, `safe`, `tbs`, `text_chars`; Tavily `topic`,
@@ -325,9 +282,7 @@ standard ones.
 
 **Nothing is dropped in silence.** An option a provider cannot honour, or
 honours differently, is reported three ways: a warning, a `Note:` line at the
-end of the text the model reads, and an entry in `notices`. On SerpAPI the
-time, country and language filters apply to the Google engines; on another
-engine they are reported as not applied.
+end of the text the model reads, and an entry in `notices`.
 
 ## Results
 

@@ -71,7 +71,6 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `OPENAI_API_KEY` | `EmbeddingOpenAI`, `OpenAIEmbedder`, `decisionOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
 | `PARALLEL_API_KEY` | `searchParallel` | — |
 | `PERPLEXITY_API_KEY` | `searchPerplexity` | yes |
-| `SERPAPI_API_KEY` | `searchSerp` | — |
 | `TAVILY_API_KEY` | `searchTavily` | — |
 | `TYPESAFE_API_KEY` | `decisionTypeSafe` | — |
 | `VOYAGE_API_KEY` | `EmbeddingVoyage`, `RerankVoyage`, `VoyageEmbedder` | — |
@@ -107,7 +106,6 @@ export EXA_API_KEY="…"
 export FIRECRAWL_API_KEY="…"
 export GOOGLE_API_KEY="…"
 export PARALLEL_API_KEY="…"
-export SERPAPI_API_KEY="…"
 export TAVILY_API_KEY="…"
 export TYPESAFE_API_KEY="…"
 export VOYAGE_API_KEY="…"
@@ -118,7 +116,7 @@ export VOYAGE_API_KEY="…"
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-…"    # orchestrator
-export BRAVE_SEARCH_API_KEY="BSA-…"    # or PERPLEXITY_API_KEY / SERPAPI_API_KEY
+export BRAVE_SEARCH_API_KEY="BSA-…"    # or PERPLEXITY_API_KEY
 # MarkItDownTool needs no key
 ```
 

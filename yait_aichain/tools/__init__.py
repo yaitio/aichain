@@ -13,7 +13,7 @@ Tool groups
 -----------
 
 search/          Web search — all return plain-text result strings.
-  searchPerplexity, searchBrave, searchSerp, searchExa, searchFirecrawl, searchTavily,
+  searchPerplexity, searchBrave, searchExa, searchFirecrawl, searchTavily,
   searchParallel — one format of options and results
 
 embedding/       Text embeddings — returns EmbeddingResult with float vectors.
@@ -77,7 +77,7 @@ Infrastructure
 Backward-compatible aliases
 ---------------------------
 All previous class names still work:
-  PerplexitySearchTool, BraveSearchTool, SerpApiTool
+  PerplexitySearchTool, BraveSearchTool
   MarkItDownTool, MistletoeTool, WeasyprintTool
   OpenAIEmbedder, CohereEmbedder, VoyageEmbedder, GoogleEmbedder
 """
@@ -96,7 +96,6 @@ from .search import (
     Search,
     searchPerplexity,
     searchBrave,
-    searchSerp,
     searchExa,
     searchFirecrawl,
     searchTavily,
@@ -104,7 +103,6 @@ from .search import (
     # aliases
     PerplexitySearchTool,
     BraveSearchTool,
-    SerpApiTool,
 )
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
@@ -223,11 +221,9 @@ __all__ = [
     "Search",
     "searchPerplexity",
     "searchBrave",
-    "searchSerp",
     # search aliases
     "PerplexitySearchTool",
     "BraveSearchTool",
-    "SerpApiTool",
     # ── Embedding ─────────────────────────────────────────────────────────
     "Embedding",
     "Embedder",

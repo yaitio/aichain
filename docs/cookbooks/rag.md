@@ -7,7 +7,7 @@ A `Chain` or `Agent` pattern that grounds generation in retrieved source materia
 ## Primitives used
 
 - `Chain` or `Agent` (agile mode for adaptive retrieval)
-- `BraveSearchTool` or `PerplexitySearchTool` or `SerpApiTool`
+- `BraveSearchTool` or `PerplexitySearchTool`
 - `MarkItDownTool`
 - `Skill` (extraction, synthesis, citation formatting)
 - `Model`

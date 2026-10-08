@@ -77,7 +77,6 @@ yourself needs no key and sends nothing outside your network. See
 | Reve | `REVE_API_KEY` | — |
 | xAI | `XAI_API_KEY` | <https://console.x.ai/> |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
-| SerpAPI | `SERPAPI_API_KEY` | <https://serpapi.com> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
 | TypeSafe | `TYPESAFE_API_KEY` | <https://console.typesafe.ai> |
 | Exa | `EXA_API_KEY` | <https://dashboard.exa.ai/api-keys> |

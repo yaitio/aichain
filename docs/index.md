@@ -70,7 +70,7 @@ Model("deepseek-chat")       # DeepSeek
 | **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
 | **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
 | **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
-| **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchSerp`, `searchTavily` |
+| **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchTavily` |
 <!-- /g:modalities -->
 
 ---
@@ -113,7 +113,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 <!-- g:provider-list -->**11 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, Reve, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
-**Built-in tools** — web search (Perplexity, Brave, SerpAPI, OpenAI), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
+**Built-in tools** — web search (Perplexity, Brave, Exa, Firecrawl, Tavily, Parallel), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 
 **Full persistence** — Skills and Chains serialise to YAML. API keys are never stored.
 

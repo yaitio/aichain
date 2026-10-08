@@ -354,16 +354,14 @@ class TestOpenAICompatParser(unittest.TestCase):
 class TestSearchNetworkPolicy(unittest.TestCase):
 
     def test_all_search_tools_have_timeout_and_retries(self):
-        os.environ.setdefault("SERPAPI_API_KEY", "k")
         os.environ.setdefault("PERPLEXITY_API_KEY", "k")
         os.environ.setdefault("BRAVE_SEARCH_API_KEY", "k")
 
-        from yait_aichain.tools.search.serp       import searchSerp
         from yait_aichain.tools.search.perplexity import searchPerplexity
         from yait_aichain.tools.search.brave      import searchBrave
         from yait_aichain.tools.search.exa        import searchExa
 
-        for tool in (searchSerp(), searchPerplexity(),
+        for tool in (searchPerplexity(),
                      searchBrave(api_key="k"), searchExa(api_key="k")):
             kw      = tool._http.connection_pool_kw
             timeout = kw.get("timeout")

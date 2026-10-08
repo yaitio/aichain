@@ -19,7 +19,6 @@ Chains and Agents identically.
 |---|---|---|---|---|---|
 | Search | [`searchPerplexity`](search.md#searchperplexity) | `PerplexitySearchTool` | Web search powered by the Perplexity Search API — each result with a substantive passage from the page. | `PERPLEXITY_API_KEY` | `read` |
 | Search | [`searchBrave`](search.md#searchbrave) | `BraveSearchTool` | Web search powered by the Brave Search API — titles, URLs, the page's description and, with `extra_snippets`, more passages from it. | `BRAVE_SEARCH_API_KEY` | `read` |
-| Search | [`searchSerp`](search.md#searchserp) | `SerpApiTool` | Web search through SerpAPI — Google by default, or any engine it supports. | `SERPAPI_API_KEY` | `read` |
 | Search | [`searchExa`](search.md#searchexa) | `searchExa` | Web search powered by the Exa Search API — results with the passages that answer the query. | `EXA_API_KEY` | `read` |
 | Search | [`searchFirecrawl`](search.md#searchfirecrawl) | `searchFirecrawl` | Web search powered by Firecrawl — results with a description and, on request, each page's content as Markdown. | `FIRECRAWL_API_KEY` | `read` |
 | Search | [`searchTavily`](search.md#searchtavily) | `searchTavily` | Web search powered by Tavily — each page with the passages chosen for the query, and on request the page itself. | `TAVILY_API_KEY` | `read` |
