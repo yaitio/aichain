@@ -377,7 +377,7 @@ class TestOneRecord(unittest.TestCase):
         for cls in FIXTURE:
             with self.subTest(provider=cls.__name__):
                 _, found, _ = _search(cls)
-                self.assertEqual(set(found), {"query", "provider", "results", "notices"})
+                self.assertEqual(set(found), {"query", "provider", "results", "notices", "cost", "cost_basis", "usage"})
                 self.assertEqual(len(found["results"]), 2)
                 for r in found["results"]:
                     self.assertEqual(set(r), self.KEYS)
@@ -407,6 +407,49 @@ class TestOneRecord(unittest.TestCase):
         self.assertEqual(r["author"], "Sebastian Raschka, PhD")
         self.assertEqual(r["text"], "Full page text.")
         self.assertEqual(_sent(tool)["contents"], {"highlights": {"maxCharacters": 1000}, "text": {"maxCharacters": 2000}})
+
+
+class TestWhatACallCost(unittest.TestCase):
+    """search() prices every call: the provider's own figure where it reports one, its units at the published
+    rate where it reports units, the published rate alone where it reports nothing (rates read 2026-10-08)."""
+
+    def test_exa_reports_dollars(self):
+        _, found, _ = _search(searchExa)
+        self.assertEqual((found["cost"], found["cost_basis"]), (0.007, "reported by Exa"))
+
+    def test_firecrawl_reports_credits(self):
+        _, found, _ = _search(searchFirecrawl)
+        self.assertEqual(found["usage"], {"credits": 2})
+        self.assertAlmostEqual(found["cost"], 2 * 19 / 5000)
+        self.assertIn("credits reported by Firecrawl", found["cost_basis"])
+
+    def test_tavily_is_asked_for_its_usage_and_reports_credits(self):
+        resp = dict(TAVILY, usage={"credits": 2})
+        tool, found, _ = _search(searchTavily, None, resp)
+        self.assertTrue(_sent(tool)["include_usage"])
+        self.assertEqual(found["usage"], {"credits": 2})
+        self.assertAlmostEqual(found["cost"], 0.016)
+
+    def test_parallel_reports_operations_and_extra_results_are_priced(self):
+        resp = dict(PARALLEL, usage=[{"name": "sku_search", "count": 1}, {"name": "sku_extract_excerpts", "count": 10}])
+        _, found, _ = _search(searchParallel, None, resp)
+        self.assertAlmostEqual(found["cost"], 0.005 + 10 * 0.001)
+        self.assertEqual(found["usage"], {"sku_search": 1, "sku_extract_excerpts": 10})
+        _, fast, _ = _search(searchParallel, {"mode": "fast"}, dict(PARALLEL, usage=[{"name": "sku_search", "count": 1}]))
+        self.assertAlmostEqual(fast["cost"], 0.001)
+
+    def test_a_provider_that_reports_nothing_is_priced_at_its_published_rate(self):
+        for cls in (searchPerplexity, searchBrave):
+            with self.subTest(provider=cls.__name__):
+                _, found, _ = _search(cls)
+                self.assertEqual(found["cost"], 0.005)
+                self.assertTrue(found["cost_basis"].startswith("published rate ("))
+                self.assertEqual(found["usage"], {})
+        _, found, _ = _search(searchParallel)           # its answer here carries no usage
+        self.assertEqual(found["cost"], 0.005)
+
+    def test_the_model_reading_run_sees_no_price(self):
+        self.assertNotIn("$", _tool(searchExa).run(input=QUERY))
 
 
 class TestTheTextAModelReads(unittest.TestCase):

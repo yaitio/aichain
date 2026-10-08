@@ -107,6 +107,9 @@ class searchTavily(Search):
     max_results = 20
     _ENV_KEY    = "TAVILY_API_KEY"
     _PROVIDER   = "Tavily"
+    _CREDIT       = 0.008                  # pay-as-you-go; monthly plans pay $0.005–0.0075
+    _LIST_PRICE   = _CREDIT                # basic search: 1 credit
+    _PRICE_SOURCE = "docs.tavily.com/documentation/api-credits, $0.008 / credit, read 2026-10-08"
     extra_options = {
         "topic":             {"type": "string", "enum": ["general", "news", "finance"],
                               "description": "What to search: 'general' (default), 'news' or 'finance'."},
@@ -127,7 +130,9 @@ class searchTavily(Search):
     }
 
     def _body(self, query: str, opts: dict, window: tuple, notices: list) -> dict:
-        body: dict = {"query": query, "max_results": opts["max_results"], "include_published_date": True}
+        # include_usage: without it the answer says nothing of the credits it cost.
+        body: dict = {"query": query, "max_results": opts["max_results"], "include_published_date": True,
+                      "include_usage": True}
         start, end = window
         if opts.get("recency") and not end:
             if opts["recency"] == "hour":
@@ -166,7 +171,7 @@ class searchTavily(Search):
             body["include_raw_content"] = "markdown"
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",
@@ -174,9 +179,14 @@ class searchTavily(Search):
         raw = response.data.decode("utf-8", errors="replace")
         if not 200 <= response.status < 300:
             raise RuntimeError(f"Tavily API error [{response.status}]: {raw}")
+        data = json.loads(raw)
+        credits = (data.get("usage") or {}).get("credits")
+        if credits is not None:
+            cost.update(usd=credits * self._CREDIT, usage={"credits": credits},
+                        basis="credits reported by Tavily, at the pay-as-you-go rate")
         cut = int(opts.get("text_chars") or 0)
         out = []
-        for r in json.loads(raw).get("results") or []:
+        for r in data.get("results") or []:
             # Passages arrive joined as "<chunk 1> [...] <chunk 2>".
             chunks = [c.strip() for c in (r.get("content") or "").split("[...]")]
             out.append(self.record(r.get("title"), r.get("url"), r.get("published_date"), "", chunks,

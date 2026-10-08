@@ -65,6 +65,8 @@ class searchBrave(Search):
     max_results = 20
     _ENV_KEY    = "BRAVE_SEARCH_API_KEY"
     _PROVIDER   = "Brave Search"
+    _LIST_PRICE   = 0.005
+    _PRICE_SOURCE = "brave.com/search/api, $5 / 1 000 requests, read 2026-10-08"
     extra_options = {
         "safe_search":    {"type": "string", "enum": ["off", "moderate", "strict"],
                            "description": "Adult-content filter. Default 'moderate'."},
@@ -101,7 +103,7 @@ class searchBrave(Search):
             body["extra_snippets"] = True
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
             headers={"x-subscription-token": self._api_key, "Content-Type": "application/json",

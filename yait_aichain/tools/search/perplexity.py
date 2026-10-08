@@ -60,6 +60,8 @@ class searchPerplexity(Search):
     max_results = 20
     _ENV_KEY    = "PERPLEXITY_API_KEY"
     _PROVIDER   = "Perplexity"
+    _LIST_PRICE   = 0.005
+    _PRICE_SOURCE = "docs.perplexity.ai, $5 / 1 000 requests, read 2026-10-08"
     extra_options = {
         "after_date":  {"type": "string", "description": "Perplexity's own MM/DD/YYYY lower bound; wins over start_date."},
         "before_date": {"type": "string", "description": "Perplexity's own MM/DD/YYYY upper bound; wins over end_date."},
@@ -92,7 +94,7 @@ class searchPerplexity(Search):
             body["search_language_filter"] = lang if isinstance(lang, list) else [lang]
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window)).encode("utf-8"),
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",

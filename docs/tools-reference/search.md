@@ -300,8 +300,17 @@ found["notices"]            # [] — or what was not applied, and why
 tool.run(input="AI and leadership", options={...})   # the same, as numbered text for a model
 ```
 
-- **`search()`** is for code: `{"query", "provider", "results", "notices"}`,
-  every result with the same six keys from every provider.
+- **`search()`** is for code: `{"query", "provider", "results", "notices",
+  "cost", "cost_basis", "usage"}`, every result with the same six keys from
+  every provider.
+- **`cost`** is the call's price in USD, and **`cost_basis`** says how it was
+  arrived at: Exa reports dollars; Firecrawl and Tavily report credits, priced
+  at the published rate (Firecrawl's Hobby plan, Tavily's pay-as-you-go —
+  a larger plan pays less); Parallel reports operation counts, priced at its
+  rates; Perplexity and Brave report nothing and are priced at $0.005 a
+  request. **`usage`** is the provider's own units, as sent. A Firecrawl call
+  that scrapes a PDF is billed per PDF page, so text calls vary in price. The
+  model reading `run()` sees no price.
 - **`run()`** is what an agent calls: the same results as numbered text —
   title, URL, `Published: … · Author: …`, one line per passage, then any notes.
 - **`date`** is the publication date as the provider reports it, normalised to

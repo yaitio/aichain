@@ -73,6 +73,10 @@ class searchParallel(Search):
     max_results = 20
     _ENV_KEY    = "PARALLEL_API_KEY"
     _PROVIDER   = "Parallel"
+    #: Per search: $0.005 basic/advanced (the default), $0.001 turbo/fast, ten results included;
+    #: each further result with its excerpts $0.001 — billed as sku_extract_excerpts, measured 2026-10-08.
+    _LIST_PRICE   = 0.005
+    _PRICE_SOURCE = "docs.parallel.ai/getting-started/pricing, read 2026-10-08"
     declines    = {"end_date": "Parallel filters from a start date only",
                    "language": "Parallel has no language filter"}
     extra_options = {
@@ -121,7 +125,7 @@ class searchParallel(Search):
         body["advanced_settings"] = settings
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
             headers={"x-api-key": self._api_key, "Content-Type": "application/json",
@@ -130,6 +134,11 @@ class searchParallel(Search):
         if not 200 <= response.status < 300:
             raise RuntimeError(f"Parallel API error [{response.status}]: {raw}")
         data = json.loads(raw)
+        if data.get("usage"):
+            n = {u.get("name"): u.get("count", 0) for u in data["usage"] if isinstance(u, dict)}
+            per = 0.001 if opts.get("mode") in ("turbo", "fast") else 0.005
+            cost.update(usd=n.get("sku_search", 0) * per + n.get("sku_extract_excerpts", 0) * 0.001,
+                        usage=n, basis="operations reported by Parallel, at the published rates")
         for w in data.get("warnings") or []:
             self._notice(notices, f"Parallel: {w.get('message') if isinstance(w, dict) else w}")
         return [self.record(r.get("title"), r.get("url"), r.get("publish_date"), "", r.get("excerpts") or [])

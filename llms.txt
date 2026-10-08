@@ -208,6 +208,7 @@ found = tool.search("AI and leadership", {"max_results": 5, "domains": ["hbr.org
                     "start_date": "2026-09-28", "end_date": "2026-10-04"})
 found["results"][0]      # {"title", "url", "date", "author", "snippets", "text"}
 found["notices"]         # options not applied here, and why
+found["cost"]            # USD; found["cost_basis"] says how, found["usage"] the provider's units
 tool.run(input="AI and leadership")   # the same as numbered text; what an agent calls
 ```
 

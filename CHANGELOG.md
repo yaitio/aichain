@@ -96,7 +96,11 @@
   every provider, dates normalised to a day; `run()` returns the same results
   as one numbered layout. Brave's result date is the article's own rather than
   `page_age`, which is when Brave saw the page — 09-30 for an HBR article of
-  09-01. Risk is `read`. Verified live on Brave, Perplexity and Exa with one
+  09-01. Every call is priced: `search()` carries `cost` in USD, `cost_basis`
+  — the provider's own figure, its credits or operation counts at the
+  published rate, or the rate alone where the answer reports nothing — and
+  `usage`, the provider's units; Tavily is now asked for its usage, which it
+  otherwise leaves out. Risk is `read`. Verified live on Brave, Perplexity and Exa with one
   query and one week's window.
 - The tool-page check in `tests/test_docs_generated.py` accepts a keyword the
   tool's schema declares. It allowed only `input`/`options`, which stopped being

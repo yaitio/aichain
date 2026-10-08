@@ -77,6 +77,10 @@ class searchExa(Search):
     max_results = 100
     _ENV_KEY    = "EXA_API_KEY"
     _PROVIDER   = "Exa"
+    #: Auto search, up to 10 results. Measured 2026-10-08: the answer's own
+    #: costDollars was $0.007 a call with highlights and with page text alike.
+    _LIST_PRICE   = 0.007
+    _PRICE_SOURCE = "exa.ai/pricing, $7 / 1 000 requests up to 10 results, read 2026-10-08"
     declines    = {"language": "Exa has no language filter"}
     extra_options = {
         "exclude_domains": {"type": "array", "items": {"type": "string"},
@@ -119,7 +123,7 @@ class searchExa(Search):
             body["endPublishedDate"] = f"{end}T23:59:59.999Z"
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window)).encode("utf-8"),
             headers={"x-api-key": self._api_key, "Content-Type": "application/json",
@@ -127,6 +131,10 @@ class searchExa(Search):
         raw = response.data.decode("utf-8", errors="replace")
         if not 200 <= response.status < 300:
             raise RuntimeError(f"Exa Search API error [{response.status}]: {raw}")
+        data = json.loads(raw)
+        spent = (data.get("costDollars") or {}).get("total")
+        if spent is not None:
+            cost.update(usd=float(spent), basis="reported by Exa", usage=data["costDollars"])
         return [self.record(r.get("title"), r.get("url"), r.get("publishedDate"), r.get("author") or "",
                             r.get("highlights") or [], r.get("text") or "")
-                for r in json.loads(raw).get("results") or []]
+                for r in data.get("results") or []]

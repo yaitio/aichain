@@ -33,7 +33,12 @@ day) is adapted and reported the same way.
 
 Results — one record
 --------------------
-``search()`` returns ``{"query", "provider", "results", "notices"}``; each
+``search()`` returns ``{"query", "provider", "results", "notices", "cost",
+"cost_basis", "usage"}``. ``cost`` is the call's price in USD; ``cost_basis``
+says where it came from — the provider's own figure, the provider's units
+(credits, operation counts) at the published rate, or the published rate alone
+for a provider that reports nothing — and ``usage`` holds those units as the
+provider sent them. Rates are each tool's, with their source and date. Each
 result is::
 
     {"title": str, "url": str, "date": "YYYY-MM-DD" or "", "author": str,
@@ -138,8 +143,10 @@ class Search(Tool):
     A subclass sets ``name``, ``description``, ``max_results`` (its ceiling),
     ``extra_options`` (its own schema entries) and ``declines`` — standard
     options it cannot honour, each with the reason the caller is told — and
-    implements ``_search(query, opts, window, notices) -> list[dict]``,
-    returning results in the common record. ``window`` is the resolved
+    implements ``_search(query, opts, window, notices, cost) -> list[dict]``,
+    returning results in the common record and, where its answer reports what
+    the call cost, filling ``cost`` with ``usd``, ``basis`` and ``usage`` (left
+    empty, the call is priced at ``_LIST_PRICE``). ``window`` is the resolved
     ``(start, end)`` dates (each ``""`` when open) and ``opts["recency"]`` the
     window word when no explicit date narrowed it, for providers that take the
     word natively.
@@ -158,6 +165,10 @@ class Search(Tool):
     #: The provider's key variable; a tuple here so the base names none.
     _ENV_KEY: "str | tuple" = ()
     _PROVIDER: str = ""
+    #: USD a call at the published rate, for a provider whose answer reports no cost.
+    _LIST_PRICE: float = 0.0
+    #: Where that rate was read, and when.
+    _PRICE_SOURCE: str = ""
 
     def __init__(self, api_key: "str | None" = None) -> None:
         key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
@@ -213,8 +224,12 @@ class Search(Tool):
                                   f"{self.max_results} were asked for")
         opts["max_results"] = max(1, min(count, self.max_results))
         window = self._window(opts)
-        results = self._search(input.strip(), opts, window, notices)
-        return {"query": input.strip(), "provider": self.name, "results": results, "notices": notices}
+        cost: dict = {}
+        results = self._search(input.strip(), opts, window, notices, cost)
+        if "usd" not in cost:
+            cost.update(usd=self._LIST_PRICE, basis=f"published rate ({self._PRICE_SOURCE})")
+        return {"query": input.strip(), "provider": self.name, "results": results, "notices": notices,
+                "cost": round(cost["usd"], 6), "cost_basis": cost["basis"], "usage": cost.get("usage", {})}
 
     def run(self, input: str, options: "dict | None" = None) -> str:  # type: ignore[override]
         """Search for *input*; the results as numbered text a model reads."""
@@ -271,5 +286,5 @@ class Search(Tool):
         notices.append(text)
         warnings.warn(f"{self.name}: {text}", stacklevel=4)
 
-    def _search(self, query: str, opts: dict, window: tuple, notices: list) -> list:  # pragma: no cover
+    def _search(self, query: str, opts: dict, window: tuple, notices: list, cost: dict) -> list:  # pragma: no cover
         raise NotImplementedError(f"{type(self).__name__} must implement _search()")

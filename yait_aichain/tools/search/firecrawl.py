@@ -78,6 +78,10 @@ class searchFirecrawl(Search):
     max_results = 100
     _ENV_KEY    = "FIRECRAWL_API_KEY"
     _PROVIDER   = "Firecrawl"
+    #: One credit's price on the Hobby plan ($19 / 5 000 credits); a larger plan pays less.
+    _CREDIT       = 19 / 5000
+    _LIST_PRICE   = 2 * _CREDIT            # a search: 2 credits per 10 results
+    _PRICE_SOURCE = "firecrawl.dev/pricing, Hobby $19 / 5 000 credits, read 2026-10-08"
     declines    = {"language": "Firecrawl has no language filter"}
     extra_options = {
         "exclude_domains": {"type": "array", "items": {"type": "string"},
@@ -136,7 +140,7 @@ class searchFirecrawl(Search):
             body["scrapeOptions"] = {"formats": [{"type": "markdown"}]}
         return body
 
-    def _search(self, query, opts, window, notices):
+    def _search(self, query, opts, window, notices, cost):
         response = self._http.request(
             "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",
@@ -147,6 +151,11 @@ class searchFirecrawl(Search):
         data = json.loads(raw)
         if data.get("success") is False:
             raise RuntimeError(f"Firecrawl API error: {data.get('error') or raw}")
+        if data.get("creditsUsed") is not None:
+            # A scraped PDF is billed per page — measured 2026-10-08, calls with one PDF
+            # cost 29–47 credits where ten HTML pages cost 12 — so text calls vary.
+            cost.update(usd=data["creditsUsed"] * self._CREDIT, usage={"credits": data["creditsUsed"]},
+                        basis="credits reported by Firecrawl, at the Hobby plan's rate")
         if data.get("warning"):
             self._notice(notices, f"Firecrawl: {data['warning']}")
         found = data.get("data") or {}
