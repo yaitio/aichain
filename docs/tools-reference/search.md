@@ -197,9 +197,52 @@ result = searchFirecrawl()(
     options={"max_results": …},
 )
 ```
+
+## `searchTavily`
+
+Web search powered by Tavily — each page with the passages chosen for the query, and on request the page itself.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import searchTavily` |
+| Risk class | `read` |
+| Key | `TAVILY_API_KEY` |
+
+```python
+searchTavily(
+    api_key: str | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | The search query, in natural language. |
+| `options.max_results` | `integer` |  | How many results to return (default 10). |
+| `options.recency` | `string` |  | Only pages published within this window. One of `hour`, `day`, `week`, `month`, `year`. |
+| `options.start_date` | `string` |  | Only pages published on or after this date, YYYY-MM-DD. |
+| `options.end_date` | `string` |  | Only pages published on or before this date, YYYY-MM-DD. |
+| `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
+| `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. |
+| `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.topic` | `string` |  | What to search: 'general' (default), 'news' or 'finance'. One of `general`, `news`, `finance`. |
+| `options.search_depth` | `string` |  | 'basic' (default); 'advanced' is more relevant and costs two credits. One of `ultra-fast`, `fast`, `basic`, `advanced`. |
+| `options.chunks_per_source` | `integer` |  | Passages per page, 1 to 3 (default 3). |
+| `options.exclude_domains` | `list[string]` |  | Leave out results from these domains. |
+| `options.exact_match` | `boolean` |  | Only pages containing the quoted phrases of the query exactly. |
+| `options.safe_search` | `boolean` |  | Filter adult content. |
+| `options.filter_by_published_date` | `boolean` |  | Drop pages outside the date window — and pages with no date. |
+| `options.filter_by_language` | `boolean` |  | Make language a filter rather than a ranking boost. |
+| `options.text_chars` | `integer` |  | Also return each page as Markdown, cut to this many characters. |
+
+```python
+result = searchTavily()(
+    input="…",
+    options={"max_results": …},
+)
+```
 <!-- /g:tool -->
 
-## One format, five providers
+## One format, six providers
 
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently. The library
@@ -213,17 +256,18 @@ tool translates them, the way the [decision tools](decision.md) work.
 | `searchSerp` | Google — or Bing, DuckDuckGo, Baidu, Yandex — through SerpAPI | ≤ 100 | `SERPAPI_API_KEY` |
 | `searchExa` | the passages that answer the query; the page's own text on request | ≤ 100 | `EXA_API_KEY` |
 | `searchFirecrawl` | a scraper first: each page as Markdown in the same call; news and PDF/research/gov indexes | ≤ 100 | `FIRECRAWL_API_KEY` |
+| `searchTavily` | up to three passages chosen for the query per page; news and finance topics; page as Markdown on request | ≤ 20 | `TAVILY_API_KEY` |
 
 ## Options
 
-| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl |
-|---|---|---|---|---|---|---|
-| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` |
-| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so |
-| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so |
-| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native |
-| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so |
-| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so |
+| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl | Tavily |
+|---|---|---|---|---|---|---|---|
+| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` | native |
+| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so | `time_range`; `hour` widened to a day, said so |
+| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so | native; undated pages pass unless `filter_by_published_date` |
+| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native | the country's name; general topic only, said so |
+| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` |
+| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` |
 
 `recency` and `start_date` bound the same side; the later is kept. Each
 provider keeps its own options beside these — Brave `extra_snippets`,
@@ -231,7 +275,9 @@ provider keeps its own options beside these — Brave `extra_snippets`,
 `safe`, `start`, `no_cache`, `time_filter`; Perplexity `after_date`,
 `before_date`; Exa `category`, `search_type`, `exclude_domains`,
 `highlight_chars`, `text_chars`; Firecrawl `exclude_domains`, `categories`,
-`sources`, `location`, `safe`, `tbs`, `text_chars`. A provider's own time option wins over the
+`sources`, `location`, `safe`, `tbs`, `text_chars`; Tavily `topic`,
+`search_depth`, `chunks_per_source`, `exclude_domains`, `exact_match`,
+`safe_search`, `filter_by_published_date`, `filter_by_language`, `text_chars`. A provider's own time option wins over the
 standard ones.
 
 **Nothing is dropped in silence.** An option a provider cannot honour, or
@@ -266,8 +312,8 @@ tool.run(input="AI and leadership", options={...})   # the same, as numbered tex
   is when it saw a page, so its article date is preferred; Perplexity has dated
   an April article to September. When the date matters, read it from the page:
   `convertToMD().last_metadata["published"]`.
-- **`text`** is the page's own text where the provider returned it — Exa and
-  Firecrawl, with `text_chars`.
+- **`text`** is the page's own text where the provider returned it — Exa,
+  Firecrawl and Tavily, with `text_chars`.
 
 ## Provider notes
 

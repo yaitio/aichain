@@ -82,6 +82,7 @@ yourself needs no key and sends nothing outside your network. See
 | TypeSafe | `TYPESAFE_API_KEY` | <https://console.typesafe.ai> |
 | Exa | `EXA_API_KEY` | <https://dashboard.exa.ai/api-keys> |
 | Firecrawl | `FIRECRAWL_API_KEY` | <https://www.firecrawl.dev/app/api-keys> |
+| Tavily | `TAVILY_API_KEY` | <https://app.tavily.com> |
 | Voyage | `VOYAGE_API_KEY` | <https://dash.voyageai.com> |
 <!-- /g:install-keys -->
 

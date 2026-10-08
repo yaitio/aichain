@@ -112,7 +112,7 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
         keys = {k: "doc" for k in ("OPENAI_API_KEY", "PERPLEXITY_API_KEY",
                                    "BRAVE_SEARCH_API_KEY", "SERPAPI_API_KEY",
                                    "XAI_API_KEY", "DASHSCOPE_API_KEY", "GOOGLE_AI_API_KEY",
-                                   "EXA_API_KEY", "FIRECRAWL_API_KEY")}
+                                   "EXA_API_KEY", "FIRECRAWL_API_KEY", "TAVILY_API_KEY")}
         with mock.patch.dict(os.environ, keys):
             return cls().parameters
 

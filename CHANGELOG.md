@@ -35,6 +35,15 @@
   not enforced** — measured 2026-10-08, a 28.09–04.10 range returned exactly the
   unfiltered results — so it is sent and every such search says so in
   `notices`. Verified live: web, news and scraped results.
+- **`searchTavily` — Tavily's search, a sixth provider in the common format.**
+  `TAVILY_API_KEY`. Each result carries up to three passages chosen for the
+  query, split into `snippets`; `text_chars` returns the page as Markdown.
+  `country` is translated from an ISO code to the country name Tavily takes,
+  and applied on the general topic only, said so otherwise; `recency` `hour`
+  is widened to a day, said so. Dates are always asked for, and Tavily's
+  `filter_by_published_date` is offered because without it undated pages pass
+  a date filter. Verified live 2026-10-08: a week's window on `hbr.org` returned
+  five pages, all dated inside it, with or without the strict filter.
 - **Decision tools — a decision with probabilities, not prose, from two
   providers in one format.** `decisionOpenAI` (OpenAI's Decisions API,
   `gpt-6-luna`, `OPENAI_API_KEY`) and `decisionTypeSafe` (TypeSafe's Jev,

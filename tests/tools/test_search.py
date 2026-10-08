@@ -21,8 +21,9 @@ What is pinned, offline, for every provider:
 
 Fixtures: Brave's and Perplexity's are real answers captured 2026-10-06 and
 trimmed; Exa's real, 2026-10-02; Firecrawl's in its documented shape,
-checked against live answers on 2026-10-08; SerpAPI's built from its
-documented shape — no key was available to capture one.
+and Tavily's in their documented shapes, checked against live answers on
+2026-10-08; SerpAPI's built from its documented shape — no key was
+available to capture one.
 """
 
 import json
@@ -36,7 +37,8 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from yait_aichain.tools import Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity, searchSerp
+from yait_aichain.tools import (Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity,
+                                searchSerp, searchTavily)
 from yait_aichain.tools.search._base import day
 
 #: Captured live 2026-10-06, query "site:hbr.org article", trimmed.
@@ -90,8 +92,19 @@ FIRECRAWL = {"success": True, "creditsUsed": 2, "data": {
     "news": [{"title": "Firecrawl raises a round", "url": "https://news.example.com/firecrawl",
               "snippet": "The scraping company announced funding.", "date": "Sep 30, 2026"}]}}
 
+#: Tavily's documented example answer, two results; the live shape matched it on 2026-10-08.
+TAVILY = {"query": "Who is Leo Messi?", "images": [], "response_time": "1.67", "usage": {"credits": 1},
+          "results": [
+              {"title": "Lionel Messi Facts | Britannica", "url": "https://www.britannica.com/facts/Lionel-Messi",
+               "content": "Lionel Messi, an Argentine footballer [...] Born in 1987, Messi spent his career at Barcelona",
+               "score": 0.81, "raw_content": "# Lionel Messi\n\nArgentine footballer.",
+               "published_date": "Tue, 11 Mar 2025 17:00:00 GMT"},
+              {"title": "Lionel Messi — Wikipedia", "url": "https://en.wikipedia.org/wiki/Lionel_Messi",
+               "content": "Lionel Andrés Messi is an Argentine professional footballer.", "score": 0.7,
+               "raw_content": None, "published_date": None}]}
+
 FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA, searchSerp: SERP,
-           searchFirecrawl: FIRECRAWL}
+           searchFirecrawl: FIRECRAWL, searchTavily: TAVILY}
 QUERY = "AI and strategy"
 
 
@@ -129,7 +142,8 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
 
     def test_max_results(self):
         for cls, field in ((searchBrave, "count"), (searchPerplexity, "max_results"),
-                           (searchExa, "numResults"), (searchSerp, "num"), (searchFirecrawl, "limit")):
+                           (searchExa, "numResults"), (searchSerp, "num"), (searchFirecrawl, "limit"),
+                           (searchTavily, "max_results")):
             with self.subTest(provider=cls.__name__):
                 tool, _, _ = _search(cls, {"max_results": 7})
                 self.assertEqual(str(_sent(tool)[field]), "7")
@@ -140,6 +154,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchPerplexity, {"recency": "week"}); self.assertEqual(_sent(tool)["search_recency_filter"], "week")
         tool, _, _ = _search(searchSerp, {"recency": "week"}); self.assertEqual(_sent(tool)["tbs"], "qdr:w")
         tool, _, _ = _search(searchFirecrawl, {"recency": "hour"}); self.assertEqual(_sent(tool)["tbs"], "qdr:h")
+        tool, _, _ = _search(searchTavily, {"recency": "week"}); self.assertEqual(_sent(tool)["time_range"], "week")
         tool, _, _ = _search(searchExa, {"recency": "week"})
         self.assertEqual(_sent(tool)["startPublishedDate"], f"{week_ago}T00:00:00.000Z")
 
@@ -152,6 +167,8 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchSerp, w); self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:9/28/2026,cd_max:10/4/2026")
         tool, _, _ = _search(searchFirecrawl, w)
         self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:09/28/2026,cd_max:10/04/2026")
+        tool, _, _ = _search(searchTavily, w)
+        self.assertEqual((_sent(tool)["start_date"], _sent(tool)["end_date"]), ("2026-09-28", "2026-10-04"))
         tool, _, _ = _search(searchExa, w)
         self.assertEqual((_sent(tool)["startPublishedDate"], _sent(tool)["endPublishedDate"]),
                          ("2026-09-28T00:00:00.000Z", "2026-10-04T23:59:59.999Z"))
@@ -168,6 +185,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchPerplexity, d); self.assertEqual(_sent(tool)["search_domain_filter"], d["domains"])
         tool, _, _ = _search(searchExa, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
         tool, _, _ = _search(searchFirecrawl, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
+        tool, _, _ = _search(searchTavily, d); self.assertEqual(_sent(tool)["include_domains"], d["domains"])
         for cls, field in ((searchBrave, "q"), (searchSerp, "q")):
             with self.subTest(provider=cls.__name__):
                 tool, _, _ = _search(cls, d)
@@ -185,6 +203,8 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, found, _ = _search(searchFirecrawl, o)
         self.assertEqual(_sent(tool)["country"], "GB")
         self.assertTrue(any("Firecrawl has no language filter" in n for n in found["notices"]))
+        tool, _, _ = _search(searchTavily, o)
+        self.assertEqual((_sent(tool)["country"], _sent(tool)["language"]), ("united kingdom", "en"))
 
     def test_a_malformed_date_or_window_is_refused_before_the_network(self):
         for opts in ({"start_date": "28.09.2026"}, {"recency": "fortnight"},
@@ -280,6 +300,39 @@ class TestFirecrawl(unittest.TestCase):
             _tool(searchFirecrawl, {"success": False, "error": "Insufficient credits"}).search(QUERY)
 
 
+class TestTavily(unittest.TestCase):
+
+    def test_dates_are_always_asked_for_and_undated_pages_pass_unless_told(self):
+        tool, _, _ = _search(searchTavily, {"start_date": "2026-09-28"})
+        self.assertTrue(_sent(tool)["include_published_date"])
+        self.assertNotIn("filter_by_published_date", _sent(tool))
+        tool, _, _ = _search(searchTavily, {"start_date": "2026-09-28", "filter_by_published_date": True})
+        self.assertTrue(_sent(tool)["filter_by_published_date"])
+
+    def test_an_hour_is_widened_and_said(self):
+        tool, found, _ = _search(searchTavily, {"recency": "hour"})
+        self.assertEqual(_sent(tool)["time_range"], "day")
+        self.assertTrue(any("widened to a day" in n for n in found["notices"]))
+
+    def test_country_is_a_name_and_only_on_the_general_topic(self):
+        for code, name in (("DE", "germany"), ("us", "united states"), ("Japan", "japan")):
+            tool, _, _ = _search(searchTavily, {"country": code})
+            self.assertEqual(_sent(tool)["country"], name)
+        tool, found, _ = _search(searchTavily, {"country": "DE", "topic": "news"})
+        self.assertNotIn("country", _sent(tool))
+        self.assertTrue(any("general topic" in n for n in found["notices"]))
+
+    def test_passages_split_rfc_dates_read_and_page_text_on_request(self):
+        tool, found, _ = _search(searchTavily, {"text_chars": 15})
+        self.assertEqual(_sent(tool)["include_raw_content"], "markdown")
+        first, second = found["results"]
+        self.assertEqual(first["snippets"], ["Lionel Messi, an Argentine footballer",
+                                             "Born in 1987, Messi spent his career at Barcelona"])
+        self.assertEqual(first["date"], "2025-03-11")
+        self.assertEqual(first["text"], "# Lionel Messi\n")
+        self.assertEqual(second["date"], "")
+
+
 class TestOneRecord(unittest.TestCase):
 
     KEYS = {"title", "url", "date", "author", "snippets", "text"}
@@ -347,7 +400,7 @@ class TestContract(unittest.TestCase):
     def test_read_risk_a_shared_base_and_a_named_key(self):
         for cls, var in ((searchBrave, "BRAVE_SEARCH_API_KEY"), (searchPerplexity, "PERPLEXITY_API_KEY"),
                          (searchExa, "EXA_API_KEY"), (searchSerp, "SERPAPI_API_KEY"),
-                         (searchFirecrawl, "FIRECRAWL_API_KEY")):
+                         (searchFirecrawl, "FIRECRAWL_API_KEY"), (searchTavily, "TAVILY_API_KEY")):
             with self.subTest(provider=cls.__name__):
                 self.assertTrue(issubclass(cls, Search))
                 self.assertEqual(cls.risk, "read")
@@ -402,6 +455,7 @@ class TestSearchLive(unittest.TestCase):
     def test_exa(self): self._check(searchExa, "EXA_API_KEY")
     def test_serp(self): self._check(searchSerp, "SERPAPI_API_KEY")
     def test_firecrawl(self): self._check(searchFirecrawl, "FIRECRAWL_API_KEY")
+    def test_tavily(self): self._check(searchTavily, "TAVILY_API_KEY")
 
 
 if __name__ == "__main__":

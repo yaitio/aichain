@@ -70,7 +70,7 @@ Model("deepseek-chat")       # DeepSeek
 | **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
 | **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
 | **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
-| **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchPerplexity`, `searchSerp` |
+| **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchPerplexity`, `searchSerp`, `searchTavily` |
 <!-- /g:modalities -->
 
 ---

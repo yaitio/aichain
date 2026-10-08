@@ -13,6 +13,7 @@ searchBrave        Brave Search — ranked links with descriptions.
 searchSerp         SerpAPI — Google, Bing, DuckDuckGo, Baidu, Yandex and more.
 searchExa          Exa — the passages that answer the query; page text on request.
 searchFirecrawl    Firecrawl — descriptions; each page as Markdown on request.
+searchTavily       Tavily — passages chosen for the query; each page as Markdown on request.
 
 ``Search`` is the base; a new provider is a subclass that implements ``_search``.
 
@@ -27,6 +28,7 @@ from .brave      import searchBrave
 from .serp       import searchSerp
 from .exa        import searchExa
 from .firecrawl  import searchFirecrawl
+from .tavily     import searchTavily
 
 # ── Backward-compatible aliases ──────────────────────────────────────────────
 PerplexitySearchTool = searchPerplexity
@@ -40,6 +42,7 @@ __all__ = [
     "searchSerp",
     "searchExa",
     "searchFirecrawl",
+    "searchTavily",
     # aliases
     "PerplexitySearchTool",
     "BraveSearchTool",

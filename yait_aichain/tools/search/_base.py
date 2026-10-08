@@ -103,7 +103,8 @@ def day(value) -> str:
     """
     if not value:
         return ""
-    s = str(value).strip()
+    # An RFC 1123 weekday prefix — "Tue, 11 Mar 2025 17:00:00 GMT" (Tavily) — says nothing more.
+    s = re.sub(r"^[A-Za-z]{3},\s*", "", str(value).strip())
     m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
     if m:
         return "-".join(m.groups())
