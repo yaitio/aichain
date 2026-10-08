@@ -69,6 +69,7 @@ export XAI_API_KEY="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export EXA_API_KEY="…"
+export FIRECRAWL_API_KEY="…"
 export GOOGLE_API_KEY="…"
 export SERPAPI_API_KEY="…"
 export TYPESAFE_API_KEY="…"
@@ -256,7 +257,7 @@ registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
 ## Built-in tools
 
 ### Search
-`searchPerplexity` · `searchBrave` · `searchSerp` · `searchExa`
+`searchPerplexity` · `searchBrave` · `searchSerp` · `searchExa` · `searchFirecrawl`
 
 ### Decision
 `decisionOpenAI` · `decisionTypeSafe`

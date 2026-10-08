@@ -156,9 +156,50 @@ result = searchExa()(
     options={"max_results": …},
 )
 ```
+
+## `searchFirecrawl`
+
+Web search powered by Firecrawl — results with a description and, on request, each page's content as Markdown.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import searchFirecrawl` |
+| Risk class | `read` |
+| Key | `FIRECRAWL_API_KEY` |
+
+```python
+searchFirecrawl(
+    api_key: str | None = None,
+)
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `input` | `string` | ✓ | The search query, in natural language. |
+| `options.max_results` | `integer` |  | How many results to return (default 10). |
+| `options.recency` | `string` |  | Only pages published within this window. One of `hour`, `day`, `week`, `month`, `year`. |
+| `options.start_date` | `string` |  | Only pages published on or after this date, YYYY-MM-DD. |
+| `options.end_date` | `string` |  | Only pages published on or before this date, YYYY-MM-DD. |
+| `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
+| `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. Not applied here: Firecrawl has no language filter. |
+| `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.exclude_domains` | `list[string]` |  | Leave out results from these host names. Not with domains. |
+| `options.categories` | `list[string]` |  | Restrict to research sites, PDFs, the developer index or the government index ('gov' combines with nothing else). |
+| `options.sources` | `list[string]` |  | Where to search: 'web' (default) and/or 'news'. |
+| `options.location` | `string` |  | A place to search from, e.g. 'Berlin,Germany'. |
+| `options.safe` | `boolean` |  | Filter explicit content. |
+| `options.tbs` | `string` |  | Firecrawl's raw time filter, e.g. 'qdr:w' or 'sbd:1,qdr:m'; wins over recency and the dates. |
+| `options.text_chars` | `integer` |  | Also return each page's content as Markdown, cut to this many characters. Scraping costs extra credits. |
+
+```python
+result = searchFirecrawl()(
+    input="…",
+    options={"max_results": …},
+)
+```
 <!-- /g:tool -->
 
-## One format, four providers
+## One format, five providers
 
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently. The library
@@ -171,24 +212,26 @@ tool translates them, the way the [decision tools](decision.md) work.
 | `searchBrave` | ranked links and descriptions; more passages with `extra_snippets` | ≤ 20 | `BRAVE_SEARCH_API_KEY` |
 | `searchSerp` | Google — or Bing, DuckDuckGo, Baidu, Yandex — through SerpAPI | ≤ 100 | `SERPAPI_API_KEY` |
 | `searchExa` | the passages that answer the query; the page's own text on request | ≤ 100 | `EXA_API_KEY` |
+| `searchFirecrawl` | a scraper first: each page as Markdown in the same call; news and PDF/research/gov indexes | ≤ 100 | `FIRECRAWL_API_KEY` |
 
 ## Options
 
-| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa |
-|---|---|---|---|---|---|
-| `max_results` | how many | `max_results` | `count` | `num` | `numResults` |
-| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date |
-| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates |
-| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` |
-| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so |
-| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` |
+| Option | Meaning | Perplexity | Brave | SerpAPI (Google) | Exa | Firecrawl |
+|---|---|---|---|---|---|---|
+| `max_results` | how many | `max_results` | `count` | `num` | `numResults` | `limit` |
+| `recency` | `hour`, `day`, `week`, `month`, `year` | native | `freshness`; `hour` widened to a day, said so | `tbs=qdr:` | a start date | `tbs=qdr:` — **not enforced**, said so |
+| `start_date`, `end_date` | `YYYY-MM-DD` | MM/DD/YYYY filters | `freshness` range | `tbs=cdr:` | ISO dates | `tbs=cdr:` — **not enforced**, said so |
+| `country` | ISO alpha-2 | native | native | `gl` | `userLocation` | native |
+| `language` | ISO 639-1 | native | `search_lang` | `hl` | **not applied** — said so | **not applied** — said so |
+| `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so |
 
 `recency` and `start_date` bound the same side; the later is kept. Each
 provider keeps its own options beside these — Brave `extra_snippets`,
 `safe_search`, `result_filter`, `freshness`; SerpAPI `engine`, `location`,
 `safe`, `start`, `no_cache`, `time_filter`; Perplexity `after_date`,
 `before_date`; Exa `category`, `search_type`, `exclude_domains`,
-`highlight_chars`, `text_chars`. A provider's own time option wins over the
+`highlight_chars`, `text_chars`; Firecrawl `exclude_domains`, `categories`,
+`sources`, `location`, `safe`, `tbs`, `text_chars`. A provider's own time option wins over the
 standard ones.
 
 **Nothing is dropped in silence.** An option a provider cannot honour, or
@@ -223,14 +266,19 @@ tool.run(input="AI and leadership", options={...})   # the same, as numbered tex
   is when it saw a page, so its article date is preferred; Perplexity has dated
   an April article to September. When the date matters, read it from the page:
   `convertToMD().last_metadata["published"]`.
-- **`text`** is the page's own text where the provider returned it — Exa, with
-  `text_chars`.
+- **`text`** is the page's own text where the provider returned it — Exa and
+  Firecrawl, with `text_chars`.
 
 ## Provider notes
 
 - **Exa's date filter lets undated pages through** — 31 of 73 results in a
   one-week window carried no date (2026-10-06). A window is a preference there,
   not a guarantee.
+- **Firecrawl does not enforce its time filter** — measured 2026-10-08: a
+  28.09–04.10 range returned exactly the unfiltered results, and with
+  `hbr.org` all five fell between 2025-11 and 2026-08. The filter is sent and
+  every such search carries a notice. Its web results carry no date unless the
+  page is scraped (`text_chars`), so ask for text when the date matters.
 - **Exa's highlights are capped** at 1 000 characters a result by default
   (`highlight_chars`; `0` turns them off): uncapped they were 5 000–8 000
   characters each, most of every page, in the agent's context.

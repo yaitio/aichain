@@ -20,8 +20,9 @@ What is pinned, offline, for every provider:
   * risk is ``read``; an API error is raised by ``run()`` and returned by a call.
 
 Fixtures: Brave's and Perplexity's are real answers captured 2026-10-06 and
-trimmed; Exa's real, 2026-10-02; SerpAPI's is built from its documented
-``organic_results`` shape — no SerpAPI key was available to capture one.
+trimmed; Exa's real, 2026-10-02; Firecrawl's in its documented shape,
+checked against live answers on 2026-10-08; SerpAPI's built from its
+documented shape — no key was available to capture one.
 """
 
 import json
@@ -35,7 +36,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from yait_aichain.tools import Search, searchBrave, searchExa, searchPerplexity, searchSerp
+from yait_aichain.tools import Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity, searchSerp
 from yait_aichain.tools.search._base import day
 
 #: Captured live 2026-10-06, query "site:hbr.org article", trimmed.
@@ -79,7 +80,18 @@ SERP = {"organic_results": [
     {"position": 2, "title": "Asyncio tutorial", "link": "https://realpython.com/async-io-python/",
      "snippet": "A walkthrough of async IO.", "date": "3 days ago"}]}
 
-FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA, searchSerp: SERP}
+#: Firecrawl's v2 response shape, as documented and as answered live on 2026-10-08:
+#: web results carry no date; a news result does; a scraped page has markdown.
+FIRECRAWL = {"success": True, "creditsUsed": 2, "data": {
+    "web": [{"title": "Firecrawl — turn websites into LLM-ready data", "url": "https://www.firecrawl.dev/",
+             "description": "Scrape, crawl and search the web for AI.",
+             "markdown": "# Firecrawl\n\nTurn websites into LLM-ready data.",
+             "metadata": {"title": "Firecrawl", "sourceURL": "https://www.firecrawl.dev/", "statusCode": 200}}],
+    "news": [{"title": "Firecrawl raises a round", "url": "https://news.example.com/firecrawl",
+              "snippet": "The scraping company announced funding.", "date": "Sep 30, 2026"}]}}
+
+FIXTURE = {searchBrave: BRAVE, searchPerplexity: PERPLEXITY, searchExa: EXA, searchSerp: SERP,
+           searchFirecrawl: FIRECRAWL}
 QUERY = "AI and strategy"
 
 
@@ -117,7 +129,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
 
     def test_max_results(self):
         for cls, field in ((searchBrave, "count"), (searchPerplexity, "max_results"),
-                           (searchExa, "numResults"), (searchSerp, "num")):
+                           (searchExa, "numResults"), (searchSerp, "num"), (searchFirecrawl, "limit")):
             with self.subTest(provider=cls.__name__):
                 tool, _, _ = _search(cls, {"max_results": 7})
                 self.assertEqual(str(_sent(tool)[field]), "7")
@@ -127,6 +139,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, _ = _search(searchBrave, {"recency": "week"}); self.assertEqual(_sent(tool)["freshness"], "pw")
         tool, _, _ = _search(searchPerplexity, {"recency": "week"}); self.assertEqual(_sent(tool)["search_recency_filter"], "week")
         tool, _, _ = _search(searchSerp, {"recency": "week"}); self.assertEqual(_sent(tool)["tbs"], "qdr:w")
+        tool, _, _ = _search(searchFirecrawl, {"recency": "hour"}); self.assertEqual(_sent(tool)["tbs"], "qdr:h")
         tool, _, _ = _search(searchExa, {"recency": "week"})
         self.assertEqual(_sent(tool)["startPublishedDate"], f"{week_ago}T00:00:00.000Z")
 
@@ -137,6 +150,8 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         self.assertEqual((_sent(tool)["search_after_date_filter"], _sent(tool)["search_before_date_filter"]),
                          ("09/28/2026", "10/04/2026"))
         tool, _, _ = _search(searchSerp, w); self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:9/28/2026,cd_max:10/4/2026")
+        tool, _, _ = _search(searchFirecrawl, w)
+        self.assertEqual(_sent(tool)["tbs"], "cdr:1,cd_min:09/28/2026,cd_max:10/04/2026")
         tool, _, _ = _search(searchExa, w)
         self.assertEqual((_sent(tool)["startPublishedDate"], _sent(tool)["endPublishedDate"]),
                          ("2026-09-28T00:00:00.000Z", "2026-10-04T23:59:59.999Z"))
@@ -152,6 +167,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         d = {"domains": ["hbr.org", "sloanreview.mit.edu"]}
         tool, _, _ = _search(searchPerplexity, d); self.assertEqual(_sent(tool)["search_domain_filter"], d["domains"])
         tool, _, _ = _search(searchExa, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
+        tool, _, _ = _search(searchFirecrawl, d); self.assertEqual(_sent(tool)["includeDomains"], d["domains"])
         for cls, field in ((searchBrave, "q"), (searchSerp, "q")):
             with self.subTest(provider=cls.__name__):
                 tool, _, _ = _search(cls, d)
@@ -166,6 +182,9 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
         tool, _, notes = _search(searchExa, o)
         self.assertEqual(_sent(tool)["userLocation"], "GB")
         self.assertNotIn("language", json.dumps(_sent(tool)))
+        tool, found, _ = _search(searchFirecrawl, o)
+        self.assertEqual(_sent(tool)["country"], "GB")
+        self.assertTrue(any("Firecrawl has no language filter" in n for n in found["notices"]))
 
     def test_a_malformed_date_or_window_is_refused_before_the_network(self):
         for opts in ({"start_date": "28.09.2026"}, {"recency": "fortnight"},
@@ -210,6 +229,55 @@ class TestNothingIsDroppedInSilence(unittest.TestCase):
     def test_a_typo_is_still_caught_by_the_schema(self):
         self.assertIn("options.recencyy", searchBrave(api_key="k").unknown_keys(
             {"input": QUERY, "options": {"recencyy": "day"}}))
+
+
+class TestFirecrawl(unittest.TestCase):
+
+    def test_a_domain_with_a_path_goes_as_site_and_is_said(self):
+        tool, found, _ = _search(searchFirecrawl, {"domains": ["hbr.org/2026", "cmr.berkeley.edu"]})
+        sent = _sent(tool)
+        self.assertNotIn("includeDomains", sent)
+        self.assertEqual(sent["query"], f"{QUERY} (site:hbr.org/2026 OR site:cmr.berkeley.edu)")
+        self.assertTrue(any("host names only" in n for n in found["notices"]))
+
+    def test_domains_and_exclude_domains_together_are_refused(self):
+        tool = _tool(searchFirecrawl)
+        with self.assertRaises(ValueError):
+            tool.search(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
+        tool._http.request.assert_not_called()
+
+    def test_text_chars_scrapes_the_pages_and_cuts_them(self):
+        tool, found, _ = _search(searchFirecrawl, {"text_chars": 11})
+        self.assertEqual(_sent(tool)["scrapeOptions"], {"formats": [{"type": "markdown"}]})
+        self.assertEqual(found["results"][0]["text"], "# Firecrawl")
+        tool, found, _ = _search(searchFirecrawl)
+        self.assertNotIn("scrapeOptions", _sent(tool))
+        self.assertEqual(found["results"][0]["text"], "")     # not asked, not carried
+
+    def test_news_is_dated_and_web_is_undated_not_misdated(self):
+        tool, found, _ = _search(searchFirecrawl, {"sources": ["web", "news"]})
+        self.assertEqual(_sent(tool)["sources"], [{"type": "web"}, {"type": "news"}])
+        self.assertEqual([r["date"] for r in found["results"]], ["", "2026-09-30"])
+
+    def test_its_own_categories_and_a_warning_become_a_notice(self):
+        resp = dict(FIRECRAWL, warning="research category changes on 2026-11-16")
+        tool, found, _ = _search(searchFirecrawl, {"categories": ["research", "pdf"]}, resp)
+        self.assertEqual(_sent(tool)["categories"], [{"type": "research"}, {"type": "pdf"}])
+        self.assertTrue(any("research category changes" in n for n in found["notices"]))
+
+    def test_a_time_filter_is_sent_and_said_not_to_be_enforced(self):
+        # Measured 2026-10-08: a 28.09–04.10 range returned the unfiltered results.
+        for opts in ({"recency": "week"}, {"start_date": "2026-09-28"}, {"tbs": "qdr:m"}):
+            with self.subTest(opts=opts):
+                tool, found, _ = _search(searchFirecrawl, opts)
+                self.assertIn("tbs", _sent(tool))
+                self.assertTrue(any("did not enforce" in n for n in found["notices"]))
+        _, found, _ = _search(searchFirecrawl)
+        self.assertEqual(found["notices"], [])
+
+    def test_success_false_is_an_error(self):
+        with self.assertRaises(RuntimeError):
+            _tool(searchFirecrawl, {"success": False, "error": "Insufficient credits"}).search(QUERY)
 
 
 class TestOneRecord(unittest.TestCase):
@@ -278,7 +346,8 @@ class TestContract(unittest.TestCase):
 
     def test_read_risk_a_shared_base_and_a_named_key(self):
         for cls, var in ((searchBrave, "BRAVE_SEARCH_API_KEY"), (searchPerplexity, "PERPLEXITY_API_KEY"),
-                         (searchExa, "EXA_API_KEY"), (searchSerp, "SERPAPI_API_KEY")):
+                         (searchExa, "EXA_API_KEY"), (searchSerp, "SERPAPI_API_KEY"),
+                         (searchFirecrawl, "FIRECRAWL_API_KEY")):
             with self.subTest(provider=cls.__name__):
                 self.assertTrue(issubclass(cls, Search))
                 self.assertEqual(cls.risk, "read")
@@ -332,6 +401,7 @@ class TestSearchLive(unittest.TestCase):
     def test_perplexity(self): self._check(searchPerplexity, "PERPLEXITY_API_KEY")
     def test_exa(self): self._check(searchExa, "EXA_API_KEY")
     def test_serp(self): self._check(searchSerp, "SERPAPI_API_KEY")
+    def test_firecrawl(self): self._check(searchFirecrawl, "FIRECRAWL_API_KEY")
 
 
 if __name__ == "__main__":

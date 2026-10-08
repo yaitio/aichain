@@ -13,7 +13,7 @@ Tool groups
 -----------
 
 search/          Web search — all return plain-text result strings.
-  searchPerplexity, searchBrave, searchSerp, searchExa — one format of options and results
+  searchPerplexity, searchBrave, searchSerp, searchExa, searchFirecrawl — one format of options and results
 
 embedding/       Text embeddings — returns EmbeddingResult with float vectors.
   Embedding(model)  factory → EmbeddingOpenAI | EmbeddingCohere |
@@ -97,6 +97,7 @@ from .search import (
     searchBrave,
     searchSerp,
     searchExa,
+    searchFirecrawl,
     # aliases
     PerplexitySearchTool,
     BraveSearchTool,
@@ -201,6 +202,7 @@ __all__ = [
     "decisionOpenAI",
     "decisionTypeSafe",
     "searchExa",
+    "searchFirecrawl",
     # ── Base ──────────────────────────────────────────────────────────────
     "Tool",
     "ToolResult",

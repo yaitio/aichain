@@ -26,6 +26,15 @@
   `category`, `search_type` (`instant` to `deep-reasoning`), `exclude_domains`,
   `highlight_chars`, `text_chars`. Verified live, alone and inside a `gpt-6-luna`
   agent that searched, answered and cited a URL.
+- **`searchFirecrawl` — Firecrawl's search (v2), a fifth provider in the common
+  format.** `FIRECRAWL_API_KEY`. A scraper first: `text_chars` returns each
+  page as Markdown in the same call, into `text`; its own `categories`
+  (research, pdf, developer, gov) and `news` source are offered. Its domain
+  filter takes host names only, so a domain with a path travels as `site:` and
+  is reported; `language` has no field and is declined. **Its time filter is
+  not enforced** — measured 2026-10-08, a 28.09–04.10 range returned exactly the
+  unfiltered results — so it is sent and every such search says so in
+  `notices`. Verified live: web, news and scraped results.
 - **Decision tools — a decision with probabilities, not prose, from two
   providers in one format.** `decisionOpenAI` (OpenAI's Decisions API,
   `gpt-6-luna`, `OPENAI_API_KEY`) and `decisionTypeSafe` (TypeSafe's Jev,
