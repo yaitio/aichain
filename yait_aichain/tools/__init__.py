@@ -88,7 +88,7 @@ All previous class names still work:
 """
 
 from ._base           import Tool, ToolResult, Record, FunctionTool, tool
-from ._wait           import Wait, Gate
+from .general         import Wait, Gate, wait, gate
 from ._permissions    import (
     PermissionPolicy, ApprovalRequest, ApprovalDecision,
     RISK_CLASSES, DECISIONS,
@@ -121,7 +121,7 @@ from .fetch import (
 )
 
 # ── Embedding ─────────────────────────────────────────────────────────────────
-from .embedding import (
+from .embed import (
     Embedding,
     Embedder,
     EmbeddingResult,
@@ -191,7 +191,7 @@ from .vectordb import (
 )
 
 # ── Reranking ────────────────────────────────────────────────────────────────
-from .reranking import (
+from .rerank import (
     Reranker,
     RerankBase,
     RerankResult,
@@ -219,12 +219,22 @@ from .mcp import MCPTool, MCPTools
 # Type checkers see the functions.
 from typing import TYPE_CHECKING as _TC
 if _TC:
-    from .search   import search
-    from .fetch    import fetch
-    from .decision import decide
+    from .search     import search
+    from .fetch      import fetch
+    from .decision   import decide
+    from .embed      import embed
+    from .rerank     import rerank
+    from .speech     import speech
+    from .transcribe import transcribe
+    from .chunk      import chunk
 else:
-    from . import search, fetch
+    from . import search, fetch, embed, rerank, speech, transcribe, chunk
     from . import decision as decide
+
+# Paths modules had before 3.5.0 (tools.embedding, tools.convert.to_speech, …)
+# resolve to the moved modules, so saved chains and old imports still load.
+from . import _moved as _moved_paths
+_moved_paths.register(__name__)
 
 __all__ = [
     "Decision",
@@ -239,6 +249,13 @@ __all__ = [
     "Record",
     "tool",
     "FunctionTool",
+    "embed",
+    "rerank",
+    "speech",
+    "transcribe",
+    "chunk",
+    "wait",
+    "gate",
     "fetch",
     "Fetch",
     "fetchFirecrawl",

@@ -204,3 +204,28 @@ def Reranker(
         f"Use a provider-prefixed name such as 'cohere/{model}', "
         f"'voyage/{model}', or 'qwen/{model}'."
     )
+
+
+# ---------------------------------------------------------------------------
+# rerank(service, model=…) — the factory the documentation shows (3.5.0)
+# ---------------------------------------------------------------------------
+
+#: Provider name → tool class, for :func:`rerank`.
+SERVICES = _PREFIX_MAP
+
+
+def rerank(service: str, *, model: str, api_key: "str | None" = None, name: "str | None" = None,
+           description: "str | None" = None) -> RerankBase:
+    """
+    A reranking tool for *service* — one of ``SERVICES`` — and *model*.
+
+    ::
+
+        top = rerank("cohere", model="rerank-v3.5").run(docs, {"query": "how does caching work?", "top_n": 5})
+    """
+    from .._callable import pick
+    return pick("rerank", SERVICES, service)(model, api_key=api_key, name=name, description=description)
+
+
+from .._callable import callable_package as _callable_package
+_callable_package(__name__, rerank)

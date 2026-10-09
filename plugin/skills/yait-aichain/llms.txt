@@ -44,7 +44,7 @@ None of them work.
    from the variable **`task`**.
 7. **A run pauses only where a `Wait`/`Gate` asks it to**, and it needs a
    `store=`. In a Chain that is a step; for an agent it is a tool the model
-   may call — `Agent(tools=[Gate(publish)], store=FileStore("runs/"))` — and
+   may call — `Agent(tools=[gate(publish)], store=FileStore("runs/"))` — and
    an agent given one of those tools **without** a store is refused at
    construction. Nothing pauses a run from outside it.
 8. **One error vocabulary**: `raise`, `stop`, `skip` (warn), `collect`
@@ -83,7 +83,7 @@ from yait_aichain import Agent, Budget, BudgetExceeded, Chain, Model, Pool, Skil
 from yait_aichain.agent import check, stalled, step_count, token_budget
 from yait_aichain.models import ToolCallRequest, tool_result_turn
 from yait_aichain.state import FileStore, RunContext, SuspendedResult
-from yait_aichain.tools import ApprovalDecision, Gate, PermissionPolicy, Tool, Wait
+from yait_aichain.tools import ApprovalDecision, PermissionPolicy, Tool, gate, wait
 ```
 
 ## Model
@@ -193,8 +193,12 @@ Calling the tool object catches an exception and returns it as `.error`;
 `Refund()(amount=20)`, still returning a `ToolResult`. `run()` may return any
 value; a dict stays a dict.
 
-Built-in tools (search, conversion, speech, decisions, local files, vector
-stores, REST, MCP) are in `docs/tools-reference/index.md`. A tool's `risk` is
+Built-in tools (search, fetch, decisions, speech, embeddings, reranking, chunking,
+conversion, local files, vector stores, REST, MCP) are in
+`docs/tools-reference/index.md`. A provider tool is made by its provider's name —
+`speech("openai")`, `transcribe("openai")`, `embed("openai", model=…)`,
+`rerank("cohere", model=…)`; `chunk(max_chars=…)`, `wait(…)` and `gate(tool, …)` take
+no provider. An embedding reaches a model as a one-line summary, never as the vectors. A tool's `risk` is
 one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
 `privileged`. A tool may keep state on its instance and define its own `__init__`.
 
@@ -388,7 +392,7 @@ from anywhere — a person, another system — not only from `agent.execute()`.
 ## Pause and resume
 
 ```python
-chain = Chain(steps=[(draft, "tweet"), (Wait(reason="approve?"), "approval"),
+chain = Chain(steps=[(draft, "tweet"), (wait(reason="approve?"), "approval"),
                      (publish, "posted")], store=FileStore("runs/"))
 result = chain.run(variables={"topic": "solar power"})
 if isinstance(result, SuspendedResult):
@@ -401,10 +405,10 @@ if isinstance(result, SuspendedResult):
 A `signal` is merged into the variables. The chain that resumes can be a new
 object — built again with the same steps and the same store.
 
-`Gate(tool)` pauses before a tool and runs it only if the signal approves:
+`gate(tool)` pauses before a tool and runs it only if the signal approves:
 
 ```python
-chain  = Chain(steps=[(draft, "announcement"), (Gate(publish), "published")], store=FileStore("runs/"))
+chain  = Chain(steps=[(draft, "announcement"), (gate(publish), "published")], store=FileStore("runs/"))
 paused = chain.run(variables={"news": "new office hours"})
 final  = chain.resume(paused.run_id, signal={"approved": False})
 final.output                            # {"approved": False, "skipped": True}; publish never ran
@@ -416,7 +420,7 @@ An **agent** pauses the same way, except that the model decides when: give it
 a `Wait` or a `Gate` as an ordinary tool, plus a store.
 
 ```python
-agent  = Agent(model, tools=[Gate(refund, reason="Approve this refund?")],
+agent  = Agent(model, tools=[gate(refund, reason="Approve this refund?")],
                store=FileStore("runs/"))
 result = agent.run("refund order 4417 if the policy allows it")
 if isinstance(result, SuspendedResult):

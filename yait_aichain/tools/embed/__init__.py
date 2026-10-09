@@ -172,3 +172,34 @@ def Embedding(
         f"Use a provider-prefixed name such as 'openai/{model}', "
         f"'cohere/{model}', 'voyage/{model}', or 'google/{model}'."
     )
+
+
+# ---------------------------------------------------------------------------
+# embed(service, model=…) — the factory the documentation shows (3.5.0)
+# ---------------------------------------------------------------------------
+
+#: Provider name → tool class, for :func:`embed`.
+SERVICES = _PREFIX_MAP
+
+
+def embed(service: str, *, model: str, api_key: "str | None" = None, name: "str | None" = None,
+          description: "str | None" = None) -> Embedder:
+    """
+    An embedding tool for *service* — one of ``SERVICES`` — and *model*.
+
+    The model is a setting, not an option: vectors from two models cannot be
+    compared, so a store is filled by one. ``name`` and ``description``
+    default to the provider's; ``api_key`` to its environment variable.
+
+    ::
+
+        vectors = embed("openai", model="text-embedding-3-small").run(["a text", "another"])
+        vectors.embeddings[0][:3], vectors.dimensions
+        str(vectors)          # what a model reads: "2 vector(s) of 1536 dimensions …"
+    """
+    from .._callable import pick
+    return pick("embed", SERVICES, service)(model, api_key=api_key, name=name, description=description)
+
+
+from .._callable import callable_package as _callable_package
+_callable_package(__name__, embed)

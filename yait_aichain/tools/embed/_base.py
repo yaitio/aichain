@@ -57,6 +57,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from .._base import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +115,14 @@ class EmbeddingResult:
             f"total_tokens={self.total_tokens})"
         )
 
+    def __str__(self) -> str:
+        # What an agent shows the model, and what a Skill prompt substitutes:
+        # a summary. The vectors are numbers a model can do nothing with —
+        # 1 536 floats a text in its context.
+        tokens = f", {self.total_tokens} tokens" if self.total_tokens is not None else ""
+        return (f"{len(self.embeddings)} vector(s) of {self.dimensions} dimensions from "
+                f"{self.provider} {self.model}{tokens}")
+
     def __len__(self) -> int:
         return len(self.embeddings)
 
@@ -125,7 +134,7 @@ class EmbeddingResult:
 # Embedder base class
 # ---------------------------------------------------------------------------
 
-class Embedder:
+class Embedder(Tool):
     """
     Abstract base class for all embedding provider clients.
 
@@ -175,6 +184,24 @@ class Embedder:
     _ENV_KEY:   str = ""
     _MAX_BATCH: int = 100
 
+    # A tool since 3.5.0: code, a chain and an agent call it alike. An agent
+    # reads a summary, never the vectors (see EmbeddingResult.__str__).
+    risk        = "read"
+    parameters  = {
+        "type": "object",
+        "properties": {
+            "input":   {"type": "array", "items": {"type": "string"},
+                        "description": "The texts to embed — or one text."},
+            "options": {"type": "object", "description": "Optional settings.", "properties": {
+                "input_type": {"type": "string", "enum": ["query", "document"],
+                               "description": "What the texts are, for providers that embed the two differently."},
+                "dimensions": {"type": "integer", "description": "Length of each vector, where the model can shorten it."},
+                "batch_size": {"type": "integer", "description": "Most texts in one request."},
+            }},
+        },
+        "required": ["input"],
+    }
+
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
@@ -184,6 +211,8 @@ class Embedder:
         model:   str,
         *,
         api_key: str | None = None,
+        name:        "str | None" = None,
+        description: "str | None" = None,
         **defaults: Any,
     ) -> None:
         # _ENV_KEY may be a single name or several accepted names (the first
@@ -199,10 +228,22 @@ class Embedder:
         self.model    = model
         self._api_key = key
         self._defaults = defaults
+        label = type(self).__name__.replace("Embedding", "", 1) or self.provider
+        self.name = name or f"embed{label}"
+        self.description = description or (
+            f"Embed texts as vectors with {label}'s {model}. Returns a summary — the "
+            "vectors go to the code that called it, not into the conversation.")
         self._http = make_http(
             timeout=DEFAULT_TIMEOUT,
             retries=DEFAULT_RETRIES,
         )
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the model and its settings, never the key."""
+        out = {"model": self.model, **self._defaults}
+        if getattr(self, "_region", None):
+            out["region"] = self._region
+        return out
 
     # ------------------------------------------------------------------
     # Public API

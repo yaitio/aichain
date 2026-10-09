@@ -23,6 +23,14 @@ Chains and Agents identically.
 | Search | [`searchFirecrawl`](search.md#searchfirecrawl) | `searchFirecrawl` | Web search powered by Firecrawl — results with a description and, on request, each page's content as Markdown. | `FIRECRAWL_API_KEY` | `read` |
 | Search | [`searchTavily`](search.md#searchtavily) | `searchTavily` | Web search powered by Tavily — each page with the passages chosen for the query, and on request the page itself. | `TAVILY_API_KEY` | `read` |
 | Search | [`searchParallel`](search.md#searchparallel) | `searchParallel` | Web search powered by Parallel — the excerpts of each page that serve the objective of the search. | `PARALLEL_API_KEY` | `read` |
+| Embeddings | [`embedOpenAI`](embed.md#embeddingopenai) | `EmbeddingOpenAI` | Embedder for the OpenAI Embeddings API. | `OPENAI_API_KEY` | `read` |
+| Embeddings | [`embedCohere`](embed.md#embeddingcohere) | `CohereEmbedder` | Embedder for the Cohere Embed API (v2). | `COHERE_API_KEY` | `read` |
+| Embeddings | [`embedVoyage`](embed.md#embeddingvoyage) | `EmbeddingVoyage` | Embedder for the Voyage AI Embeddings API. | `VOYAGE_API_KEY` | `read` |
+| Embeddings | [`embedGoogle`](embed.md#embeddinggoogle) | `EmbeddingGoogle` | Embedder for the Google AI (Gemini) Embeddings API. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `read` |
+| Embeddings | [`embedQwen`](embed.md#embeddingqwen) | `EmbeddingQwen` | Embedder for the Alibaba DashScope Embeddings API. | `DASHSCOPE_API_KEY` | `read` |
+| Reranking | [`rerankCohere`](rerank.md#rerankcohere) | `RerankCohere` | Reranker for the Cohere Rerank API (v2). | `COHERE_API_KEY` | `read` |
+| Reranking | [`rerankVoyage`](rerank.md#rerankvoyage) | `RerankVoyage` | Reranker for the Voyage AI Rerank API. | `VOYAGE_API_KEY` | `read` |
+| Reranking | [`rerankQwen`](rerank.md#rerankqwen) | `RerankQwen` | Reranker for the Alibaba DashScope Text-Rerank API. | `DASHSCOPE_API_KEY` | `read` |
 | Fetch | [`fetchFirecrawl`](fetch.md#fetchfirecrawl) | `fetchFirecrawl` | A web page's text by Firecrawl Scrape — the main content, as Markdown, with the page's metadata. | `FIRECRAWL_API_KEY` | `read` |
 | Fetch | [`fetchTavily`](fetch.md#fetchtavily) | `fetchTavily` | Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown. | `TAVILY_API_KEY` | `read` |
 | Fetch | [`fetchExa`](fetch.md#fetchexa) | `fetchExa` | Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and author. | `EXA_API_KEY` | `read` |
@@ -31,14 +39,14 @@ Chains and Agents identically.
 | Conversion | [`convertToMD`](markitdown.md) | `MarkItDownTool` | Convert a file or URL to Markdown text. | — | `write` |
 | Conversion | [`convertToHTML`](mistletoe.md) | `MistletoeTool` | Convert Markdown text to HTML, LaTeX, or normalised Markdown. | — | `write` |
 | Conversion | [`convertToPDF`](weasyprint.md) | `WeasyprintTool` | Render an HTML document to PDF. | — | `write` |
-| Conversion | [`ttsOpenAI`](speech.md#ttsopenai) | `ttsOpenAI` | Text-to-speech via the OpenAI TTS API. | `OPENAI_API_KEY` | `write` |
-| Conversion | [`ttsGoogle`](speech.md#ttsgoogle) | `ttsGoogle` | Text-to-speech via Google Cloud Text-to-Speech. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
-| Conversion | [`ttsXAI`](speech.md#ttsxai) | `ttsXAI` | Text-to-speech via the xAI TTS API. | `XAI_API_KEY` | `write` |
-| Conversion | [`ttsQwen`](speech.md#ttsqwen) | `ttsQwen` | Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API. | `DASHSCOPE_API_KEY` | `write` |
-| Conversion | [`sttOpenAI`](speech.md#sttopenai) | `sttOpenAI` | Speech-to-text via the OpenAI Whisper API. | `OPENAI_API_KEY` | `write` |
-| Conversion | [`sttGoogle`](speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
-| Conversion | [`sttXAI`](speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `write` |
-| Conversion | [`sttQwen`](speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `write` |
+| Speech | [`ttsOpenAI`](speech.md#ttsopenai) | `ttsOpenAI` | Text-to-speech via the OpenAI TTS API. | `OPENAI_API_KEY` | `write` |
+| Speech | [`ttsGoogle`](speech.md#ttsgoogle) | `ttsGoogle` | Text-to-speech via Google Cloud Text-to-Speech. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
+| Speech | [`ttsXAI`](speech.md#ttsxai) | `ttsXAI` | Text-to-speech via the xAI TTS API. | `XAI_API_KEY` | `write` |
+| Speech | [`ttsQwen`](speech.md#ttsqwen) | `ttsQwen` | Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API. | `DASHSCOPE_API_KEY` | `write` |
+| Speech | [`sttOpenAI`](speech.md#sttopenai) | `sttOpenAI` | Speech-to-text via the OpenAI Whisper API. | `OPENAI_API_KEY` | `write` |
+| Speech | [`sttGoogle`](speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
+| Speech | [`sttXAI`](speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `write` |
+| Speech | [`sttQwen`](speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `write` |
 | Local | [`local_browse`](local.md#localbrowsetool) | `LocalBrowseTool` | List directory contents as a tree. | — | `write` |
 | Local | [`local_read`](local.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `write` |
 | Local | [`local_write`](local.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |

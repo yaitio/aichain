@@ -981,6 +981,12 @@ class Chain:
                         "init_args": init_args,
                     },
                 }
+                # A name or a description given to the factory, over the
+                # class's: kept for every tool, whatever its constructor takes.
+                for attr in ("name", "description"):
+                    value = getattr(runner, attr, None)
+                    if value and value != getattr(cls, attr, None):
+                        step["tool"][attr] = value
 
             if input_map:
                 step["input_map"] = input_map
@@ -1178,6 +1184,9 @@ class Chain:
                     )
 
                 tool  = tool_cls(**init_args)
+                for attr in ("name", "description"):
+                    if td.get(attr):
+                        setattr(tool, attr, td[attr])
                 entry = (tool, output_key, input_map, options)
 
             else:

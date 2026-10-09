@@ -1,5 +1,63 @@
 # Changelog
 
+## [3.5.0] — 2026-10-09
+
+**Embeddings, reranking and chunking are tools; every tool is made by name.**
+`embed`, `rerank`, `chunk`, `speech`, `transcribe`, `wait` and `gate` join
+`search`, `fetch` and `decide`, and six families moved to folders of their own.
+Every old path still imports.
+
+### Breaking
+
+- Each embedder and reranker is a `Tool` now, so calling one — `embedder(texts)`
+  — is the safe call every tool has and returns a `ToolResult`. Before, it had
+  no `__call__` and raised `TypeError`; `run()`, `embed()`, `rerank()` and
+  `batch()` are unchanged.
+
+### Added
+
+- **`embed(service, model=…)`, `rerank(service, model=…)`** — `openai`,
+  `cohere`, `voyage`, `google`, `qwen` and `cohere`, `voyage`, `qwen`. The model
+  is a required setting: vectors from two models cannot be compared, so a store
+  is filled by one. Both are `Tool`s with `risk = "read"`, named by provider
+  (`embedOpenAI`, `rerankCohere`), and an agent accepts them — until now
+  `Agent(tools=[Reranker(...)])` failed. An embedding reaches a model as a
+  one-line summary — "2 vector(s) of 1536 dimensions from openai
+  text-embedding-3-small, 7 tokens" — never as the vectors, a model can do
+  nothing with 1 536 floats a text. `Embedding(model)` and `Reranker(model)`
+  still work.
+- **`speech(service)`, `transcribe(service)`** — `openai`, `google`, `xai`,
+  `qwen`; `region` is `speech("qwen")`'s and a `TypeError` on any other.
+  `TTS(provider)` and `STT(provider)` still work.
+- **`chunk(max_chars=…, overlap_chars=…, merge_peers=…)`**, **`wait(…)`**,
+  **`gate(tool, …)`** — `vectorChunk`, `Wait` and `Gate` by the convention's
+  names; the old ones still work.
+- **`name=` and `description=` on every factory**, and a saved chain keeps
+  them for any tool, whatever its constructor takes.
+- **Reference pages for embeddings and reranking**, which had none.
+
+### Changed
+
+- **Six families moved**: `tools.embedding` → `tools.embed`,
+  `tools.reranking` → `tools.rerank`, `tools.convert.to_speech` →
+  `tools.speech`, `tools.convert.to_text` → `tools.transcribe`,
+  `tools.vectordb._chunk` → `tools.chunk`, `tools._wait` → `tools.general`.
+  Each old path is the moved module itself, registered under its old name, so
+  `import`, `from … import`, attribute access, `mock.patch` and `Chain.load` of
+  a chain saved with an old class path all resolve — on 3.10 as on 3.14. A
+  chain saved from now on writes the new path.
+
+### Fixed
+
+- **A saved chain keeps an embedder's model, a reranker's model and a
+  chunker's sizes.** None was written: an embedder or a reranker did not load
+  back at all (`missing 1 required positional argument: 'model'`), and a
+  chunker came back with the default sizes — a store filled one way, queried
+  with pieces cut another. Keys are never written.
+- **The README's RAG chain runs.** It maps `{"input": "{candidates}",
+  "options": {"query": "{question}", "top_n": 5}}` into a reranker; until 3.4.0
+  the templates were dropped, and until now the reranker was not a tool.
+
 ## [3.4.0] — 2026-10-09
 
 **Any function is a tool, and a chain fills a tool's arguments from a

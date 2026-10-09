@@ -566,6 +566,11 @@ class VectorChunkTool(Tool):
         self._overlap_chars  = overlap_chars
         self._merge_enabled  = merge_peers
 
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the sizes, which decide how a store was filled."""
+        return {"max_chars": self._max_chars, "overlap_chars": self._overlap_chars,
+                "merge_peers": self._merge_enabled}
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def run(

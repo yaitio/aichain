@@ -58,6 +58,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from .._base import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ class RerankResult:
 # RerankBase — abstract
 # ---------------------------------------------------------------------------
 
-class RerankBase:
+class RerankBase(Tool):
     """
     Abstract base class for all reranking provider implementations.
 
@@ -150,6 +151,21 @@ class RerankBase:
     provider: str = ""
     _ENV_KEY: str = ""
 
+    # A tool since 3.5.0: code, a chain and an agent call it alike.
+    risk        = "read"
+    parameters  = {
+        "type": "object",
+        "properties": {
+            "input":   {"type": "array", "items": {"type": "string"},
+                        "description": "The documents to put in order — texts, or records with a 'text' field."},
+            "options": {"type": "object", "description": "What to order them by.", "properties": {
+                "query": {"type": "string", "description": "The question the documents should answer."},
+                "top_n": {"type": "integer", "description": "How many to return, best first (default: all)."},
+            }, "required": ["query"]},
+        },
+        "required": ["input", "options"],
+    }
+
     # ── Construction ──────────────────────────────────────────────────────────
 
     def __init__(
@@ -157,6 +173,8 @@ class RerankBase:
         model:   str,
         *,
         api_key: str | None = None,
+        name:        "str | None" = None,
+        description: "str | None" = None,
         **kwargs: Any,
     ) -> None:
         key = api_key or os.environ.get(self._ENV_KEY, "")
@@ -167,10 +185,22 @@ class RerankBase:
             )
         self.model    = model
         self._api_key = key
+        label = type(self).__name__.replace("Rerank", "", 1) or self.provider
+        self.name = name or f"rerank{label}"
+        self.description = description or (
+            f"Put documents in order of how well they answer a query, with {label}'s {model}; "
+            "returns them best first, each with its score.")
         self._http    = make_http(
             timeout = DEFAULT_TIMEOUT,
             retries = DEFAULT_RETRIES,
         )
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the model, never the key."""
+        out = {"model": self.model}
+        if getattr(self, "_region", None):
+            out["region"] = self._region
+        return out
 
     # ── Public API ────────────────────────────────────────────────────────────
 

@@ -61,6 +61,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 <!-- g:env-tools -->
 | Variable | Read by | Same key as a model provider |
 |---|---|---|
+| `` | `Embedder`, `RerankBase` | — |
 | `BRAVE_SEARCH_API_KEY` | `searchBrave` | — |
 | `COHERE_API_KEY` | `CohereEmbedder`, `EmbeddingCohere`, `RerankCohere` | — |
 | `DASHSCOPE_API_KEY` | `EmbeddingQwen`, `RerankQwen`, `sttQwen`, `ttsQwen` | yes |
@@ -100,6 +101,7 @@ export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
 export REVE_API_KEY="…"
 export XAI_API_KEY="…"
+export ="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export EXA_API_KEY="…"

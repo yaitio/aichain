@@ -105,8 +105,15 @@ class TestAgentRefusesWhatCannotBeATool(unittest.TestCase):
         self.assertEqual(sorted(agent._tool_map), ["searchExa", "search_again"])
 
     def test_a_non_tool_by_its_class(self):
-        with self.assertRaisesRegex(TypeError, "RerankCohere is not a tool"):
-            Agent(self.model, tools=[Reranker("rerank-v3.5", api_key="k")])
+        # A reranker was the example until 3.5.0 made it a tool; a vector
+        # store is a utility, not a tool.
+        from yait_aichain.tools.vectordb._base import VectorStore
+        store = VectorStore.__new__(VectorStore)
+        with self.assertRaisesRegex(TypeError, "VectorStore is not a tool"):
+            Agent(self.model, tools=[store])
+
+    def test_a_reranker_is_a_tool_since_3_5(self):
+        Agent(self.model, tools=[Reranker("rerank-v3.5", api_key="k")])
 
     def test_a_skill_says_where_it_belongs(self):
         with self.assertRaisesRegex(TypeError, "a step for a Chain, not a tool for an Agent"):

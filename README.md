@@ -66,6 +66,7 @@ export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
 export REVE_API_KEY="…"
 export XAI_API_KEY="…"
+export ="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export EXA_API_KEY="…"
@@ -167,15 +168,14 @@ print(f"steps={result.steps_taken}  tokens={result.tokens_used:,}")
 ### Full RAG pipeline
 
 ```python
-from yait_aichain.tools.embedding import Embedding
-from yait_aichain.tools.vectordb  import VectorDB, vectorChunk, vectorUpsert, vectorQuery
-from yait_aichain.tools.reranking import Reranker
+from yait_aichain.tools          import chunk, embed, rerank
+from yait_aichain.tools.vectordb import VectorDB, vectorUpsert, vectorQuery
 
-store    = VectorDB("chroma", "docs", embedder=Embedding("cohere/embed-v4.0"))
-reranker = Reranker("cohere/rerank-v3.5")
+store    = VectorDB("chroma", "docs", embedder=embed("cohere", model="embed-v4.0"))
+reranker = rerank("cohere", model="rerank-v3.5")
 
 # Ingest
-chunks = vectorChunk(max_chars=800).run(my_document)
+chunks = chunk(max_chars=800).run(my_document)
 vectorUpsert(store).run([{"id": f"c{i}", **c} for i, c in enumerate(chunks)])
 
 # Query → rerank → answer
@@ -274,15 +274,19 @@ pages = fetch("firecrawl").run([r["url"] for r in found["results"]])
 Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 ```
 
-### Convert
-`convertToMD` · `convertToHTML` · `convertToPDF` · `TTS(provider)` · `STT(provider)`
+### Speech
+`speech(service)` — `openai` · `google` · `xai` · `qwen` (text → audio) ·
+`transcribe(service)` — the same four (audio → text)
 
-### Embeddings
-```python
-Embedding("openai/text-embedding-3-small")
-Embedding("cohere/embed-v4.0")
-Embedding("voyage/voyage-3-large")
-```
+### Embeddings, reranking, chunking
+`embed(service, model=…)` — `openai` · `cohere` · `voyage` · `google` · `qwen` ·
+`rerank(service, model=…)` — `cohere` · `voyage` · `qwen` · `chunk(max_chars=…)`
+
+### Pause
+`wait(reason=…)` · `gate(tool, reason=…)`
+
+### Convert
+`convertToMD` · `convertToHTML` · `convertToPDF`
 
 ---
 

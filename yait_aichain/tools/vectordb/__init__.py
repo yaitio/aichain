@@ -107,7 +107,7 @@ In a Chain::
 """
 
 from ._base    import VectorRecord, VectorBackend, VectorStore
-from ._chunk   import VectorChunkTool,  vectorChunk
+from ..chunk._chunk import VectorChunkTool, vectorChunk
 from ._query   import VectorQueryTool,  vectorQuery
 from ._upsert  import VectorUpsertTool, vectorUpsert
 from ._fetch   import VectorFetchTool,  vectorFetch

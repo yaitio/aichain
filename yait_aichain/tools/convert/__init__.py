@@ -32,8 +32,8 @@ MarkItDownTool, MistletoeTool, WeasyprintTool
 from .to_md     import convertToMD
 from .to_html   import convertToHTML
 from .to_pdf    import convertToPDF
-from .to_speech import convertToSpeech, ttsOpenAI, ttsGoogle, ttsXAI, ttsQwen
-from .to_text   import convertToText,   sttOpenAI, sttGoogle, sttXAI, sttQwen
+from ..speech._tts import convertToSpeech, ttsOpenAI, ttsGoogle, ttsXAI, ttsQwen
+from ..transcribe._stt import convertToText,   sttOpenAI, sttGoogle, sttXAI, sttQwen
 
 # Backward-compatible aliases
 MarkItDownTool = convertToMD

@@ -19,8 +19,8 @@ catches; nothing here is engine-specific.
 
 from __future__ import annotations
 
-from ._base import Tool
-from ..state import Suspend
+from .._base import Tool
+from ...state import Suspend
 
 _EMPTY_PARAMS = {"type": "object", "properties": {}, "required": []}
 
