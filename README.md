@@ -282,6 +282,10 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 `embed(service, model=…)` — `openai` · `cohere` · `voyage` · `google` · `qwen` ·
 `rerank(service, model=…)` — `cohere` · `voyage` · `qwen` · `chunk(max_chars=…)`
 
+### Images
+`image(service, model=…)` — `openai` · `google` · `bfl` · `xai` · `qwen` · `recraft` · `reve`;
+`.run(prompt, images=[…], options={"aspect_ratio": "16:9"})` generates, or edits the images given
+
 ### Pause
 `wait(reason=…)` · `gate(tool, reason=…)`
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## [3.9.0] — 2026-10-10
+
+**An image model is a tool.** A model is what can be an agent's mind — it
+reads, reasons and calls tools; an image model does none of that, so it is
+reached as a tool now: `image(service, model=…)`. Only the face changed: the
+request is the one `Skill` and `Model` built before, from the same provider
+data, with the same option vocabulary and the same notices.
+
+### Added
+
+- **`image(service, model=…, output_dir=…)`** — `openai`, `google`, `bfl`,
+  `xai`, `qwen`, `recraft`, `reve` — and `Image`, the tool it makes.
+  `.run(prompt, images=[…], options={…})` generates, or edits the images given
+  (file paths or URLs). The options are the model layer's image vocabulary —
+  `size`, `aspect_ratio`, `quality`, `background`, `output_format`,
+  `compression`, `seed`, `fidelity` — converted where a provider spells it
+  otherwise; an unknown one is an error. The result is a `Record`: the image
+  (`base64`, `mime_type`, `url`, `revised_prompt`, and `path` when saved) for
+  code, and one line for a model — what was made and where — never the bytes.
+  `output_dir` is where images are saved, a setting the code chooses; without
+  it the image goes back in the result. `cost` is the reported usage at the
+  registry's rate where both exist (OpenAI) and `None` with the reason in
+  `cost_basis` where they do not. Measured live 2026-10-10:
+  gemini-2.5-flash-image at 16:9 returned 1344x768, and an edit of it kept the
+  size; gpt-image-1-mini returned 1024x1024 for $0.0022.
+- **A reference page for images**, `docs/tools-reference/image.md`.
+
+### Deprecated
+
+- **A `Skill` with an image model** — `Skill(Model("gpt-image-1.5"),
+  output={"modalities": ["image"], …})` — warns with a `DeprecationWarning`
+  pointing at `image(...)`, and raises in 4.0. It works as before until then.
+
 ## [3.8.0] — 2026-10-10
 
 **The convert tools leave the library.** `convertToMD`, `convertToHTML` and

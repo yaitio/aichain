@@ -155,9 +155,14 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
         what they are for.
         """
         abstract = {"Search", "convertToSpeech", "convertToText"}
+        # Options handed on whole to a layer that reads each one itself: the
+        # image tool passes its options as the model's `output["format"]`, whose
+        # every key the parameters matrix holds (tests/test_parameters_matrix.py)
+        # and tests/test_image_tool.py shows arriving.
+        forwarded = {"Image"}
         offenders = []
         for name, cls in sorted(_tool_classes().items()):
-            if name in abstract:
+            if name in abstract or name in forwarded:
                 continue
             declared = _declared_options(cls)
             if not declared:

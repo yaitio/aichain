@@ -86,22 +86,47 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
 
     def _tools_in(self, tree):
         import ast
+        import types
         import yait_aichain.tools as tools
         bound = {}
         for node in ast.walk(tree):
             if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
                     and isinstance(node.value.func, ast.Name)
                     and hasattr(tools, node.value.func.id)):
+                made = getattr(tools, node.value.func.id)
+                if isinstance(made, types.ModuleType):
+                    # A factory — `picture = image("openai", model=…)` — is
+                    # built with the page's own literal arguments.
+                    made = self._from_factory(made, node.value)
                 for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        bound[target.id] = getattr(tools, node.value.func.id)
+                    if isinstance(target, ast.Name) and made is not None:
+                        bound[target.id] = made
         return bound
+
+    @staticmethod
+    def _from_factory(factory, call):
+        import ast
+        import os
+        from unittest import mock
+        try:
+            args = [ast.literal_eval(a) for a in call.args]
+            kwargs = {k.arg: ast.literal_eval(k.value) for k in call.keywords if k.arg}
+        except ValueError:
+            return None
+        keys = {k: "doc" for k in ("OPENAI_API_KEY", "GOOGLE_AI_API_KEY", "XAI_API_KEY", "BFL_API_KEY",
+                                   "DASHSCOPE_API_KEY", "RECRAFT_API_KEY", "REVE_API_KEY", "EXA_API_KEY",
+                                   "FIRECRAWL_API_KEY", "TAVILY_API_KEY", "PARALLEL_API_KEY",
+                                   "PERPLEXITY_API_KEY", "BRAVE_SEARCH_API_KEY", "COHERE_API_KEY")}
+        with mock.patch.dict(os.environ, keys):
+            return factory(*args, **kwargs)
 
     @staticmethod
     def _schema(cls):
         import inspect
         import os
         from unittest import mock
+        if not isinstance(cls, type):                    # a tool a factory built
+            return cls.parameters
         params = inspect.signature(cls.__init__).parameters
         if any(p.default is p.empty and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
                for p in list(params.values())[1:]):

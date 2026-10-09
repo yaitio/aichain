@@ -137,6 +137,9 @@ from .embed import (
     GoogleEmbedder,
 )
 
+# ── Image ────────────────────────────────────────────────────────────────────
+from .image._tool import Image
+
 # ── Speech and transcription ─────────────────────────────────────────────────
 # Imported from tools.convert until 3.8.0, which removed the convert tools.
 from .speech import TTS, convertToSpeech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
@@ -209,8 +212,9 @@ if _TC:
     from .speech     import speech
     from .transcribe import transcribe
     from .chunk      import chunk
+    from .image      import image
 else:
-    from . import search, fetch, embed, rerank, speech, transcribe, chunk
+    from . import search, fetch, embed, rerank, speech, transcribe, chunk, image
     from . import decision as decide
 
 __all__ = [
@@ -231,6 +235,8 @@ __all__ = [
     "speech",
     "transcribe",
     "chunk",
+    "image",
+    "Image",
     "wait",
     "gate",
     "fetch",

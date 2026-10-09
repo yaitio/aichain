@@ -31,6 +31,7 @@ Chains and Agents identically.
 | Reranking | [`rerankCohere`](rerank.md#rerankcohere) | `RerankCohere` | Reranker for the Cohere Rerank API (v2). | `COHERE_API_KEY` | `read` |
 | Reranking | [`rerankVoyage`](rerank.md#rerankvoyage) | `RerankVoyage` | Reranker for the Voyage AI Rerank API. | `VOYAGE_API_KEY` | `read` |
 | Reranking | [`rerankQwen`](rerank.md#rerankqwen) | `RerankQwen` | Reranker for the Alibaba DashScope Text-Rerank API. | `DASHSCOPE_API_KEY` | `read` |
+| Image | [`imageOpenai`](image.md) | `Image` | An image model as a tool — generation from a prompt, and editing when the call carries images. Made by `tools.image` — `image("openai", model="gpt-image-1.5")`. | — | `draft` |
 | Fetch | [`fetchFirecrawl`](fetch.md#fetchfirecrawl) | `fetchFirecrawl` | A web page's text by Firecrawl Scrape — the main content, as Markdown, with the page's metadata. | `FIRECRAWL_API_KEY` | `read` |
 | Fetch | [`fetchTavily`](fetch.md#fetchtavily) | `fetchTavily` | Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown. | `TAVILY_API_KEY` | `read` |
 | Fetch | [`fetchExa`](fetch.md#fetchexa) | `fetchExa` | Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and author. | `EXA_API_KEY` | `read` |

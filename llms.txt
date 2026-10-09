@@ -200,6 +200,13 @@ local files, vector stores, REST, MCP) are in
 `rerank("cohere", model=…)`; `chunk(max_chars=…)`, `wait(…)` and `gate(tool, …)` take
 no provider. An embedding reaches a model as a one-line summary, never as the vectors.
 
+**Images are a tool, not a model** — a model is what can be an agent's mind:
+`image("openai", model="gpt-image-1.5", output_dir="images/").run("a lighthouse",
+images=[…], options={"aspect_ratio": "16:9"})` → `out["images"][0]["path"]` (or
+`["base64"]` without `output_dir`), `out["cost"]`. `images=` makes it an edit. A model
+reads one line — what was made and where — never the bytes. `Skill` with an image model
+still works, warns, and raises in 4.0.
+
 **Utilities** hold a connection or a place: `from yait_aichain.utilities import Vectors,
 MCP, REST, Shell`. Code calls their methods directly; their tools are attributes called
 with `.run` — only a tool has `.run`. Give an agent the tools, never the utility:

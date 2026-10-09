@@ -20,6 +20,7 @@ the :meth:`Skill.load` class method.
 """
 
 import json
+import warnings
 import os
 import time
 from typing import TYPE_CHECKING
@@ -215,6 +216,14 @@ class Skill:
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
+        if output and "image" in (output.get("modalities") or []):
+            # An image model is a tool since 3.9.0 — it cannot be an agent's
+            # mind — and this path raises in 4.0. The tool builds its request
+            # through a Skill too, and hides this one notice for its own call.
+            from ..tools.image._tool import _FromImageTool
+            warnings.warn(_FromImageTool(
+                "a Skill with an image model is deprecated since 3.9.0 and raises in 4.0: an image "
+                "model is a tool — image(service, model=…).run(prompt, options={…})"), stacklevel=2)
         # Internal seam, not public API — the leading underscore is the
         # contract. The Agent declares its tools here so the provider receives
         # them natively; Skill only *transports* declarations and returns the
