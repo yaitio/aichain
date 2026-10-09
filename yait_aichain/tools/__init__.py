@@ -87,7 +87,7 @@ All previous class names still work:
   OpenAIEmbedder, CohereEmbedder, VoyageEmbedder, GoogleEmbedder
 """
 
-from ._base           import Tool, ToolResult, Record
+from ._base           import Tool, ToolResult, Record, FunctionTool, tool
 from ._wait           import Wait, Gate
 from ._permissions    import (
     PermissionPolicy, ApprovalRequest, ApprovalDecision,
@@ -237,6 +237,8 @@ __all__ = [
     "searchParallel",
     "search",
     "Record",
+    "tool",
+    "FunctionTool",
     "fetch",
     "Fetch",
     "fetchFirecrawl",

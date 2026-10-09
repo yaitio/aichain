@@ -271,5 +271,14 @@ class Decision(Tool):
     def _ask(self, state, images: list) -> tuple[dict, str, dict]:  # pragma: no cover
         raise NotImplementedError(f"{type(self).__name__} must implement _ask()")
 
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the questions and the model, never the key."""
+        out = {"questions": self.questions, "model": self.model}
+        if self.name != type(self).name:
+            out["name"] = self.name
+        if self.description != describe(self.questions):
+            out["description"] = self.description
+        return out
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}(name={self.name!r}, model={self.model!r}, questions={list(self.questions)})"

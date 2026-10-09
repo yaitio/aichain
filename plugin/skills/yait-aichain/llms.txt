@@ -38,8 +38,10 @@ None of them work.
    declared under `parameters["properties"]["options"]["properties"]`. An
    undeclared option is warned about and not used.
 6. **In a Chain, a Tool step receives the variables named like its
-   `parameters`**; rename with a third element — `(tool, "count", {"input":
-   "text"})`. An Agent step reads its task from the variable **`task`**.
+   `parameters`**; map them with a third element — a name `(tool, "count",
+   {"input": "text"})`, a template `{"input": "Draw {topic}"}`, or a dict
+   `{"options": {"query": "{q}", "top_n": 5}}`. An Agent step reads its task
+   from the variable **`task`**.
 7. **A run pauses only where a `Wait`/`Gate` asks it to**, and it needs a
    `store=`. In a Chain that is a step; for an agent it is a tool the model
    may call — `Agent(tools=[Gate(publish)], store=FileStore("runs/"))` — and
@@ -140,6 +142,33 @@ whole = summarise.last_result                                    # the full answ
 ```
 
 ## Tool — a function with a schema
+
+**Any function is a tool** with `@tool`: its name is the tool's name, the first line
+of its docstring the description, its annotated parameters the schema, each
+described by its `name: text` docstring line. `risk` defaults to `"write"` — say
+`risk="read"` when it only reads.
+
+```python
+from yait_aichain.tools import tool
+
+@tool(risk="read")
+def word_count(text: str, unique: bool = False) -> dict:
+    """Count the words in a text.
+
+    text: the text to count.
+    unique: count each word once.
+    """
+    words = text.split()
+    return {"words": len(set(words)) if unique else len(words)}
+
+word_count.run(text="to be or not to be")    # {"words": 6}
+Agent(model, tools=[word_count])             # the model sees word_count(text, unique)
+```
+
+No docstring, `*args`, or an annotation with no JSON type (`str`, `int`, `float`,
+`bool`, `list[...]`, `dict`, `Literal[...]`, `Optional[...]`) is refused when the tool
+is made. A chain holding a `@tool` cannot be saved — a function is code. A subclass
+is the other way, when a tool holds state or needs a schema annotations cannot say:
 
 ```python
 class FirstWords(Tool):
@@ -249,11 +278,14 @@ final  = result.output                                    # the last step's outp
 first  = result["tweet"]                                  # any step's output, by key
 ```
 
-A dict output is merged into the variables and is not stored under its key
-(as the last step, it is `result.output`);
-any other output — a string, a number — is stored under the key. A rename maps
-**the tool's parameter on the left to the chain variable on the right**:
-`(CharCount(), "chars", {"text": "draft"})`. `result.history` has one record
+A plain dict output is merged into the variables and is not stored under its key
+(as the last step, it is `result.output`); any other output — a string, a number, a
+`Record` from search, fetch or decide — is stored under the key. A mapping puts
+**the tool's parameter on the left and, on the right, a chain variable's name**
+(`(CharCount(), "chars", {"text": "draft"})`), **a template** (`{"text": "Title:
+{title}"}`, filled like a Skill prompt; `"{docs}"` alone passes the value itself) or
+**a dict** whose templates are filled and other values kept. A missing variable or a
+parameter the tool does not take is an error naming it. `result.history` has one record
 per step; `result.success` is False when a step failed under
 `on_step_error="skip"`.
 `chain.save("c.yaml")` / `Chain.load("c.yaml")`.

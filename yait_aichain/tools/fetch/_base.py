@@ -120,6 +120,11 @@ class Fetch(Tool):
         if description:
             self.description = description
 
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the overrides, never the key."""
+        return {k: v for k, v in (("name", self.name), ("description", self.description))
+                if v != getattr(type(self), k)}
+
     # ------------------------------------------------------------------
 
     def run(self, url, options: "dict | None" = None) -> Record:  # type: ignore[override]

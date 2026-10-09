@@ -12,16 +12,26 @@ act.
 Use a built-in tool, or define your own in a few lines:
 
 ```python
-import os
-from yait_aichain.tools import PerplexitySearchTool, Tool
+from yait_aichain.tools import search, tool, Tool
 
-# built-in — call it, get a ToolResult (never raises)
-search = PerplexitySearchTool()                 # reads PERPLEXITY_API_KEY
-result = search(input="best managed vector databases 2025")
-if result:
-    print(result.output)
+# built-in — made by the provider's name; run() returns the data
+found = search("perplexity").run("best managed vector databases")   # reads PERPLEXITY_API_KEY
+print(found["results"][0]["url"], str(found)[:200])                 # fields for code, text for a model
 
-# custom — name + description + parameters + run()
+# any function — the name, the docstring and the annotations are the schema
+@tool(risk="read")
+def word_count(text: str, unique: bool = False) -> dict:
+    """Count the words in a text.
+
+    text: the text to count.
+    unique: count each word once.
+    """
+    words = text.split()
+    return {"words": len(set(words)) if unique else len(words)}
+
+word_count.run(text="to be or not to be")       # {'words': 6}
+
+# a subclass — when the tool holds state or needs a schema annotations cannot say
 class ReverseTool(Tool):
     name        = "reverse"
     description = "Reverse a string."

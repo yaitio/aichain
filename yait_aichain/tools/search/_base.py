@@ -188,6 +188,11 @@ class Search(Tool):
             self.description = description
         self._http = make_http(timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES)
 
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the overrides, never the key."""
+        return {k: v for k, v in (("name", self.name), ("description", self.description))
+                if v != getattr(type(self), k)}
+
     parameters = {
         "type": "object",
         "properties": {

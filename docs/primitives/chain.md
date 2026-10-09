@@ -66,17 +66,27 @@ Chain(steps=[summariser, translator])
 Chain(steps=[(summariser, "summary"), (translator, "final")])
 ```
 
-**3. `(runner, output_key, input_map)`** — remap accumulated variables into the
-step. `input_map` is `{dst: src}`:
+**3. `(runner, output_key, input_map)`** — fill the step from accumulated
+variables. `input_map` is `{dst: src}`:
 
 ```python
 Chain(steps=[
-    (fetch_url,  "raw",     {"source": "url"}),    # Tool: accumulated["url"] → param "source"
-    (summariser, "summary", {"article": "raw"}),   # Skill: alias raw → {article}
+    (fetch("firecrawl"), "page",    {"url": "link"}),                       # a variable's name
+    (search("exa"),      "found",   {"input": "news about {topic} this week"}),  # a template
+    (rerank_tool,        "top",     {"input": "{candidates}",               # the value itself
+                                     "options": {"query": "{question}", "top_n": 5}}),  # a dict
+    (summariser,         "summary", {"article": "page"}),                   # Skill: alias page → {article}
 ])
 ```
 
-- **Tool** — `dst` is the tool's parameter name; `src` is the accumulated key to read.
+- **Tool** — `dst` is the tool's parameter name, and `src` is one of: a
+  variable's **name** (`"link"`); a **template** with `{variables}`, filled as a
+  Skill fills its prompt; **one placeholder alone** (`"{candidates}"`), which
+  passes the value itself so a list stays a list; or a **dict**, resolved key by
+  key, where templates are filled and anything else — a number, a plain
+  string — is a literal. A parameter not mapped takes the variable of the same
+  name when there is one. A name or a template naming a variable the chain does
+  not have, and a `dst` the tool does not take, are errors that say which.
 - **Skill** — `dst` is the template variable name; `src` is the accumulated key to copy in (non-destructive).
 
 **4. `(runner, output_key, input_map, options)`** — currently for **Agent** steps:
@@ -106,11 +116,14 @@ initial: {"article": "...", "language": "French"}
 | Runner | Reads | Writes |
 |---|---|---|
 | **Skill** | The whole accumulated dict as its variable namespace. | Output under `output_key`. |
-| **Tool** | Only kwargs matching its `parameters` (optionally renamed via `input_map`); extras ignored. | `str` → `output_key`; `dict` → **merged** into accumulated (many keys). |
+| **Tool** | Only its `parameters`, filled by `input_map` as above. | A `Record` (search, fetch, decide) or any non-dict → `output_key`; a plain `dict` → **merged** into accumulated (many keys). |
 | **Agent** | Task from `accumulated[task_key]`; full dict passed as variables. | The `output_field` attribute under `output_key`. |
 
-After each step: `str` output → `accumulated[output_key] = output`; `dict`
-output → `accumulated.update(output)`.
+After each step: a plain `dict` output → `accumulated.update(output)` — a REST
+reply's fields become variables; anything else, a `Record` included →
+`accumulated[output_key] = output`. A `Record` is one result, so two search
+steps do not overwrite each other's `results`, and a Skill that reads
+`{found}` gets its text.
 
 ### Initial variables
 

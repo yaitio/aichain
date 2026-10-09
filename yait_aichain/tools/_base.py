@@ -450,3 +450,140 @@ class Tool:
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(name={self.name!r})"
+
+
+# ---------------------------------------------------------------------------
+# @tool — any function as a tool
+# ---------------------------------------------------------------------------
+
+import inspect as _inspect
+import re as _re
+import types as _types
+import typing as _typing
+
+#: What providers accept as a function name.
+_TOOL_NAME = _re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+#: ``text: the text to count.`` or ``text (str): …`` — a parameter's line in a docstring.
+_PARAM_LINE = _re.compile(r"^\s*\*{0,2}([A-Za-z_][A-Za-z0-9_]*)\*{0,2}\s*(?:\([^)]*\))?\s*:\s*(.+?)\s*$")
+
+
+def _json_type(tp, where: str) -> dict:
+    """The JSON Schema of one annotation — or a TypeError naming what is not supported."""
+    if tp is _inspect.Parameter.empty or tp is _typing.Any:
+        return {"type": "string"}
+    origin, args = _typing.get_origin(tp), _typing.get_args(tp)
+    if origin is _typing.Union or (hasattr(_types, "UnionType") and origin is _types.UnionType):
+        rest = [a for a in args if a is not type(None)]
+        if len(rest) == 1:
+            return _json_type(rest[0], where)
+        raise TypeError(f"{where}: a union of {rest} has no single JSON type; annotate one type, "
+                        "or Optional of one")
+    if origin is _typing.Literal:
+        kinds = {type(a) for a in args}
+        base = _json_type(kinds.pop(), where) if len(kinds) == 1 else {}
+        return {**base, "enum": list(args)}
+    if tp is bool:                                  # before int: a bool is an int
+        return {"type": "boolean"}
+    if tp is int:
+        return {"type": "integer"}
+    if tp is float:
+        return {"type": "number"}
+    if tp is str:
+        return {"type": "string"}
+    if tp in (list, tuple, set) or origin in (list, tuple, set):
+        return {"type": "array", **({"items": _json_type(args[0], where)} if args else {})}
+    if tp is dict or origin is dict:
+        return {"type": "object"}
+    raise TypeError(f"{where}: no JSON schema for {tp!r} — annotate with str, int, float, bool, "
+                    "list, dict, Literal, or Optional of one of them")
+
+
+class FunctionTool(Tool):
+    """
+    A function as a :class:`Tool` — what :func:`tool` returns.
+
+    The function's name is the tool's ``name``, the first line of its
+    docstring the ``description``, and its parameters the schema: types from
+    the annotations, required where there is no default, each described by
+    its ``name: text`` line in the docstring. ``run(**arguments)`` calls the
+    function and returns what it returns; the function itself is
+    ``.__wrapped__``.
+    """
+
+    def __init__(self, fn, *, name: "str | None" = None, description: "str | None" = None,
+                 risk: str = "write") -> None:
+        from ._permissions import RISK_CLASSES
+        if not callable(fn):
+            raise TypeError(f"@tool wraps a function; got {type(fn).__name__}")
+        label = getattr(fn, "__name__", type(fn).__name__)
+        self.name = name or label
+        if not _TOOL_NAME.match(self.name):
+            raise ValueError(f"tool name {self.name!r} must be 1 to 64 letters, digits, '_' or '-' — "
+                             "what providers accept; pass name=")
+        doc = _inspect.getdoc(fn) or ""
+        self.description = description or (doc.strip().splitlines()[0].strip() if doc.strip() else "")
+        if not self.description:
+            raise ValueError(f"@tool {label}: no description — a model decides whether to call a "
+                             "tool by it. Give the function a docstring, or pass description=")
+        if risk not in RISK_CLASSES:
+            raise ValueError(f"@tool {label}: risk {risk!r} is not one of {sorted(RISK_CLASSES)}")
+        self.risk = risk
+
+        sig = _inspect.signature(fn)
+        hints = _typing.get_type_hints(fn) if not isinstance(fn, type) else {}
+        lines = {m.group(1): m.group(2) for line in doc.splitlines()[1:]
+                 if (m := _PARAM_LINE.match(line))}
+        props, required = {}, []
+        for p in sig.parameters.values():
+            if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
+                raise TypeError(f"@tool {label}: *{p.name} has no schema — a model passes named "
+                                "arguments; declare each one")
+            spec = _json_type(hints.get(p.name, p.annotation), f"@tool {label}, parameter {p.name!r}")
+            if p.name in lines:
+                spec["description"] = lines[p.name]
+            props[p.name] = spec
+            if p.default is p.empty:
+                required.append(p.name)
+        self.parameters = {"type": "object", "properties": props, "required": required}
+        self.__wrapped__ = fn
+        self.__doc__ = fn.__doc__
+        self._takes_options = "options" in sig.parameters
+
+    def run(self, *args, **kwargs):  # type: ignore[override]
+        # Tool.__call__ passes (input, options) positionally when no keyword is
+        # given; a function without an `options` parameter does not take the None.
+        if len(args) == 2 and args[1] is None and not self._takes_options:
+            args = args[:1]
+        return self.__wrapped__(*args, **kwargs)
+
+
+def tool(fn=None, *, name: "str | None" = None, description: "str | None" = None,
+         risk: str = "write"):
+    """
+    Make any function a tool — code, a chain and an agent call it alike.
+
+    ::
+
+        @tool(risk="read")
+        def word_count(text: str, unique: bool = False) -> dict:
+            \"\"\"Count the words in a text.
+
+            text: the text to count.
+            unique: count each word once.
+            \"\"\"
+            words = text.split()
+            return {"words": len(set(words)) if unique else len(words)}
+
+        word_count.run(text="to be or not to be")     # {"words": 6}
+        Agent(model, tools=[word_count])              # the model sees word_count(text, unique)
+
+    ``name``, ``description`` and ``risk`` are the tool's settings; the
+    function's parameters are its arguments. **``risk`` defaults to
+    ``"write"``**, as on every tool: the library cannot tell what a function
+    does, and assuming it only reads would let a permission policy pass it
+    unasked — saying ``risk="read"`` is the author's claim to make. Usable as
+    ``@tool``, ``@tool(...)`` or ``tool(fn, ...)``.
+    """
+    if fn is None:
+        return lambda f: FunctionTool(f, name=name, description=description, risk=risk)
+    return FunctionTool(fn, name=name, description=description, risk=risk)

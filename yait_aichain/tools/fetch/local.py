@@ -75,12 +75,26 @@ class fetchLocal(Fetch):
             from markitdown import MarkItDown
         except ImportError:
             raise ImportError('fetchLocal needs MarkItDown. Install it with:  pip install "yait-aichain[fetch]"') from None
+        if isinstance(timeout, list):            # as YAML gives it back after Chain.save
+            timeout = tuple(timeout)
         self._session = _session(timeout, headers)
         self._md = MarkItDown(requests_session=self._session)
         self.respect_robots = respect_robots
         self.robots_agents = tuple(robots_agents)
         self._robots: dict = {}
+        self._timeout, self._headers = timeout, dict(headers or {})
         self._named(name, description)
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes. Headers are not: they carry cookies and tokens."""
+        if self._headers:
+            import warnings
+            warnings.warn(f"{self.name}: headers are not saved — they can carry credentials; "
+                          "pass them again after Chain.load", RuntimeWarning, stacklevel=3)
+        out = super()._serialise_init_args()
+        out.update(timeout=list(self._timeout) if isinstance(self._timeout, tuple) else self._timeout,
+                   respect_robots=self.respect_robots, robots_agents=list(self.robots_agents))
+        return out
 
     def _fetch(self, urls, opts, notices, cost):
         u = urls[0]

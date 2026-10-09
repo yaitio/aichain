@@ -101,6 +101,7 @@ from ..models._usage import Usage
 from .._events import Event, emit
 from ._result import ChainResult
 from ..tools._base import Record
+from .._template import _PLACEHOLDER_RE, substitute_placeholders
 
 # One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
 # is a silent `skip`: a chain of a hundred generated steps that expects a few
@@ -165,27 +166,74 @@ def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
     """
     Build the ``**kwargs`` dict to pass to ``tool.run()``.
 
-    For each parameter declared in ``tool.parameters["properties"]``:
-      * Check whether *input_map* remaps it to a different accumulated key.
-      * Fall back to the parameter name itself.
-      * Include the value only when the resolved key is present in *accumulated*.
+    A parameter the step's *input_map* does not mention takes the variable of
+    the same name, when there is one, and is otherwise left to the tool's own
+    default. A parameter it does mention is filled from its value:
 
-    Parameters that have no matching accumulated variable are omitted (the
-    tool's own default or required-parameter validation will handle them).
+      * ``"draft"`` — a variable's name: that variable's value;
+      * ``"Draw {topic} in watercolor"`` — a template: the variables
+        substituted, as a Skill substitutes its prompt;
+      * ``"{candidates}"`` — one placeholder alone: the variable's value itself,
+        so a list stays a list;
+      * ``{"query": "{question}", "top_n": 5}`` — a dict, resolved key by key:
+        templates are filled, and anything else — a number, a plain string — is
+        a literal.
+
+    A name or a template naming a variable the chain does not have, and a
+    parameter the tool does not take, are errors that say which. Until 3.4.0
+    a template was looked up as a variable's name, found nothing and was
+    dropped in silence; a dict raised ``TypeError: unhashable type``.
 
     Parameters
     ----------
     tool       : Tool instance whose ``.parameters`` schema is inspected.
     accumulated: Current accumulated variable dict.
-    input_map  : ``{"tool_param": "accumulated_var"}`` renaming rules.
+    input_map  : ``{"tool_param": value}`` — see above.
     """
     props  = tool.parameters.get("properties", {})
+    name   = getattr(tool, "name", None) or type(tool).__name__
+    if props and (unknown := [k for k in input_map if k not in props]):
+        raise ValueError(f"the step maps {unknown} into {name!r}, which takes {sorted(props)}")
     kwargs = {}
     for param in props:
-        src = input_map.get(param, param)   # honour explicit remap, else same name
-        if src in accumulated:
-            kwargs[param] = accumulated[src]
+        if param in input_map:
+            kwargs[param] = _resolve(input_map[param], accumulated, f"{name}.{param}", top=True)
+        elif param in accumulated:
+            kwargs[param] = accumulated[param]
     return kwargs
+
+
+def _refuse_function_tool(t) -> None:
+    """A @tool function is code: a saved chain could name it and never bring it back."""
+    from ..tools._base import FunctionTool
+    if isinstance(t, FunctionTool):
+        raise TypeError(f"tool {t.name!r} is a @tool function, and a function cannot be saved — "
+                        "it is code, not configuration. Build this chain in code, or make the "
+                        "tool a Tool subclass whose settings can be written down.")
+
+
+def _resolve(value, accumulated: dict, where: str, top: bool = False):
+    """One value of a step's input_map, filled from the chain's variables."""
+    if isinstance(value, str):
+        names = _PLACEHOLDER_RE.findall(value)
+        if not names:
+            if not top:
+                return value                                  # a literal inside a dict
+            if value not in accumulated:
+                raise ValueError(f"{where} is mapped to the variable {value!r}, which the chain does "
+                                 f"not have; it has {sorted(accumulated)}")
+            return accumulated[value]
+        if missing := [n for n in dict.fromkeys(names) if n not in accumulated]:
+            raise ValueError(f"{where}: the template {value!r} names {missing}, which the chain does "
+                             f"not have; it has {sorted(accumulated)}")
+        if (alone := _PLACEHOLDER_RE.fullmatch(value)) is not None:
+            return accumulated[alone.group(1)]                # the value itself, not its text
+        return substitute_placeholders(value, accumulated)
+    if isinstance(value, dict):
+        return {k: _resolve(v, accumulated, f"{where}.{k}") for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve(v, accumulated, where) for v in value]
+    return value                                              # a number, a bool: a literal
 
 
 class Chain:
@@ -905,6 +953,8 @@ class Chain:
                         RuntimeWarning, stacklevel=2)
                 # Tool list — store class paths only (no API keys)
                 if getattr(runner, "tools", None):
+                    for t in runner.tools:
+                        _refuse_function_tool(t)
                     agent_data["tools"] = [
                         f"{type(t).__module__}.{type(t).__qualname__}"
                         for t in runner.tools
@@ -917,6 +967,7 @@ class Chain:
                 }
 
             else:  # tool
+                _refuse_function_tool(runner)
                 cls       = type(runner)
                 class_path = f"{cls.__module__}.{cls.__qualname__}"
                 init_args  = runner._serialise_init_args() \

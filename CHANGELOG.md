@@ -1,5 +1,55 @@
 # Changelog
 
+## [3.4.0] — 2026-10-09
+
+**Any function is a tool, and a chain fills a tool's arguments from a
+template.** Plus what a saved chain lost of the 3.3.0 tools.
+
+### Breaking
+
+- A chain step that maps a tool's parameter to a variable the chain does not
+  have, or maps a parameter the tool does not take, is an error naming it.
+  Until now the first was dropped and the second ignored, both in silence.
+
+### Added
+
+- **`@tool`** — any function becomes a `Tool` that code, a chain and an agent
+  call alike: `@tool(risk="read") def word_count(text: str) -> dict: …`. The
+  function's name is the tool's name, the first line of its docstring the
+  description, and its parameters the schema — `str`, `int`, `float`, `bool`,
+  `list[...]`, `dict`, `Literal[...]` and `Optional[...]` to their JSON types,
+  required where there is no default, each described by its `name: text` line
+  in the docstring. `name=`, `description=` and `risk=` override. `risk`
+  defaults to `"write"`, as on every tool: the library cannot tell what a
+  function does, and assuming it only reads would let a permission policy pass
+  it unasked. No docstring, `*args`, an annotation with no JSON type, a name a
+  provider refuses or an unknown risk is refused when the tool is made, by
+  name. Planned for 2.1.0 and never shipped. `docs/primitives/tools.md` and
+  `llms.txt` show it before the subclass.
+- **A chain fills a tool's argument from a template.** A step's mapping value
+  is a variable's name, as before; a string with `{variables}`, filled as a
+  Skill fills its prompt — `{"input": "Draw {topic} in watercolor"}`; one
+  placeholder alone, `"{candidates}"`, passing the value itself so a list stays
+  a list; or a dict resolved key by key, its templates filled and its numbers
+  and plain strings kept — `{"options": {"query": "{question}", "top_n": 5}}`.
+  Before, a template was looked up as a variable's name, found nothing and was
+  dropped in silence, the tool then failing on the missing argument; a dict
+  raised `TypeError: unhashable type: 'dict'` — the mapping the reranker's own
+  docstring shows as its example.
+
+### Fixed
+
+- **A saved chain keeps what a search, fetch or decision tool is.** They wrote
+  no settings, so `search("exa", name="web")` came back from `Chain.load` as
+  `searchExa`, and a decision tool did not load at all (`missing 1 required
+  positional argument: 'questions'`). They now write their questions, model,
+  name and description, and `fetch("local")` its timeout and robots settings —
+  never a key, and not its headers, which can carry cookies and tokens: that is
+  a warning at save. A chain holding a `@tool` function refuses to save, by
+  name: a function is code, and a file naming it could not bring it back.
+- **`docs/primitives/chain.md` says a `Record` is kept under its key.** 3.3.0
+  changed it and the table still said a dict output is merged.
+
 ## [3.3.0] — 2026-10-09
 
 **Search, fetch and decide by one convention** — the first release of
