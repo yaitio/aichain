@@ -90,8 +90,8 @@ class TestMCP(unittest.TestCase):
 class TestREST(unittest.TestCase):
 
     def test_endpoints_share_the_apis_url_auth_and_headers(self):
-        api = REST("https://example.com/api/", auth={"type": "bearer", "env": "EXAMPLE_TOKEN"},
-                   headers={"Accept": "application/json"})
+        api = REST("https://example.com/api/", description="Example bookings API",
+                   auth={"type": "bearer", "env": "EXAMPLE_TOKEN"}, headers={"Accept": "application/json"})
         get = api.endpoint("get_booking", "GET", "/booking/{id}", path_params=["id"], description="One booking.")
         put = api.endpoint("update_booking", "PUT", "booking/{id}", path_params=["id"], body_params=["name"],
                            description="Rename a booking.")
@@ -101,16 +101,26 @@ class TestREST(unittest.TestCase):
             self.assertEqual(t._static_headers, {"Accept": "application/json"})
             self.assertEqual(t._auth["env"], "EXAMPLE_TOKEN")
         self.assertIs(api.get_booking, get)
+        # the model reads which API, then what the endpoint does
+        self.assertEqual(get.description, "Example bookings API — One booking.")
         self.assertEqual(api.tools, [get, put])
         self.assertEqual(api.TOOLS, ("get_booking", "update_booking"))
 
+    def test_the_api_must_say_what_it_is(self):
+        with self.assertRaises(TypeError):
+            REST("https://example.com")
+        with self.assertRaisesRegex(ValueError, "needs a description of the API"):
+            REST("https://example.com", description="  ")
+        with self.assertRaisesRegex(ValueError, "endpoint 'x' needs a description"):
+            REST("https://example.com", description="Example").endpoint("x", "GET", "/x", description="")
+
     def test_mistakes_are_said(self):
-        api = REST("https://example.com")
+        api = REST("https://example.com", description="Example")
         api.endpoint("x", "GET", "/x", description="X.")
         with self.assertRaisesRegex(ValueError, "already has an endpoint named 'x'"):
             api.endpoint("x", "GET", "/y", description="Y.")
         with self.assertRaisesRegex(ValueError, "http or https base URL"):
-            REST("ftp://example.com")
+            REST("ftp://example.com", description="Example")
         with self.assertRaisesRegex(AttributeError, "no attribute or endpoint 'y'"):
             api.y
 

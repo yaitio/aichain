@@ -209,7 +209,7 @@ kb = Vectors("qdrant", collection="docs", embedder=embed("openai", model="text-e
 kb.upsert(records); kb.count()                       # methods
 kb.query.run("how does caching work?", {"n": 5})     # its tool
 sh = Shell("projects/demo")                          # browse, read, write, run
-api = REST("https://api.example.com", headers={...}) # api.endpoint(name, method, path, description=…)
+api = REST("https://api.example.com", description="What the API is")  # api.endpoint(name, method, path, description=…)
 Agent(model, tools=[kb.query, sh.read, *MCP("https://mcp.deepwiki.com/mcp").tools])
 Chain(steps=[(chunk(max_chars=800), "pieces", {"input": "text"}),
              (kb.upsert, "count", {"records": "pieces"})])   # a method is a chain step

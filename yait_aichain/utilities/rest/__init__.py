@@ -2,12 +2,15 @@
 utilities.rest
 ==============
 
-``REST`` — an HTTP API as a utility. The base URL, the authentication and the
-headers are set once for the whole API; each endpoint is a tool.
+``REST`` — an HTTP API as a utility. The base URL, a description of the API,
+the authentication and the headers are set once for the whole API; each
+endpoint is a tool.
 
 ::
 
-    api = REST("https://restful-booker.herokuapp.com", headers={"Accept": "application/json"})
+    api = REST("https://restful-booker.herokuapp.com",
+               description="Restful Booker, a hotel booking API",
+               headers={"Accept": "application/json"})
     get_booking = api.endpoint("get_booking", "GET", "/booking/{id}", path_params=["id"],
                                description="One booking by its id.")
     get_booking.run(id=1)
@@ -24,12 +27,24 @@ from ._tool import RestApiTool
 
 
 class REST(Utility):
-    """An HTTP API: ``endpoint(...)`` makes each of its tools; ``tools`` lists them."""
+    """
+    An HTTP API: ``endpoint(...)`` makes each of its tools; ``tools`` lists them.
 
-    def __init__(self, base_url: str, *, auth: "dict | None" = None, headers: "dict | None" = None) -> None:
+    ``description`` says what the API is, and is required: an endpoint's own
+    description — "One booking by its id." — does not tell a model which
+    system it is in, so every endpoint carries the API's description before its
+    own: "Restful Booker, a hotel booking API — One booking by its id."
+    """
+
+    def __init__(self, base_url: str, *, description: str, auth: "dict | None" = None,
+                 headers: "dict | None" = None) -> None:
         if not isinstance(base_url, str) or not base_url.lower().startswith(("http://", "https://")):
             raise ValueError(f"REST needs an http or https base URL; got {base_url!r}")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError("REST needs a description of the API — a model decides whether to call an "
+                             "endpoint by it, and an endpoint alone does not say which system it is in")
         self.base_url = base_url.rstrip("/")
+        self.description = description.strip()
         self.auth = dict(auth or {})
         self.headers = dict(headers or {})
         self._endpoints: dict = {}
@@ -44,7 +59,10 @@ class REST(Utility):
         """
         if name in self._endpoints:
             raise ValueError(f"this API already has an endpoint named {name!r}")
-        tool = RestApiTool(name, description, method, self.base_url + "/" + path.lstrip("/"),
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError(f"endpoint {name!r} needs a description — what it does, for the model")
+        tool = RestApiTool(name, f"{self.description.rstrip('.')} — {description.strip()}", method,
+                           self.base_url + "/" + path.lstrip("/"),
                            path_params=path_params, query_params=query_params, body_params=body_params,
                            required_params=required_params, headers=self.headers, auth=self.auth,
                            content_type=content_type, response_field=response_field)
@@ -67,7 +85,7 @@ class REST(Utility):
         raise AttributeError(f"{type(self).__name__} has no attribute or endpoint {name!r}")
 
     def __repr__(self) -> str:
-        return f"REST({self.base_url!r}, endpoints={list(self._endpoints)})"
+        return f"REST({self.base_url!r}, description={self.description!r}, endpoints={list(self._endpoints)})"
 
 
 __all__ = ["REST", "RestApiTool"]

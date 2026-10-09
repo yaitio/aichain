@@ -15,9 +15,12 @@ code shows which is which.
   `Agent(tools=[kb.query])` searches and can do nothing else.
 - **`MCP(server)`** — `tools`, `names`, `tool(name)`, `call(name, **args)`;
   the server is asked for its tools on first use.
-- **`REST(base_url, auth=…, headers=…)`** — `endpoint(name, method, path, …)`
-  makes each tool, sharing the API's URL, auth and headers, set once; an
-  endpoint is reachable as `api.<name>` once made.
+- **`REST(base_url, description=…, auth=…, headers=…)`** — `endpoint(name,
+  method, path, description=…, …)` makes each tool, sharing the API's URL, auth
+  and headers, set once; an endpoint is reachable as `api.<name>` once made. A
+  description of the API is required, and every endpoint carries it before its
+  own — "Restful Booker, a hotel booking API — One booking by its id." — since
+  an endpoint alone does not tell a model which system it is in.
 - **`Shell(folder)`** — `browse`, `read`, `write`, `run`, each a tool confined
   to the folder, each given to an agent on its own: `tools=[sh.browse,
   sh.read]` reads and cannot write.
