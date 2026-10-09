@@ -36,7 +36,11 @@ Each is listed again below with its reason.
   the factory is a `TypeError` that says so. An unknown service names the ones
   that exist. The classes (`searchExa`, `fetchFirecrawl`, `decisionOpenAI`, …)
   are the same tools by their own names, and take `name=` and `description=`
-  as well.
+  as well. Each factory is its package, callable — `search` is
+  `yait_aichain.tools.search` — so `from yait_aichain.tools.search.exa import …`,
+  `import … as`, attribute access and `mock.patch` paths into it all resolve on
+  every supported Python; a function by the same name hid the package and broke
+  `mock.patch` on 3.10 and 3.11, which the first run on 3.10 showed.
 - **`Record`** — what `run()` returns on search, fetch and decision tools: a
   dict for code, whose `str()` is the tool's `render()` — the numbered results,
   each page or why it could not be fetched, one line per answer. An agent shows

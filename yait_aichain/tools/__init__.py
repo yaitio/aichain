@@ -98,7 +98,6 @@ from ._permissions    import (
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
-    search,
     Search,
     searchPerplexity,
     searchBrave,
@@ -113,7 +112,6 @@ from .search import (
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 from .fetch import (
-    fetch,
     Fetch,
     fetchFirecrawl,
     fetchTavily,
@@ -166,7 +164,7 @@ from .convert import (
 )
 
 # ── Decision ──────────────────────────────────────────────────────────────────
-from .decision import decide, Decision, decisionOpenAI, decisionTypeSafe
+from .decision import Decision, decisionOpenAI, decisionTypeSafe
 
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
@@ -214,6 +212,19 @@ from .local import (
 # ── MCP (Model Context Protocol) ─────────────────────────────────────────────
 from .mcp import MCPTool, MCPTools
 
+
+
+# The factories: each package is callable — `search("exa")` — and stays the
+# package, so every import form and `mock.patch` path into it still resolves.
+# Type checkers see the functions.
+from typing import TYPE_CHECKING as _TC
+if _TC:
+    from .search   import search
+    from .fetch    import fetch
+    from .decision import decide
+else:
+    from . import search, fetch
+    from . import decision as decide
 
 __all__ = [
     "Decision",

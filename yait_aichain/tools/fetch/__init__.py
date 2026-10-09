@@ -84,3 +84,23 @@ __all__ = [
     "fetchParallel",
     "fetchLocal",
 ]
+
+
+# ── The package is callable ──────────────────────────────────────────────────
+# `fetch("…")` is called on this package, not on a function that takes its name
+# in `tools`: a function there hides the package, and `import
+# yait_aichain.tools.fetch.x as m`, attribute access and — on Python 3.10 and
+# 3.11 — `mock.patch("yait_aichain.tools.fetch.x.…")` resolve through that name
+# and fail. Measured 2026-10-09; see docs/design/tool-convention.md.
+import inspect as _inspect
+import sys as _sys
+import types as _types
+
+
+class _CallableModule(_types.ModuleType):
+    def __call__(self, *args, **kwargs):
+        return fetch(*args, **kwargs)
+
+
+_sys.modules[__name__].__class__ = _CallableModule
+_sys.modules[__name__].__signature__ = _inspect.signature(fetch)
