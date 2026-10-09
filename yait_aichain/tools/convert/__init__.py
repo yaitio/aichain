@@ -34,6 +34,9 @@ from .to_html   import convertToHTML
 from .to_pdf    import convertToPDF
 from ..speech._tts import convertToSpeech, ttsOpenAI, ttsGoogle, ttsXAI, ttsQwen
 from ..transcribe._stt import convertToText,   sttOpenAI, sttGoogle, sttXAI, sttQwen
+# The modules that lived here until 3.5.0, still attributes: tools.convert.to_speech.
+from ..speech import _tts as to_speech            # noqa: E402
+from ..transcribe import _stt as to_text           # noqa: E402
 
 # Backward-compatible aliases
 MarkItDownTool = convertToMD

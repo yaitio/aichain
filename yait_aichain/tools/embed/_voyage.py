@@ -47,8 +47,8 @@ class EmbeddingVoyage(Embedder):
         Model identifier, e.g. ``"voyage-3-large"``.
     api_key : str | None, optional
         Override ``VOYAGE_API_KEY`` environment variable.
-    **defaults
-        Default values for ``input_type``, ``dimensions``, etc.
+    dimensions, batch_size
+        Settings of the embedder; a call takes only ``input_type``.
 
     Examples
     --------

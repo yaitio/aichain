@@ -1,5 +1,64 @@
 # Changelog
 
+## [3.7.0] — 2026-10-09
+
+**A setting is accepted in exactly one place.** Eleven were accepted at
+construction and again with a call, the call winning in silence. Each now lives
+in the tool, and given to a call is an error that says where it belongs.
+
+### Breaking
+
+Each line is a setting a call can no longer give, and where it lives now:
+
+- embeddings — `dimensions`, `batch_size`: `embed(service, model=…,
+  dimensions=…, batch_size=…)`; `embed()` and `run()` take `input_type` only,
+  and `Embedding(model, **defaults)` takes no other keyword.
+- speech, transcription — `model`: `speech(service, model=…)`,
+  `transcribe(service, model=…)`, or the class's `model=`; Qwen's `region`:
+  `speech("qwen", region=…)`.
+- vector tools — `collection`: the store's, `VectorDB(…, collection=…)`.
+- chunking — `max_chars`, `overlap_chars`, `merge_peers`: `chunk(…)`.
+- REST — `headers`, `timeout`: `RestApiTool(…, headers=…, timeout=…)` or
+  `REST(…, headers=…, timeout=…)`.
+- MCP — a call's `timeout`: `call_timeout=` on `MCPTool`, `MCPTools`, `MCP`;
+  the connection's is `MCP(connect_timeout=…)`, still `timeout=` on `MCPTools`.
+
+And:
+
+- A REST or MCP argument given both in the input dict and as a keyword is an
+  error; the keyword won.
+- MCP `headers`, `env`, `cwd` or `transport` given both as an argument and in
+  the server dict is an error; the dict won.
+- A REST `auth` with more than one source of its token — `token`,
+  `token_field`, `env` — is an error; the field won over the variable.
+- `Reranker(model, …)` refuses any keyword it does not take; it accepted and
+  dropped them — `Reranker("rerank-v3.5", top_n=3)` returned every document.
+- An embedding `dimensions` on a model with a fixed length —
+  `text-embedding-ada-002`, Qwen's `text-embedding-v2`, Google's older models —
+  is refused when the embedder is made; it was sent nowhere and said nowhere.
+
+### Added
+
+- **A REST token a model never sees.** `auth={"token_field": …}` keeps the
+  field in the tool's `parameters`, so code and a chain fill it — a token from a
+  login step — and out of `schema()`, so a model is not asked for it; a model
+  that passes it anyway is refused. `auth={"token": callable}` reads it when the
+  call is made.
+- **`REST(timeout=…)`, `RestApiTool(timeout=…)`; `MCPTool`/`MCPTools`/`MCP`
+  `call_timeout=…`; `MCP(connect_timeout=…)`.**
+
+### Fixed
+
+- **`chunk`'s overlap scales with the piece.** It defaulted to 150 characters
+  whatever `max_chars` was, so 780 characters at `max_chars=200` came back as 30
+  near-identical windows; it is a tenth of `max_chars` now — 150 at the default
+  1 500, as before — and 5 pieces there.
+- **`yait_aichain.tools.convert.to_text` and the other moved modules are
+  attributes again** without being imported first, as they were before 3.5.0.
+  3.6.0's import finder made them attributes only once something had imported
+  them, which a suite running every test in one process did not notice; a test
+  now checks in a fresh process.
+
 ## [3.6.0] — 2026-10-09
 
 **Utilities: what holds a connection or a place, and gives an agent the tools

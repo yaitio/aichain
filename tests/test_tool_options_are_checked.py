@@ -108,7 +108,7 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
     schema hides cannot be found by a model at all, and now also produces a
     warning for the person who uses it — so the two have to agree."""
 
-    _READS = re.compile(r'\bo(?:pts|ptions)?\.get\(\s*["\']([\w_]+)["\']')
+    _READS = re.compile(r'\bo(?:pts|ptions)?\.(?:get|pop)\(\s*["\']([\w_]+)["\']')
 
     @classmethod
     def _reads(cls, tool):
@@ -169,13 +169,16 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
                 offenders.append(f"{name}: {unread}")
         self.assertEqual(offenders, [], "\n".join(offenders))
 
-    def test_qwen_declares_its_region_and_its_siblings_do_not(self):
-        """The one that was found. `region` is DashScope's; putting it on the
-        shared TTS schema would advertise it on OpenAI, Google and xAI, where
-        nothing reads it — the opposite defect, and the one 2.3.0 was about."""
-        self.assertIn("region", _declared_options(ttsQwen))
-        self.assertNotIn("region", _declared_options(ttsOpenAI))
-        self.assertNotIn("region", _declared_options(convertToSpeech))
+    def test_qwen_takes_its_region_as_a_setting_and_its_siblings_do_not(self):
+        """The one that was found. `region` is DashScope's. Until 3.7.0 it was
+        an option of Qwen's call as well as a setting of the tool — the same
+        setting in two places, the call winning — so it is the tool's alone
+        now: declared on no TTS's options, taken by Qwen's constructor."""
+        import inspect
+        for cls in (ttsQwen, ttsOpenAI, convertToSpeech):
+            self.assertNotIn("region", _declared_options(cls))
+        self.assertIn("region", inspect.signature(ttsQwen.__init__).parameters)
+        self.assertNotIn("region", inspect.signature(ttsOpenAI.__init__).parameters)
 
     def test_extending_a_shared_schema_does_not_mutate_it(self):
         """Schemas are class attributes shared by inheritance: extending one

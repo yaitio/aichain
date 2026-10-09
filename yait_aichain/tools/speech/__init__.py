@@ -21,11 +21,13 @@ from ._tts import convertToSpeech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
 SERVICES = {"openai": ttsOpenAI, "google": ttsGoogle, "xai": ttsXAI, "qwen": ttsQwen}
 
 
-def speech(service: str, *, api_key: "str | None" = None, region: "str | None" = None,
-           name: "str | None" = None, description: "str | None" = None) -> convertToSpeech:
+def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = None,
+           region: "str | None" = None, name: "str | None" = None,
+           description: "str | None" = None) -> convertToSpeech:
     """
     A text-to-speech tool for *service* — one of ``SERVICES``.
 
+    ``model`` defaults to the provider's (Google's has one and takes none);
     ``region`` is Qwen's alone; ``name`` and ``description`` default to the
     provider's; ``api_key`` to its environment variable.
 
@@ -37,7 +39,10 @@ def speech(service: str, *, api_key: "str | None" = None, region: "str | None" =
     cls = pick("speech", SERVICES, service)
     if region is not None and cls is not ttsQwen:
         raise TypeError(f"region is speech('qwen')'s; speech({service!r}) takes api_key, name and description")
-    tool = cls(api_key=api_key, **({"region": region} if region is not None else {}))
+    extra = {"region": region} if region is not None else {}
+    if model is not None:
+        extra["model"] = model
+    tool = cls(api_key=api_key, **extra)
     return named(tool, name, description)
 
 

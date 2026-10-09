@@ -18,7 +18,8 @@ Model notes
 * The ``batchEmbedContents`` endpoint accepts a list of
   ``EmbedContentRequest`` objects in one POST, making it naturally batched.
 * ``task_type`` (RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, etc.) is supported only
-  by ``gemini-embedding-001``; it is silently omitted for other models.
+  by ``gemini-embedding-001``; on any other model it is refused when the embedder is
+  made (3.7.0).
 * ``output_dimensionality`` truncates the vector; only ``gemini-embedding-001``
   and newer models support it — omitted otherwise.
 * The API accepts up to 100 requests per batch call.
@@ -69,8 +70,8 @@ class EmbeddingGoogle(Embedder):
         Model identifier, e.g. ``"gemini-embedding-001"``.
     api_key : str | None, optional
         Override ``GOOGLE_AI_API_KEY`` environment variable.
-    **defaults
-        Default values for ``input_type``, ``dimensions``, etc.
+    dimensions, batch_size
+        Settings of the embedder; a call takes only ``input_type``.
 
     Examples
     --------
@@ -87,6 +88,7 @@ class EmbeddingGoogle(Embedder):
     """
 
     provider   = "google"
+    _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = ("GOOGLE_AI_API_KEY", "GOOGLE_API_KEY")
     _MAX_BATCH = 100
 

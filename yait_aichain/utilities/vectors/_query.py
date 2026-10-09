@@ -52,7 +52,6 @@ class VectorQueryTool(Tool):
     options : dict, optional
         ``n``          int  — number of results to return (default 5)
         ``filter``     dict — provider-native metadata filter
-        ``collection`` str  — override the store's default collection
 
     Returns
     -------
@@ -87,10 +86,6 @@ class VectorQueryTool(Tool):
                         "type":        "object",
                         "description": "Provider-native metadata filter applied before ranking.",
                     },
-                    "collection": {
-                        "type":        "string",
-                        "description": "Override the store's default collection / namespace.",
-                    },
                 },
             },
         },
@@ -110,10 +105,12 @@ class VectorQueryTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        """Return a store scoped to the overridden collection, if provided."""
-        col = opts.get("collection")
-        if col and col != self._store._collection:
-            return VectorStore(self._store._backend, col, self._store._embedder)
+        """The store. Its collection is a setting — until 3.7.0 a call's
+        ``collection`` option switched it, so a model could read or write
+        another collection than the one the code chose."""
+        if "collection" in opts:
+            raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
+                             "VectorDB(…, collection=…) or Vectors(…, collection=…)")
         return self._store
 
     def __repr__(self) -> str:

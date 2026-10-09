@@ -53,6 +53,21 @@ from .._base import Tool
 # ── Base class ────────────────────────────────────────────────────────────────
 
 
+
+def _model_setting(tool, model):
+    """The tool's model: the one given, or the provider's default. A setting,
+    fixed for the tool — a call no longer chooses it (3.7.0)."""
+    default = getattr(type(tool), "_DEFAULT_MODEL", None)
+    if model is not None and default is None:
+        raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
+    return model or default
+
+
+def _no_model_option(tool, opts: dict) -> None:
+    if "model" in opts:
+        raise ValueError(f"{tool.name}: model is a setting of the tool, not of a call — "
+                         f"make it with model=… ({type(tool).__name__}(model=…), or the factory)")
+
 def _without_options(parameters: dict, *keys: str) -> dict:
     """A copy of *parameters* with option *keys* removed — see the twin in
     `to_speech.py`. Declaring an option a provider has no control for
@@ -103,10 +118,6 @@ class convertToText(Tool):
                             "Improves accuracy.  Auto-detected when omitted."
                         ),
                     },
-                    "model": {
-                        "type":        "string",
-                        "description": "Model or tier to use (provider-specific).",
-                    },
                     "timestamps": {
                         "type":        "boolean",
                         "description": (
@@ -135,6 +146,15 @@ class convertToText(Tool):
         },
         "required": ["input"],
     }
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the model and the region, never the key."""
+        out = {}
+        if getattr(self, "model", None) and self.model != getattr(type(self), "_DEFAULT_MODEL", None):
+            out["model"] = self.model
+        if getattr(self, "_region", None):
+            out["region"] = self._region
+        return out
 
     def run(self, input: str, options: dict | None = None) -> str:
         raise NotImplementedError(f"{type(self).__name__} must implement run()")
@@ -176,7 +196,8 @@ class _OpenAICompatSTT(convertToText):
     _OVERLAP_SECONDS: int          = 3      # overlap to avoid clipping words
     _MAX_FILE_MB:     float        = 24.0   # stay under the 25 MB API limit
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get(self._ENV_KEY)
         if not self._api_key:
             raise ValueError(
@@ -205,6 +226,7 @@ class _OpenAICompatSTT(convertToText):
         str
             Plain transcript, or JSON string when timestamps/format="json".
         """
+        _no_model_option(self, options or {})
         try:
             import openai
         except ImportError:
@@ -218,7 +240,7 @@ class _OpenAICompatSTT(convertToText):
 
         opts       = options or {}
         language   = opts.get("language")
-        model      = opts.get("model",      self._DEFAULT_MODEL)
+        model      = self.model
         timestamps = bool(opts.get("timestamps", False))
         prompt     = opts.get("prompt")
         fmt        = opts.get("format", "text")
@@ -463,7 +485,8 @@ class sttGoogle(convertToText):
         ".opus": "OGG_OPUS",
     }
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
         # the older spelling. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
@@ -489,6 +512,7 @@ class sttGoogle(convertToText):
         str
             Plain transcript, or JSON string when timestamps/format="json".
         """
+        _no_model_option(self, options or {})
         try:
             from google.cloud import speech
         except ImportError:
@@ -502,7 +526,7 @@ class sttGoogle(convertToText):
 
         opts       = options or {}
         language   = opts.get("language", self._DEFAULT_LANGUAGE)
-        model      = opts.get("model",    self._DEFAULT_MODEL)
+        model      = self.model
         timestamps = bool(opts.get("timestamps", False))
         fmt        = opts.get("format", "text")
 
@@ -763,9 +787,10 @@ class sttQwen(_OpenAICompatSTT):
     _OVERLAP_SECONDS = 3
     _MAX_FILE_MB     = 24.0
 
-    def __init__(self, api_key: "str | None" = None) -> None:
+    def __init__(self, api_key: "str | None" = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         # Resolve the region-aware base URL before calling the parent __init__
         # (which reads self._BASE_URL to build the OpenAI client).
         from ...clients._families.qwen import resolve_qwen_base_url
         self._BASE_URL = resolve_qwen_base_url() + "/compatible-mode/v1"
-        super().__init__(api_key=api_key)
+        super().__init__(api_key=api_key, model=model)

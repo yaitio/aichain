@@ -19,6 +19,7 @@ MCPTool(
     env: dict | None = None,
     cwd: str | None = None,
     transport: str | None = None,
+    call_timeout: float | None = None,
 )
 ```
 

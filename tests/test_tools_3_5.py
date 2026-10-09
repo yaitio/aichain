@@ -165,7 +165,7 @@ class TestASavedChainKeepsWhatEachToolIs(unittest.TestCase):
         from yait_aichain.tools import Embedding
         back, text = self._round_trip(Embedding("qwen/text-embedding-v4", api_key="secret",
                                                 region="intl", dimensions=512))
-        self.assertEqual((back.model, back._region, back._defaults), ("text-embedding-v4", "intl", {"dimensions": 512}))
+        self.assertEqual((back.model, back._region, back.dimensions), ("text-embedding-v4", "intl", 512))
         self.assertNotIn("secret", text)
 
     def test_a_reranker_keeps_its_model(self):

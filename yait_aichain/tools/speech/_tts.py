@@ -53,6 +53,21 @@ _DEFAULT_FORMAT = "mp3"
 _DEFAULT_SPEED  = 1.0
 
 
+
+def _model_setting(tool, model):
+    """The tool's model: the one given, or the provider's default. A setting,
+    fixed for the tool — a call no longer chooses it (3.7.0)."""
+    default = getattr(type(tool), "_DEFAULT_MODEL", None)
+    if model is not None and default is None:
+        raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
+    return model or default
+
+
+def _no_model_option(tool, opts: dict) -> None:
+    if "model" in opts:
+        raise ValueError(f"{tool.name}: model is a setting of the tool, not of a call — "
+                         f"make it with model=… ({type(tool).__name__}(model=…), or the factory)")
+
 def _auto_path(fmt: str) -> str:
     """Return a timestamped output path inside ``./audio/`` (relative to cwd)."""
     stamp   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -132,10 +147,6 @@ class convertToSpeech(Tool):
                         "type":        "string",
                         "description": "Voice name or ID (provider-specific).",
                     },
-                    "model": {
-                        "type":        "string",
-                        "description": "Model or quality tier (provider-specific).",
-                    },
                     "speed": {
                         "type":        "number",
                         "description": "Playback speed multiplier.  0.25–4.0, default 1.0.",
@@ -166,6 +177,15 @@ class convertToSpeech(Tool):
         },
         "required": ["input"],
     }
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the model and the region, never the key."""
+        out = {}
+        if getattr(self, "model", None) and self.model != getattr(type(self), "_DEFAULT_MODEL", None):
+            out["model"] = self.model
+        if getattr(self, "_region", None):
+            out["region"] = self._region
+        return out
 
     def run(self, input: str, options: dict | None = None) -> str:
         raise NotImplementedError(f"{type(self).__name__} must implement run()")
@@ -229,7 +249,8 @@ class ttsOpenAI(convertToSpeech):
     _DEFAULT_MODEL = "tts-1"
     _DEFAULT_VOICE = "alloy"
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
         if not self._api_key:
             raise ValueError(
@@ -258,6 +279,7 @@ class ttsOpenAI(convertToSpeech):
         str
             Absolute path to the saved audio file.
         """
+        _no_model_option(self, options or {})
         try:
             import openai
         except ImportError:
@@ -268,7 +290,7 @@ class ttsOpenAI(convertToSpeech):
 
         opts        = options or {}
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
-        model       = opts.get("model",       self._DEFAULT_MODEL)
+        model       = self.model
         speed       = float(opts.get("speed", _DEFAULT_SPEED))
         fmt         = opts.get("format",      _DEFAULT_FORMAT)
         output_path = opts.get("output_path") or _auto_path(fmt)
@@ -345,7 +367,8 @@ class ttsGoogle(convertToSpeech):
         "flac": ("FLAC",     "flac"),
     }
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
         # the older spelling. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
@@ -463,7 +486,8 @@ class ttsXAI(convertToSpeech):
     _DEFAULT_MODEL = "grok-tts"    # check docs.x.ai for current model names
     _DEFAULT_VOICE = "default"     # check docs.x.ai for available voice IDs
 
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get("XAI_API_KEY")
         if not self._api_key:
             raise ValueError(
@@ -491,6 +515,7 @@ class ttsXAI(convertToSpeech):
         str
             Absolute path to the saved audio file.
         """
+        _no_model_option(self, options or {})
         try:
             import openai
         except ImportError:
@@ -501,7 +526,7 @@ class ttsXAI(convertToSpeech):
 
         opts        = options or {}
         voice       = opts.get("voice",  self._DEFAULT_VOICE)
-        model       = opts.get("model",  self._DEFAULT_MODEL)
+        model       = self.model
         speed       = float(opts.get("speed", _DEFAULT_SPEED))
         fmt         = opts.get("format", _DEFAULT_FORMAT)
         output_path = opts.get("output_path") or _auto_path(fmt)
@@ -594,17 +619,17 @@ class ttsQwen(convertToSpeech):
     # `language` and `speed` are dropped for the same reason `region` is
     # added: this endpoint reads neither, and an option a model can set and
     # watch vanish is worse than one it never saw.
-    parameters = _deep_with_option(
-        _without_options(convertToSpeech.parameters, "language", "speed"),
-        "region",
-        {"type": "string", "enum": ["ap", "us", "cn", "hk"],
-         "description": "DashScope region for this call. Default: ap."})
+    # `region` was also an option of the call until 3.7.0 — the same setting
+    # in two places, the call winning. It is the tool's alone now.
+    parameters = _without_options(convertToSpeech.parameters, "language", "speed")
 
     def __init__(
         self,
         api_key: "str | None" = None,
         region:  "str | None" = None,
+        model:   "str | None" = None,
     ) -> None:
+        self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
         if not self._api_key:
             raise ValueError(
@@ -644,19 +669,16 @@ class ttsQwen(convertToSpeech):
         str
             Absolute path to the saved audio file.
         """
+        _no_model_option(self, options or {})
         opts        = options or {}
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
-        model       = opts.get("model",       self._DEFAULT_MODEL)
+        model       = self.model
         fmt         = opts.get("format",      _DEFAULT_FORMAT)
         output_path = opts.get("output_path") or _auto_path(fmt)
-        region      = opts.get("region",      self._region)
-
-        # Override region from options if provided
-        if region and region != self._region:
-            from ...clients._families.qwen import resolve_qwen_base_url
-            base_url = resolve_qwen_base_url(region)
-        else:
-            base_url = self._base_url()
+        if "region" in opts:
+            raise ValueError(f"{self.name}: region is a setting of the tool, not of a call — "
+                             "speech('qwen', region=…)")
+        base_url = self._base_url()
 
         url = base_url + self._TTS_PATH
 

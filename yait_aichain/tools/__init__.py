@@ -196,11 +196,16 @@ _LAZY = {name: module for module, names in _FROM_UTILITIES.items() for name in n
 
 
 def __getattr__(name):
+    import importlib
     if name in _LAZY:
-        import importlib
         value = getattr(importlib.import_module(_LAZY[name]), name)
         globals()[name] = value
         return value
+    # A module that lived here before it moved — tools.vectordb, tools.embedding —
+    # is still an attribute, as it was when this package imported it.
+    from .. import _moved
+    if _moved.new_path(f"{__name__}.{name}") is not None:
+        return importlib.import_module(f"{__name__}.{name}")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

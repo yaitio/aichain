@@ -108,6 +108,7 @@ In a Chain::
 
 from ._base    import VectorRecord, VectorBackend, VectorStore
 from ...tools.chunk._chunk import VectorChunkTool, vectorChunk
+from ...tools.chunk import _chunk                     # still an attribute here, as before 3.5.0
 from ._query   import VectorQueryTool,  vectorQuery
 from ._upsert  import VectorUpsertTool, vectorUpsert
 from ._fetch   import VectorFetchTool,  vectorFetch

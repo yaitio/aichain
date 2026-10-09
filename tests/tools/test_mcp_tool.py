@@ -373,19 +373,13 @@ class TestMCPToolRunMocked(unittest.TestCase):
             self._tool().run(message="hello via kwarg")
         self.assertEqual(captured["args"], {"message": "hello via kwarg"})
 
-    def test_kwargs_win_over_input_dict(self):
-        call_result = _make_call_result(data="ok")
-        mock = _mock_client(call_tool_return=call_result)
-        captured = {}
-
-        async def capture_call(name, arguments, **kw):
-            captured["args"] = arguments
-            return call_result
-
-        mock.call_tool = capture_call
+    def test_an_argument_given_twice_is_refused(self):
+        # 3.7.0: the keyword used to win over the dict in silence.
+        mock = _mock_client(call_tool_return=_make_call_result(data="ok"))
         with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
-            self._tool().run(input={"message": "from dict"}, message="from kwarg")
-        self.assertEqual(captured["args"]["message"], "from kwarg")
+            with self.assertRaisesRegex(ValueError, r"\['message'\] given both"):
+                self._tool().run(input={"message": "from dict"}, message="from kwarg")
+        mock.call_tool.assert_not_called()
 
     def test_string_input_stored_as_input_field(self):
         call_result = _make_call_result(data="ok")
@@ -457,8 +451,13 @@ class TestMCPToolRunMocked(unittest.TestCase):
 
         mock.call_tool = capture_call
         with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
-            self._tool().run(options={"timeout": 30.0})
+            MCPTool("echo", "Echo.", "https://example.com/mcp", call_timeout=30.0).run(message="hi")
         self.assertEqual(captured["kw"].get("timeout"), 30.0)
+
+    def test_a_calls_timeout_is_a_setting(self):
+        # 3.7.0: `timeout` meant the connection on MCPTools and one call here.
+        with self.assertRaisesRegex(ValueError, "call_timeout"):
+            self._tool().run(message="hi", options={"timeout": 30.0})
 
     def test_no_timeout_not_sent(self):
         call_result = _make_call_result(data="ok")

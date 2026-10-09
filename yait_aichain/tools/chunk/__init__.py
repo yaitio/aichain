@@ -11,11 +11,13 @@ makes the tool; until 3.5.0 it lived in ``tools.vectordb`` as
 from ._chunk import VectorChunkTool, vectorChunk
 
 
-def chunk(*, max_chars: int = 1500, overlap_chars: int = 150, merge_peers: bool = True,
+def chunk(*, max_chars: int = 1500, overlap_chars: "int | None" = None, merge_peers: bool = True,
           name: "str | None" = None, description: "str | None" = None) -> VectorChunkTool:
     """
     A chunking tool. The sizes are settings: a store is filled with pieces cut
     one way, so they are fixed for the tool, not chosen per call.
+    ``overlap_chars`` defaults to a tenth of ``max_chars`` — 150 at the
+    default size.
 
     ::
 

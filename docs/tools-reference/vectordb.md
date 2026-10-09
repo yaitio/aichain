@@ -13,7 +13,7 @@ Split text into overlapping chunks for embedding and vector-store ingestion.
 ```python
 VectorChunkTool(
     max_chars: int = 1500,
-    overlap_chars: int = 150,
+    overlap_chars: int | None = None,
     merge_peers: bool = True,
 )
 ```
@@ -21,14 +21,10 @@ VectorChunkTool(
 | Name | Type | Required | Description |
 |---|---|---|---|
 | `input` | `string` | ✓ | The text to chunk. |
-| `options.max_chars` | `integer` |  | Maximum characters per chunk (default 1500). |
-| `options.overlap_chars` | `integer` |  | Overlap in characters between consecutive chunks (default 150). |
-| `options.merge_peers` | `boolean` |  | Merge adjacent small chunks with identical headings (default true). |
 
 ```python
 result = VectorChunkTool()(
     input="…",
-    options={"max_chars": …},
 )
 ```
 
@@ -50,12 +46,11 @@ VectorUpsertTool(
 | Name | Type | Required | Description |
 |---|---|---|---|
 | `input` | `list[object]` | ✓ | List of records to insert or update. |
-| `options.collection` | `string` |  | Override the store's default collection / namespace. |
+| `options` | `object` |  | Upsert options. |
 
 ```python
 result = VectorUpsertTool(store)(
     input="…",
-    options={"collection": …},
 )
 ```
 
@@ -79,7 +74,6 @@ VectorQueryTool(
 | `input` | `string` | ✓ | The query text to search for semantically similar documents. |
 | `options.n` | `integer` |  | Number of results to return (default 5). |
 | `options.filter` | `object` |  | Provider-native metadata filter applied before ranking. |
-| `options.collection` | `string` |  | Override the store's default collection / namespace. |
 
 ```python
 result = VectorQueryTool(store)(
@@ -106,12 +100,11 @@ VectorFetchTool(
 | Name | Type | Required | Description |
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | List of document IDs to retrieve. |
-| `options.collection` | `string` |  | Override the store's default collection / namespace. |
+| `options` | `object` |  | Fetch options. |
 
 ```python
 result = VectorFetchTool(store)(
     input="…",
-    options={"collection": …},
 )
 ```
 
@@ -134,7 +127,6 @@ VectorDeleteTool(
 |---|---|---|---|
 | `input` | `any` |  | List of document IDs to delete, or null to delete by filter only. |
 | `options.filter` | `object` |  | Provider-native metadata filter for bulk deletion. |
-| `options.collection` | `string` |  | Override the store's default collection / namespace. |
 
 ```python
 result = VectorDeleteTool(store)(

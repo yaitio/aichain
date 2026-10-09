@@ -23,6 +23,7 @@ RestApiTool(
     auth: dict | None = None,
     content_type: str = 'application/json',
     response_field: str | None = None,
+    timeout: float | None = None,
 )
 ```
 

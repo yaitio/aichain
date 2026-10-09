@@ -526,27 +526,6 @@ class VectorChunkTool(Tool):
                 "type":        "string",
                 "description": "The text to chunk.",
             },
-            "options": {
-                "type":        "object",
-                "description": "Chunking configuration.",
-                "properties": {
-                    "max_chars": {
-                        "type":        "integer",
-                        "description": "Maximum characters per chunk (default 1500).",
-                    },
-                    "overlap_chars": {
-                        "type":        "integer",
-                        "description": "Overlap in characters between consecutive chunks (default 150).",
-                    },
-                    "merge_peers": {
-                        "type":        "boolean",
-                        "description": (
-                            "Merge adjacent small chunks with identical headings "
-                            "(default true)."
-                        ),
-                    },
-                },
-            },
         },
         "required": ["input"],
     }
@@ -554,9 +533,14 @@ class VectorChunkTool(Tool):
     def __init__(
         self,
         max_chars:     int  = 1500,
-        overlap_chars: int  = 150,
+        overlap_chars: "int | None" = None,
         merge_peers:   bool = True,
     ) -> None:
+        # A tenth of a piece unless given: 150 at the default 1 500, as before.
+        # A fixed 150 cut 780 characters into 30 near-identical windows at
+        # max_chars=200 — every piece three-quarters its neighbour (3.7.0).
+        if overlap_chars is None:
+            overlap_chars = max_chars // 10
         if overlap_chars >= max_chars:
             raise ValueError(
                 f"overlap_chars ({overlap_chars}) must be less than "
@@ -597,10 +581,14 @@ class VectorChunkTool(Tool):
         if not input or not input.strip():
             return []
 
-        opts          = options or {}
-        max_chars     = int(opts.get("max_chars",     self._max_chars))
-        overlap_chars = int(opts.get("overlap_chars", self._overlap_chars))
-        merge_peers   = bool(opts.get("merge_peers",  self._merge_enabled))
+        # The sizes are the tool's settings: a store is filled with pieces cut
+        # one way. Until 3.7.0 a call's options overrode them.
+        if options and (given := [k for k in ("max_chars", "overlap_chars", "merge_peers") if k in options]):
+            raise ValueError(f"{self.name}: {', '.join(given)} is a setting of the chunker, not of a call "
+                             f"— chunk({given[0]}=…)")
+        max_chars     = self._max_chars
+        overlap_chars = self._overlap_chars
+        merge_peers   = self._merge_enabled
 
         if overlap_chars >= max_chars:
             raise ValueError(
@@ -783,7 +771,7 @@ class VectorChunkTool(Tool):
 
 def vectorChunk(
     max_chars:     int  = 1500,
-    overlap_chars: int  = 150,
+    overlap_chars: "int | None" = None,
     merge_peers:   bool = True,
 ) -> VectorChunkTool:
     """

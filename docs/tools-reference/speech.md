@@ -14,6 +14,7 @@ Text-to-speech via the OpenAI TTS API.
 ```python
 ttsOpenAI(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -21,7 +22,6 @@ ttsOpenAI(
 |---|---|---|---|
 | `input` | `string` | ✓ | Text to synthesise into speech. |
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
-| `options.model` | `string` |  | Model or quality tier (provider-specific). |
 | `options.speed` | `number` |  | Playback speed multiplier. 0.25–4.0, default 1.0. |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
 | `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
@@ -46,6 +46,7 @@ Text-to-speech via Google Cloud Text-to-Speech.
 ```python
 ttsGoogle(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -78,6 +79,7 @@ Text-to-speech via the xAI TTS API.
 ```python
 ttsXAI(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -85,7 +87,6 @@ ttsXAI(
 |---|---|---|---|
 | `input` | `string` | ✓ | Text to synthesise into speech. |
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
-| `options.model` | `string` |  | Model or quality tier (provider-specific). |
 | `options.speed` | `number` |  | Playback speed multiplier. 0.25–4.0, default 1.0. |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
 | `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
@@ -111,6 +112,7 @@ Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API.
 ttsQwen(
     api_key: str | None = None,
     region: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -118,10 +120,8 @@ ttsQwen(
 |---|---|---|---|
 | `input` | `string` | ✓ | Text to synthesise into speech. |
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
-| `options.model` | `string` |  | Model or quality tier (provider-specific). |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
 | `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
-| `options.region` | `string` |  | DashScope region for this call. Default: ap. One of `ap`, `us`, `cn`, `hk`. |
 
 ```python
 result = ttsQwen()(
@@ -143,6 +143,7 @@ Speech-to-text via the OpenAI Whisper API.
 ```python
 sttOpenAI(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -150,7 +151,6 @@ sttOpenAI(
 |---|---|---|---|
 | `input` | `string` | ✓ | Path to the audio file to transcribe. |
 | `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.model` | `string` |  | Model or tier to use (provider-specific). |
 | `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
 | `options.prompt` | `string` |  | Context hint — domain vocabulary or spelling guidance. Supported by OpenAI and xAI. |
 | `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |
@@ -175,6 +175,7 @@ Speech-to-text via Google Cloud Speech-to-Text.
 ```python
 sttGoogle(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -182,7 +183,6 @@ sttGoogle(
 |---|---|---|---|
 | `input` | `string` | ✓ | Path to the audio file to transcribe. |
 | `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.model` | `string` |  | Model or tier to use (provider-specific). |
 | `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
 | `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |
 
@@ -206,6 +206,7 @@ Speech-to-text via the xAI STT API.
 ```python
 sttXAI(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -213,7 +214,6 @@ sttXAI(
 |---|---|---|---|
 | `input` | `string` | ✓ | Path to the audio file to transcribe. |
 | `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.model` | `string` |  | Model or tier to use (provider-specific). |
 | `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
 | `options.prompt` | `string` |  | Context hint — domain vocabulary or spelling guidance. Supported by OpenAI and xAI. |
 | `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |
@@ -238,6 +238,7 @@ Speech-to-text via the Alibaba DashScope ASR API.
 ```python
 sttQwen(
     api_key: str | None = None,
+    model: str | None = None,
 )
 ```
 
@@ -245,7 +246,6 @@ sttQwen(
 |---|---|---|---|
 | `input` | `string` | ✓ | Path to the audio file to transcribe. |
 | `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.model` | `string` |  | Model or tier to use (provider-specific). |
 | `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
 | `options.prompt` | `string` |  | Context hint — domain vocabulary or spelling guidance. Supported by OpenAI and xAI. |
 | `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |

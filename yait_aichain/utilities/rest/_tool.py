@@ -39,10 +39,12 @@ Auth strategies (``auth`` kwarg)
 | ``type``      | Behaviour                                                 |
 +===============+===========================================================+
 | ``"bearer"``  | ``Authorization: Bearer <value>``                         |
-|               | Source: ``token_field`` from data, else ``env`` var.      |
+|               | Source: one of ``token`` (a value or a callable),         |
+|               | ``token_field`` (a field code or a chain fills — never    |
+|               | the model) or ``env``; two of them is an error.           |
 +---------------+-----------------------------------------------------------+
 | ``"cookie"``  | ``Cookie: <cookie_name>=<value>``                         |
-|               | Source: ``token_field`` from data, else ``env`` var.      |
+|               | Source: as for ``"bearer"``.                              |
 |               | Default cookie_name: ``"token"``                          |
 +---------------+-----------------------------------------------------------+
 | ``"basic"``   | ``Authorization: Basic base64(user:pass)``                |
@@ -50,7 +52,7 @@ Auth strategies (``auth`` kwarg)
 +---------------+-----------------------------------------------------------+
 | ``"api_key"`` | Custom header set to ``<value>``                          |
 |               | Header name: ``header`` (default ``"X-Api-Key"``).        |
-|               | Source: ``token_field`` from data, else ``env`` var.      |
+|               | Source: as for ``"bearer"``.                              |
 +---------------+-----------------------------------------------------------+
 
 Response handling
@@ -228,6 +230,7 @@ class RestApiTool(Tool):
         auth:            dict | None = None,
         content_type:    str         = "application/json",
         response_field:  str | None  = None,
+        timeout:         "float | None" = None,
     ) -> None:
         # ── Public identity (Tool class attributes) ────────────────────
         self.name        = name
@@ -243,6 +246,16 @@ class RestApiTool(Tool):
         self._auth           = dict(auth or {})
         self._content_type   = content_type
         self._response_field = response_field
+        self._timeout        = timeout
+        # The token has one source (3.7.0): a callable, a field the code or a
+        # chain fills, or an environment variable — until now a field won over
+        # the variable in silence when both were set.
+        sources = [k for k in ("token", "token_field", "env") if self._auth.get(k)]
+        if len(sources) > 1:
+            raise ValueError(f"RestApiTool {name!r}: auth takes one source of its token; got "
+                             f"{', '.join(sources)}")
+        #: Fields a model never sees nor fills: the token. A chain still fills it.
+        self._hidden = {self._auth["token_field"]} if self._auth.get("token_field") else set()
 
         # ── Auto-build parameters schema ───────────────────────────────
         # All declared field names become schema properties so Agents and
@@ -293,12 +306,11 @@ class RestApiTool(Tool):
             single ``"input"`` field (compatibility shim for plain-string
             Chain steps).
         options : dict | None, optional
-            Runtime overrides:
-              ``headers`` (dict) — merged on top of static + auth headers.
-              ``timeout``  (float) — per-call read timeout in seconds.
+            None. Headers and the timeout are settings of the tool since
+            3.7.0; options given here are an error that says so.
         **kwargs
-            Individual field values.  Merged with *input*; kwargs win on
-            conflict.  This is the form used by Chains — each accumulated
+            Individual field values, merged with *input*; a field given in
+            both is an error.  This is the form used by Chains — each accumulated
             variable whose name matches a declared parameter is passed here
             automatically.
 
@@ -322,9 +334,20 @@ class RestApiTool(Tool):
             data.update(input)
         elif isinstance(input, str) and input:
             data["input"] = input
-        data.update(kwargs)          # kwargs win on conflict
+        if clash := sorted(set(data) & set(kwargs)):
+            raise ValueError(f"RestApiTool {self.name!r}: {clash} given both in the input dict and "
+                             "as keyword arguments — pass each field once")
+        data.update(kwargs)
 
-        opts = options or {}
+        # Headers and the timeout are the tool's settings since 3.7.0; a call's
+        # headers were merged over them, and the call won.
+        if options:
+            moved = [k for k in options if k in ("headers", "timeout")]
+            raise ValueError(f"RestApiTool {self.name!r}: "
+                             + (f"{', '.join(moved)} is a setting of the tool — RestApiTool(…, "
+                                f"{moved[0]}=…) or REST(…, headers=…)" if moved else
+                                f"a call takes the endpoint's fields, not options {sorted(options)}"))
+        opts: dict = {}
 
         # ── 2. Build URL (substitute path params) ─────────────────────
         url = self._url_template
@@ -367,15 +390,14 @@ class RestApiTool(Tool):
             headers["Content-Type"] = self._content_type
         headers.update(self._static_headers)
         headers = self._apply_auth(headers, data)
-        headers.update(opts.get("headers") or {})
 
         # ── 6. Execute ─────────────────────────────────────────────────
         req_kwargs: dict[str, Any] = {"headers": headers}
         if body is not None:
             req_kwargs["body"] = body
 
-        if opts.get("timeout") is not None:
-            req_kwargs["timeout"] = urllib3.Timeout(read=float(opts["timeout"]))
+        if self._timeout is not None:
+            req_kwargs["timeout"] = urllib3.Timeout(read=float(self._timeout))
 
         # Only ever speak http(s), and block SSRF targets (private / loopback /
         # metadata IPs) unless AICHAIN_ALLOW_PRIVATE_URLS is set — needed when a
@@ -463,6 +485,9 @@ class RestApiTool(Tool):
         1. ``data[auth["token_field"]]``  — runtime value (e.g. from a prior Chain step)
         2. ``os.environ[auth["env"]]``    — environment variable
         """
+        token = auth.get("token")
+        if token is not None:
+            return str(token() if callable(token) else token)
         token_field = auth.get("token_field")
         if token_field and token_field in data:
             return str(data[token_field])
@@ -474,6 +499,21 @@ class RestApiTool(Tool):
     # ------------------------------------------------------------------
     # Dunder helpers
     # ------------------------------------------------------------------
+
+    def schema(self) -> dict:
+        """The schema a model sees: the endpoint's fields, without the token."""
+        out = super().schema()
+        params = dict(out["function"]["parameters"])        # a copy: self.parameters stays whole for a chain
+        params["properties"] = {k: v for k, v in params["properties"].items() if k not in self._hidden}
+        params["required"] = [k for k in params.get("required", []) if k not in self._hidden]
+        out["function"] = {**out["function"], "parameters": params}
+        return out
+
+    def check_args(self, kwargs: dict) -> "str | None":
+        if given := sorted(set(kwargs) & self._hidden):
+            return (f"Invalid call to tool '{self.name}': {given} is the API's credential and is "
+                    "not an argument of the call.")
+        return super().check_args(kwargs)
 
     def __repr__(self) -> str:
         return (

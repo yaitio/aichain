@@ -153,7 +153,7 @@ class _AsyncBridge:
             raise TimeoutError(
                 f"MCP operation did not complete within {timeout:.0f}s "
                 "(server hung during connection or call). Pass a larger "
-                "options={'timeout': ...} if the operation is legitimately slow."
+                "call_timeout=… if the operation is legitimately slow."
             ) from None
 
     @classmethod
@@ -236,6 +236,12 @@ def _build_client(
 
     # ── Dict spec ─────────────────────────────────────────────────────────
     if isinstance(server, dict):
+        # One source for each (3.7.0): given both as an argument and in the
+        # server dict, they were merged and the dict won, in silence.
+        for key, given in (("headers", headers), ("env", env), ("cwd", cwd), ("transport", transport)):
+            if given and server.get(key):
+                raise ValueError(f"MCP {key} given twice — as {key}= and in the server dict; "
+                                 "give it in one place")
         if "url" in server:
             url      = server["url"]
             merged_h = {**(headers or {}), **server.get("headers", {})}
@@ -414,8 +420,10 @@ class MCPTool(Tool):
         env:         "dict | None" = None,
         cwd:         "str | None"  = None,
         transport:   "str | None"  = None,
+        call_timeout: "float | None" = None,
     ) -> None:
         self.name        = name
+        self._call_timeout = call_timeout
         self.description = description
         self._server     = server
         self._headers    = headers
@@ -451,11 +459,11 @@ class MCPTool(Tool):
             single ``"input"`` field (compatibility shim for plain-string
             Chain steps).
         options : dict | None, optional
-            Runtime overrides:
-              ``timeout`` (float) — per-call timeout in seconds.
+            None. A call's timeout is the tool's ``call_timeout`` since
+            3.7.0; options given here are an error that says so.
         **kwargs
-            Individual argument values.  Merged with *input*; kwargs win
-            on conflict.  This is the form used by Chains — accumulated
+            Individual argument values, merged with *input*; an argument
+            given in both is an error.  This is the form used by Chains — accumulated
             variables whose names match declared parameter properties are
             passed here automatically.
 
@@ -477,12 +485,19 @@ class MCPTool(Tool):
             arguments.update(input)
         elif isinstance(input, str) and input:
             arguments["input"] = input
+        if clash := sorted(set(arguments) & set(kwargs)):
+            raise ValueError(f"MCP tool {self.name!r}: {clash} given both in the input dict and as "
+                             "keyword arguments — pass each argument once")
         arguments.update(kwargs)
 
-        opts    = options or {}
-        timeout = opts.get("timeout")
-
-        return _run_sync(self._acall(arguments, timeout=timeout))
+        # A call's timeout is the tool's setting since 3.7.0: the word meant the
+        # connection on MCPTools and one call here.
+        if options:
+            raise ValueError(f"MCP tool {self.name!r}: "
+                             + ("timeout is a setting — MCPTools(…, call_timeout=…) or MCP(…, call_timeout=…)"
+                                if "timeout" in options else
+                                f"a call takes the server's arguments, not options {sorted(options)}"))
+        return _run_sync(self._acall(arguments, timeout=self._call_timeout))
 
     def __call__(
         self,
@@ -571,6 +586,7 @@ def MCPTools(
     cwd:       "str | None"       = None,
     transport: "str | None"       = None,
     timeout:   "float | None"     = DEFAULT_MCP_SETUP_TIMEOUT,
+    call_timeout: "float | None"  = None,
 ) -> "list[MCPTool]":
     """
     Connect to an MCP server, discover all exposed tools, and return one
@@ -686,6 +702,7 @@ def MCPTools(
             env       = env,
             cwd       = cwd,
             transport = transport,
+            call_timeout = call_timeout,
         ),
         timeout = timeout,
     )
@@ -699,6 +716,7 @@ async def _discover_tools(
     env:       "dict | None",
     cwd:       "str | None",
     transport: "str | None",
+    call_timeout: "float | None" = None,
 ) -> "list[MCPTool]":
     """Async implementation — open connection, fetch tool list, close."""
     client = _build_client(
@@ -726,5 +744,6 @@ async def _discover_tools(
             env         = env,
             cwd         = cwd,
             transport   = transport,
+            call_timeout = call_timeout,
         ))
     return result

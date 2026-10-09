@@ -32,10 +32,13 @@ class MCP(Utility):
 
     def __init__(self, server, *, filter: "list | None" = None, headers: "dict | None" = None,
                  env: "dict | None" = None, cwd: "str | None" = None, transport: "str | None" = None,
-                 timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT) -> None:
+                 connect_timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT,
+                 call_timeout: "float | None" = None) -> None:
+        # Two timeouts, two names: reaching the server and listing its tools,
+        # and one call of a tool. MCPTools calls the first `timeout`.
         self.server = server
         self._settings = dict(filter=filter, headers=headers, env=env, cwd=cwd, transport=transport,
-                              timeout=timeout)
+                              timeout=connect_timeout, call_timeout=call_timeout)
         self._tools: "list | None" = None
 
     @property

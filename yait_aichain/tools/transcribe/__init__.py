@@ -21,8 +21,8 @@ from ._stt import convertToText, sttGoogle, sttOpenAI, sttQwen, sttXAI
 SERVICES = {"openai": sttOpenAI, "google": sttGoogle, "xai": sttXAI, "qwen": sttQwen}
 
 
-def transcribe(service: str, *, api_key: "str | None" = None, name: "str | None" = None,
-               description: "str | None" = None) -> convertToText:
+def transcribe(service: str, *, model: "str | None" = None, api_key: "str | None" = None,
+               name: "str | None" = None, description: "str | None" = None) -> convertToText:
     """
     A speech-to-text tool for *service* — one of ``SERVICES``.
 
@@ -31,7 +31,8 @@ def transcribe(service: str, *, api_key: "str | None" = None, name: "str | None"
         transcribe("openai").run("call.mp3", {"language": "ru"})    # the transcript
     """
     from .._callable import named, pick
-    return named(pick("transcribe", SERVICES, service)(api_key=api_key), name, description)
+    cls = pick("transcribe", SERVICES, service)
+    return named(cls(api_key=api_key, **({"model": model} if model is not None else {})), name, description)
 
 
 __all__ = ["transcribe", "SERVICES", "convertToText", "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen"]

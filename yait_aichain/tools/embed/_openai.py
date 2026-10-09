@@ -13,7 +13,8 @@ Supported models
 Model notes
 -----------
 * ``text-embedding-3-*`` accept a ``dimensions`` parameter (1–max-dim).
-* ``text-embedding-ada-002`` ignores ``dimensions``; the parameter is silently
+* ``text-embedding-ada-002`` has a fixed length; ``dimensions`` on it is refused when the
+  embedder is made (3.7.0) — it was
   omitted from the request body for that model.
 * OpenAI does not distinguish query vs document embeddings; ``input_type`` is
   accepted by the interface but ignored.
@@ -45,8 +46,8 @@ class EmbeddingOpenAI(Embedder):
         Model identifier, e.g. ``"text-embedding-3-large"``.
     api_key : str | None, optional
         Override ``OPENAI_API_KEY`` environment variable.
-    **defaults
-        Default values for ``input_type``, ``dimensions``, etc.
+    dimensions, batch_size
+        Settings of the embedder; a call takes only ``input_type``.
 
     Examples
     --------
@@ -60,6 +61,7 @@ class EmbeddingOpenAI(Embedder):
     """
 
     provider   = "openai"
+    _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = "OPENAI_API_KEY"
     _MAX_BATCH = 2048
 

@@ -43,7 +43,7 @@ To process a list larger than any single provider limit:
 
 To cap the slice size for rate-limiting purposes:
 
-    result = embedder.embed(texts, batch_size=32)
+    embedder = Embedding("openai/text-embedding-3-small", batch_size=32)
 """
 
 from __future__ import annotations
@@ -134,6 +134,17 @@ class EmbeddingResult:
 # Embedder base class
 # ---------------------------------------------------------------------------
 
+def _refuse_settings(who: str, given: dict) -> None:
+    """A setting passed with a call is an error that says where it belongs."""
+    if not given:
+        return
+    settings = [k for k in given if k in ("dimensions", "batch_size")]
+    if settings:
+        raise ValueError(f"{who}: {', '.join(settings)} is a setting of the embedder, not of a call — "
+                         f"embed(service, model=…, {settings[0]}=…). Vectors of two lengths cannot share a store.")
+    raise ValueError(f"{who}: unknown option(s) {sorted(given)}; a call takes input_type")
+
+
 class Embedder(Tool):
     """
     Abstract base class for all embedding provider clients.
@@ -154,11 +165,11 @@ class Embedder(Tool):
 
     Constructor
     -----------
-    All subclasses accept ``(model, *, api_key=None, **defaults)``:
+    All subclasses accept ``(model, *, api_key=None, dimensions=None, batch_size=None)``:
 
     * ``model``    — model identifier string (e.g. ``"text-embedding-3-large"``)
     * ``api_key``  — override the environment variable
-    * ``**defaults`` — default values for ``input_type``, ``dimensions``, etc.
+    * ``dimensions``, ``batch_size`` — settings of the embedder; a call takes only ``input_type``
 
     Public methods
     --------------
@@ -183,6 +194,8 @@ class Embedder(Tool):
     provider:   str = ""
     _ENV_KEY:   str = ""
     _MAX_BATCH: int = 100
+    #: Models that take a ``dimensions``; ``None`` means every model does.
+    _DIMENSION_MODELS: "frozenset | None" = None
 
     # A tool since 3.5.0: code, a chain and an agent call it alike. An agent
     # reads a summary, never the vectors (see EmbeddingResult.__str__).
@@ -195,8 +208,6 @@ class Embedder(Tool):
             "options": {"type": "object", "description": "Optional settings.", "properties": {
                 "input_type": {"type": "string", "enum": ["query", "document"],
                                "description": "What the texts are, for providers that embed the two differently."},
-                "dimensions": {"type": "integer", "description": "Length of each vector, where the model can shorten it."},
-                "batch_size": {"type": "integer", "description": "Most texts in one request."},
             }},
         },
         "required": ["input"],
@@ -213,7 +224,8 @@ class Embedder(Tool):
         api_key: str | None = None,
         name:        "str | None" = None,
         description: "str | None" = None,
-        **defaults: Any,
+        dimensions:  "int | None" = None,
+        batch_size:  "int | None" = None,
     ) -> None:
         # _ENV_KEY may be a single name or several accepted names (the first
         # set one wins) — e.g. Google embeddings accept GOOGLE_AI_API_KEY or
@@ -227,7 +239,17 @@ class Embedder(Tool):
             )
         self.model    = model
         self._api_key = key
-        self._defaults = defaults
+        # Settings, in one place (3.7.0). They used to be `**defaults` that
+        # any call's options overrode — so one store could be filled with
+        # vectors of two lengths — and that took any other key in silence.
+        if (dimensions is not None and self._DIMENSION_MODELS is not None
+                and model not in self._DIMENSION_MODELS):
+            # It was sent nowhere and said nowhere: a store built for 512 got
+            # the model's own length. Refused where it is set (3.7.0).
+            raise ValueError(f"{type(self).__name__}: {model} has a fixed length and takes no "
+                             f"dimensions; the models that do: {', '.join(sorted(self._DIMENSION_MODELS))}")
+        self.dimensions = dimensions
+        self.batch_size = batch_size
         label = type(self).__name__.replace("Embedding", "", 1) or self.provider
         self.name = name or f"embed{label}"
         self.description = description or (
@@ -240,7 +262,11 @@ class Embedder(Tool):
 
     def _serialise_init_args(self) -> dict:
         """What `Chain.save` writes: the model and its settings, never the key."""
-        out = {"model": self.model, **self._defaults}
+        out = {"model": self.model}
+        if self.dimensions is not None:
+            out["dimensions"] = self.dimensions
+        if self.batch_size is not None:
+            out["batch_size"] = self.batch_size
         if getattr(self, "_region", None):
             out["region"] = self._region
         return out
@@ -254,9 +280,7 @@ class Embedder(Tool):
         texts: "str | list[str]",
         *,
         input_type:  "str | None"  = None,
-        dimensions:  "int | None"  = None,
-        batch_size:  "int | None"  = None,
-        **options: Any,
+        **refused: Any,
     ) -> EmbeddingResult:
         """
         Embed one or more texts and return an :class:`EmbeddingResult`.
@@ -274,18 +298,9 @@ class Embedder(Tool):
             Semantic hint passed to the provider.  Improves retrieval quality
             for providers that distinguish query and document embeddings
             (Cohere, Voyage, Google v1).  OpenAI ignores it.
-        dimensions : int | None, optional
-            Output vector size.  When omitted the provider default is used.
-            Supported by: OpenAI (``dimensions``), Cohere v4
-            (``output_dimension``), Voyage (``output_dimension``),
-            Google (``output_dimensionality``).
-        batch_size : int | None, optional
-            Override the provider's default maximum batch size.  Useful for
-            rate-limiting.  Clamped to ``[1, _MAX_BATCH]``.
-        **options
-            Provider-specific keyword arguments forwarded directly to
-            :meth:`_embed_chunk`.  Unknown keys are silently ignored by
-            each provider implementation.
+        **refused
+            ``dimensions`` and ``batch_size`` here are an error that says where
+            they belong — the embedder — and any other key is an error too.
 
         Returns
         -------
@@ -316,7 +331,8 @@ class Embedder(Tool):
 
         Large list with custom chunk size (useful for rate-limiting)::
 
-            result = embedder.embed(my_10k_list, batch_size=32)
+            embedder = Embedding("openai/text-embedding-3-small", batch_size=32)
+            result   = embedder.embed(my_10k_list)
         """
         # ── Normalise input ───────────────────────────────────────────
         if isinstance(texts, str):
@@ -324,15 +340,14 @@ class Embedder(Tool):
         if not texts:
             raise ValueError("texts must not be empty")
 
-        # ── Resolve effective options (defaults → call-time overrides) ─
-        merged_opts = {**self._defaults, **options}
-        eff_input_type = input_type  if input_type  is not None else merged_opts.pop("input_type", None)
-        eff_dimensions = dimensions  if dimensions  is not None else merged_opts.pop("dimensions", None)
+        _refuse_settings(type(self).__name__, refused)
+        eff_input_type = input_type
+        eff_dimensions = self.dimensions
 
         # ── Determine chunk size ──────────────────────────────────────
         limit = self._MAX_BATCH
-        if batch_size is not None:
-            limit = max(1, min(batch_size, self._MAX_BATCH))
+        if self.batch_size is not None:
+            limit = max(1, min(self.batch_size, self._MAX_BATCH))
 
         # ── Fan-out across batches ────────────────────────────────────
         all_embeddings: list[list[float]] = []
@@ -347,7 +362,6 @@ class Embedder(Tool):
                 chunk,
                 input_type = eff_input_type,
                 dimensions = eff_dimensions,
-                **merged_opts,
             )
             all_embeddings.extend(vecs)
             if tok is not None:
@@ -386,16 +400,10 @@ class Embedder(Tool):
         -------
         EmbeddingResult
         """
-        opts       = options or {}
-        input_type = opts.get("input_type")
-        dimensions = opts.get("dimensions")
-        batch_size = opts.get("batch_size")
-        return self.embed(
-            input,
-            input_type = input_type,
-            dimensions = dimensions,
-            batch_size = batch_size,
-        )
+        opts = dict(options or {})
+        input_type = opts.pop("input_type", None)
+        _refuse_settings(self.name, opts)
+        return self.embed(input, input_type=input_type)
 
     def batch(self, input: "list[str]", options: "dict | None" = None) -> "EmbeddingResult":
         """

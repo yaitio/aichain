@@ -234,6 +234,20 @@ class TestOldPathsUnderTools(unittest.TestCase):
         with patch("yait_aichain.tools.rest_api.make_http") as p:
             self.assertIs(sys.modules["yait_aichain.utilities.rest._tool"].make_http, p)
 
+    def test_attribute_access_in_a_fresh_process(self):
+        # Order-free: in one process another test may have imported the old
+        # path first, which is how 3.6.0 broke `tools.convert.to_text` unseen.
+        import subprocess
+        code = ("import yait_aichain as y; "
+                "print(y.tools.convert.to_text.__name__, y.tools.vectordb._chunk.__name__, "
+                "y.tools.vectordb.providers.__name__, y.tools.rest_api.__name__, y.tools.embedding._openai.__name__)")
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                             cwd=os.path.join(os.path.dirname(__file__), ".."))
+        self.assertEqual(out.returncode, 0, out.stderr[-500:])
+        self.assertEqual(out.stdout.split(), ["yait_aichain.tools.transcribe._stt", "yait_aichain.tools.chunk._chunk",
+                                              "yait_aichain.utilities.vectors.providers",
+                                              "yait_aichain.utilities.rest._tool", "yait_aichain.tools.embed._openai"])
+
     def test_a_chain_saved_with_an_old_class_path_loads(self):
         d = tempfile.mkdtemp()
         path = os.path.join(d, "old.yaml")

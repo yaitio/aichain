@@ -40,7 +40,6 @@ class VectorFetchTool(Tool):
     input   : list[str]
         Document IDs to retrieve.
     options : dict, optional
-        ``collection`` str — override the store's default collection
 
     Returns
     -------
@@ -65,10 +64,6 @@ class VectorFetchTool(Tool):
                 "type":        "object",
                 "description": "Fetch options.",
                 "properties": {
-                    "collection": {
-                        "type":        "string",
-                        "description": "Override the store's default collection / namespace.",
-                    },
                 },
             },
         },
@@ -86,9 +81,12 @@ class VectorFetchTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        col = opts.get("collection")
-        if col and col != self._store._collection:
-            return VectorStore(self._store._backend, col, self._store._embedder)
+        """The store. Its collection is a setting — until 3.7.0 a call's
+        ``collection`` option switched it, so a model could read or write
+        another collection than the one the code chose."""
+        if "collection" in opts:
+            raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
+                             "VectorDB(…, collection=…) or Vectors(…, collection=…)")
         return self._store
 
     def __repr__(self) -> str:

@@ -20,7 +20,7 @@ Model notes
     ``"document"``  → ``"document"``
     ``None``        → omitted (provider picks the default)
 * ``text-embedding-v4`` and ``text-embedding-v3`` support variable
-  ``dimensions``; the parameter is silently omitted for other models.
+  ``dimensions``; on any other model it is refused when the embedder is made (3.7.0).
 * The API accepts up to 25 strings per request; the base class handles
   automatic chunking for larger inputs.
 
@@ -74,9 +74,8 @@ class EmbeddingQwen(Embedder):
     region : str | None, optional
         Region selector: ``"ap"`` (default), ``"us"``, ``"cn"``, ``"hk"``.
         Overrides the ``DASHSCOPE_REGION`` env var.
-    **defaults
-        Default values for ``input_type``, ``dimensions``, etc., forwarded
-        to every :meth:`~Embedder.embed` call.
+    dimensions, batch_size
+        Settings of the embedder; a call takes only ``input_type``.
 
     Examples
     --------
@@ -96,6 +95,7 @@ class EmbeddingQwen(Embedder):
     """
 
     provider   = "qwen"
+    _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = "DASHSCOPE_API_KEY"
     _MAX_BATCH = 25
 

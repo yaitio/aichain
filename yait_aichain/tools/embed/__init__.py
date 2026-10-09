@@ -6,7 +6,7 @@ Provider-agnostic embedding interface.
 
 Public API
 ----------
-``Embedding(model, *, api_key=None, **defaults)``
+``Embedding(model, *, api_key=None, dimensions=None, batch_size=None)``
     Factory function that inspects the ``model`` string and returns the
     right :class:`~tools.embedding._base.Embedder` subclass instance.
 
@@ -67,8 +67,8 @@ Examples
     result = e.embed(["text A", "text B"], input_type="document")
     print(result.dimensions, result.total_tokens)
 
-    # Override batch chunk size (useful for rate-limiting)
-    result = e.embed(my_large_list, batch_size=32)
+    # A smaller batch, for rate-limiting — a setting of the embedder
+    e = Embedding("openai/text-embedding-3-small", batch_size=32)
 """
 
 from ._base   import Embedder, EmbeddingResult
@@ -136,9 +136,10 @@ def Embedding(
         provider-prefixed string (``"voyage/voyage-3-large"``).
     api_key : str | None, optional
         Override the provider's environment variable.
-    **defaults
-        Default call-time options forwarded to every :meth:`~Embedder.embed`
-        call, e.g. ``input_type="document"``, ``dimensions=512``.
+    dimensions, batch_size
+        Settings of the embedder — the vectors' length, where the model can
+        shorten them, and the most texts in one request. A call takes only
+        ``input_type``.
 
     Returns
     -------
@@ -182,13 +183,15 @@ def Embedding(
 SERVICES = _PREFIX_MAP
 
 
-def embed(service: str, *, model: str, api_key: "str | None" = None, name: "str | None" = None,
+def embed(service: str, *, model: str, dimensions: "int | None" = None, batch_size: "int | None" = None,
+          api_key: "str | None" = None, name: "str | None" = None,
           description: "str | None" = None) -> Embedder:
     """
     An embedding tool for *service* — one of ``SERVICES`` — and *model*.
 
-    The model is a setting, not an option: vectors from two models cannot be
-    compared, so a store is filled by one. ``name`` and ``description``
+    The model, the vectors' ``dimensions`` and the ``batch_size`` are
+    settings, not options: vectors from two models, or of two lengths, cannot
+    share a store, so the tool is fixed to one. ``name`` and ``description``
     default to the provider's; ``api_key`` to its environment variable.
 
     ::
@@ -198,7 +201,8 @@ def embed(service: str, *, model: str, api_key: "str | None" = None, name: "str 
         str(vectors)          # what a model reads: "2 vector(s) of 1536 dimensions …"
     """
     from .._callable import pick
-    return pick("embed", SERVICES, service)(model, api_key=api_key, name=name, description=description)
+    return pick("embed", SERVICES, service)(model, api_key=api_key, name=name, description=description,
+                                            dimensions=dimensions, batch_size=batch_size)
 
 
 from .._callable import callable_package as _callable_package

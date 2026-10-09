@@ -177,6 +177,13 @@ class RerankBase(Tool):
         description: "str | None" = None,
         **kwargs: Any,
     ) -> None:
+        if kwargs:
+            # Accepted and dropped until 3.7.0: Reranker("rerank-v3.5", top_n=3)
+            # built a reranker that returned every document, and said nothing.
+            hint = (" — top_n and query are options of the call: .run(docs, {\"query\": …, \"top_n\": …})"
+                    if set(kwargs) & {"top_n", "query"} else "")
+            raise TypeError(f"{type(self).__name__} takes model, api_key, name and description; "
+                            f"got {', '.join(sorted(kwargs))}{hint}")
         key = api_key or os.environ.get(self._ENV_KEY, "")
         if not key:
             raise ValueError(

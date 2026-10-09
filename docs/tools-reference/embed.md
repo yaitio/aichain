@@ -19,7 +19,8 @@ EmbeddingOpenAI(
     api_key: str | None = None,
     name: str | None = None,
     description: str | None = None,
-    **defaults,
+    dimensions: int | None = None,
+    batch_size: int | None = None,
 )
 ```
 
@@ -27,8 +28,6 @@ EmbeddingOpenAI(
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | The texts to embed — or one text. |
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
-| `options.dimensions` | `integer` |  | Length of each vector, where the model can shorten it. |
-| `options.batch_size` | `integer` |  | Most texts in one request. |
 
 ```python
 result = EmbeddingOpenAI("<model>")(
@@ -55,7 +54,8 @@ CohereEmbedder(
     api_key: str | None = None,
     name: str | None = None,
     description: str | None = None,
-    **defaults,
+    dimensions: int | None = None,
+    batch_size: int | None = None,
 )
 ```
 
@@ -63,8 +63,6 @@ CohereEmbedder(
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | The texts to embed — or one text. |
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
-| `options.dimensions` | `integer` |  | Length of each vector, where the model can shorten it. |
-| `options.batch_size` | `integer` |  | Most texts in one request. |
 
 ```python
 result = CohereEmbedder("<model>")(
@@ -91,7 +89,8 @@ EmbeddingVoyage(
     api_key: str | None = None,
     name: str | None = None,
     description: str | None = None,
-    **defaults,
+    dimensions: int | None = None,
+    batch_size: int | None = None,
 )
 ```
 
@@ -99,8 +98,6 @@ EmbeddingVoyage(
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | The texts to embed — or one text. |
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
-| `options.dimensions` | `integer` |  | Length of each vector, where the model can shorten it. |
-| `options.batch_size` | `integer` |  | Most texts in one request. |
 
 ```python
 result = EmbeddingVoyage("<model>")(
@@ -127,7 +124,8 @@ EmbeddingGoogle(
     api_key: str | None = None,
     name: str | None = None,
     description: str | None = None,
-    **defaults,
+    dimensions: int | None = None,
+    batch_size: int | None = None,
 )
 ```
 
@@ -135,8 +133,6 @@ EmbeddingGoogle(
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | The texts to embed — or one text. |
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
-| `options.dimensions` | `integer` |  | Length of each vector, where the model can shorten it. |
-| `options.batch_size` | `integer` |  | Most texts in one request. |
 
 ```python
 result = EmbeddingGoogle("<model>")(
@@ -169,8 +165,6 @@ EmbeddingQwen(
 |---|---|---|---|
 | `input` | `list[string]` | ✓ | The texts to embed — or one text. |
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
-| `options.dimensions` | `integer` |  | Length of each vector, where the model can shorten it. |
-| `options.batch_size` | `integer` |  | Most texts in one request. |
 
 ```python
 result = EmbeddingQwen("<model>")(

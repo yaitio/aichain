@@ -53,8 +53,8 @@ class EmbeddingCohere(Embedder):
         Model identifier, e.g. ``"embed-v4.0"``.
     api_key : str | None, optional
         Override ``COHERE_API_KEY`` environment variable.
-    **defaults
-        Default values for ``input_type``, ``dimensions``, etc.
+    dimensions, batch_size
+        Settings of the embedder; a call takes only ``input_type``.
 
     Examples
     --------

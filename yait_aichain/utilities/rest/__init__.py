@@ -37,7 +37,7 @@ class REST(Utility):
     """
 
     def __init__(self, base_url: str, *, description: str, auth: "dict | None" = None,
-                 headers: "dict | None" = None) -> None:
+                 headers: "dict | None" = None, timeout: "float | None" = None) -> None:
         if not isinstance(base_url, str) or not base_url.lower().startswith(("http://", "https://")):
             raise ValueError(f"REST needs an http or https base URL; got {base_url!r}")
         if not isinstance(description, str) or not description.strip():
@@ -47,6 +47,7 @@ class REST(Utility):
         self.description = description.strip()
         self.auth = dict(auth or {})
         self.headers = dict(headers or {})
+        self.timeout = timeout
         self._endpoints: dict = {}
 
     def endpoint(self, name: str, method: str, path: str, *, description: str,
@@ -65,7 +66,8 @@ class REST(Utility):
                            self.base_url + "/" + path.lstrip("/"),
                            path_params=path_params, query_params=query_params, body_params=body_params,
                            required_params=required_params, headers=self.headers, auth=self.auth,
-                           content_type=content_type, response_field=response_field)
+                           content_type=content_type, response_field=response_field,
+                           timeout=self.timeout)
         self._endpoints[name] = tool
         return tool
 
