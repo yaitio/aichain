@@ -135,7 +135,7 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.agent  import Agent, step_count, token_budget
 from yait_aichain.chain  import Chain
-from yait_aichain.tools  import PerplexitySearchTool, WeasyprintTool
+from yait_aichain.tools  import PerplexitySearchTool, tool
 
 # Phase 1 — Agent: gather everything we need
 research_agent = Agent(
@@ -158,13 +158,22 @@ report_skill = Skill(
     output = {"modalities": ["text"], "format": {"type": "text"}},
 )
 
-# Phase 3 — Tool: export to PDF
-pdf_tool = WeasyprintTool()
+# Phase 3 — Tool: save the report — any function, made a tool with @tool
+@tool(risk="write")
+def save_report(markdown: str, path: str = "report.md") -> str:
+    """Write the report to a file and return its path.
+
+    markdown: the report.
+    path: where to write it.
+    """
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(markdown)
+    return path
 
 chain = Chain(steps=[
     (research_agent, "research_brief", {}, {"task_key": "research_task"}),
     (report_skill,   "report_markdown"),
-    (pdf_tool,       "pdf_path", {"html": "report_markdown"}),
+    (save_report,    "report_path", {"markdown": "report_markdown"}),
 ])
 
 chain.run(variables={
@@ -194,8 +203,8 @@ accumulated after Agent:
 accumulated after Skill:
   {research_task, report_task, research_brief, report_markdown}
 
-  ↓ Tool step (input_map renames report_markdown → html)
-      returns the output PDF path
+  ↓ Tool step (input_map maps report_markdown → markdown)
+      returns the path of the saved report
 ```
 
 ---

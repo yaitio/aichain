@@ -194,7 +194,7 @@ Calling the tool object catches an exception and returns it as `.error`;
 value; a dict stays a dict.
 
 Built-in tools (search, fetch, decisions, speech, embeddings, reranking, chunking,
-conversion, local files, vector stores, REST, MCP) are in
+local files, vector stores, REST, MCP) are in
 `docs/tools-reference/index.md`. A provider tool is made by its provider's name —
 `speech("openai")`, `transcribe("openai")`, `embed("openai", model=…)`,
 `rerank("cohere", model=…)`; `chunk(max_chars=…)`, `wait(…)` and `gate(tool, …)` take

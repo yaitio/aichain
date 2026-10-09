@@ -1,5 +1,5 @@
 """
-tools.convert.to_speech — convertToSpeech
+tools.speech._tts — convertToSpeech
 ==========================================
 
 Base class and provider implementations for text-to-speech synthesis.
@@ -12,8 +12,7 @@ Supported providers
   ttsQwen     Alibaba DashScope CosyVoice / Qwen3-TTS
 
 All implement ``run(input, options=None) -> str`` where the return value
-is the absolute path to the saved audio file — the same pattern as
-``convertToPDF``.
+is the absolute path to the saved audio file.
 
 A ``stream()`` placeholder is present on every class.  Real-time
 streaming synthesis is reserved for a future release.
@@ -225,7 +224,7 @@ class ttsOpenAI(convertToSpeech):
     --------
     ::
 
-        from yait_aichain.tools.convert import ttsOpenAI
+        from yait_aichain.tools import ttsOpenAI
 
         tool = ttsOpenAI()
 
@@ -338,7 +337,7 @@ class ttsGoogle(convertToSpeech):
     --------
     ::
 
-        from yait_aichain.tools.convert import ttsGoogle
+        from yait_aichain.tools import ttsGoogle
 
         tool = ttsGoogle()
         path = tool.run(
@@ -469,7 +468,7 @@ class ttsXAI(convertToSpeech):
     --------
     ::
 
-        from yait_aichain.tools.convert import ttsXAI
+        from yait_aichain.tools import ttsXAI
 
         tool = ttsXAI()
         path = tool.run(
@@ -588,7 +587,7 @@ class ttsQwen(convertToSpeech):
     --------
     ::
 
-        from yait_aichain.tools.convert import ttsQwen
+        from yait_aichain.tools import ttsQwen
 
         tool = ttsQwen()
 

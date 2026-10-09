@@ -187,13 +187,13 @@ parameter name:
 
 ```python
 from yait_aichain.chain  import Chain
-from yait_aichain.tools  import MarkItDownTool
+from yait_aichain.tools  import fetch
 
 chain = Chain(steps=[
-    (MarkItDownTool(), "content", {"source": "url"}),   # accumulated["url"] → param "source"
-    (summariser,       "summary"),
+    (fetch("local"), "content", {"url": "link"}),     # accumulated["link"] → param "url"
+    (summariser,     "summary"),
 ])
-chain.run(variables={"url": "https://example.com/article"})
+chain.run(variables={"link": "https://example.com/article"})
 ```
 
 A tool whose `run()` returns a **dict** writes several named outputs at once —
@@ -202,7 +202,7 @@ full step syntax.
 
 ### Built-in tools
 
-Search, conversion, speech, local files, vector-store operations, REST, MCP,
+Search, fetch, speech, local files, vector-store operations, REST, MCP,
 and `Wait`/`Gate`. Every one — its wire name, class, key, risk class and full
 parameter table — is in the [Tools reference](../tools-reference/index.md),
 which is generated from the classes themselves.

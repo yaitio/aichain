@@ -1,5 +1,41 @@
 # Changelog
 
+## [3.8.0] — 2026-10-10
+
+**The convert tools leave the library.** `convertToMD`, `convertToHTML` and
+`convertToPDF` were one project's case brought into a library, and they carried
+more than they gave: bare MarkItDown pulls `onnxruntime` (80 MB) and `numpy`
+(34 MB) to tell file types apart — 114 MB of a Lambda package's 250 — while its
+PDF and DOCX converters need extras the `convert` extra never installed, so a
+one-page PDF failed and a `.docx` came back as its raw bytes; `convertToHTML`
+and `convertToPDF` needed `mistletoe` and `weasyprint`, which no extra declared,
+WeasyPrint with system libraries pip cannot install. Their example lives in the
+cookbooks now, using those libraries directly.
+
+### Breaking
+
+- `convertToMD`, `convertToHTML`, `convertToPDF` and their aliases
+  (`MarkItDownTool`, `MistletoeTool`, `WeasyprintTool`) are gone, and so is the
+  `convert` extra. Importing one — from `yait_aichain.tools`, from
+  `yait_aichain.tools.convert`, or its old module, as a saved chain does — is an
+  `ImportError` that says what replaced it: a page from its URL is
+  `fetch("local")`; a local file, MarkItDown itself.
+
+### Changed
+
+- **`fetch("local")` keeps what it took from `convertToMD`** — the session with
+  a timeout and the reading of a page's `<head>` for its title, dates and
+  author — in `tools.fetch._page`. The `fetch` extra installs MarkItDown, as
+  before.
+- **`TTS(provider)` and `STT(provider)` live with `speech` and `transcribe`.**
+  `yait_aichain.tools.convert`, `tools.convert.to_speech` and
+  `tools.convert.to_text` still import, so speech code from before 3.5.0 and
+  chains saved with those paths keep working.
+- **The examples that read a page use `fetch("local")`** — 05 is now
+  `05_tool_fetch.py`; 09, 12 and 14 fetch instead of converting, and the
+  agent-as-chain-step guide saves its report with a `@tool` function instead
+  of rendering a PDF.
+
 ## [3.7.0] — 2026-10-09
 
 **A setting is accepted in exactly one place.** Eleven were accepted at

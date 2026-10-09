@@ -35,7 +35,12 @@ def transcribe(service: str, *, model: "str | None" = None, api_key: "str | None
     return named(cls(api_key=api_key, **({"model": model} if model is not None else {})), name, description)
 
 
-__all__ = ["transcribe", "SERVICES", "convertToText", "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen"]
+def STT(provider: str, *, api_key: "str | None" = None) -> convertToText:
+    """The 3.4 name of :func:`transcribe` — ``STT("openai")`` is ``transcribe("openai")``."""
+    return transcribe(provider, api_key=api_key)
+
+
+__all__ = ["transcribe", "STT", "SERVICES", "convertToText", "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen"]
 
 from .._callable import callable_package as _callable_package
 _callable_package(__name__, transcribe)

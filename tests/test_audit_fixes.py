@@ -717,7 +717,7 @@ class TestSttGoogleRouting(unittest.TestCase):
 
     def test_duration_probe_used_for_routing(self):
         """A small-but-long file must go to the chunked path."""
-        from yait_aichain.tools.convert.to_text import sttGoogle
+        from yait_aichain.tools.transcribe import sttGoogle
 
         tool = sttGoogle.__new__(sttGoogle)   # skip __init__ (no credentials)
         self.assertEqual(tool._MAX_SYNC_SECONDS, 55.0)

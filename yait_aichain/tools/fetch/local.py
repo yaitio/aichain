@@ -33,7 +33,7 @@ from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
 from .._security import assert_safe_url
-from ..convert.to_md import DEFAULT_TIMEOUT, _session, page_metadata
+from ._page import DEFAULT_TIMEOUT, _session, page_metadata
 from ._base import Fetch
 
 #: ``*`` plus the names Anthropic's crawlers and user-directed fetcher answer to.

@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import yait_aichain.tools as tools_pkg                              # noqa: E402
 from yait_aichain.tools._base import Tool                           # noqa: E402
 from yait_aichain.tools.search.perplexity import searchPerplexity   # noqa: E402
-from yait_aichain.tools.convert.to_speech import (                  # noqa: E402
+from yait_aichain.tools.speech import (                             # noqa: E402
     convertToSpeech, ttsOpenAI, ttsQwen)
 
 

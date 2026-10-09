@@ -8,7 +8,7 @@ A `Chain` or `Agent` pattern that grounds generation in retrieved source materia
 
 - `Chain` or `Agent` (agile mode for adaptive retrieval)
 - `BraveSearchTool` or `PerplexitySearchTool`
-- `MarkItDownTool`
+- `fetch("local")` or `fetch("firecrawl")`
 - `Skill` (extraction, synthesis, citation formatting)
 - `Model`
 
@@ -24,5 +24,5 @@ A `Chain` or `Agent` pattern that grounds generation in retrieved source materia
 
 - [Research agent pattern](research-agent.md)
 - [perplexity_search](../tools-reference/search.md#searchperplexity)
-- [markitdown](../tools-reference/markitdown.md)
+- [fetch](../tools-reference/fetch.md)
 - [Agent memory](../agents/memory.md)

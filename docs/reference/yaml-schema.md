@@ -179,8 +179,8 @@ steps:
       verbose: 1
       instructions: "You are a senior analyst."
       tools:
-        - "tools.search.brave_search.BraveSearchTool"
-        - "tools.markitdown.MarkItDownTool"
+        - "yait_aichain.tools.search.brave.searchBrave"
+        - "yait_aichain.tools.fetch.local.fetchLocal"
 ```
 
 ---
@@ -235,7 +235,7 @@ steps:
 ## Notes on serialisation
 
 - **API keys** are never written. On `Chain.load()` / `Skill.load()`, each model or tool constructor reads its key from the matching env var, or from the optional `api_key=` argument.
-- **Tool `init_args`** must be JSON-serialisable. Pass non-serialisable state (e.g. LLM clients for `MarkItDownTool`) by constructing the tool in Python before placing it in a Chain.
+- **Tool `init_args`** must be JSON-serialisable. Pass non-serialisable state (e.g. an embedder for a vector store) by constructing the tool in Python before placing it in a Chain.
 - **Agent tools** are stored as class paths only; at load time each class is imported and instantiated with no arguments (API keys come from env vars).
 - **Parent directories** are created automatically by both `save()` methods.
 

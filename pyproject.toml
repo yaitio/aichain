@@ -16,7 +16,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-convert = ["markitdown"]
 yaml    = ["pyyaml"]
 mcp     = ["fastmcp"]
 fetch   = ["markitdown"]

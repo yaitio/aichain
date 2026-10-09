@@ -1,5 +1,5 @@
 """
-tools.convert.to_text — convertToText
+tools.transcribe._stt — convertToText
 ======================================
 
 Base class and provider implementations for speech-to-text transcription.
@@ -395,7 +395,7 @@ class sttOpenAI(_OpenAICompatSTT):
     --------
     ::
 
-        from yait_aichain.tools.convert import sttOpenAI
+        from yait_aichain.tools import sttOpenAI
 
         tool = sttOpenAI()
 
@@ -448,7 +448,7 @@ class sttGoogle(convertToText):
     --------
     ::
 
-        from yait_aichain.tools.convert import sttGoogle
+        from yait_aichain.tools import sttGoogle
 
         tool = sttGoogle()
         text = tool.run(
@@ -721,7 +721,7 @@ class sttXAI(_OpenAICompatSTT):
     --------
     ::
 
-        from yait_aichain.tools.convert import sttXAI
+        from yait_aichain.tools import sttXAI
 
         tool = sttXAI()
         text = tool.run(input="recording.mp3", options={"language": "en"})
@@ -769,7 +769,7 @@ class sttQwen(_OpenAICompatSTT):
     --------
     ::
 
-        from yait_aichain.tools.convert import sttQwen
+        from yait_aichain.tools import sttQwen
 
         tool = sttQwen()
         text = tool.run(input="meeting.mp3", options={"language": "zh"})

@@ -95,7 +95,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 **[Skill](primitives/skills.md)** — a reusable task: one model + one prompt template + one output format. Supports text, JSON, and validated JSON Schema outputs.
 
-**[Tool](primitives/tools.md)** — a Python function with a declared interface. Connects the gateway to the real world: web search, file conversion, external APIs.
+**[Tool](primitives/tools.md)** — a Python function with a declared interface. Connects the gateway to the real world: web search, pages by URL, external APIs.
 
 **[Chain](primitives/chain.md)** — a sequential pipeline. Each step's output flows forward as named variables. Mixes Skills, Tools, and Agents freely.
 
@@ -113,7 +113,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 <!-- g:provider-list -->**11 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, Reve, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
-**Built-in tools** — web search (Perplexity, Brave, Exa, Firecrawl, Tavily, Parallel), file conversion (Markdown / HTML / PDF / text), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
+**Built-in tools** — web search (Perplexity, Brave, Exa, Firecrawl, Tavily, Parallel), pages by URL (Firecrawl, Tavily, Exa, Parallel, local), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 
 **Full persistence** — Skills and Chains serialise to YAML. API keys are never stored.
 

@@ -6,8 +6,8 @@ tools.fetch._base
 
 A search finds the link; a fetch brings back the page. Four providers sell
 this as an API — Firecrawl Scrape, Tavily Extract, Exa Contents, Parallel
-Extract — and one more runs locally and free: MarkItDown, the same library as
-``convertToMD``, installed only with ``pip install "yait-aichain[fetch]"``.
+Extract — and one more runs locally and free: MarkItDown, installed only with
+``pip install "yait-aichain[fetch]"``.
 
 They differ in what they return (Tavily has no metadata at all), how many
 URLs a call takes (one to a hundred), how they report what a call cost, and in

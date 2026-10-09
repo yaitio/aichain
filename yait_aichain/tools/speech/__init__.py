@@ -46,7 +46,12 @@ def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = 
     return named(tool, name, description)
 
 
-__all__ = ["speech", "SERVICES", "convertToSpeech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen"]
+def TTS(provider: str, *, api_key: "str | None" = None) -> convertToSpeech:
+    """The 3.4 name of :func:`speech` — ``TTS("openai")`` is ``speech("openai")``."""
+    return speech(provider, api_key=api_key)
+
+
+__all__ = ["speech", "TTS", "SERVICES", "convertToSpeech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen"]
 
 from .._callable import callable_package as _callable_package
 _callable_package(__name__, speech)

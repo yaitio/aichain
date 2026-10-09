@@ -37,22 +37,12 @@ pip install urllib3
 
 | Feature | Package | Install |
 |---|---|---|
-| URL / file → Markdown | markitdown | `pip install markitdown` |
-| Save & load Skills/Chains | pyyaml | `pip install pyyaml` |
-| MCP server tools | fastmcp | `pip install fastmcp` |
-| HTML export | mistletoe | `pip install mistletoe` |
-| PDF export | weasyprint | `pip install weasyprint` |
+| A page by URL on this machine, `fetch("local")` | markitdown | `pip install "yait-aichain[fetch]"` |
+| Save & load Skills/Chains | pyyaml | `pip install "yait-aichain[yaml]"` |
+| MCP server tools | fastmcp | `pip install "yait-aichain[mcp]"` |
 
-#### WeasyPrint system libraries (macOS)
-
-WeasyPrint needs Pango and GLib. Install with Homebrew:
-
-```bash
-brew install pango glib
-export DYLD_LIBRARY_PATH="$(brew --prefix)/lib:$DYLD_LIBRARY_PATH"
-```
-
-Add the `export` line to your `~/.zshrc` to make it permanent.
+Converting files to Markdown, HTML or PDF left the library in 3.8.0; the
+cookbooks show it done with MarkItDown, mistletoe and WeasyPrint directly.
 
 ---
 

@@ -158,19 +158,19 @@ class Pool:
     --------
     Parse every file in a directory::
 
-        from yait_aichain.tools.convert import convertToMD
+        from yait_aichain.tools import fetch
         from yait_aichain.pool import Pool
 
         files = [{"source": f} for f in os.listdir("./docs")]
-        pool  = Pool(convertToMD(), items=files, max_flows=5)
+        pool  = Pool(fetch("local"), items=files, max_flows=5)
         texts = pool.run()   # list[str], same order as files
 
     Fetch 20 URLs in parallel::
 
-        from yait_aichain.tools.convert import convertToMD
+        from yait_aichain.tools import fetch
         from yait_aichain.pool import Pool
 
-        pool    = Pool(convertToMD(), items=[{"source": u} for u in urls])
+        pool    = Pool(fetch("local"), items=[{"source": u} for u in urls])
         pages   = pool.run()
 
     Shared variables merged into every item::

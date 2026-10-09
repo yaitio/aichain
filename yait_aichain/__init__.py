@@ -24,10 +24,10 @@ Full imports::
     from yait_aichain.chain  import Chain
     from yait_aichain.pool   import Pool, DONE, FAILED
     from yait_aichain.agent  import Agent
-    from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
+    from yait_aichain.tools  import fetch, search, embed
 """
 
-__version__ = "3.7.0"
+__version__ = "3.8.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────

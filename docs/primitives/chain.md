@@ -216,10 +216,10 @@ All three compose as steps:
 ```python
 from yait_aichain.chain  import Chain
 from yait_aichain.agent  import Agent
-from yait_aichain.tools  import MarkItDownTool
+from yait_aichain.tools  import fetch
 
 chain = Chain(steps=[
-    (MarkItDownTool(),        "article", {"source": "url"}),             # Tool
+    (fetch("local"),          "article", {"url": "url"}),                # Tool
     (summariser,              "summary"),                                 # Skill
     (Agent(model=...), "analysis", {}, {"task_key": "summary"}),   # Agent
     (report_skill,            "report"),                                  # Skill

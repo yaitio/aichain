@@ -8,7 +8,7 @@ An `Agent` equipped with search and fetch tools that autonomously investigates a
 
 - `Agent` (agile mode)
 - `PerplexitySearchTool` or `BraveSearchTool`
-- `MarkItDownTool`
+- `fetch("local")` or `fetch("firecrawl")`
 - `Model` (orchestrator)
 
 ## Key decisions
@@ -24,4 +24,4 @@ An `Agent` equipped with search and fetch tools that autonomously investigates a
 - [Agent configuration](../agents/configuration.md)
 - [perplexity_search](../tools-reference/search.md#searchperplexity)
 - [brave_search](../tools-reference/search.md#searchbrave)
-- [markitdown](../tools-reference/markitdown.md)
+- [fetch](../tools-reference/fetch.md)

@@ -53,21 +53,21 @@ Examples
 Parse files in parallel::
 
     import os
-    from yait_aichain.tools.convert import convertToMD
+    from yait_aichain.tools import fetch
     from yait_aichain.pool import Pool
 
     files  = [{"source": f} for f in os.listdir("./documents")]
-    pool   = Pool(convertToMD(), items=files, max_flows=5)
+    pool   = Pool(fetch("local"), items=files, max_flows=5)
     texts  = pool.run()
     # texts[i] is the Markdown content of files[i]
 
 Fetch 20 URLs, shared variable merged in::
 
-    from yait_aichain.tools.convert import convertToMD
+    from yait_aichain.tools import fetch
     from yait_aichain.pool import Pool
 
     pool  = Pool(
-        convertToMD(),
+        fetch("local"),
         items     = [{"source": url} for url in urls],
         max_flows = 10,
         on_error  = "collect",

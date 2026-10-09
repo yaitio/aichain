@@ -34,7 +34,7 @@ A **Tool** wraps any callable — a REST API, an MCP server, your own function.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`05_tool_convert.py`](05_tool_convert.py) | Convert a URL or file to Markdown. | *(none)* |
+| [`05_tool_fetch.py`](05_tool_fetch.py) | A web page's text from its URL. | *(none)* |
 | [`06_tool_mcp.py`](06_tool_mcp.py) | Connect to an MCP server, discover tools, run them. | *(none — an MCP server of your own on :8009)* |
 | [`07_tool_custom.py`](07_tool_custom.py) | Define your own tool and use it in a Chain. | `ANTHROPIC_API_KEY` |
 

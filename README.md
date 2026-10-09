@@ -156,7 +156,7 @@ from yait_aichain.agent import Agent, step_count
 
 agent  = Agent(
     model        = Model("claude-opus-4-8"),
-    tools        = [searchPerplexity(), convertToMD()],
+    tools        = [search("perplexity"), fetch("local")],
     mode         = "agile",
     stop_when    = [step_count(10)],
 )
@@ -289,8 +289,6 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 `Vectors` (a vector database; `kb.query` its tool) · `MCP` (a server's tools) ·
 `REST` (an API; each endpoint a tool) · `Shell` (a folder; browse, read, write, run)
 
-### Convert
-`convertToMD` · `convertToHTML` · `convertToPDF`
 
 ---
 
@@ -305,7 +303,7 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 | 02 | [`02_skill_models.py`](examples/02_skill_models.py) | Same prompt, three providers. |
 | 03 | [`03_skill_multimodal.py`](examples/03_skill_multimodal.py) | Text → Image → Text, three different providers. |
 | 04 | [`04_skill_save_load.py`](examples/04_skill_save_load.py) | Save a skill to YAML, reload and run it. |
-| 05 | [`05_tool_convert.py`](examples/05_tool_convert.py) | Convert a URL or file to Markdown. |
+| 05 | [`05_tool_fetch.py`](examples/05_tool_fetch.py) | A web page's text from its URL. |
 | 06 | [`06_tool_mcp.py`](examples/06_tool_mcp.py) | Connect to an MCP server, discover tools, run them. |
 | 07 | [`07_tool_custom.py`](examples/07_tool_custom.py) | Define your own tool and use it in a Chain. |
 | 08 | [`08_chain.py`](examples/08_chain.py) | Two skills in sequence, two different providers. |

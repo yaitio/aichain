@@ -5,11 +5,11 @@ Every parameter that shapes how an Agent decides, acts, and spends.
 ```python
 from yait_aichain.models import Model
 from yait_aichain.agent  import Agent, step_count, token_budget
-from yait_aichain.tools  import PerplexitySearchTool, MarkItDownTool
+from yait_aichain.tools  import fetch, search
 
 agent = Agent(
     model        = Model("claude-opus-4-6"),
-    tools        = [PerplexitySearchTool(), MarkItDownTool()],
+    tools        = [search("perplexity"), fetch("local")],
     mode         = "agile",
     stop_when    = [step_count(12), token_budget(80_000)],
     instructions = "You are a senior market intelligence analyst…",

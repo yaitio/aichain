@@ -119,7 +119,7 @@ export VOYAGE_API_KEY="…"
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-…"    # orchestrator
 export BRAVE_SEARCH_API_KEY="BSA-…"    # or PERPLEXITY_API_KEY
-# MarkItDownTool needs no key
+# fetch("local") needs no key
 ```
 
 ---

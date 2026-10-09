@@ -137,31 +137,10 @@ from .embed import (
     GoogleEmbedder,
 )
 
-# ── Convert ───────────────────────────────────────────────────────────────────
-from .convert import (
-    convertToMD,
-    convertToHTML,
-    convertToPDF,
-    convertToSpeech,
-    convertToText,
-    # TTS providers
-    ttsOpenAI,
-    ttsGoogle,
-    ttsXAI,
-    ttsQwen,
-    # STT providers
-    sttOpenAI,
-    sttGoogle,
-    sttXAI,
-    sttQwen,
-    # factories
-    TTS,
-    STT,
-    # aliases
-    MarkItDownTool,
-    MistletoeTool,
-    WeasyprintTool,
-)
+# ── Speech and transcription ─────────────────────────────────────────────────
+# Imported from tools.convert until 3.8.0, which removed the convert tools.
+from .speech import TTS, convertToSpeech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
+from .transcribe import STT, convertToText, sttGoogle, sttOpenAI, sttQwen, sttXAI
 
 # ── Decision ──────────────────────────────────────────────────────────────────
 from .decision import Decision, decisionOpenAI, decisionTypeSafe
@@ -197,13 +176,17 @@ _LAZY = {name: module for module, names in _FROM_UTILITIES.items() for name in n
 
 def __getattr__(name):
     import importlib
+    # importlib, not `from . import`: that form calls this __getattr__ again.
+    removed = importlib.import_module(f"{__name__}._convert_removed")
+    if name in removed.REMOVED:                          # removed in 3.8.0: say what replaced it
+        raise removed.removed(name)
     if name in _LAZY:
         value = getattr(importlib.import_module(_LAZY[name]), name)
         globals()[name] = value
         return value
     # A module that lived here before it moved — tools.vectordb, tools.embedding —
     # is still an attribute, as it was when this package imported it.
-    from .. import _moved
+    _moved = importlib.import_module("yait_aichain._moved")
     if _moved.new_path(f"{__name__}.{name}") is not None:
         return importlib.import_module(f"{__name__}.{name}")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -289,10 +272,7 @@ __all__ = [
     "CohereEmbedder",
     "VoyageEmbedder",
     "GoogleEmbedder",
-    # ── Convert ───────────────────────────────────────────────────────────
-    "convertToMD",
-    "convertToHTML",
-    "convertToPDF",
+    # ── Speech and transcription ──────────────────────────────────────────
     "convertToSpeech",
     "convertToText",
     # TTS providers
@@ -308,10 +288,6 @@ __all__ = [
     # factories
     "TTS",
     "STT",
-    # convert aliases
-    "MarkItDownTool",
-    "MistletoeTool",
-    "WeasyprintTool",
     # ── Universal REST API ────────────────────────────────────────────────
     "RestApiTool",
     # ── MCP (Model Context Protocol) ─────────────────────────────────────

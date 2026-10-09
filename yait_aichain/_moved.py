@@ -26,6 +26,7 @@ import sys
 MOVED = {
     "yait_aichain.tools.embedding":         "yait_aichain.tools.embed",
     "yait_aichain.tools.reranking":         "yait_aichain.tools.rerank",
+    "yait_aichain.tools.convert":           "yait_aichain.tools._convert_removed",
     "yait_aichain.tools.convert.to_speech": "yait_aichain.tools.speech._tts",
     "yait_aichain.tools.convert.to_text":   "yait_aichain.tools.transcribe._stt",
     "yait_aichain.tools.vectordb._chunk":   "yait_aichain.tools.chunk._chunk",
@@ -34,6 +35,14 @@ MOVED = {
     "yait_aichain.tools.mcp":               "yait_aichain.utilities.mcp._tools",
     "yait_aichain.tools.rest_api":          "yait_aichain.utilities.rest._tool",
     "yait_aichain.tools.local":             "yait_aichain.utilities.shell",
+}
+
+
+#: Modules removed outright (3.8.0): importing one says what replaced it.
+REMOVED = {
+    "yait_aichain.tools.convert.to_md":   "convertToMD",
+    "yait_aichain.tools.convert.to_html": "convertToHTML",
+    "yait_aichain.tools.convert.to_pdf":  "convertToPDF",
 }
 
 
@@ -47,6 +56,9 @@ def new_path(name: str) -> "str | None":
 
 class _Finder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     def find_spec(self, fullname, path=None, target=None):
+        if fullname in REMOVED:
+            from .tools._convert_removed import removed
+            raise removed(REMOVED[fullname])
         if new_path(fullname) is None:
             return None
         return importlib.util.spec_from_loader(fullname, self)

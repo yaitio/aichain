@@ -10,7 +10,7 @@ Required env vars:
     ANTHROPIC_API_KEY
 
 Required packages:
-    pip install markitdown
+    pip install "yait-aichain[fetch]"
 """
 
 import os
@@ -18,18 +18,16 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
 from yait_aichain.pool import Pool, DONE, FAILED
-from yait_aichain.tools import convertToMD
-
-fetch = convertToMD()
+from yait_aichain.tools import fetch
 
 summarise = Skill(
     model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
-        "Summarise in one sentence:\n\n{result}"
+        "Summarise in one sentence:\n\n{page}"
     ]}]},
 )
 
-per_item = Chain(steps=[(fetch, "result", {"input": "source"}), summarise])
+per_item = Chain(steps=[(fetch("local"), "page", {"url": "source"}), summarise])
 
 items = [
     {"source": "https://fr.lipsum.com"},
