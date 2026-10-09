@@ -15,7 +15,9 @@ searchFirecrawl    Firecrawl — descriptions; each page as Markdown on request.
 searchTavily       Tavily — passages chosen for the query; each page as Markdown on request.
 searchParallel     Parallel — excerpts that serve an objective; built for agents.
 
-``Search`` is the base; a new provider is a subclass that implements ``_search``.
+``search(service)`` makes one by the provider's name — ``search("exa")`` — and
+is the way the documentation shows. ``Search`` is the base; a new provider is a
+subclass that implements ``_search``, and an entry in ``SERVICES``.
 
 Backward-compatible aliases
 ---------------------------
@@ -30,11 +32,45 @@ from .firecrawl  import searchFirecrawl
 from .tavily     import searchTavily
 from .parallel   import searchParallel
 
+#: Provider name → tool class, for :func:`search`.
+SERVICES = {
+    "perplexity": searchPerplexity,
+    "brave":      searchBrave,
+    "exa":        searchExa,
+    "firecrawl":  searchFirecrawl,
+    "tavily":     searchTavily,
+    "parallel":   searchParallel,
+}
+
+
+def search(service: str, *, api_key: "str | None" = None, name: "str | None" = None,
+           description: "str | None" = None) -> Search:
+    """
+    A web search tool for *service* — one of ``SERVICES``.
+
+    ``name`` and ``description`` default to the provider's own and override
+    them; ``api_key`` defaults to the provider's environment variable. Every
+    other setting of a search is an option of the call, so nothing else is
+    taken here.
+
+    ::
+
+        search("exa").run("AI and leadership", {"domains": ["hbr.org"]})["results"]
+        Agent(model, tools=[search("perplexity")])
+    """
+    cls = SERVICES.get(service.lower()) if isinstance(service, str) else None
+    if cls is None:
+        raise ValueError(f"unknown search service {service!r}; one of: {', '.join(SERVICES)}")
+    return cls(api_key, name=name, description=description)
+
+
 # ── Backward-compatible aliases ──────────────────────────────────────────────
 PerplexitySearchTool = searchPerplexity
 BraveSearchTool      = searchBrave
 
 __all__ = [
+    "search",
+    "SERVICES",
     "Search",
     "searchPerplexity",
     "searchBrave",

@@ -30,8 +30,9 @@ A map of name → question. The name is what the answer comes back under.
 
 Answers — one format for every provider
 ---------------------------------------
-``run()`` returns ``{"answers", "model", "usage", "cost"}``; ``answers`` maps
-each question's name to::
+``run()`` returns ``{"answers", "model", "usage", "cost", "cost_basis"}`` as a
+:class:`~tools.Record` — the fields for code, one line per answer for a model
+(:meth:`Decision.render`); ``answers`` maps each question's name to::
 
     {"type": "predicate", "probability": 0.92}
     {"type": "choice", "choice": "billing", "confidence": 0.93,
@@ -57,7 +58,7 @@ import os
 
 from ...clients._base import make_http
 from ...clients._constants import DEFAULT_RETRIES, DEFAULT_TIMEOUT
-from .._base import Tool
+from .._base import Record, Tool
 
 QUESTION_TYPES = ("predicate", "choice", "score")
 #: Both providers' own ceilings: 255 options, 2–10 levels. OpenAI's checked
@@ -152,6 +153,10 @@ def image_url(image) -> str:
     return f"data:{mime};base64,{base64.b64encode(data).decode()}"
 
 
+def _p(v) -> str:
+    return "?" if v is None else f"{v:.2f}"
+
+
 class Decision(Tool):
     """
     Base of the decision tools: one format of questions and answers, a
@@ -201,6 +206,8 @@ class Decision(Tool):
     _RETRIES = DEFAULT_RETRIES
     _DEFAULT_MODEL: str = ""
     _PRICE_PER_INPUT_TOKEN: float = 0.0
+    #: Where that rate was read, and when.
+    _PRICE_SOURCE: str = ""
     #: Whether the provider takes images beside the text.
     images: bool = False
 
@@ -241,8 +248,25 @@ class Decision(Tool):
             raise ValueError(f"{type(self).__name__} ({self._PROVIDER}) takes no images; "
                              "decisionOpenAI does")
         answers, model, usage = self._ask(state, [image_url(i) for i in images or []])
-        return {"answers": answers, "model": model, "usage": usage,
-                "cost": (usage.get("input_tokens") or 0) * self._PRICE_PER_INPUT_TOKEN}
+        return Record({"answers": answers, "model": model, "usage": usage,
+                       "cost": (usage.get("input_tokens") or 0) * self._PRICE_PER_INPUT_TOKEN,
+                       "cost_basis": f"input tokens reported by {self._PROVIDER}, at the published "
+                                     f"rate ({self._PRICE_SOURCE})"},
+                      self.render)
+
+    def render(self, out: dict) -> str:
+        """What a model reads: one line per question, with the probabilities."""
+        lines = []
+        for name, a in out["answers"].items():
+            if a["type"] == "predicate":
+                lines.append(f"{name}: yes with probability {_p(a['probability'])}")
+            elif a["type"] == "choice":
+                rest = ", ".join(f"{k} {_p(v)}" for k, v in (a.get("probabilities") or {}).items())
+                lines.append(f"{name}: {a.get('choice')} (confidence {_p(a.get('confidence'))}; {rest})")
+            else:
+                rest = ", ".join(f"{k} {_p(v)}" for k, v in (a.get("probabilities") or {}).items())
+                lines.append(f"{name}: score {_p(a.get('score'))} (confidence {_p(a.get('confidence'))}; {rest})")
+        return "\n".join(lines)
 
     def _ask(self, state, images: list) -> tuple[dict, str, dict]:  # pragma: no cover
         raise NotImplementedError(f"{type(self).__name__} must implement _ask()")

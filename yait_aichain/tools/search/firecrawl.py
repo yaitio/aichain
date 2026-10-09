@@ -69,7 +69,7 @@ class searchFirecrawl(Search):
         tool.run(input="web scraping for LLMs", options={"recency": "month", "max_results": 5})
 
         # The pages themselves, cut to 5 000 characters each:
-        tool.search(input="EU AI Act", options={"domains": ["europa.eu"], "text_chars": 5000})
+        tool.run(input="EU AI Act", options={"domains": ["europa.eu"], "text_chars": 5000})
     """
 
     name        = "searchFirecrawl"

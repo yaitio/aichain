@@ -27,14 +27,14 @@ is the one both promises keep. A provider adds its own options beside these
 
 An option a provider cannot honour is never dropped in silence: it is
 reported — as a warning once per provider and option, as a line at the end of
-the text the model reads, and in ``notices`` of :meth:`Search.search`. An
+the text the model reads, and in the result's ``notices``. An
 option it honours differently (``hour`` on a provider whose finest window is a
 day) is adapted and reported the same way.
 
 Results — one record
 --------------------
-``search()`` returns ``{"query", "provider", "results", "notices", "cost",
-"cost_basis", "usage"}``. ``cost`` is the call's price in USD; ``cost_basis``
+``run()`` returns ``{"query", "provider", "results", "notices", "cost",
+"cost_basis", "usage"}`` as a :class:`~tools.Record`. ``cost`` is the call's price in USD; ``cost_basis``
 says where it came from — the provider's own figure, the provider's units
 (credits, operation counts) at the published rate, or the published rate alone
 for a provider that reports nothing — and ``usage`` holds those units as the
@@ -47,10 +47,15 @@ result is::
 ``date`` is the publication date as the provider reports it, normalised to a
 calendar day, or empty — not a fact about the page: providers date pages
 wrongly, and a caller that needs the true date reads it from the page
-(``convertToMD().last_metadata``). ``text`` is the page's own text when the
-provider returned it (Exa, on request), else empty.
+(``fetch``). ``text`` is the page's own text when the provider returned it
+(Exa, on request), else empty.
 
-``run()`` — what an agent calls — returns the same results as numbered text.
+The record is one object for three readers: code reads its fields, an agent
+shows the model :meth:`Search.render` — the results as a numbered list with
+the notes at the end — and a Skill prompt that substitutes it gets the same
+list. ``search()`` is ``run()`` under its 3.2 name.
+
+``search(service)`` makes one: ``search("exa")``, ``search("perplexity")``.
 """
 
 from __future__ import annotations
@@ -63,7 +68,7 @@ from datetime import date, datetime, timedelta, timezone
 import urllib3
 
 from ...clients._base import make_http
-from .._base import Tool
+from .._base import Record, Tool
 
 # ---------------------------------------------------------------------------
 # Shared network policy for all search providers
@@ -170,12 +175,17 @@ class Search(Tool):
     #: Where that rate was read, and when.
     _PRICE_SOURCE: str = ""
 
-    def __init__(self, api_key: "str | None" = None) -> None:
+    def __init__(self, api_key: "str | None" = None, *, name: "str | None" = None,
+                 description: "str | None" = None) -> None:
         key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
         if not key:
             raise ValueError(f"No {self._PROVIDER} API key found. Pass api_key= or set the "
                              f"{self._ENV_KEY} environment variable.")
         self._api_key = key
+        if name:
+            self.name = name
+        if description:
+            self.description = description
         self._http = make_http(timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES)
 
     parameters = {
@@ -208,8 +218,12 @@ class Search(Tool):
 
     # ------------------------------------------------------------------
 
-    def search(self, input: str, options: "dict | None" = None) -> dict:
-        """Search for *input*; the results as records, with any notices."""
+    def run(self, input: str, options: "dict | None" = None) -> Record:  # type: ignore[override]
+        """
+        Search for *input*. The result is a :class:`Record`: the fields below
+        for code, and the numbered list of :meth:`render` for a model or a
+        prompt.
+        """
         if not isinstance(input, str) or not input.strip():
             raise ValueError(f"{type(self).__name__} needs a query — it was empty")
         opts = dict(options or {})
@@ -228,12 +242,17 @@ class Search(Tool):
         results = self._search(input.strip(), opts, window, notices, cost)
         if "usd" not in cost:
             cost.update(usd=self._LIST_PRICE, basis=f"published rate ({self._PRICE_SOURCE})")
-        return {"query": input.strip(), "provider": self.name, "results": results, "notices": notices,
-                "cost": round(cost["usd"], 6), "cost_basis": cost["basis"], "usage": cost.get("usage", {})}
+        return Record({"query": input.strip(), "provider": self.name, "results": results, "notices": notices,
+                       "cost": round(cost["usd"], 6), "cost_basis": cost["basis"], "usage": cost.get("usage", {})},
+                      self.render)
 
-    def run(self, input: str, options: "dict | None" = None) -> str:  # type: ignore[override]
-        """Search for *input*; the results as numbered text a model reads."""
-        return self.format(self.search(input, options))
+    def search(self, input: str, options: "dict | None" = None) -> Record:
+        """The same as :meth:`run` — kept from 3.2, when ``run()`` returned the text."""
+        return self.run(input, options)
+
+    def render(self, found: dict) -> str:
+        """What a model reads: the results as a numbered list, then any notes."""
+        return self.format(found)
 
     # ------------------------------------------------------------------
 

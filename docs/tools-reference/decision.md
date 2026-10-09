@@ -76,9 +76,9 @@ A map of name → question; the answer comes back under the same name.
 ```python
 from yait_aichain.agent import Agent
 from yait_aichain.models import Model
-from yait_aichain.tools import decisionOpenAI   # or decisionTypeSafe — same arguments
+from yait_aichain.tools import decide
 
-triage = decisionOpenAI(name="triage", questions={
+triage = decide("openai", name="triage", questions={      # or "typesafe" — same arguments
     "urgent": {"type": "predicate", "instructions": "Does this convey urgency?"},
     "team":   {"type": "choice", "instructions": "Which team should handle it?",
                "choices": {"billing": "Payments, refunds", "technical": "Bugs, outages", "other": None}},
@@ -98,15 +98,26 @@ network.
 The same shape from every provider:
 
 ```python
-triage.run(state="Help! My payouts have been failing for 3 days.")
+out = triage.run("Help! My payouts have been failing for 3 days.")
 # {"answers": {
 #    "urgent": {"type": "predicate", "probability": 0.96},
 #    "team":   {"type": "choice", "choice": "billing", "confidence": 0.91,
 #               "probabilities": {"billing": 0.94, "technical": 0.05, "other": 0.01}},
 #    "anger":  {"type": "score", "score": 1.0, "confidence": 1.0,
 #               "probabilities": {"Calm": 0.0, "Frustrated": 1.0, "Very angry": 0.0}}},
-#  "model": "gpt-6-luna", "usage": {"input_tokens": 395, "output_tokens": 0}, "cost": 3.9e-05}
+#  "model": "gpt-6-luna", "usage": {"input_tokens": 395, "output_tokens": 0}, "cost": 3.9e-05,
+#  "cost_basis": "input tokens reported by OpenAI, at the published rate (…)"}
+str(out)
+# urgent: yes with probability 0.96
+# team: billing (confidence 0.91; billing 0.94, technical 0.05, other 0.01)
+# anger: score 1.00 (confidence 1.00; Calm 0.00, Frustrated 1.00, Very angry 0.00)
 ```
+
+`decide(service, questions=…)` makes the tool — `openai` or `typesafe` — with
+`model`, `name`, `description` and `api_key`; the questions are fixed there, so
+an agent passes only the text. `run()` returns a `Record`: the dict for code,
+and one line per answer for a model — which is what an agent sees, and what a
+Skill prompt gets when it substitutes the result.
 
 - **A score** is the probability-weighted average of level indices from 0, so
   it can fall between levels; `probabilities` are keyed by level label.

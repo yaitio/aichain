@@ -258,13 +258,21 @@ registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
 ## Built-in tools
 
 ### Search
-`searchPerplexity` · `searchBrave` · `searchExa` · `searchFirecrawl` · `searchTavily` · `searchParallel`
+`search(service)` — `perplexity` · `brave` · `exa` · `firecrawl` · `tavily` · `parallel`
 
 ### Fetch
-`fetchFirecrawl` · `fetchTavily` · `fetchExa` · `fetchParallel` · `fetchLocal` (free; `pip install "yait-aichain[fetch]"`)
+`fetch(service)` — `firecrawl` · `tavily` · `exa` · `parallel` · `local` (free; `pip install "yait-aichain[fetch]"`)
 
-### Decision
-`decisionOpenAI` · `decisionTypeSafe`
+### Decide
+`decide(service, questions=…)` — `openai` · `typesafe`
+
+```python
+from yait_aichain.tools import search, fetch
+
+found = search("exa").run("AI and leadership", {"domains": ["hbr.org"]})
+pages = fetch("firecrawl").run([r["url"] for r in found["results"]])
+Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
+```
 
 ### Convert
 `convertToMD` · `convertToHTML` · `convertToPDF` · `TTS(provider)` · `STT(provider)`

@@ -1,8 +1,52 @@
 # Changelog
 
-## [Unreleased]
+## [3.3.0] — 2026-10-09
+
+**Search, fetch and decide by one convention** — the first release of
+`docs/design/tool-convention.md`. A tool is made by its provider's name —
+`search("exa")`, `fetch("firecrawl")`, `decide("openai", questions=…)` — and
+`run()` returns a `Record`: a dict for code, whose text is what a model reads.
+Fetch is new, search has six providers, and the decision tools are a family.
+
+### Breaking
+
+Each is listed again below with its reason.
+
+- `searchOpenAI` and `searchSerp` are removed, with their aliases.
+- `run()` on a search or fetch tool returns a `Record`, not text: code that
+  read the text reads `str(result)`. `search()` and `fetch()` on a tool are
+  `run()` under their old names and return the same.
+- `run()` on a fetch tool no longer raises when the page could not be fetched:
+  the page carries its reason in `error`, and the model reads it.
+- A chain keeps a search, fetch or decision result whole under its step's key
+  instead of merging its fields (`results`, `answers`, `cost`) into the
+  variables.
+- `Agent(...)` refuses two tools with one name and anything that is not a
+  tool, where the first was kept in silence and the second failed on the
+  first turn.
 
 ### Added
+
+- **`search(service)`, `fetch(service)`, `decide(service, questions=…)`** —
+  a tool by its provider's name, the way the documentation now shows. Each
+  takes `name=` and `description=`, which default to the provider's own;
+  `api_key=` defaults to its environment variable; `decide` takes `model=`,
+  `fetch("local", …)` its four local settings. Nothing else: every other
+  setting of a search or a fetch is an option of the call, and one given to
+  the factory is a `TypeError` that says so. An unknown service names the ones
+  that exist. The classes (`searchExa`, `fetchFirecrawl`, `decisionOpenAI`, …)
+  are the same tools by their own names, and take `name=` and `description=`
+  as well.
+- **`Record`** — what `run()` returns on search, fetch and decision tools: a
+  dict for code, whose `str()` is the tool's `render()` — the numbered results,
+  each page or why it could not be fetched, one line per answer. An agent shows
+  the model that text rather than the dict as JSON; a Skill prompt that
+  substitutes the result gets the same text; a chain keeps the record under its
+  step's key, where a plain dict — a REST reply — is still merged. Copies keep
+  the rendering; a pickled or stored record is the plain dict.
+- **`cost_basis` on a decision** — where its `cost` came from: the input
+  tokens the provider reported, at the published rate, with the source and the
+  date it was read.
 
 - **`fetch` — a web page's text from its URL, one record from five tools.**
   `fetchFirecrawl` (Scrape, one URL a call), `fetchTavily` (Extract, ≤ 20),
@@ -140,6 +184,17 @@
 
 ### Fixed
 
+- **`Agent` refuses what it cannot use, by name.** An object without a name,
+  `schema()` and `run()` — a reranker, an embedder, a `Skill` — passed
+  construction and failed on the first turn with an `AttributeError`
+  (`'RerankCohere' object has no attribute 'name'`); it is now a `TypeError`
+  at `Agent(...)` naming the class, and for a `Skill` that it is a step for a
+  Chain. Two tools with one name were kept as one, the second replacing the
+  first in the agent's map while both went to the provider; that is now a
+  `ValueError` naming them, and `name=` tells them apart.
+- **MCP tools read their schema from `input_schema`.** MCP SDK v2 renamed
+  `inputSchema`, and fastmcp 4 warned on every discovery; the old field is
+  read only when the new one is absent, so a server on either SDK works.
 - **`convertToMD` no longer waits forever on a URL.** MarkItDown fetches with
   `requests` and no timeout, so a server that held the connection open and
   never answered hung the call — measured 2026-10-06 on www.mckinsey.com, for

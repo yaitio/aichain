@@ -278,6 +278,28 @@ def _delegate_schema(team) -> dict:
 _AWAITING = object()
 
 
+
+def _check_tools(tools: list) -> None:
+    """
+    Refuse, by name, what cannot be a tool and two tools the model cannot tell
+    apart — here, before the first call, rather than as an ``AttributeError``
+    on the first turn or a tool silently replaced by its namesake.
+    """
+    seen: dict = {}
+    for t in tools:
+        if not (getattr(t, "name", None) and callable(getattr(t, "schema", None))
+                and callable(getattr(t, "run", None))):
+            kind = type(t).__name__
+            hint = (" A Skill is one call to a model — a step for a Chain, not a tool for an Agent."
+                    if any(c.__name__ == "Skill" for c in type(t).__mro__) else "")
+            raise TypeError(f"{kind} is not a tool: an Agent needs a name, schema() and run() — "
+                            f"a Tool subclass, or a tool from a factory such as search('exa').{hint}")
+        if t.name in seen:
+            raise ValueError(f"two tools are named {t.name!r} ({type(seen[t.name]).__name__} and "
+                             f"{type(t).__name__}); the model could call only one of them. Give one "
+                             f"of them name=… to tell them apart.")
+        seen[t.name] = t
+
 class Agent:
     """
     A loop that holds one growing conversation and acts on the world.
@@ -342,6 +364,7 @@ class Agent:
 
         self.model        = model
         self.tools        = list(tools or [])
+        _check_tools(self.tools)
         self.instructions = instructions
         self.mode         = mode
         self.team         = list(team) if isinstance(team, (list, tuple)) else team

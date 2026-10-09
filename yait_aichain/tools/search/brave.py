@@ -56,7 +56,7 @@ class searchBrave(Search):
 
         tool = searchBrave()
         tool.run(input="Python asyncio tutorial", options={"max_results": 5, "recency": "month"})
-        tool.search(input="AI agents", options={"domains": ["hbr.org"]})["results"]
+        tool.run(input="AI agents", options={"domains": ["hbr.org"]})["results"]
     """
 
     name        = "searchBrave"

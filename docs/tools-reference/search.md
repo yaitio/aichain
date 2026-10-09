@@ -15,6 +15,9 @@ Web search powered by the Perplexity Search API — each result with a substanti
 ```python
 PerplexitySearchTool(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -52,6 +55,9 @@ Web search powered by the Brave Search API — titles, URLs, the page's descript
 ```python
 BraveSearchTool(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -90,6 +96,9 @@ Web search powered by the Exa Search API — results with the passages that answ
 ```python
 searchExa(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -129,6 +138,9 @@ Web search powered by Firecrawl — results with a description and, on request, 
 ```python
 searchFirecrawl(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -170,6 +182,9 @@ Web search powered by Tavily — each page with the passages chosen for the quer
 ```python
 searchTavily(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -213,6 +228,9 @@ Web search powered by Parallel — the excerpts of each page that serve the obje
 ```python
 searchParallel(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -287,22 +305,28 @@ end of the text the model reads, and an entry in `notices`.
 ## Results
 
 ```python
-from yait_aichain.tools import searchPerplexity
+from yait_aichain.tools import search
 
-tool  = searchPerplexity()
-found = tool.search("AI and leadership", {"domains": ["hbr.org"],
-                                          "start_date": "2026-09-28", "end_date": "2026-10-04"})
+found = search("perplexity").run("AI and leadership", {"domains": ["hbr.org"],
+                                 "start_date": "2026-09-28", "end_date": "2026-10-04"})
 found["results"][0]
 # {"title": "...", "url": "https://hbr.org/2026/10/...", "date": "2026-10-02",
 #  "author": "", "snippets": ["..."], "text": ""}
 found["notices"]            # [] — or what was not applied, and why
+str(found)                  # what a model reads: the numbered list, then the notes
 
-tool.run(input="AI and leadership", options={...})   # the same, as numbered text for a model
+Agent(model, tools=[search("perplexity")])           # the agent calls the same run()
 ```
 
-- **`search()`** is for code: `{"query", "provider", "results", "notices",
-  "cost", "cost_basis", "usage"}`, every result with the same six keys from
-  every provider.
+- **`search(service)`** makes the tool: `perplexity`, `brave`, `exa`,
+  `firecrawl`, `tavily` or `parallel`. It takes `api_key`, `name` and
+  `description` and nothing else — every other setting of a search is an
+  option of the call. The classes (`searchExa` and the rest) are the same
+  tools by their own names.
+- **`run()`** returns a `Record`: a dict for code — `{"query", "provider",
+  "results", "notices", "cost", "cost_basis", "usage"}`, every result with the
+  same six keys from every provider — whose text is the numbered list.
+  `search()` on a tool is `run()` under its 3.2 name.
 - **`cost`** is the call's price in USD, and **`cost_basis`** says how it was
   arrived at: Exa reports dollars; Firecrawl and Tavily report credits, priced
   at the published rate (Firecrawl's Hobby plan, Tavily's pay-as-you-go —
@@ -311,14 +335,16 @@ tool.run(input="AI and leadership", options={...})   # the same, as numbered tex
   request. **`usage`** is the provider's own units, as sent. A Firecrawl call
   that scrapes a PDF is billed per PDF page, so text calls vary in price. The
   model reading `run()` sees no price.
-- **`run()`** is what an agent calls: the same results as numbered text —
-  title, URL, `Published: … · Author: …`, one line per passage, then any notes.
+- **The text** — what an agent shows the model, and what a Skill prompt gets
+  when it substitutes the result — is the numbered list: title, URL,
+  `Published: … · Author: …`, one line per passage, then any notes. A chain
+  keeps the record whole under its step's key.
 - **`date`** is the publication date as the provider reports it, normalised to
   a day (`Sep 30, 2026` and Google's `3 days ago` included), or empty. It is
   not a fact about the page: providers date pages wrongly — Brave's `page_age`
   is when it saw a page, so its article date is preferred; Perplexity has dated
   an April article to September. When the date matters, read it from the page:
-  `convertToMD().last_metadata["published"]`.
+  `fetch(...)`, whose pages carry the date they declare.
 - **`text`** is the page's own text where the provider returned it — Exa,
   Firecrawl and Tavily, with `text_chars`.
 

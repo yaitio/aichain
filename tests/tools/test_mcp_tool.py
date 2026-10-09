@@ -25,6 +25,7 @@ import os
 import sys
 import shutil
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -99,16 +100,19 @@ def _mock_client(list_tools_return=None, call_tool_return=None):
     return mock
 
 
-def _make_mcp_tool_info(name: str, description: str = "", schema: dict | None = None):
-    """Return a mock MCP Tool info object (as returned by list_tools())."""
-    t = MagicMock()
-    t.name        = name
-    t.description = description
-    t.inputSchema = schema or {
+def _make_mcp_tool_info(name: str, description: str = "", schema: dict | None = None,
+                        field: str = "input_schema"):
+    """
+    A tool as list_tools() returns it — a plain object, so a field it does not
+    carry is absent rather than conjured by a mock. ``field`` is where the
+    schema sits: ``input_schema`` since MCP SDK v2, ``inputSchema`` before.
+    """
+    t = SimpleNamespace(name=name, description=description)
+    setattr(t, field, schema or {
         "type": "object",
         "properties": {"q": {"type": "string", "description": "query"}},
         "required": ["q"],
-    }
+    })
     return t
 
 
@@ -530,6 +534,15 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
             "required": ["city"],
         }
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("wx", "", schema)])
+        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+            tools = MCPTools("https://example.com/mcp")
+        self.assertEqual(tools[0].parameters, schema)
+
+    def test_tool_schema_from_the_pre_v2_field(self):
+        # MCP SDK before v2 named it `inputSchema`; fastmcp 4 warns on reading
+        # it, so it is read only when `input_schema` is absent.
+        schema = {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}
+        mock = _mock_client(list_tools_return=[_make_mcp_tool_info("wx", "", schema, field="inputSchema")])
         with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools[0].parameters, schema)

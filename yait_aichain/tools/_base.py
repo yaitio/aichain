@@ -58,6 +58,46 @@ from typing import Any
 
 
 # ---------------------------------------------------------------------------
+# Record
+# ---------------------------------------------------------------------------
+
+class Record(dict):
+    """
+    A tool's result: a dict for code, and text for a model or a prompt.
+
+    Three readers take the same result. Code reads the fields —
+    ``found["results"]``. An agent shows the model ``str(record)``, the tool's
+    own rendering, rather than the dict as JSON. A Skill that substitutes the
+    result into its prompt gets that rendering too, since substitution is
+    ``str(value)``. And a Chain stores a record under its step's key, where a
+    plain dict is merged into the variables: a record is one result, and its
+    keys (``results``, ``cost``) would collide between two steps.
+
+    The rendering is not stored: a record written to a state store and read
+    back is a plain dict.
+    """
+
+    __slots__ = ("_render",)
+
+    def __init__(self, data: dict, render) -> None:
+        super().__init__(data)
+        self._render = render
+
+    def __str__(self) -> str:
+        return self._render(self)
+
+    def __copy__(self):
+        return Record(dict(self), self._render)
+
+    def __deepcopy__(self, memo):
+        import copy
+        return Record(copy.deepcopy(dict(self), memo), self._render)
+
+    def __reduce__(self):            # pickled as the dict it is; a renderer is not data
+        return (dict, (dict(self),))
+
+
+# ---------------------------------------------------------------------------
 # ToolResult
 # ---------------------------------------------------------------------------
 

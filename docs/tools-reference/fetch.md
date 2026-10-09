@@ -14,6 +14,9 @@ A web page's text by Firecrawl Scrape — the main content, as Markdown, with th
 ```python
 fetchFirecrawl(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -36,6 +39,9 @@ Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown.
 ```python
 fetchTavily(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -58,6 +64,9 @@ Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and 
 ```python
 fetchExa(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -80,6 +89,9 @@ Web pages' full content by Parallel Extract — up to 20 URLs a call, with title
 ```python
 fetchParallel(
     api_key: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -104,6 +116,9 @@ fetchLocal(
     headers: dict | None = None,
     respect_robots: bool = True,
     robots_agents = ('*', 'ClaudeBot', 'Claude-User', 'anthropic-ai'),
+    *,
+    name: str | None = None,
+    description: str | None = None,
 )
 ```
 
@@ -144,9 +159,9 @@ Constructing it without MarkItDown raises `ImportError` with that line.
 ## Pages
 
 ```python
-from yait_aichain.tools import fetchExa
+from yait_aichain.tools import fetch
 
-found = fetchExa().fetch(["https://example.com", "https://example.invalid/x"])
+found = fetch("exa").run(["https://example.com", "https://example.invalid/x"])
 found["pages"][0]
 # {"url": "https://example.com", "final_url": "https://example.com",
 #  "title": "Example Domain", "published": "", "author": "",
@@ -155,13 +170,21 @@ found["pages"][1]["error"]  # "CRAWL_LIVECRAWL_TIMEOUT (HTTP 504)"
 found["cost"]               # 0.002 — read from the answer where the provider reports it
 found["cost_basis"]         # "reported by Exa"
 
-fetchExa().run(input="https://example.com")   # the page as text for a model
+str(found)                  # what a model reads: each page, or why it could not be fetched
+
+Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 ```
 
-A page that could not be fetched is still a record, with `error` set and no
-text: one bad URL does not fail the call. `run()` — what an agent calls —
-takes one URL and raises with the reason, so the agent sees why. An API error
-(a bad key, no credits) raises from both.
+`fetch(service)` makes the tool — `firecrawl`, `tavily`, `exa`, `parallel` or
+`local` — with `api_key`, `name` and `description`; `local` takes `timeout`,
+`headers`, `respect_robots` and `robots_agents` instead of a key. `run()` takes
+one URL or a list and returns a `Record`: the dict above for code, and for a
+model each page as text and each failed one as `Could not fetch …: reason`.
+
+A page that could not be fetched is still a page, with `error` set and no
+text: one bad URL does not fail the call, and an agent reads why. An API error
+(a bad key, no credits) raises. `fetch()` on a tool is `run()` under its 3.2
+name.
 
 `published` is a day, `YYYY-MM-DD`, or empty — never guessed.
 

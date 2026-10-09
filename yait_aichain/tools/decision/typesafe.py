@@ -93,6 +93,7 @@ class decisionTypeSafe(Decision):
     #: "$42 / $0.042 per Btok / per Mtok … Charged per input token. Output
     #: tokens are free" — docs.typesafe.ai/models, read 2026-10-02, jev-1.13.0.
     _PRICE_PER_INPUT_TOKEN = 0.042 / 1_000_000
+    _PRICE_SOURCE          = "docs.typesafe.ai/models, read 2026-10-02"
     images                 = False
     _RETRIES               = _RETRIES
 

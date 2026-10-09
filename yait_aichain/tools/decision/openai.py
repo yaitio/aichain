@@ -96,6 +96,7 @@ class decisionOpenAI(Decision):
     #: guide, read 2026-10-08. Regional and long-context multipliers are not
     #: applied here.
     _PRICE_PER_INPUT_TOKEN = 0.10 / 1_000_000
+    _PRICE_SOURCE          = "the Decisions guide, read 2026-10-08"
     images                 = True
 
     def _ask(self, state, images):

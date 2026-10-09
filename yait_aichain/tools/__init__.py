@@ -12,11 +12,11 @@ A ``Tool`` wraps any callable unit of work behind a uniform interface:
 Tool groups
 -----------
 
-search/          Web search — all return plain-text result strings.
+search/          Web search — search("exa").run(query, options) → a Record.
   searchPerplexity, searchBrave, searchExa, searchFirecrawl, searchTavily,
   searchParallel — one format of options and results
 
-fetch/           A web page's text from its URL — one record for every provider.
+fetch/           A web page's text from its URL — fetch("firecrawl").run(urls) → a Record.
   fetchFirecrawl, fetchTavily, fetchExa, fetchParallel, and fetchLocal
   (MarkItDown, free; needs pip install "yait-aichain[fetch]")
 
@@ -36,7 +36,8 @@ convert/         Format conversion — all return str (path or content).
   TTS(provider)     factory → ttsOpenAI | ttsGoogle | ttsXAI | ttsQwen
   STT(provider)     factory → sttOpenAI | sttGoogle | sttXAI | sttQwen
 
-decision/        Typed questions about a text, answered with probabilities.
+decision/        Typed questions about a text, answered with probabilities —
+                 decide("openai", questions={...}).run(text) → a Record.
   decisionOpenAI, decisionTypeSafe — one format of questions and answers
 
 rest_api         Universal REST endpoint tool.
@@ -86,7 +87,7 @@ All previous class names still work:
   OpenAIEmbedder, CohereEmbedder, VoyageEmbedder, GoogleEmbedder
 """
 
-from ._base           import Tool, ToolResult
+from ._base           import Tool, ToolResult, Record
 from ._wait           import Wait, Gate
 from ._permissions    import (
     PermissionPolicy, ApprovalRequest, ApprovalDecision,
@@ -97,6 +98,7 @@ from ._permissions    import (
 
 # ── Search ────────────────────────────────────────────────────────────────────
 from .search import (
+    search,
     Search,
     searchPerplexity,
     searchBrave,
@@ -111,6 +113,7 @@ from .search import (
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 from .fetch import (
+    fetch,
     Fetch,
     fetchFirecrawl,
     fetchTavily,
@@ -163,7 +166,7 @@ from .convert import (
 )
 
 # ── Decision ──────────────────────────────────────────────────────────────────
-from .decision import Decision, decisionOpenAI, decisionTypeSafe
+from .decision import decide, Decision, decisionOpenAI, decisionTypeSafe
 
 # ── Universal REST API ────────────────────────────────────────────────────────
 from .rest_api import RestApiTool
@@ -214,12 +217,16 @@ from .mcp import MCPTool, MCPTools
 
 __all__ = [
     "Decision",
+    "decide",
     "decisionOpenAI",
     "decisionTypeSafe",
     "searchExa",
     "searchFirecrawl",
     "searchTavily",
     "searchParallel",
+    "search",
+    "Record",
+    "fetch",
     "Fetch",
     "fetchFirecrawl",
     "fetchTavily",

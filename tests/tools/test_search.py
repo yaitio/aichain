@@ -36,8 +36,8 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from yait_aichain.tools import (Search, searchBrave, searchExa, searchFirecrawl, searchPerplexity,
-                                searchParallel, searchTavily)
+from yait_aichain.tools import (Record, Search, search, searchBrave, searchExa, searchFirecrawl,
+                                searchPerplexity, searchParallel, searchTavily)
 from yait_aichain.tools.search._base import day
 
 #: Captured live 2026-10-06, query "site:hbr.org article", trimmed.
@@ -464,13 +464,51 @@ class TestTheTextAModelReads(unittest.TestCase):
         # folded onto one line each — the page's own breaks would break the list
         self.assertIn("    · Published January 30, 2025 Introduction When AI models generate text.", text)
 
-    def test_run_returns_exactly_that_text(self):
+    def test_run_returns_a_record_whose_text_is_that_layout(self):
+        # 3.3.0: run() returns the fields; the model and a prompt read str().
         for cls in FIXTURE:
             with self.subTest(provider=cls.__name__):
-                self.assertEqual(_tool(cls).run(input=QUERY), cls.format(_tool(cls).search(QUERY)))
+                found = _tool(cls).run(input=QUERY)
+                self.assertIsInstance(found, Record)
+                self.assertEqual(set(found), {"query", "provider", "results", "notices",
+                                              "cost", "cost_basis", "usage"})
+                self.assertEqual(str(found), cls.format(dict(found)))
+
+    def test_search_is_run_under_its_old_name(self):
+        tool = _tool(searchExa)
+        self.assertEqual(dict(tool.search(QUERY)), dict(tool.run(QUERY)))
 
     def test_no_results_is_said(self):
-        self.assertIn("(0 results)", _tool(searchExa, {"results": []}).run(input=QUERY))
+        self.assertIn("(0 results)", str(_tool(searchExa, {"results": []}).run(input=QUERY)))
+
+
+class TestFactory(unittest.TestCase):
+    """search(service) — the one way the documentation shows."""
+
+    def test_every_service_by_name(self):
+        from yait_aichain.tools.search import SERVICES
+        self.assertEqual(set(SERVICES), {"perplexity", "brave", "exa", "firecrawl", "tavily", "parallel"})
+        for service, cls in SERVICES.items():
+            with self.subTest(service):
+                self.assertIs(type(search(service, api_key="k")), cls)
+                self.assertIs(type(search(service.upper(), api_key="k")), cls)
+
+    def test_an_unknown_service_names_the_ones_that_exist(self):
+        with self.assertRaisesRegex(ValueError, "one of: perplexity, brave, exa"):
+            search("exaa", api_key="k")
+
+    def test_name_and_description_follow_the_service_and_can_be_overridden(self):
+        self.assertEqual(search("exa", api_key="k").name, "searchExa")
+        self.assertEqual(search("perplexity", api_key="k").name, "searchPerplexity")
+        t = search("exa", api_key="k", name="web", description="Search the web.")
+        self.assertEqual((t.name, t.description), ("web", "Search the web."))
+        self.assertEqual(t.schema()["function"]["name"], "web")
+        self.assertEqual(searchExa.name, "searchExa")       # the class is untouched
+
+    def test_a_call_setting_is_not_a_factory_setting(self):
+        # One place for each setting: options belong to the call.
+        with self.assertRaises(TypeError):
+            search("exa", api_key="k", max_results=5)
 
 
 class TestContract(unittest.TestCase):

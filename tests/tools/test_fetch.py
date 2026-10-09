@@ -30,7 +30,8 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from yait_aichain.tools import Fetch, fetchExa, fetchFirecrawl, fetchLocal, fetchParallel, fetchTavily
+from yait_aichain.tools import (Fetch, Record, fetch, fetchExa, fetchFirecrawl, fetchLocal,
+                                fetchParallel, fetchTavily)
 
 OK, BAD = "https://example.com", "https://example.invalid/x"
 TEXT = "This domain is for use in documentation examples without needing permission."
@@ -232,19 +233,61 @@ class TestWhatACallCost(unittest.TestCase):
 
 class TestTheTextAModelReads(unittest.TestCase):
 
-    def test_run_returns_the_page(self):
-        out = _tool(fetchFirecrawl).run(OK)
-        self.assertTrue(out.startswith("Title: Example Domain\nURL: https://example.com/\n"
-                                       "Published: 2026-09-30 · Author: IANA\n\n"))
-        self.assertIn("documentation examples", out)
+    def test_run_returns_a_record_whose_text_is_the_page(self):
+        found = _tool(fetchFirecrawl).run(OK)
+        self.assertIsInstance(found, Record)
+        self.assertEqual(found["pages"][0]["title"], "Example Domain")
+        self.assertTrue(str(found).startswith("Title: Example Domain\nURL: https://example.com/\n"
+                                              "Published: 2026-09-30 · Author: IANA\n\n"))
+        self.assertIn("documentation examples", str(found))
 
-    def test_run_raises_with_the_reason(self):
-        with self.assertRaisesRegex(RuntimeError, "Failed to fetch url"):
-            _tool(fetchTavily).run(BAD)
+    def test_a_failed_page_is_its_reason_not_an_exception(self):
+        # 3.3.0: run() raised on a single failed URL; a failed page is now a
+        # record like any other, and the model reads why.
+        found = _tool(fetchTavily).run([OK, BAD])
+        self.assertIn("Could not fetch https://example.invalid/x: Failed to fetch url", str(found))
+        self.assertIn("Title: Example Domain", str(found))
 
-    def test_call_returns_the_reason_as_a_failed_result(self):
+    def test_call_succeeds_with_the_failed_page_in_it(self):
         res = _tool(fetchTavily)(BAD)
-        self.assertFalse(res.success)
+        self.assertTrue(res.success)
+        self.assertEqual(res.output["pages"][0]["error"], "Failed to fetch url")
+
+    def test_fetch_is_run_under_its_old_name(self):
+        tool = _tool(fetchExa)
+        self.assertEqual(dict(tool.fetch(OK)), dict(tool.run(OK)))
+
+
+class TestFactory(unittest.TestCase):
+    """fetch(service) — the one way the documentation shows."""
+
+    def test_every_service_by_name(self):
+        from yait_aichain.tools.fetch import SERVICES
+        self.assertEqual(set(SERVICES), {"firecrawl", "tavily", "exa", "parallel", "local"})
+        for service in ("firecrawl", "tavily", "exa", "parallel"):
+            with self.subTest(service):
+                self.assertIs(type(fetch(service, api_key="k")), SERVICES[service])
+        self.assertIs(type(fetch("local")), fetchLocal)
+
+    def test_an_unknown_service_names_the_ones_that_exist(self):
+        with self.assertRaisesRegex(ValueError, "one of: firecrawl, tavily, exa, parallel, local"):
+            fetch("firecrawlx", api_key="k")
+
+    def test_local_settings_are_locals_and_a_key_is_not(self):
+        t = fetch("local", respect_robots=False, robots_agents=("*",), timeout=(5, 10))
+        self.assertEqual((t.respect_robots, t.robots_agents), (False, ("*",)))
+        with self.assertRaisesRegex(TypeError, "are fetch\\('local'\\)'s"):
+            fetch("exa", api_key="k", timeout=3)
+        with self.assertRaisesRegex(TypeError, "takes no api_key"):
+            fetch("local", api_key="k")
+        with self.assertRaisesRegex(TypeError, "max_chars"):
+            fetch("local", max_chars=10)              # an option of the call
+
+    def test_name_and_description_override(self):
+        t = fetch("exa", api_key="k", name="read_page", description="Read a page.")
+        self.assertEqual((t.name, t.description), ("read_page", "Read a page."))
+        t = fetch("local", name="read_local")
+        self.assertEqual(t.name, "read_local")
 
 
 class TestContract(unittest.TestCase):

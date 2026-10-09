@@ -69,7 +69,8 @@ class fetchLocal(Fetch):
     _PRICE_SOURCE = "runs locally"
 
     def __init__(self, timeout=DEFAULT_TIMEOUT, headers: "dict | None" = None,
-                 respect_robots: bool = True, robots_agents=ROBOTS_AGENTS) -> None:
+                 respect_robots: bool = True, robots_agents=ROBOTS_AGENTS, *,
+                 name: "str | None" = None, description: "str | None" = None) -> None:
         try:
             from markitdown import MarkItDown
         except ImportError:
@@ -79,6 +80,7 @@ class fetchLocal(Fetch):
         self.respect_robots = respect_robots
         self.robots_agents = tuple(robots_agents)
         self._robots: dict = {}
+        self._named(name, description)
 
     def _fetch(self, urls, opts, notices, cost):
         u = urls[0]

@@ -719,7 +719,9 @@ async def _discover_tools(
             name        = t.name,
             description = getattr(t, "description", "") or "",
             server      = server,
-            parameters  = getattr(t, "inputSchema", None),
+            # `input_schema` since MCP SDK v2; `inputSchema` before it, and
+            # deprecated now — read only when the new field is absent.
+            parameters  = getattr(t, "input_schema", None) or getattr(t, "inputSchema", None),
             headers     = headers,
             env         = env,
             cwd         = cwd,

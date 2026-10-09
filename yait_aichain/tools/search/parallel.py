@@ -61,7 +61,7 @@ class searchParallel(Search):
         tool = searchParallel()
         tool.run(input="What did the major consultancies publish about AI agents this week?",
                  options={"recency": "week", "domains": ["bcg.com/publications", "bain.com/insights"]})
-        tool.search(input="Parallel Web Systems announcements",
+        tool.run(input="Parallel Web Systems announcements",
                     options={"search_queries": ["Parallel Web Systems products",
                                                 "Parallel Web Systems funding"]})
     """

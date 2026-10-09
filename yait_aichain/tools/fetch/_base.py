@@ -32,8 +32,10 @@ A page that failed is still a record, with ``error`` set and no text: one bad
 URL does not fail the call. ``published`` is what the page or the provider
 declares, normalised to a day, or empty.
 
-``run()`` — what an agent calls — takes one URL and returns the page as text,
-or raises with the reason when it could not be fetched.
+``run()`` returns that dict as a :class:`~tools.Record`: code reads its fields,
+and an agent — or a Skill prompt that substitutes it — gets :meth:`Fetch.render`,
+each page as text and each failed one as its reason. ``fetch()`` is ``run()``
+under its 3.2 name. ``fetch(service)`` makes one: ``fetch("firecrawl")``.
 
 Standard option
 ---------------
@@ -47,7 +49,7 @@ import os
 import warnings
 
 from ...clients._base import make_http
-from .._base import Tool
+from .._base import Record, Tool
 from ..search._base import SEARCH_RETRIES, SEARCH_TIMEOUT, day
 
 DEFAULT_MAX_CHARS = 20_000
@@ -102,18 +104,30 @@ class Fetch(Tool):
             "required": ["url"],
         }
 
-    def __init__(self, api_key: "str | None" = None) -> None:
+    def __init__(self, api_key: "str | None" = None, *, name: "str | None" = None,
+                 description: "str | None" = None) -> None:
         key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
         if not key:
             raise ValueError(f"No {self._PROVIDER} API key found. Pass api_key= or set the "
                              f"{self._ENV_KEY} environment variable.")
         self._api_key = key
         self._http = make_http(timeout=SEARCH_TIMEOUT, retries=SEARCH_RETRIES)
+        self._named(name, description)
+
+    def _named(self, name, description) -> None:
+        if name:
+            self.name = name
+        if description:
+            self.description = description
 
     # ------------------------------------------------------------------
 
-    def fetch(self, urls, options: "dict | None" = None) -> dict:
-        """Fetch one URL or a list of them; every URL comes back as a page record."""
+    def run(self, url, options: "dict | None" = None) -> Record:  # type: ignore[override]
+        """
+        Fetch *url* — one URL or a list of them. Every URL comes back as a
+        page; one that failed carries its reason in ``error`` instead of text.
+        """
+        urls = url
         wanted = [urls] if isinstance(urls, str) else list(urls or [])
         if not wanted or not all(isinstance(u, str) and u.strip() for u in wanted):
             raise ValueError(f"{type(self).__name__} needs a URL or a list of URLs")
@@ -141,30 +155,32 @@ class Fetch(Tool):
             if p["text"] and len(p["text"]) > opts["max_chars"]:
                 p["text"] = p["text"][:opts["max_chars"]]
             pages.append(p)
-        return {"pages": pages, "notices": notices, "cost": round(total["usd"], 6),
-                "cost_basis": total["basis"], "usage": total["usage"]}
+        return Record({"pages": pages, "notices": notices, "cost": round(total["usd"], 6),
+                       "cost_basis": total["basis"], "usage": total["usage"]}, self.render)
 
-    def run(self, url: str, options: "dict | None" = None) -> str:  # type: ignore[override]
-        """Fetch *url*; the page as text a model reads. Raises with the reason when it failed."""
-        found = self.fetch(url, options)
-        p = found["pages"][0]
-        if p["error"]:
-            raise RuntimeError(f"{self.name} could not fetch {url}: {p['error']}")
-        return self.format(p, found["notices"])
+    def fetch(self, urls, options: "dict | None" = None) -> Record:
+        """The same as :meth:`run` — kept from 3.2, when ``run()`` returned the text."""
+        return self.run(urls, options)
+
+    def render(self, found: dict) -> str:
+        """What a model reads: each page, or the reason it could not be fetched, then any notes."""
+        out = "\n\n---\n\n".join(self.format(p) for p in found["pages"])
+        for n in found["notices"]:
+            out += f"\n\nNote: {n}"
+        return out
 
     # ------------------------------------------------------------------
 
     @staticmethod
-    def format(p: dict, notices: list = ()) -> str:
+    def format(p: dict) -> str:
+        if p["error"]:
+            return f"Could not fetch {p['url']}: {p['error']}"
         head = [f"Title: {p['title'] or '(untitled)'}", f"URL: {p['final_url'] or p['url']}"]
         meta = ([f"Published: {p['published']}"] if p["published"] else []) + \
                ([f"Author: {p['author']}"] if p["author"] else [])
         if meta:
             head.append(" · ".join(meta))
-        out = "\n".join(head) + "\n\n" + p["text"].strip()
-        for n in notices:
-            out += f"\n\nNote: {n}"
-        return out
+        return "\n".join(head) + "\n\n" + p["text"].strip()
 
     @staticmethod
     def page(url, final_url="", title="", published="", author="", text="", error="") -> dict:

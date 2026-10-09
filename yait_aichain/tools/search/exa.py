@@ -67,7 +67,7 @@ class searchExa(Search):
         tool.run(input="KV cache in LLM inference explained", options={"max_results": 5, "recency": "year"})
 
         # News only, from two sites, with up to 2 000 characters of each page:
-        tool.search(input="EU AI Act enforcement", options={
+        tool.run(input="EU AI Act enforcement", options={
             "category": "news", "domains": ["reuters.com", "ft.com"], "text_chars": 2000})
     """
 

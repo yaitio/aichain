@@ -37,7 +37,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from yait_aichain.tools import Decision, decisionOpenAI, decisionTypeSafe
+from yait_aichain.tools import Decision, Record, decide, decisionOpenAI, decisionTypeSafe
 
 QUESTIONS = {
     "urgent": {"type": "predicate", "instructions": "Does this convey urgency?"},
@@ -323,6 +323,60 @@ class TestInsideAnAgent(unittest.TestCase):
         self.assertEqual(triage._http.request.call_count, 1)
         self.assertIn("0.95", json.dumps(sent[-1]))
         self.assertIn("billing", json.dumps(sent[-1]))
+
+
+
+class TestWhatACallReturns(unittest.TestCase):
+    """3.3.0: a Record — the fields for code, one line per answer for a model."""
+
+    def test_a_record_with_where_the_cost_came_from(self):
+        for cls in PROVIDERS:
+            with self.subTest(cls.__name__):
+                out = _tool(cls).run(TICKET)
+                self.assertIsInstance(out, Record)
+                self.assertEqual(set(out), {"answers", "model", "usage", "cost", "cost_basis"})
+                self.assertIn(f"input tokens reported by {cls._PROVIDER}", out["cost_basis"])
+                self.assertIn("read 2026-", out["cost_basis"])
+
+    def test_the_model_reads_one_line_per_answer(self):
+        text = str(_tool(decisionTypeSafe).run(TICKET))
+        lines = text.splitlines()
+        self.assertEqual(len(lines), len(QUESTIONS))
+        self.assertTrue(any(l.startswith("urgent: yes with probability 0.") for l in lines), text)
+
+    def test_a_chain_keeps_it_under_its_key(self):
+        # A plain dict is merged into a chain's variables; a record is one
+        # result, so two decisions in one chain do not overwrite `answers`.
+        from yait_aichain.chain import Chain
+        a = _tool(decisionTypeSafe, name="first")
+        b = _tool(decisionTypeSafe, name="second")
+        res = Chain(steps=[(a, "one", {"state": "ticket"}), (b, "two", {"state": "ticket"})]).run(
+            variables={"ticket": TICKET})
+        self.assertIn("answers", res["one"])
+        self.assertIn("answers", res["two"])
+
+
+class TestFactory(unittest.TestCase):
+    """decide(service, questions=...) — the one way the documentation shows."""
+
+    def test_every_service_by_name(self):
+        from yait_aichain.tools.decision import SERVICES
+        self.assertEqual(SERVICES, {"openai": decisionOpenAI, "typesafe": decisionTypeSafe})
+        for service, cls in SERVICES.items():
+            with self.subTest(service):
+                t = decide(service, questions=QUESTIONS, api_key="k", name="triage", model="m-1")
+                self.assertIs(type(t), cls)
+                self.assertEqual((t.name, t.model), ("triage", "m-1"))
+
+    def test_questions_are_required_and_checked_here(self):
+        with self.assertRaises(TypeError):
+            decide("openai", api_key="k")
+        with self.assertRaises(ValueError):
+            decide("openai", api_key="k", questions={"x": {"type": "noul", "instructions": "?"}})
+
+    def test_an_unknown_service_names_the_ones_that_exist(self):
+        with self.assertRaisesRegex(ValueError, "one of: openai, typesafe"):
+            decide("jev", questions=QUESTIONS, api_key="k")
 
 
 def _real(var):

@@ -68,6 +68,9 @@ def result_message(result, error: "str | None" = None):
     from ..models._calls import carries_media
     if carries_media(result):
         return result
+    from ..tools._base import Record
+    if isinstance(result, Record):               # the tool's own rendering, not its JSON
+        return str(result)
     if isinstance(result, (dict, list)):
         return json.dumps(result, indent=1, ensure_ascii=False, default=str)
     return str(result)

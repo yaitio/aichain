@@ -100,6 +100,7 @@ from .. import _hints
 from ..models._usage import Usage
 from .._events import Event, emit
 from ._result import ChainResult
+from ..tools._base import Record
 
 # One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
 # is a silent `skip`: a chain of a hundred generated steps that expects a few
@@ -720,7 +721,10 @@ class Chain:
             if step_usage:
                 usage_total = step_usage if usage_total is None else usage_total + step_usage
 
-            if isinstance(output, dict):
+            # A plain dict is fields for the variables (a REST reply); a Record
+            # is one result, kept whole under its key so two steps' `results`
+            # or `cost` do not overwrite each other.
+            if isinstance(output, dict) and not isinstance(output, Record):
                 accumulated.update(output)
             else:
                 accumulated[output_key] = output

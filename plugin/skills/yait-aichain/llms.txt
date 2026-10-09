@@ -169,69 +169,73 @@ stores, REST, MCP) are in `docs/tools-reference/index.md`. A tool's `risk` is
 one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
 `privileged`. A tool may keep state on its instance and define its own `__init__`.
 
-**A decision with probabilities, not prose** — `decisionOpenAI` (OpenAI's Decisions
-API, `OPENAI_API_KEY`, takes images) and `decisionTypeSafe` (TypeSafe's Jev,
-`TYPESAFE_API_KEY`). Same arguments, same answers. They write no text: they answer
-questions fixed when the tool is made, about a text passed as `state`.
+**Search, fetch and decide — a tool made by its provider's name.** `search("exa")`,
+`fetch("firecrawl")`, `decide("openai", questions=…)`. `run()` returns a `Record`: a
+dict for code, whose `str()` is what a model reads — an agent shows the model that
+text, a Skill prompt that substitutes the result gets it, and a Chain keeps the
+record under its step's key. A paid call has `cost` (USD), `cost_basis` and `usage`.
+
+**A decision with probabilities, not prose** — `decide("openai", …)` (OpenAI's
+Decisions API, `OPENAI_API_KEY`, takes images) or `decide("typesafe", …)` (TypeSafe's
+Jev, `TYPESAFE_API_KEY`). Same arguments, same answers. They write no text: they answer
+questions fixed when the tool is made, about the text passed to `run()`.
 
 ```python
-from yait_aichain.tools import decisionOpenAI
+from yait_aichain.tools import decide
 
-triage = decisionOpenAI(name="triage", questions={
+triage = decide("openai", name="triage", questions={
     "urgent": {"type": "predicate", "instructions": "Does this convey urgency?"},
     "team":   {"type": "choice", "instructions": "Which team should handle it?",
                "choices": {"billing": "Payments, refunds", "technical": "Bugs, outages"}},
     "anger":  {"type": "score", "instructions": "How frustrated is the customer?",
                "levels": ["Calm", "Frustrated", "Very angry"]},
 })
-out = triage.run(state="Help! My payouts have been failing for 3 days.")
+out = triage.run("Help! My payouts have been failing for 3 days.")
 out["answers"]["urgent"]["probability"]    # 0.96 — a probability, not a bool
 out["answers"]["team"]["choice"]           # "billing"; also "probabilities", "confidence"
 out["answers"]["anger"]["score"]           # 1.0 on 0..2; "probabilities" keyed by label
 out["model"], out["cost"]                  # the version that answered; USD, input only
-triage.run(state="Is this damaged?", images=["photo.png"])   # decisionOpenAI only
+triage.run("Is this damaged?", images=["photo.png"])   # openai only
 Agent(model, tools=[triage])               # the agent calls triage(state) by itself
 ```
 
 Thresholds are yours: compare `probability` or `confidence` to a number in code.
 
-**Web search, one format** — `searchPerplexity`, `searchBrave`, `searchExa`,
-`searchFirecrawl`, `searchTavily`, `searchParallel`
-take the same options and return the same records; a provider that cannot honour an
-option says so in `notices` and in a `Note:` line, never silently.
+**Web search, one format** — `search(service)` with `perplexity`, `brave`, `exa`,
+`firecrawl`, `tavily` or `parallel`: the same options and the same records; a provider
+that cannot honour an option says so in `notices` and in a `Note:` line, never silently.
 
 ```python
-from yait_aichain.tools import searchPerplexity
+from yait_aichain.tools import search
 
-tool  = searchPerplexity()
-found = tool.search("AI and leadership", {"max_results": 5, "domains": ["hbr.org"],
-                    "start_date": "2026-09-28", "end_date": "2026-10-04"})
+found = search("perplexity").run("AI and leadership", {"max_results": 5, "domains": ["hbr.org"],
+                                 "start_date": "2026-09-28", "end_date": "2026-10-04"})
 found["results"][0]      # {"title", "url", "date", "author", "snippets", "text"}
 found["notices"]         # options not applied here, and why
 found["cost"]            # USD; found["cost_basis"] says how, found["usage"] the provider's units
-tool.run(input="AI and leadership")   # the same as numbered text; what an agent calls
+str(found)               # the numbered list a model reads
 ```
 
 Options: `max_results`, `recency` (hour/day/week/month/year), `start_date`, `end_date`
 (YYYY-MM-DD), `country`, `language`, `domains`. A result's `date` is the provider's
-claim; read the page's own with `convertToMD().last_metadata["published"]`.
+claim; a fetched page carries the date it declares.
 
-**A page from its link, one format** — `fetchFirecrawl`, `fetchTavily`, `fetchExa`,
-`fetchParallel` (each with its search tool's key) and `fetchLocal` (MarkItDown on this
+**A page from its link, one format** — `fetch(service)` with `firecrawl`, `tavily`,
+`exa`, `parallel` (each with its search tool's key) or `local` (MarkItDown on this
 machine, free, respects robots.txt; needs `pip install "yait-aichain[fetch]"`).
 
 ```python
-from yait_aichain.tools import fetchExa
+from yait_aichain.tools import fetch
 
-found = fetchExa().fetch(["https://example.com/a", "https://example.com/b"], {"max_chars": 20000})
+found = fetch("exa").run(["https://example.com/a", "https://example.com/b"], {"max_chars": 20000})
 found["pages"][0]        # {"url", "final_url", "title", "published", "author", "text", "error"}
 found["cost"]            # USD, as for search
-fetchExa().run(input="https://example.com/a")   # one page as text; raises with the reason
+str(found)               # each page as text, each failed one as its reason
 ```
 
 A URL that failed is a page with `error` set, not a failed call. Search finds the
-link, fetch brings the page: `searchPerplexity` + `fetchFirecrawl` is the pair that
-reached the most in our measurement (2026-10-08).
+link, fetch brings the page: `search("perplexity")` + `fetch("firecrawl")` is the pair
+that reached the most in our measurement (2026-10-08).
 
 ## Chain — steps in order
 
