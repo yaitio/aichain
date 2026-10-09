@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-from .._base import Tool
+from ...tools._base import Tool
 from ._base  import SandboxedTool
 
 

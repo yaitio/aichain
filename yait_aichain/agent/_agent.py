@@ -279,6 +279,19 @@ _AWAITING = object()
 
 
 
+def _is_utility(obj) -> bool:
+    return any(c.__name__ == "Utility" for c in type(obj).__mro__)
+
+
+def _utility_tools(u) -> str:
+    names = list(getattr(u, "TOOLS", ()) or ())
+    kind = type(u).__name__
+    if not names:
+        return f"Give the agent {kind}.tools, the tools it has."
+    return (f"Its tools are {', '.join(names)} — give the agent those, e.g. tools=[x.{names[0]}], "
+            f"or all of them with tools=x.tools.")
+
+
 def _check_tools(tools: list) -> None:
     """
     Refuse, by name, what cannot be a tool and two tools the model cannot tell
@@ -287,6 +300,12 @@ def _check_tools(tools: list) -> None:
     """
     seen: dict = {}
     for t in tools:
+        owner = getattr(t, "__self__", None)
+        if owner is not None and _is_utility(owner):
+            raise TypeError(f"{type(owner).__name__}.{t.__name__} is a method of a utility, not a tool — "
+                            f"code calls it. {_utility_tools(owner)}")
+        if _is_utility(t):
+            raise TypeError(f"{type(t).__name__} is a utility, not a tool. {_utility_tools(t)}")
         if not (getattr(t, "name", None) and callable(getattr(t, "schema", None))
                 and callable(getattr(t, "run", None))):
             kind = type(t).__name__

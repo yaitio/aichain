@@ -166,30 +166,6 @@ from .convert import (
 # ── Decision ──────────────────────────────────────────────────────────────────
 from .decision import Decision, decisionOpenAI, decisionTypeSafe
 
-# ── Universal REST API ────────────────────────────────────────────────────────
-from .rest_api import RestApiTool
-
-# ── Vector DB ────────────────────────────────────────────────────────────────
-from .vectordb import (
-    VectorDB,
-    VectorStore,
-    VectorRecord,
-    VectorBackend,
-    ChromaBackend,
-    PineconeBackend,
-    QdrantBackend,
-    vectorChunk,
-    vectorQuery,
-    vectorUpsert,
-    vectorFetch,
-    vectorDelete,
-    VectorChunkTool,
-    VectorQueryTool,
-    VectorUpsertTool,
-    VectorFetchTool,
-    VectorDeleteTool,
-)
-
 # ── Reranking ────────────────────────────────────────────────────────────────
 from .rerank import (
     Reranker,
@@ -200,18 +176,36 @@ from .rerank import (
     RerankQwen,
 )
 
-# ── Local filesystem ─────────────────────────────────────────────────────────
-from .local import (
-    LocalTools,
-    localBrowse, LocalBrowseTool,
-    localRead,   LocalReadTool,
-    localWrite,  LocalWriteTool,
-    localRun,    LocalRunTool,
-)
+# ── Utilities, under their tools/ names ──────────────────────────────────────
+# The vector store, REST, MCP and local files are utilities since 3.6.0 and live
+# in yait_aichain.utilities. Their old names still import from here, lazily: a
+# utility imports tools._base, so importing it eagerly here would be a cycle.
+_FROM_UTILITIES = {
+    "yait_aichain.utilities.vectors": (
+        "VectorDB", "VectorStore", "VectorRecord", "VectorBackend", "ChromaBackend",
+        "PineconeBackend", "QdrantBackend", "vectorChunk", "vectorQuery", "vectorUpsert",
+        "vectorFetch", "vectorDelete", "VectorChunkTool", "VectorQueryTool", "VectorUpsertTool",
+        "VectorFetchTool", "VectorDeleteTool"),
+    "yait_aichain.utilities.rest._tool": ("RestApiTool",),
+    "yait_aichain.utilities.shell": (
+        "LocalTools", "localBrowse", "LocalBrowseTool", "localRead", "LocalReadTool",
+        "localWrite", "LocalWriteTool", "localRun", "LocalRunTool"),
+    "yait_aichain.utilities.mcp._tools": ("MCPTool", "MCPTools"),
+}
+_LAZY = {name: module for module, names in _FROM_UTILITIES.items() for name in names}
 
-# ── MCP (Model Context Protocol) ─────────────────────────────────────────────
-from .mcp import MCPTool, MCPTools
 
+def __getattr__(name):
+    if name in _LAZY:
+        import importlib
+        value = getattr(importlib.import_module(_LAZY[name]), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(_LAZY))
 
 
 # The factories: each package is callable — `search("exa")` — and stays the
@@ -230,11 +224,6 @@ if _TC:
 else:
     from . import search, fetch, embed, rerank, speech, transcribe, chunk
     from . import decision as decide
-
-# Paths modules had before 3.5.0 (tools.embedding, tools.convert.to_speech, …)
-# resolve to the moved modules, so saved chains and old imports still load.
-from . import _moved as _moved_paths
-_moved_paths.register(__name__)
 
 __all__ = [
     "Decision",

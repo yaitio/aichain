@@ -198,7 +198,25 @@ conversion, local files, vector stores, REST, MCP) are in
 `docs/tools-reference/index.md`. A provider tool is made by its provider's name —
 `speech("openai")`, `transcribe("openai")`, `embed("openai", model=…)`,
 `rerank("cohere", model=…)`; `chunk(max_chars=…)`, `wait(…)` and `gate(tool, …)` take
-no provider. An embedding reaches a model as a one-line summary, never as the vectors. A tool's `risk` is
+no provider. An embedding reaches a model as a one-line summary, never as the vectors.
+
+**Utilities** hold a connection or a place: `from yait_aichain.utilities import Vectors,
+MCP, REST, Shell`. Code calls their methods directly; their tools are attributes called
+with `.run` — only a tool has `.run`. Give an agent the tools, never the utility:
+
+```python
+kb = Vectors("qdrant", collection="docs", embedder=embed("openai", model="text-embedding-3-small"))
+kb.upsert(records); kb.count()                       # methods
+kb.query.run("how does caching work?", {"n": 5})     # its tool
+sh = Shell("projects/demo")                          # browse, read, write, run
+api = REST("https://api.example.com", headers={...}) # api.endpoint(name, method, path, description=…)
+Agent(model, tools=[kb.query, sh.read, *MCP("https://mcp.deepwiki.com/mcp").tools])
+Chain(steps=[(chunk(max_chars=800), "pieces", {"input": "text"}),
+             (kb.upsert, "count", {"records": "pieces"})])   # a method is a chain step
+```
+
+`Agent(tools=[kb])` or `[kb.upsert]` is refused, naming the utility's tools. A chain
+with a method step cannot be saved. A tool's `risk` is
 one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
 `privileged`. A tool may keep state on its instance and define its own `__init__`.
 

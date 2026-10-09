@@ -102,8 +102,8 @@ from typing import Any
 import urllib3
 from yait_aichain.clients._base import make_http
 
-from ._base import Tool
-from ._security import assert_safe_url
+from ...tools._base import Tool
+from ...tools._security import assert_safe_url
 
 # ---------------------------------------------------------------------------
 # Internal constants

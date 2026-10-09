@@ -96,7 +96,7 @@ import threading
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
-from ._base import Tool
+from ...tools._base import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -503,7 +503,7 @@ class MCPTool(Tool):
             ``success=True`` + raw output on success; ``success=False``
             + error string on any exception.
         """
-        from ._base import ToolResult  # local import avoids circular at module level
+        from ...tools._base import ToolResult  # local import avoids circular at module level
 
         try:
             output = self.run(input, options, **kwargs)

@@ -203,6 +203,36 @@ def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
     return kwargs
 
 
+def _callable_name(f) -> str:
+    owner = getattr(f, "__self__", None)
+    return (f"{type(owner).__name__}.{f.__name__}" if owner is not None and hasattr(f, "__name__")
+            else getattr(f, "__name__", None) or type(f).__name__)
+
+
+def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> dict:
+    """
+    The arguments for a function or a method step: each parameter its
+    signature names, filled as a tool's are (see `_build_tool_kwargs`); a
+    required one the chain cannot fill is an error naming it.
+    """
+    import inspect
+    params = {n: p for n, p in inspect.signature(f).parameters.items()
+              if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)}
+    where = _callable_name(f)
+    if unknown := [k for k in input_map if k not in params]:
+        raise ValueError(f"the step maps {unknown} into {where!r}, which takes {list(params)}")
+    kwargs = {}
+    for name, p in params.items():
+        if name in input_map:
+            kwargs[name] = _resolve(input_map[name], accumulated, f"{where}.{name}", top=True)
+        elif name in accumulated:
+            kwargs[name] = accumulated[name]
+        elif p.default is p.empty:
+            raise ValueError(f"{where} needs {name!r}, and the chain has no variable of that name — "
+                             f"map one: ({where}, key, {{{name!r}: 'variable'}}); it has {sorted(accumulated)}")
+    return kwargs
+
+
 def _refuse_function_tool(t) -> None:
     """A @tool function is code: a saved chain could name it and never bring it back."""
     from ..tools._base import FunctionTool
@@ -624,7 +654,10 @@ class Chain:
             self._emit("step.started", step=idx, name=name, payload={"kind": kind})
 
             try:
-                if kind == "tool":
+                if kind == "call":
+                    output = runner(**_build_call_kwargs(runner, accumulated, input_map))
+
+                elif kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
                     if step_signal is not None:
                         output = runner.run(_signal=step_signal, **kwargs)
@@ -886,6 +919,10 @@ class Chain:
 
         steps_data = []
         for runner, output_key, input_map, kind, options in self._steps:
+            if kind == "call":
+                raise TypeError(f"step {_callable_name(runner)!r} is a function or a utility's method, and "
+                                "cannot be saved — it is code, or a method of a live object, not "
+                                "configuration. Build this chain in code.")
             if kind == "skill":
                 skill_data: dict = {
                     "model_name": runner.model.name,
@@ -1264,6 +1301,10 @@ class Chain:
                 kind = "tool"
             elif _is_agent(runner):
                 kind = "agent"
+            elif callable(runner) and not hasattr(runner, "run"):
+                # A function or a utility's method — `kb.upsert` — called with
+                # the arguments its signature names (3.6.0).
+                kind = "call"
             else:
                 kind = "skill"
 

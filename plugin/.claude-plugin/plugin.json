@@ -1,6 +1,6 @@
 {
   "name": "yait-aichain",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "Build AI features in Python with yait-aichain \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
   "author": {
     "name": "YAIT"

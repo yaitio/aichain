@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import convertToMD, searchPerplexity, Embedding
 """
 
-__version__ = "3.5.0"
+__version__ = "3.6.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -40,6 +40,10 @@ _logging.getLogger("yait_aichain").addHandler(_logging.NullHandler())
 
 # A module that does not exist names where its contents live
 # (`yait_aichain.hooks` → `from yait_aichain import Tracer`). See _hints.py.
+# Old module paths still import, first: a saved chain names its tools by them.
+from . import _moved as _moved_paths
+_moved_paths.install()
+
 from ._hints import install_module_hints as _install_module_hints
 _install_module_hints()
 

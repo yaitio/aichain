@@ -32,7 +32,7 @@ Chain usage
 
 from __future__ import annotations
 
-from .._base  import Tool
+from ...tools._base import Tool
 from ._base   import VectorStore, VectorRecord
 
 

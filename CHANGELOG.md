@@ -1,5 +1,48 @@
 # Changelog
 
+## [3.6.0] — 2026-10-09
+
+**Utilities: what holds a connection or a place, and gives an agent the tools
+it should have.** `Vectors`, `MCP`, `REST` and `Shell`, in
+`yait_aichain.utilities`. Code calls a utility's methods; its tools are called
+with `.run` and handed to an agent one by one — only a tool has `.run`, so the
+code shows which is which.
+
+### Added
+
+- **`Vectors(backend, collection, embedder=…)`** — `create`, `upsert`,
+  `fetch`, `delete`, `count` as methods, `query` as its tool:
+  `Agent(tools=[kb.query])` searches and can do nothing else.
+- **`MCP(server)`** — `tools`, `names`, `tool(name)`, `call(name, **args)`;
+  the server is asked for its tools on first use.
+- **`REST(base_url, auth=…, headers=…)`** — `endpoint(name, method, path, …)`
+  makes each tool, sharing the API's URL, auth and headers, set once; an
+  endpoint is reachable as `api.<name>` once made.
+- **`Shell(folder)`** — `browse`, `read`, `write`, `run`, each a tool confined
+  to the folder, each given to an agent on its own: `tools=[sh.browse,
+  sh.read]` reads and cannot write.
+- **A chain takes a function or a utility's method as a step** —
+  `(kb.upsert, "count", {"records": "pieces"})` — its arguments filled by the
+  names its signature takes, as a tool's are; a required one the chain cannot
+  fill is an error naming it. Such a chain refuses to save: a method of a live
+  object is not configuration.
+- **`Agent(...)` refuses a utility, or one of its methods, by name**, and says
+  which tools the utility has — `Vectors.upsert is a method of a utility, not a
+  tool — code calls it. Its tools are query`.
+
+### Changed
+
+- **The vector store, MCP, REST and local tools moved to
+  `yait_aichain.utilities`**: `tools.vectordb` → `utilities.vectors`,
+  `tools.mcp` → `utilities.mcp`, `tools.rest_api` → `utilities.rest`,
+  `tools.local` → `utilities.shell`. Their old names still import from
+  `yait_aichain.tools` (`VectorDB`, `vectorQuery`, `MCPTools`, `RestApiTool`,
+  `LocalTools`, …), and every old module path — including the vector store's
+  providers — resolves to the moved module by every import form, `mock.patch`
+  and `Chain.load`, on 3.10 as on 3.14. The 3.5.0 moves go through the same
+  mechanism now: one map of old prefixes to new, longest first, rather than a
+  list of modules.
+
 ## [3.5.0] — 2026-10-09
 
 **Embeddings, reranking and chunking are tools; every tool is made by name.**

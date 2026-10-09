@@ -143,3 +143,22 @@ result = VectorDeleteTool(store)(
 )
 ```
 <!-- /g:tool -->
+
+## `Vectors` — the database as a utility
+
+```python
+from yait_aichain.tools import chunk, embed
+from yait_aichain.utilities import Vectors
+
+kb = Vectors("qdrant", collection="docs", embedder=embed("openai", model="text-embedding-3-small"))
+kb.create(dimension=1536)
+kb.upsert(chunk(max_chars=800).run(text))           # a method: code and chain
+kb.query.run("how does caching work?", {"n": 5})    # a tool: .run, and an agent can take it
+Agent(model, tools=[kb.query])                      # the agent searches, and can do nothing else
+```
+
+`create`, `upsert`, `fetch`, `delete` and `count` are methods — called directly,
+by code or as a chain step (`(kb.upsert, "count", {"records": "pieces"})`) — and
+`query` is the one tool. Given `kb` or `kb.upsert`, an agent refuses it and names
+`query`. The store underneath is `kb.store`; `VectorDB(...)` and `vectorQuery(store)`
+are what it is built on and still work.

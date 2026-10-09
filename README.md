@@ -285,6 +285,10 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 ### Pause
 `wait(reason=…)` · `gate(tool, reason=…)`
 
+### Utilities — `from yait_aichain.utilities import …`
+`Vectors` (a vector database; `kb.query` its tool) · `MCP` (a server's tools) ·
+`REST` (an API; each endpoint a tool) · `Shell` (a folder; browse, read, write, run)
+
 ### Convert
 `convertToMD` · `convertToHTML` · `convertToPDF`
 

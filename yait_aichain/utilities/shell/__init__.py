@@ -120,3 +120,7 @@ def LocalTools(root_dir: str | None = None) -> list:
         localWrite(root_dir),
         localRun(root_dir),
     ]
+
+
+# ── The utility (3.6.0) ──────────────────────────────────────────────────────
+from ._utility import Shell

@@ -22,7 +22,7 @@ import os
 import subprocess
 import sys
 
-from .._base import Tool
+from ...tools._base import Tool
 from ._base  import SandboxedTool
 
 
