@@ -10,9 +10,12 @@ code shows which is which.
 
 ### Added
 
-- **`Vectors(backend, collection, embedder=…)`** — `create`, `upsert`,
-  `fetch`, `delete`, `count` as methods, `query` as its tool:
-  `Agent(tools=[kb.query])` searches and can do nothing else.
+- **`Vectors(backend, collection, description=…, embedder=…)`** — `create`,
+  `upsert`, `fetch`, `delete`, `count` as methods, `query` as its tool:
+  `Agent(tools=[kb.query])` searches and can do nothing else. A description of
+  what the database holds is required, and the search tool carries it — "Search
+  the product documentation — …" — so an agent with two knowledge bases can
+  tell them apart.
 - **`MCP(server)`** — `tools`, `names`, `tool(name)`, `call(name, **args)`;
   the server is asked for its tools on first use.
 - **`REST(base_url, description=…, auth=…, headers=…)`** — `endpoint(name,

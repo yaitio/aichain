@@ -205,7 +205,8 @@ MCP, REST, Shell`. Code calls their methods directly; their tools are attributes
 with `.run` — only a tool has `.run`. Give an agent the tools, never the utility:
 
 ```python
-kb = Vectors("qdrant", collection="docs", embedder=embed("openai", model="text-embedding-3-small"))
+kb = Vectors("qdrant", collection="docs", description="the product documentation",
+             embedder=embed("openai", model="text-embedding-3-small"))
 kb.upsert(records); kb.count()                       # methods
 kb.query.run("how does caching work?", {"n": 5})     # its tool
 sh = Shell("projects/demo")                          # browse, read, write, run

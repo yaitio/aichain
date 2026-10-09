@@ -55,9 +55,19 @@ class TestVectors(unittest.TestCase):
 
     def test_it_is_made_on_vectordb(self):
         with patch("yait_aichain.utilities.vectors.VectorDB") as vdb:
-            kb = Vectors("qdrant", "docs", embedder="E", url="http://q", index="i")
+            kb = Vectors("qdrant", "docs", description="HR policies, 2024–2026", embedder="E",
+                         url="http://q", index="i")
         vdb.assert_called_once_with("qdrant", "docs", embedder="E", url="http://q", api_key=None, index="i")
         self.assertIs(kb.store, vdb.return_value)
+
+    def test_the_search_says_what_it_searches(self):
+        with patch("yait_aichain.utilities.vectors.VectorDB"):
+            kb = Vectors("qdrant", "docs", description="HR policies, 2024–2026")
+            self.assertTrue(kb.query.description.startswith("Search HR policies, 2024–2026 — "))
+            with self.assertRaises(TypeError):
+                Vectors("qdrant", "docs")
+            with self.assertRaisesRegex(ValueError, "description of what the database holds"):
+                Vectors("qdrant", "docs", description=" ")
 
 
 class TestMCP(unittest.TestCase):

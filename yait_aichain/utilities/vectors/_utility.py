@@ -12,11 +12,17 @@ class Vectors(Utility):
 
     ::
 
-        kb = Vectors("qdrant", collection="docs", embedder=embed("openai", model="text-embedding-3-small"))
+        kb = Vectors("qdrant", collection="docs", description="the product documentation",
+                     embedder=embed("openai", model="text-embedding-3-small"))
         kb.create(dimension=1536)
         kb.upsert(chunk(max_chars=800).run(text))
         kb.query.run("how does caching work?", {"n": 5})
         Agent(model, tools=[kb.query])            # the agent searches, and can do nothing else
+
+    ``description`` says what the database holds, and is required: an agent
+    with two knowledge bases cannot tell them apart without it, and the search
+    tool's own description — "semantic similarity search" — says nothing of
+    what is searched. ``query`` reads "Search the product documentation — …".
 
     ``backend`` is ``chroma``, ``pinecone`` or ``qdrant``; ``collection``,
     ``embedder``, ``url``, ``api_key`` and the backend's own settings
@@ -26,11 +32,17 @@ class Vectors(Utility):
 
     TOOLS = ("query",)
 
-    def __init__(self, backend: str, collection: str, *, embedder=None, url: "str | None" = None,
-                 api_key: "str | None" = None, **settings) -> None:
+    def __init__(self, backend: str, collection: str, *, description: str, embedder=None,
+                 url: "str | None" = None, api_key: "str | None" = None, **settings) -> None:
         from . import VectorDB, VectorQueryTool
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError("Vectors needs a description of what the database holds — an agent's "
+                             "search tool says what it searches by it")
+        self.description = description.strip()
         self.store = VectorDB(backend, collection, embedder=embedder, url=url, api_key=api_key, **settings)
         self.query = VectorQueryTool(self.store)
+        self.query.description = (f"Search {self.description.rstrip('.')} — the passages most relevant "
+                                  "to a question, by meaning rather than by exact words.")
 
     def create(self, dimension: int, metric: str = "cosine") -> None:
         """Create the collection, *dimension* long, if it does not exist."""
