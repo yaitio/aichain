@@ -21,9 +21,9 @@ A **Skill** is the atomic unit — one prompt template, one model, one result.
 |---|---|---|
 | [`01_skill.py`](01_skill.py) | Run a prompt against a model. | `ANTHROPIC_API_KEY` |
 | [`02_skill_models.py`](02_skill_models.py) | Same prompt, three providers. | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` |
-| [`03_skill_multimodal.py`](03_skill_multimodal.py) | Text → Image → Text, three different providers. | `ANTHROPIC_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` |
+| [`03_skill_multimodal.py`](03_skill_multimodal.py) | Text → Image → Text, three providers. | `ANTHROPIC_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` |
 | [`04_skill_save_load.py`](04_skill_save_load.py) | Save a skill to YAML, reload and run it. | `ANTHROPIC_API_KEY` |
-| [`19_image_edit.py`](19_image_edit.py) | Image → image (editing) across four providers, one Skill. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` |
+| [`19_image_edit.py`](19_image_edit.py) | Image → image (editing) across providers, one tool. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` `RECRAFT_API_TOKEN` `BFL_API_KEY` |
 | [`21_multi_turn.py`](21_multi_turn.py) | Directed multi-turn reasoning in ONE Skill. | `ANTHROPIC_API_KEY` |
 
 ---
@@ -35,8 +35,8 @@ A **Tool** wraps any callable — a REST API, an MCP server, your own function.
 | File | What it shows | Keys |
 |---|---|---|
 | [`05_tool_fetch.py`](05_tool_fetch.py) | A web page's text from its URL. | *(none)* |
-| [`06_tool_mcp.py`](06_tool_mcp.py) | Connect to an MCP server, discover tools, run them. | *(none — an MCP server of your own on :8009)* |
-| [`07_tool_custom.py`](07_tool_custom.py) | Define your own tool and use it in a Chain. | `ANTHROPIC_API_KEY` |
+| [`06_tool_mcp.py`](06_tool_mcp.py) | An MCP server as a utility: discover its tools, call them. | *(none)* |
+| [`07_tool_custom.py`](07_tool_custom.py) | Make any function a tool, and use it in a Chain. | `ANTHROPIC_API_KEY` |
 
 ---
 
@@ -116,10 +116,10 @@ from yait_aichain import Agent, Chain, Model, Pool, Skill
 from yait_aichain.agent import step_count
 from yait_aichain.pool import DONE, FAILED
 from yait_aichain.state import FileStore, SuspendedResult
-from yait_aichain.tools import Wait
+from yait_aichain.tools import wait
 
 # Skill — one prompt, one model
-skill = Skill(model=Model("claude-sonnet-4-6"), prompt="Summarise: {text}")
+skill = Skill(model=Model("claude-haiku-4-5-20251001"), prompt="Summarise: {text}")
 result = skill.run(variables={"text": "..."})
 
 # Chain — sequential steps
@@ -133,12 +133,12 @@ results = pool.run()          # outputs in item order
 print(results[0], results.success, results.cost)
 
 # Agent — one loop, tools or an answer each turn
-agent = Agent(Model("claude-sonnet-4-6"), tools=[...], stop_when=[step_count(10)])
+agent = Agent(Model("claude-haiku-4-5-20251001"), tools=[...], stop_when=[step_count(10)])
 result = agent.run("Research the top 3 vector databases.")
 print(result.output, result.stopped_by, result.tokens_used)
 
 # Pause / resume — a chain parks until an external signal arrives
-chain = Chain(steps=[draft, Wait(reason="approve?"), send], store=FileStore("runs/"))
+chain = Chain(steps=[draft, wait(reason="approve?"), send], store=FileStore("runs/"))
 result = chain.run(variables={"complaint": "..."})
 if isinstance(result, SuspendedResult):
     # ...later, possibly in another process sharing the same store...

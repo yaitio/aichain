@@ -1,9 +1,9 @@
 """
-03_skill_multimodal.py — Text → Image → Text, three different providers.
+03_skill_multimodal.py — Text → Image → Text, three providers.
 
-  1. text  → text   Claude  (claude-sonnet-4-6)
-  2. text  → image  Grok    (grok-imagine-image-pro)
-  3. image → text   Qwen    (qwen-vl-max)
+  1. text  → text   Claude  (claude-haiku-4-5-20251001)   a model
+  2. text  → image  Grok    (grok-imagine-image)  a tool — an image model cannot be an agent's mind
+  3. image → text   Qwen    (qwen3-vl-plus)       a model that sees
 
 Required env vars:
     ANTHROPIC_API_KEY
@@ -11,14 +11,19 @@ Required env vars:
     DASHSCOPE_API_KEY
 """
 
-import os, sys, base64, pathlib
+import base64
+import os
+import pathlib
 
 from yait_aichain.models import Model
 from yait_aichain.skills import Skill
+from yait_aichain.tools import image
+
+HERE = pathlib.Path(__file__).parent
 
 # ── 1. Text → Text (Claude) ───────────────────────────────────────────────────
 text_skill = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": ["Describe a sunset in one sentence."]}]},
 )
 
@@ -26,27 +31,22 @@ description = text_skill.run()
 print(f"[text → text · Claude]\n{description}\n")
 
 # ── 2. Text → Image (Grok) ────────────────────────────────────────────────────
-image_skill = Skill(
-    model  = Model("grok-imagine-image-pro", api_key=os.getenv("XAI_API_KEY")),
-    input  = {"messages": [{"role": "user", "parts": [description]}]},
-    output = {"modalities": ["image"], "format": {"type": "image", "size": "1024x1024"}},
-)
-
-image    = image_skill.run()
-img_path = pathlib.Path(__file__).parent / "output_sunset.png"
-img_path.write_bytes(base64.b64decode(image["base64"]))
+drawn   = image("xai", model="grok-imagine-image").run(description, options={"aspect_ratio": "1:1"})
+picture = drawn["images"][0]
+img_path = HERE / "output_sunset.png"
+img_path.write_bytes(base64.b64decode(picture["base64"]))
 print(f"[text → image · Grok]\nsaved → {img_path}\n")
 
 # ── 3. Image → Text (Qwen Vision) ────────────────────────────────────────────
 vision_skill = Skill(
-    model = Model("qwen-vl-max", api_key=os.getenv("DASHSCOPE_API_KEY")),
+    model = Model("qwen3-vl-plus", api_key=os.getenv("DASHSCOPE_API_KEY")),
     input = {
         "messages": [{
             "role": "user",
             "parts": [
                 {"type": "image", "source": {"kind": "base64",
-                                              "data": image["base64"],
-                                              "mime": image["mime_type"]}},
+                                              "data": picture["base64"],
+                                              "mime": picture["mime_type"]}},
                 {"type": "text",  "text": "What do you see in this image?"},
             ],
         }]

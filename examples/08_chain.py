@@ -17,7 +17,7 @@ from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
 
 writer = Skill(
-    model = Model("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
+    model = Model("gpt-6-luna", api_key=os.getenv("OPENAI_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Write a short paragraph (3 sentences) about {topic}."
     ]}]},
@@ -25,7 +25,7 @@ writer = Skill(
 )
 
 reviewer = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Review this paragraph and suggest one concrete improvement:\n\n{result}"
     ]}]},

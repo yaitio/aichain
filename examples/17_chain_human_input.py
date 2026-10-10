@@ -25,7 +25,7 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
 from yait_aichain.state  import FileStore
-from yait_aichain.tools  import Tool, Wait
+from yait_aichain.tools  import Tool, wait
 from yait_aichain.state  import SuspendedResult
 
 
@@ -45,7 +45,7 @@ class SendReply(Tool):
 
 
 draft = Skill(
-    model = Model("gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY")),
+    model = Model("gpt-6-luna", api_key=os.getenv("OPENAI_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Draft a short, polite support reply to this complaint:\n\n{complaint}"
     ]}]},
@@ -55,7 +55,7 @@ draft = Skill(
 chain = Chain(
     steps=[
         (draft, "draft"),
-        Wait(reason="A human must approve or edit the draft before sending.",
+        wait(reason="A human must approve or edit the draft before sending.",
              resume_with={"reply": "str"}),
         (SendReply(), "confirmation"),
     ],

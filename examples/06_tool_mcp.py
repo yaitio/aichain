@@ -1,47 +1,40 @@
 """
-06_tool_mcp.py — Connect to an MCP server, discover tools, run them.
+06_tool_mcp.py — An MCP server as a utility: discover its tools, call them.
 
-Start the MCP server first:
-    python your_newsapi_server.py
-
-MCP server: newsapi on http://127.0.0.1:8009/mcp
-
-Tools available:
-    search_news        — search articles (requires: q, sources, or domains)
-    get_top_headlines  — breaking news  (requires: q, country, category, or sources)
-    get_sources        — list all available news sources
+Uses DeepWiki (Cognition), a public MCP server that answers questions about
+GitHub repositories — no key, read-only. The server declares its tools; each
+comes with the name, description and schema the server gives it.
 
 Required env vars:
-    (none — an MCP server of your own on :8009)
+    (none)
+
+Required packages:
+    pip install "yait-aichain[mcp]"
 """
 
-from yait_aichain.tools import MCPTools
+from yait_aichain.utilities import MCP
 
-MCP_URL = "http://127.0.0.1:8009/mcp"
+deepwiki = MCP("https://mcp.deepwiki.com/mcp")
 
-# ── Discover all tools on the server ─────────────────────────────────────────
-tools = MCPTools(MCP_URL)
-print(f"Connected: {MCP_URL}")
-print(f"Tools found: {len(tools)}\n")
-for t in tools:
-    print(f"  {t.name:<25} {t.description.splitlines()[0]}")
+# ── Discover the tools the server declares ───────────────────────────────────
+print("Tools found:")
+for t in deepwiki.tools:
+    print(f"  {t.name:<22} {t.description.splitlines()[0]}")
 
-# ── 1. Search news ────────────────────────────────────────────────────────────
-print("\n── search_news: 'AI agents' ─────────────────────────────────────────")
-tool_map = {t.name: t for t in tools}
+# ── 1. One tool, called by its arguments ─────────────────────────────────────
+print("\n── read_wiki_structure: anthropics/anthropic-sdk-python ──────────")
+structure = deepwiki.tool("read_wiki_structure").run(repoName="anthropics/anthropic-sdk-python")
+print(str(structure)[:600])
 
-search = tool_map["search_news"]
-result = search.run(input={"q": "AI agents"})
-print(result)
+# ── 2. Another, from code, by name ───────────────────────────────────────────
+print("\n── read_wiki_contents: pallets/flask ──────────────────────────────")
+contents = deepwiki.call("read_wiki_contents", repoName="pallets/flask")
+print(f"{len(str(contents)):,} characters; the first 400:")
+print(str(contents)[:400])
 
-# ── 2. Top headlines ──────────────────────────────────────────────────────────
-print("\n── get_top_headlines: technology ────────────────────────────────────")
-headlines = tool_map["get_top_headlines"]
-result = headlines.run(input={"category": "technology"})
-print(result)
+# ask_wiki_question answers in prose, written by DeepWiki's own model — slower,
+# and the stream can be cut by a proxy on the way:
+#     deepwiki.call("ask_wiki_question", repoName="pallets/flask", question="How are blueprints registered?")
 
-# ── 3. List sources ───────────────────────────────────────────────────────────
-print("\n── get_sources ──────────────────────────────────────────────────────")
-sources = tool_map["get_sources"]
-result  = sources.run(input={})
-print(result)
+# An agent takes the server's tools, never the utility itself:
+#     Agent(model, tools=deepwiki.tools)

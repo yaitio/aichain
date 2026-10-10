@@ -22,7 +22,7 @@ from yait_aichain.skills import Skill
 from yait_aichain.chain  import Chain
 from yait_aichain.pool import Pool, PENDING, RUNNING, DONE, FAILED
 from yait_aichain.agent  import Agent, step_count
-from yait_aichain.tools import searchPerplexity
+from yait_aichain.tools import search
 
 ANTHROPIC_KEY  = os.getenv("ANTHROPIC_API_KEY")
 PERPLEXITY_KEY = os.getenv("PERPLEXITY_API_KEY")
@@ -37,12 +37,12 @@ def _hr(label): print(f"\n{'─' * 60}\n  {label}\n{'─' * 60}")
 _hr("CHAIN · chain.history")
 
 writer = Skill(
-    model = Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Write one sentence about {topic}."]}]},
     name  = "writer",
 )
 reviewer = Skill(
-    model = Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Improve this: {result}"]}]},
     name  = "reviewer",
 )
@@ -63,7 +63,7 @@ for record in chain.history:
 _hr("POOL · pool.status (live) + pool.history")
 
 skill = Skill(
-    model = Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Explain {topic} in one sentence."]}]},
 )
 
@@ -108,8 +108,8 @@ for r in pool.history:
 _hr("AGENT · verbose=1 + result.journal")
 
 agent = Agent(
-    Model("claude-sonnet-4-6", api_key=ANTHROPIC_KEY),
-    tools     = [searchPerplexity(api_key=PERPLEXITY_KEY)],
+    Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
+    tools     = [search("perplexity", api_key=PERPLEXITY_KEY)],
     stop_when = [step_count(5)],   # a ceiling; reaching it is a failure, and it says so
     verbose   = 1,                 # ← one line per tool call
 )

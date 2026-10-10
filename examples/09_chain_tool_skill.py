@@ -19,7 +19,7 @@ from yait_aichain.chain  import Chain
 from yait_aichain.tools import fetch
 
 summarise = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Summarise the following page in exactly 3 bullet points:\n\n{page}"
     ]}]},

@@ -39,7 +39,7 @@ Required env vars:
 
 import textwrap
 
-MODEL = "gpt-5.6-terra"          # any provider you have a key for
+MODEL = "gpt-6-luna"          # any provider you have a key for
 
 from yait_aichain import Agent, Model
 from yait_aichain.agent import step_count, cost_budget

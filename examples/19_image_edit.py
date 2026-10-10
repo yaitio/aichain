@@ -1,20 +1,20 @@
 """
-19_image_edit.py — Image → image (editing) across four providers, one Skill.
+19_image_edit.py — Image → image (editing) across providers, one tool.
 
-Editing an image is just an input image part + an image output: the same Skill
-as generation, with the provider chosen by the model name. Here one base image
-is restyled by every provider whose API key is present.
+Editing is the image tool given images: image(service, model=…).run(prompt,
+images=[…]). One base image is restyled by every provider whose API key is set;
+a provider that cannot do it says why, and the rest go on.
 
-  OpenAI  gpt-image-1.5            (multipart /v1/images/edits)
-  Google  gemini-3.1-flash-image   (conversational edit)
-  xAI     grok-imagine-image       (JSON /v1/images/edits)
-  Qwen    qwen-image-edit          (synchronous multimodal-generation)
-
-Set whichever you have; the rest are skipped:
-    OPENAI_API_KEY  GOOGLE_AI_API_KEY  XAI_API_KEY  DASHSCOPE_API_KEY
+  OpenAI   gpt-image-1.5
+  Google   gemini-3.1-flash-image
+  xAI      grok-imagine-image
+  Qwen     qwen-image-edit
+  Recraft  recraftv3
+  BFL      flux-kontext-pro
 
 Required env vars:
     any one of OPENAI_API_KEY  GOOGLE_AI_API_KEY  XAI_API_KEY  DASHSCOPE_API_KEY
+               RECRAFT_API_TOKEN  BFL_API_KEY
 """
 
 import base64
@@ -23,10 +23,10 @@ import pathlib
 import struct
 import zlib
 
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
+from yait_aichain.tools import image
 
 HERE = pathlib.Path(__file__).parent
+EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg"}
 
 
 def _make_base_png(path: pathlib.Path, w: int = 1024, h: int = 1024) -> None:
@@ -56,31 +56,28 @@ _make_base_png(base)
 print(f"base image → {base}\n")
 
 instruction = "Place this product on a marble kitchen counter, soft morning light, photorealistic"
-output = {"modalities": ["image"], "format": {"type": "image", "size": "1024x1024"}}
 
 providers = [
-    ("OPENAI_API_KEY",     "gpt-image-1.5"),
-    ("GOOGLE_AI_API_KEY",  "gemini-3.1-flash-image"),
-    ("XAI_API_KEY",        "grok-imagine-image"),
-    ("DASHSCOPE_API_KEY",  "qwen-image-edit"),
-    ("RECRAFT_API_TOKEN",  "recraftv3"),
-    ("BFL_API_KEY",        "flux-kontext-pro"),
+    ("OPENAI_API_KEY",     "openai",  "gpt-image-1.5"),
+    ("GOOGLE_AI_API_KEY",  "google",  "gemini-3.1-flash-image"),
+    ("XAI_API_KEY",        "xai",     "grok-imagine-image"),
+    ("DASHSCOPE_API_KEY",  "qwen",    "qwen-image-edit"),
+    ("RECRAFT_API_TOKEN",  "recraft", "recraftv3"),
+    ("BFL_API_KEY",        "bfl",     "flux-kontext-pro"),
 ]
 
-for env_var, model_name in providers:
+for env_var, service, model in providers:
     if not os.getenv(env_var):
-        print(f"– {model_name:24} skipped ({env_var} not set)")
+        print(f"– {model:24} skipped ({env_var} not set)")
         continue
-    edit = Skill(
-        model  = Model(model_name),
-        input  = {"messages": [{"role": "user", "parts": [
-            # A local file is read and base64-encoded automatically.
-            {"type": "image", "source": {"kind": "file", "path": str(base)}},
-            instruction,
-        ]}]},
-        output = output,
-    )
-    result  = edit.run()
-    out_path = HERE / f"edited_{model_name}.png"
-    out_path.write_bytes(base64.b64decode(result["base64"]))
-    print(f"✓ {model_name:24} → {out_path.name}  ({result['mime_type']})")
+    try:
+        edited = image(service, model=model).run(instruction, images=[str(base)],
+                                                 options={"size": "1024x1024"})
+    except Exception as exc:                  # one provider failing is not the example failing
+        print(f"✗ {model:24} {type(exc).__name__}: {str(exc)[:100]}")
+        continue
+    picture  = edited["images"][0]
+    out_path = HERE / f"edited_{model}.{EXT.get(picture['mime_type'], 'png')}"
+    out_path.write_bytes(base64.b64decode(picture["base64"]))
+    notes = f"  — {'; '.join(edited['notices'])}" if edited["notices"] else ""
+    print(f"✓ {model:24} → {out_path.name}  ({picture['mime_type']}){notes}")

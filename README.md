@@ -305,11 +305,11 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 |---|---|---|
 | 01 | [`01_skill.py`](examples/01_skill.py) | Run a prompt against a model. |
 | 02 | [`02_skill_models.py`](examples/02_skill_models.py) | Same prompt, three providers. |
-| 03 | [`03_skill_multimodal.py`](examples/03_skill_multimodal.py) | Text → Image → Text, three different providers. |
+| 03 | [`03_skill_multimodal.py`](examples/03_skill_multimodal.py) | Text → Image → Text, three providers. |
 | 04 | [`04_skill_save_load.py`](examples/04_skill_save_load.py) | Save a skill to YAML, reload and run it. |
 | 05 | [`05_tool_fetch.py`](examples/05_tool_fetch.py) | A web page's text from its URL. |
-| 06 | [`06_tool_mcp.py`](examples/06_tool_mcp.py) | Connect to an MCP server, discover tools, run them. |
-| 07 | [`07_tool_custom.py`](examples/07_tool_custom.py) | Define your own tool and use it in a Chain. |
+| 06 | [`06_tool_mcp.py`](examples/06_tool_mcp.py) | An MCP server as a utility: discover its tools, call them. |
+| 07 | [`07_tool_custom.py`](examples/07_tool_custom.py) | Make any function a tool, and use it in a Chain. |
 | 08 | [`08_chain.py`](examples/08_chain.py) | Two skills in sequence, two different providers. |
 | 09 | [`09_chain_tool_skill.py`](examples/09_chain_tool_skill.py) | Tool + Skill in one chain. |
 | 10 | [`10_chain_save_load.py`](examples/10_chain_save_load.py) | Save a chain to YAML, reload and run it. |
@@ -321,7 +321,7 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 | 16 | [`16_debug.py`](examples/16_debug.py) | Inspect intermediate steps in Chain, Pool, and Agent. |
 | 17 | [`17_chain_human_input.py`](examples/17_chain_human_input.py) | Human-in-the-loop: pause a chain for manual input. |
 | 18 | [`18_chain_external_trigger.py`](examples/18_chain_external_trigger.py) | Pause a run until an EXTERNAL trigger resumes it. |
-| 19 | [`19_image_edit.py`](examples/19_image_edit.py) | Image → image (editing) across four providers, one Skill. |
+| 19 | [`19_image_edit.py`](examples/19_image_edit.py) | Image → image (editing) across providers, one tool. |
 | 20 | [`20_observability.py`](examples/20_observability.py) | The step boundary: hooks, events, and an approval gate. |
 | 21 | [`21_multi_turn.py`](examples/21_multi_turn.py) | Directed multi-turn reasoning in ONE Skill. |
 | 22 | [`22_goal_mode.py`](examples/22_goal_mode.py) | A stop condition the harness can verify |

@@ -75,5 +75,5 @@ print(f"cost:   {usage.cost}   (None — you are paying in electricity)")
 # Everything else in the library treats this like any other model. Swapping
 # back to a cloud provider is the same one-word change it always is:
 #
-#     Model("claude-sonnet-4-6")     # data leaves, quality rises, cost appears
+#     Model("claude-haiku-4-5-20251001")     # data leaves, quality rises, cost appears
 #     Model(f"private/{NAME}")       # data stays

@@ -21,9 +21,9 @@ PROMPT = {
 }
 
 models = [
-    Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    Model("gpt-4o-mini",       api_key=os.getenv("OPENAI_API_KEY")),
-    Model("gemini-2.5-flash",  api_key=os.getenv("GOOGLE_AI_API_KEY")),
+    Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    Model("gpt-6-luna",       api_key=os.getenv("OPENAI_API_KEY")),
+    Model("gemini-3-flash-preview",  api_key=os.getenv("GOOGLE_AI_API_KEY")),
 ]
 
 for model in models:

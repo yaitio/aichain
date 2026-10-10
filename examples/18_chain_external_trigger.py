@@ -32,7 +32,7 @@ import tempfile
 
 from yait_aichain.chain import Chain
 from yait_aichain.state import FileStore, SuspendedResult
-from yait_aichain.tools import Tool, Gate
+from yait_aichain.tools import Tool, gate
 
 # A shared, persistent store. In production it lives on shared infrastructure,
 # so a different process can pick the run up.
@@ -69,7 +69,7 @@ def build_chain() -> Chain:
     return Chain(
         steps=[
             (LookupOrder(), "order"),
-            (Gate(IssueRefund(),
+            (gate(IssueRefund(),
                   reason="A manager must approve the refund.",
                   hint={"on": "webhook"}),          # recorded for the scheduler, never acted on
              "refund"),

@@ -49,7 +49,7 @@ class IssueRefund(Tool):
 
 
 # ── A scripted stand-in for the model (so this runs offline) ────────────────
-# A real Agent takes Model("gpt-4o-mini") here. This one goes through the same
+# A real Agent takes Model("gpt-6-luna") here. This one goes through the same
 # to_request → client.send → from_response seam and replays a script.
 
 class ScriptedModel:

@@ -13,7 +13,7 @@ from yait_aichain.skills import Skill
 from yait_aichain.pool import Pool, DONE, FAILED
 
 skill = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Explain {topic} in exactly one sentence."
     ]}]},

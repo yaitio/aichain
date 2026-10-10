@@ -19,15 +19,15 @@ Required env vars:
 import os
 from yait_aichain.models import Model
 from yait_aichain.agent  import Agent, step_count
-from yait_aichain.tools import searchPerplexity
+from yait_aichain.tools import search
 
 # ``team="auto"`` lets the agent describe and spawn workers as it needs them.
 # Delegation here is first of all about *context*: each sub-agent researches a
 # topic in its own conversation and hands back a conclusion, so the coordinator
 # gains one turn per topic instead of a whole search history.
 orchestrator = Agent(
-    Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    tools     = [searchPerplexity(api_key=os.getenv("PERPLEXITY_API_KEY"))],
+    Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    tools     = [search("perplexity", api_key=os.getenv("PERPLEXITY_API_KEY"))],
     team      = "auto",
     stop_when = [step_count(15)],
     instructions = (
