@@ -22,7 +22,6 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `PERPLEXITY_API_KEY` | Perplexity | <https://www.perplexity.ai/settings/api> |
 | `DASHSCOPE_API_KEY` | Qwen (DashScope) | <https://dashscope.aliyuncs.com> |
 | `RECRAFT_API_TOKEN` | Recraft | — |
-| `REVE_API_KEY` | Reve | — |
 | `XAI_API_KEY` | xAI | <https://console.x.ai/> |
 <!-- /g:env-providers -->
 
@@ -47,7 +46,6 @@ Model("gpt-4.1")            # reads OPENAI_API_KEY
 Model("sonar")              # reads PERPLEXITY_API_KEY
 Model("QwQ-32B")            # reads DASHSCOPE_API_KEY
 Model("recraft-vectorize")  # reads RECRAFT_API_TOKEN
-Model("reve-image")         # reads REVE_API_KEY
 Model("grok-3")             # reads XAI_API_KEY
 
 Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
@@ -99,7 +97,6 @@ export OPENAI_API_KEY="…"
 export PERPLEXITY_API_KEY="…"
 export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
-export REVE_API_KEY="…"
 export XAI_API_KEY="…"
 export ="…"
 export BRAVE_SEARCH_API_KEY="…"

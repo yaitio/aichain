@@ -24,7 +24,6 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `private` | `1.0`\* | — | — | `4096`\* |
 | `qwen` | `0.7` | `0.8` | — | `8192`\* |
 | `recraft` | `1.0`\* | — | — | `4096`\* |
-| `reve` | `1.0`\* | — | — | `4096`\* |
 | `xai` | `1.0` | `1.0` | — | `16384`\* |
 
 `temperature` alone takes `0.2`, `0.7`, `1.0` depending on where the request goes; `max_tokens` spans `4096`–`32768`.
@@ -95,11 +94,6 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — unused · this provider renders images and reads neither of these
 - `max_tokens` — unused · this provider renders images and reads neither of these
 
-**`reve`**
-
-- `temperature` — unused · this provider renders images and reads neither of these
-- `max_tokens` — unused · this provider renders images and reads neither of these
-
 **`xai`**
 
 - `temperature` — vendor · the OpenAI-compatible default
@@ -128,10 +122,10 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 
 | option | what it does | values | who takes it |
 |---|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `reve`, `xai` |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `reve`, `xai` |
-| `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) | `openai`, `reve` |
-| `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` | `openai`, `reve` |
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `xai` |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `xai` |
+| `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) | `openai` |
+| `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` | `openai` |
 | `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` | `bfl`, `openai` |
 | `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` | `openai` |
 | `seed` | fix the randomness so the same prompt renders the same way | any | `bfl` |
@@ -152,7 +146,6 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `perplexity` | `max_tokens`, `temperature`, `top_p` |
 | `qwen` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 | `recraft` | `aspect_ratio`, `fidelity`, `size` |
-| `reve` | `aspect_ratio`, `background`, `quality`, `size` |
 | `xai` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 
 ### The same level on each provider's own scale
@@ -167,8 +160,6 @@ A universal name is only half the promise. These are the tables the value is put
 | `kimi` | `reasoning` | `low`→`enabled`, `medium`→`enabled`, `high`→`enabled` |
 | `openai` | `reasoning` | `none`→`none`, `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `qwen` | `reasoning` | `low`→`True`, `medium`→`True`, `high`→`True` |
-| `reve` | `quality` | `low`→`3`, `medium`→`7`, `high`→`12` |
-| `reve` | `background` | `transparent`→`remove_background` |
 | `xai` | `reasoning` | `low`→`low`, `medium`→`high`, `high`→`high` |
 
 ## 3. What happens when you ask
@@ -212,7 +203,6 @@ without saying so. It may adapt; it may not do it quietly.
 | `gpt-image-1.5` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — |
 | `gemini-2.5-flash-image` | ≈ `aspectRatio` | → `aspectRatio` | — | — | — | — | — | — |
 | `flux-2-pro` | ≈ `height, width` | ✓ | — | — | ✓ | — | ✓ | — |
-| `reve-image` | ≈ `aspect_ratio` | ✓ | ≈ `test_time_scaling` | ≈ `[0]` | — | — | — | — |
 | `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — |
 | `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — |

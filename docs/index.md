@@ -67,9 +67,9 @@ Model("deepseek-chat")       # DeepSeek
 | Modality | Providers |
 |---|---|
 | **Text → Text** | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI, [your own private server](getting-started/private-models.md) |
-| **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
-| **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
+| **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchTavily` |
 <!-- /g:modalities -->
 
@@ -111,7 +111,7 @@ The gateway becomes useful through five building blocks you compose in plain Pyt
 
 ## What's in the box
 
-<!-- g:provider-list -->**11 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, Reve, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
+<!-- g:provider-list -->**10 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
 
 **Built-in tools** — web search (Perplexity, Brave, Exa, Firecrawl, Tavily, Parallel), pages by URL (Firecrawl, Tavily, Exa, Parallel, local), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
 

@@ -28,7 +28,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `recraft`, `reve`, `xai`.
+`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `recraft`, `xai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../getting-started/private-models.md).
 
@@ -43,7 +43,6 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Perplexity | 4 | — | — | — |
 | Qwen (DashScope) | 18 | 2 | 3 | 3 |
 | Recraft | — | 9 | — | 3 |
-| Reve | — | 1 | — | 1 |
 | xAI | 14 | 3 | 13 | 3 |
 
 ---
@@ -386,24 +385,6 @@ recraftv3_vector   # per_image $0.08
 
 ---
 
-## Reve
-
-`provider = "reve"` · key `REVE_API_KEY`
-
-### `text-to-image`
-
-```
-reve-image
-```
-
-### `image-to-image`
-
-```
-reve-image
-```
-
----
-
 ## xAI
 
 `provider = "xai"` · key `XAI_API_KEY`
@@ -531,7 +512,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'openai', 'perplexity', 'qwen', 'recraft', 'reve', 'xai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'openai', 'perplexity', 'qwen', 'recraft', 'xai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

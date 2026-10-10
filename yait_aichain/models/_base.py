@@ -71,7 +71,6 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
     from ..clients._families.qwen       import QwenClient
     from ..clients._families.recraft    import RecraftClient
     from ..clients._families.bfl        import BFLClient
-    from ..clients._families.reve       import ReveClient
 
     family = {
         "openai":     OpenAIClient,
@@ -81,7 +80,6 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
         "qwen":       QwenClient,
         "recraft":    RecraftClient,
         "bfl":        BFLClient,
-        "reve":       ReveClient,
     }[ctype]
     _hints.check_client_options(ctype, client_options)
     return family(api_key, data=data, **client_options)
@@ -101,7 +99,6 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^(qwen|qwq|wanx|wan\d)"),                            "qwen"),
     (re.compile(r"^recraft"),                                          "recraft"),
     (re.compile(r"^flux"),                                             "bfl"),
-    (re.compile(r"^reve-"),                                            "reve"),
     (re.compile(r"^(gpt-|dall-e-|chatgpt-image-|text-embedding-|whisper-|tts-|o\d)"), "openai"),
 ]
 
@@ -110,7 +107,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "reve", "private",
+    "recraft", "bfl", "private",
 })
 
 

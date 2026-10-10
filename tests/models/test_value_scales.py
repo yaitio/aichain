@@ -8,8 +8,8 @@ on DeepSeek. One word, five shapes, written once by the caller — that is what
 the value is not.
 
 The mapping existed for `reasoning` alone. It is the same need elsewhere:
-Reve measures render quality as compute, a number from 1 to 15, and expresses
-a transparent background as a step in a post-processing list.
+Reve measured render quality as compute, a number from 1 to 15 — a provider
+gone since 3.10.0, whose need the mechanism outlives.
 """
 
 import sys
@@ -58,26 +58,32 @@ class TestOneLevelManyScales(unittest.TestCase):
 
 
 class TestTheMapIsNotOnlyForReasoning(unittest.TestCase):
+    """Any option can carry a map, declared as ``[provider.options.map.<option>]``.
 
-    def test_quality_becomes_this_provider_s_compute_number(self):
-        _, reve = _body("reve-image", fmt={"quality": "high"})
-        self.assertEqual(reve["test_time_scaling"], 12)
+    Reve was the provider that needed it — render quality as a compute number
+    from 1 to 15 — and left in 3.10.0 when its API closed. The mechanism stays,
+    and is pinned on a declared map rather than on a provider."""
+
+    def setUp(self):
+        from unittest.mock import patch
+        from yait_aichain.models._data import PROVIDERS
+        fake = {"provider": {"options": {"map": {"quality": {"low": 3, "medium": 7, "high": 12}}}}}
+        self._patch = patch.dict(PROVIDERS, {"scaled": fake})
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+
+    def test_a_word_becomes_this_provider_s_number(self):
+        sent, note = to_provider_value("quality", "high", "scaled")
+        self.assertEqual(sent, 12)
+        self.assertIn("own scale", note)
 
     def test_a_lower_level_is_a_lower_number(self):
-        _, reve = _body("reve-image", fmt={"quality": "low"})
-        self.assertEqual(reve["test_time_scaling"], 3)
+        self.assertEqual(to_provider_value("quality", "low", "scaled")[0], 3)
 
-    def test_a_setting_can_become_a_step_in_a_list(self):
-        """Not every provider has a field for every intent — here a
-        transparent background is something done afterwards."""
-        _, reve = _body("reve-image", fmt={"background": "transparent"})
-        self.assertIn("remove_background", reve["postprocessing"])
-
-    def test_the_caller_s_own_postprocessing_is_not_lost(self):
-        _, reve = _body("reve-image", fmt={"background": "transparent",
-                                           "postprocessing": ["upscale"]})
-        self.assertEqual(sorted(reve["postprocessing"]),
-                         ["remove_background", "upscale"])
+    def test_an_unmapped_option_has_no_map(self):
+        self.assertIsNone(value_map("background", "scaled"))
 
 
 class TestTheMechanism(unittest.TestCase):

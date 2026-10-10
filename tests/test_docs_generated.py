@@ -114,7 +114,7 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
         except ValueError:
             return None
         keys = {k: "doc" for k in ("OPENAI_API_KEY", "GOOGLE_AI_API_KEY", "XAI_API_KEY", "BFL_API_KEY",
-                                   "DASHSCOPE_API_KEY", "RECRAFT_API_KEY", "REVE_API_KEY", "EXA_API_KEY",
+                                   "DASHSCOPE_API_KEY", "RECRAFT_API_KEY", "EXA_API_KEY",
                                    "FIRECRAWL_API_KEY", "TAVILY_API_KEY", "PARALLEL_API_KEY",
                                    "PERPLEXITY_API_KEY", "BRAVE_SEARCH_API_KEY", "COHERE_API_KEY")}
         with mock.patch.dict(os.environ, keys):

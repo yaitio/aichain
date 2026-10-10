@@ -29,7 +29,7 @@ from yait_aichain import Agent, Chain, Model, Skill
 from yait_aichain.tools import Image, image
 
 KEYS = {"OPENAI_API_KEY": "k", "GOOGLE_AI_API_KEY": "k", "XAI_API_KEY": "k", "BFL_API_KEY": "k",
-        "DASHSCOPE_API_KEY": "k", "RECRAFT_API_KEY": "k", "REVE_API_KEY": "k"}
+        "DASHSCOPE_API_KEY": "k", "RECRAFT_API_KEY": "k"}
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32).decode()
 
 
@@ -57,6 +57,8 @@ class TestFactory(unittest.TestCase):
     def test_refusals(self):
         with self.assertRaisesRegex(ValueError, "grok-imagine-image is xai's, not openai's"):
             image("openai", model="grok-imagine-image")
+        with self.assertRaisesRegex(ValueError, "Reve closed its API on 2026-08-14"):
+            image("reve", model="reve-image")
         with self.assertRaisesRegex(ValueError, "unknown image service 'midjourney'"):
             image("midjourney", model="x")
         with self.assertRaises(TypeError):

@@ -3,7 +3,7 @@ tools.image
 ===========
 
 An image model as a tool (3.9.0). ``image(service, model=…)`` makes one —
-``openai``, ``google``, ``bfl``, ``xai``, ``qwen``, ``recraft`` or ``reve`` —
+``openai``, ``google``, ``bfl``, ``xai``, ``qwen`` or ``recraft`` —
 built on the model layer's provider data: the same request, the same option
 vocabulary, the same notices when a provider adapts or declines an option.
 
@@ -22,7 +22,10 @@ which still works and warns; it raises in 4.0.
 from ._tool import OPTIONS, Image
 
 #: The providers with image models — the ones `image()` takes.
-SERVICES = ("openai", "google", "bfl", "xai", "qwen", "recraft", "reve")
+SERVICES = ("openai", "google", "bfl", "xai", "qwen", "recraft")
+
+#: Providers that were here and closed, with what to say instead of "unknown".
+CLOSED = {"reve": "Reve closed its API on 2026-08-14; it was removed in 3.10.0"}
 
 
 def image(service: str, *, model: str, api_key: "str | None" = None, output_dir: "str | None" = None,
@@ -34,6 +37,8 @@ def image(service: str, *, model: str, api_key: "str | None" = None, output_dir:
     (transparency, vectors, edits) come with it. ``output_dir`` is where images
     are saved; without it they go back to the code in the result.
     """
+    if isinstance(service, str) and service.lower().strip() in CLOSED:
+        raise ValueError(f"{CLOSED[service.lower().strip()]}; one of: {', '.join(SERVICES)}")
     if not isinstance(service, str) or service.lower().strip() not in SERVICES:
         raise ValueError(f"unknown image service {service!r}; one of: {', '.join(SERVICES)}")
     tool = Image(model, api_key=api_key, output_dir=output_dir, name=name, description=description)

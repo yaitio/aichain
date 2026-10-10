@@ -699,64 +699,6 @@
    ]
   }
  },
- "reve-image": {
-  "size": {
-   "outcome": "converted",
-   "detail": "aspect_ratio",
-   "said": [
-    "adapted+named"
-   ]
-  },
-  "aspect_ratio": {
-   "outcome": "passed",
-   "detail": "",
-   "said": [
-    "translated+named"
-   ]
-  },
-  "quality": {
-   "outcome": "converted",
-   "detail": "test_time_scaling",
-   "said": [
-    "adapted+named"
-   ]
-  },
-  "background": {
-   "outcome": "converted",
-   "detail": "[0]",
-   "said": [
-    "adapted+named"
-   ]
-  },
-  "output_format": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "compression": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "seed": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "fidelity": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  }
- },
  "recraftv3": {
   "size": {
    "outcome": "passed",

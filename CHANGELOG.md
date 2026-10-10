@@ -57,12 +57,16 @@ a cost, 35 of 35; six new image models drew a picture.
   which the API now refuses as deprecated. A name not in the registry still
   resolves by its prefix, so code naming one reaches the provider and hears its
   refusal.
+- **The Reve provider.** Reve closed its API on 2026-08-14 and image
+  generation in its app on 2026-09-27; on 2026-10-10 both API paths answered
+  HTTP 405 and the API root redirected to the app. Gone: `ReveClient`,
+  `reve.toml`, `reve-image`, the `reve-` prefix and `REVE_API_KEY`.
+  `image("reve", …)` says why rather than "unknown service". The mechanism it
+  brought — a universal value in a provider's own scale,
+  `[provider.options.map.<option>]` — stays, pinned on a declared map.
 
 ### Not settled
 
-- **Reve answers nothing**: `POST /v1/image/create` and `/v1/image/edit` return
-  HTTP 405 and the API root redirects to the app. Third-party reports date the
-  API's end to 2026-08-14. The provider stays until Reve says so.
 - **Qwen**: `qwen3-max`, `qwen3-235b-a22b`, `qwen3-32b`, `qwen3-72b`,
   `QwQ-32B`, `qwen-vl-max`, `qwen-vl-plus` and the `qwen-image-edit` and
   `wan2.2` models answer "does not exist" to this project's key while the

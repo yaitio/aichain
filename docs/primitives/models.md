@@ -109,10 +109,10 @@ option, the library declines it and says so — it is never dropped silently.
 
 | Key | What it asks for | ✓ | Providers that read it |
 |---|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, Reve, xAI |
-| `quality` | how much work to spend on the render |  | OpenAI, Reve |
-| `background` | transparent, opaque, or let the model decide | ✓ | OpenAI, Reve |
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `quality` | how much work to spend on the render |  | OpenAI |
+| `background` | transparent, opaque, or let the model decide | ✓ | OpenAI |
 | `output_format` | the file format to return: png, jpeg, webp | ✓ | Black Forest Labs (FLUX), OpenAI |
 | `compression` | compression level for jpeg and webp, 0-100 | ✓ | OpenAI |
 | `seed` | fix the randomness so the same prompt renders the same way | ✓ | Black Forest Labs (FLUX) |
@@ -168,7 +168,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (<!-- g:count-models -->131 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
+and is tested with (<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models --> — the `private` provider
 deliberately lists none, because its catalogue belongs to your server):
 
 ```python

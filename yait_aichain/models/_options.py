@@ -66,8 +66,7 @@ UNIVERSAL_OPTIONS: dict = {
 #: Keys of ``output["format"]``. A second vocabulary because it is asked for
 #: per call rather than per model — and an **open** one, unlike the options
 #: above: providers legitimately extend it with names of their own (Recraft's
-#: ``style``, Reve's ``version`` and ``postprocessing``), which their clients
-#: read. So an unrecognised key here is reported and the request still goes,
+#: ``style``), which their clients read. So an unrecognised key here is reported and the request still goes,
 #: while an unrecognised model option raises at construction. The difference
 #: is not tidiness: a closed vocabulary can refuse a typo outright, an open
 #: one cannot tell a typo from a provider's own word — the same Model renders one picture square
@@ -349,9 +348,9 @@ def check_value(option: str, value, provider: str, model: str):
 # word, seven shapes, and the caller writes it once.
 #
 # That mapping existed for `reasoning` alone, as `[provider.reasoning_map]`.
-# It is the same need everywhere: Reve expresses render quality as
-# `test_time_scaling`, a number from 1 to 15, and a transparent background as
-# an entry in a `postprocessing` list. Declaring those in data rather than
+# It is the same need everywhere: Reve (removed in 3.10.0, when its API
+# closed) expressed render quality as `test_time_scaling`, a number from 1 to
+# 15, and a transparent background as an entry in a `postprocessing` list. Declaring those in data rather than
 # writing them into a client keeps the translation where it can be read.
 
 

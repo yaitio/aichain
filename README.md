@@ -1,6 +1,6 @@
 # aichain
 
-**The simplest way to build AI pipelines. <!-- g:count-providers -->11 cloud providers<!-- /g:count-providers --> + your own private server. 1 interface. Zero lock-in.**
+**The simplest way to build AI pipelines. <!-- g:count-providers -->10 cloud providers<!-- /g:count-providers --> + your own private server. 1 interface. Zero lock-in.**
 
 ```python
 from yait_aichain import Model, Skill
@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **<!-- g:count-models -->131 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
+All of these work identically across **<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
 
 ---
 
@@ -64,7 +64,6 @@ export OPENAI_API_KEY="…"
 export PERPLEXITY_API_KEY="…"
 export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
-export REVE_API_KEY="…"
 export XAI_API_KEY="…"
 export ="…"
 export BRAVE_SEARCH_API_KEY="…"
@@ -283,7 +282,7 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 `rerank(service, model=…)` — `cohere` · `voyage` · `qwen` · `chunk(max_chars=…)`
 
 ### Images
-`image(service, model=…)` — `openai` · `google` · `bfl` · `xai` · `qwen` · `recraft` · `reve`;
+`image(service, model=…)` — `openai` · `google` · `bfl` · `xai` · `qwen` · `recraft`;
 `.run(prompt, images=[…], options={"aspect_ratio": "16:9"})` generates, or edits the images given
 
 ### Pause
@@ -348,17 +347,16 @@ chain = Chain.load("chains/research.yaml")
 
 | Provider | Text | Vision | Image gen | Env var |
 |---|---|---|---|---|
-| **Anthropic** | Claude Fable 5, Opus / Sonnet / Haiku 4 | ✓ | — | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-5.5, GPT-5.4, GPT-4o | ✓ | ChatGPT-Image, GPT-Image-2 | `OPENAI_API_KEY` |
-| **Google** | Gemini 2.5 Pro / Flash, 3.x | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
-| **xAI** | Grok 4, Grok 3 | ✓ | Grok-Imagine | `XAI_API_KEY` |
+| **Anthropic** | Claude Fable 5.1, Opus / Sonnet / Haiku 5.5 | ✓ | — | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-6.1, GPT-6, GPT-5.6, GPT-5.5 | ✓ | GPT-Image-2.5, GPT-Image-2 | `OPENAI_API_KEY` |
+| **Google** | Gemini 3.8 / 3.6 Flash, 3.1 Pro, 3.1 Flash-Lite | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
+| **xAI** | Grok 4.7, 4.3, Grok Build | ✓ | Grok-Imagine | `XAI_API_KEY` |
 | **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |
-| **Kimi** | K2.7 Code, K2.6, K2.5, K2 Thinking | ✓ | — | `MOONSHOT_API_KEY` |
-| **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | — | — | `DEEPSEEK_API_KEY` |
-| **Qwen** | Qwen-Max, Qwen3, QwQ | ✓ | Wan 2.2 image | `DASHSCOPE_API_KEY` |
-| **Recraft** | — | — | Recraft V3 (raster + vector) | `RECRAFT_API_TOKEN` |
-| **BFL (FLUX)** | — | — | FLUX.2, FLUX Kontext | `BFL_API_KEY` |
-| **Reve** | — | — | Reve Image (create / edit / remix) | `REVE_API_KEY` |
+| **Kimi** | K3, K2.7 Code, K2.6 | ✓ | — | `MOONSHOT_API_KEY` |
+| **DeepSeek** | DeepSeek Flash, V4 Pro | — | — | `DEEPSEEK_API_KEY` |
+| **Qwen** | Qwen 3.8 Max / Flash, 3.7 Plus | ✓ | Wan 2.2, Qwen-Image-Edit | `DASHSCOPE_API_KEY` |
+| **Recraft** | — | — | Recraft V4.1, V3 (raster + vector) | `RECRAFT_API_TOKEN` |
+| **BFL (FLUX)** | — | — | FLUX.3, FLUX.2, FLUX Kontext | `BFL_API_KEY` |
 
 **Image editing — instruction edit, preserves the subject:** OpenAI · Google · xAI · Qwen · FLUX Kontext (place / restyle / recompose while keeping the original object)  
 **Image-to-image — whole-image variation (restyle, not subject-preserving):** Recraft (`imageToImage`, `strength`-controlled)  

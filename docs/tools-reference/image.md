@@ -52,8 +52,8 @@ picture.run("make the sky stormy", images=[out["images"][0]["path"]])   # an edi
 Agent(model, tools=[picture])           # the agent draws when it decides to
 ```
 
-`image(service, model=…)` takes `openai`, `google`, `bfl`, `xai`, `qwen`,
-`recraft` or `reve`, and a model of that provider — `registry.models(task=
+`image(service, model=…)` takes `openai`, `google`, `bfl`, `xai`, `qwen` or
+`recraft`, and a model of that provider — `registry.models(task=
 "text-to-image")` lists them, `"image-to-image"` the ones that edit. A model is
 what can be an agent's mind; an image model cannot, so since 3.9.0 it is a tool.
 The request is the one `Skill` and `Model` built before: the same option

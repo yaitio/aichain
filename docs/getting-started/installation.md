@@ -64,7 +64,6 @@ yourself needs no key and sends nothing outside your network. See
 | Perplexity | `PERPLEXITY_API_KEY` | <https://www.perplexity.ai/settings/api> |
 | Qwen (DashScope) | `DASHSCOPE_API_KEY` | <https://dashscope.aliyuncs.com> |
 | Recraft | `RECRAFT_API_TOKEN` | — |
-| Reve | `REVE_API_KEY` | — |
 | xAI | `XAI_API_KEY` | <https://console.x.ai/> |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
