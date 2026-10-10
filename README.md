@@ -1,39 +1,59 @@
 # aichain
 
-**The simplest way to build AI pipelines. <!-- g:count-providers -->10 cloud providers<!-- /g:count-providers --> + your own private server. 1 interface. Zero lock-in.**
+**Let your coding agent write your agents. Ship the code you tested. Leave any provider with one word.**
+
+A Python library for AI pipelines and agents, small enough for Claude Code or
+Codex to learn from one file and build on.
 
 ```python
 from yait_aichain import Model, Skill
 
 skill = Skill(
-    model  = Model("claude-sonnet-4-6"),   # change this one word to switch providers
+    model  = Model("claude-haiku-5-5"),   # change this one word to switch providers
     input  = {"messages": [{"role": "user", "parts": ["Summarise: {text}"]}]},
 )
 
 result = skill.run(variables={"text": "..."})
 ```
 
-Change `"claude-sonnet-4-6"` to `"gpt-4o"`, `"gemini-2.5-pro"`, or `"grok-3"` — nothing else changes.
+Change `"claude-haiku-5-5"` to `"gpt-6-luna"`, `"gemini-3-flash-preview"` or
+`"grok-4.3"` — nothing else changes.
 
 ---
 
-## Why aichain?
+## Three promises
 
-Every major AI library makes you choose: LangChain is too complex, LlamaIndex is RAG-only, CrewAI is agents-only, AutoGen requires a PhD to configure.
+**Your coding agent writes the agents.** The whole contract is one 25 KB
+[`llms.txt`](llms.txt), and the [Claude Code plugin](#use-it-from-claude-code)
+carries it with twenty worked recipes. Measured on twenty tasks the docs were
+not written against: a small model with the docs passed 15 of them in all three
+tries, Claude Code passed 19, and the same small model without the docs passed
+none ([`evals/agent_builds/`](evals/agent_builds/HOLDOUT-RESULTS-2.md)).
 
-**aichain covers the full stack with the simplest interface:**
+**The code you tested is the code you ship.** Only what you inject changes
+between a laptop and production: where state is stored, whose keys are used,
+what starts the run. A chain or an agent that waits for a person or a webhook
+parks, and resumes later in another process. An agent's state is its
+conversation, so one turn fits one serverless call. Spending stops at a ceiling
+in dollars, and keys can be resolved per request, per tenant.
 
-| Need | aichain primitive |
+**No provider owns your code.** Switching provider is changing the model name.
+When the new one cannot do what you asked — no `top_k`, no `seed`, a different
+image size — the result says what was adapted or dropped, instead of leaving
+you to find out from the output.
+
+---
+
+## What you build with it
+
+| | |
 |---|---|
-| Call any LLM | `Skill` |
-| Chain steps together | `Chain` |
-| Run tasks in parallel | `Pool` |
-| Autonomous reasoning | `Agent` |
-| Vector search + RAG | `VectorDB` + `vectorQuery` |
-| Rerank results | `Reranker` |
-| Call any tool or MCP server | `Tool` / `MCPTools` |
-
-All of these work identically across **<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
+| **Deterministic pipelines** | `Skill` — one model call with a template and an output format. `Chain` — steps in order, each output passed on by name. `Pool` — one Skill or Chain over many inputs at once. |
+| **Agents, by how hard the task is** | `mode="agile"` decides at every turn. `mode="waterfall"` writes a plan first — from a stronger `planner_model` if you like — and holds to it. `team=` lets it delegate to workers with conversations of their own. On τ²-bench a plain loop did best with a weak model and a planned run with a strong one. |
+| **Tools** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
+| **Utilities** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
+| **Control and measurement** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class, and `approve=` for a person to decide. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
+| **Models** | **<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 
@@ -109,7 +129,7 @@ Model("qwen-max")            # Qwen
 Model("private/llama3.3")    # your own server — vLLM, Ollama, LM Studio, …
 ```
 
-88 cloud models total (full list: [model registry →](docs/reference/model-registry.md)).
+Full list: [model registry →](docs/reference/model-registry.md).
 The `private` provider needs no key and accepts whatever your server serves —
 the prompts and the answers stay inside your perimeter
 ([private models →](docs/getting-started/private-models.md)).

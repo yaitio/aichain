@@ -1,67 +1,79 @@
-# aichain 2.0
+# aichain
 
-**The AI Gateway For Developers**
+**Let your coding agent write your agents. Ship the code you tested. Leave any provider with one word.**
 
-Text, image, and video — route to any AI model through a single, centralized interface. Write your logic once; swap providers without changing a line of code.
-
----
-
-## What it is
-
-aichain is a pure-Python library that sits between your application and the AI providers you use. It normalises the differences between the providers listed below — and a private server of your own (vLLM, Ollama, LM Studio), where nothing leaves your perimeter — into one universal interface, then gives you programmable building blocks to compose those models into pipelines, tools, and autonomous agents.
-
-```
-Your code
-    │
-    ▼
-┌──────────────────── aichain gateway ────────────────────────┐
-│                                                              │
-│   Model("gpt-4o")          Model("claude-opus-4-6")         │
-│   Model("gemini-2.0-flash") Model("grok-3")                 │
-│   Model("sonar-pro")        Model("gpt-image-1")            │
-│                                                              │
-│   Skills · Tools · Chains · Agents                          │
-└──────────────────────────────────────────────────────────────┘
-    │           │           │           │
-    ▼           ▼           ▼           ▼
- OpenAI    Anthropic     Google       xAI    Perplexity
-```
-
----
-
-## One interface. Every provider.
+A Python library for AI pipelines and agents, small enough for Claude Code or
+Codex to learn from one file and build on.
 
 ```python
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
+from yait_aichain import Model, Skill
 
 skill = Skill(
-    model  = Model("claude-sonnet-4-6"),   # ← swap this for any model below
-    input  = {"messages": [
-        {"role": "user", "parts": [{"type": "text", "text": "Summarise: {text}"}]}
-    ]},
-    output = {"modalities": ["text"], "format": {"type": "text"}},
+    model  = Model("claude-haiku-5-5"),   # change this one word to switch providers
+    input  = {"messages": [{"role": "user", "parts": ["Summarise: {text}"]}]},
 )
 
 result = skill.run(variables={"text": "Your content here..."})
 ```
 
-Change the model name — nothing else changes:
+---
 
-```python
-Model("gpt-4o")              # OpenAI
-Model("claude-sonnet-4-6")   # Anthropic
-Model("gemini-2.0-flash")    # Google
-Model("grok-3")              # xAI
-Model("sonar-pro")           # Perplexity (with live web search)
-Model("gpt-image-1")         # OpenAI image generation
-Model("kimi-k2.6")           # Kimi
-Model("deepseek-chat")       # DeepSeek
-```
+## Three promises
+
+**Your coding agent writes the agents.** The whole contract is one 25 KB
+`llms.txt`, and the Claude Code plugin carries it with twenty worked recipes.
+On twenty tasks the docs were not written against, a small model with the docs
+passed 15 in all three tries, Claude Code passed 19, and the same small model
+without the docs passed none.
+
+**The code you tested is the code you ship.** Only what you inject changes
+between a laptop and production: where state is stored, whose keys are used,
+what starts the run. A run that waits for a person or a webhook
+[parks and resumes](primitives/state.md) in another process; an agent's state
+is its conversation, so one turn fits one serverless call; spending stops at a
+ceiling in dollars; keys can be resolved per request, per tenant.
+
+**No provider owns your code.** Switching provider is changing the model name.
+When the new one cannot do what you asked, the result says what was adapted or
+dropped — [what each provider does with each option](reference/parameters.md).
 
 ---
 
-## What the gateway routes
+## What you build with it
+
+**Deterministic pipelines.** [Skill](primitives/skills.md) — one model call
+with a template and an output format. [Chain](primitives/chain.md) — steps in
+order, each output passed on by name; Skills, tools, agents and your own
+functions mix freely. [Pool](primitives/pool.md) — one Skill or Chain over many
+inputs at once; total time is the slowest item, not the sum.
+
+**Agents, by how hard the task is.** [Agent](agents/overview.md) runs one loop:
+each turn the model calls tools or answers, and `stop_when` decides when it
+ends. `mode="agile"` decides at every turn; `mode="waterfall"` writes a plan
+first, from a stronger `planner_model` if you like, and holds to it; `team=`
+lets it delegate to workers with conversations of their own. On τ²-bench a
+plain loop did best with a weak model and a planned run with a strong one.
+
+**Tools.** Search, fetch, decide, speech, transcription, images, embeddings,
+reranking, chunking, wait and gate — each made the same way,
+`search("exa").run(query)`. Any function becomes a tool with `@tool`; any REST
+API or MCP server goes into an agent in two lines.
+[All tools →](tools-reference/index.md)
+
+**Utilities.** `Vectors` for a vector collection, `Shell` for one folder to
+browse, read, write and run commands in, `MCP` and `REST` for connections. Your
+code calls their methods; the agent gets only the methods that are tools.
+
+**Control and measurement.** Usage and cost on every result; `max_cost`, one
+budget in dollars across every step; permissions by risk class, and `approve=`
+for a person to decide; an [event for every step](agents/observability.md);
+[Eval](primitives/eval.md) runs arms × cases × trials and reports accuracy,
+`Pass^k` and cost side by side.
+
+**Models.** <!-- g:provider-list -->**10 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md)
+you run yourself (vLLM, Ollama, LM Studio, …), where nothing leaves your
+perimeter. Text and vision are [models](primitives/models.md); image generation
+is a [tool](tools-reference/image.md).
 
 <!-- g:modalities -->
 | Modality | Providers |
@@ -75,54 +87,10 @@ Model("deepseek-chat")       # DeepSeek
 
 ---
 
-## Why a gateway instead of calling providers directly?
-
-| Without aichain | With aichain |
-|---|---|
-| Different request format per provider | One universal message format for all |
-| Different response parsing per provider | One `skill.run()` returns clean Python |
-| Switching models requires rewriting code | Change the model name, nothing else |
-| Building pipelines is manual glue code | Chain wires steps together automatically |
-| Tool-using loops are hand-rolled per project | Agent runs one loop: tools or an answer each turn, `stop_when` decides the end |
-
----
-
-## The programmable layer
-
-The gateway becomes useful through five building blocks you compose in plain Python:
-
-**[Model](primitives/models.md)** — the routing layer. Auto-detects the provider from the model name and handles all serialisation differences.
-
-**[Skill](primitives/skills.md)** — a reusable task: one model + one prompt template + one output format. Supports text, JSON, and validated JSON Schema outputs.
-
-**[Tool](primitives/tools.md)** — a Python function with a declared interface. Connects the gateway to the real world: web search, pages by URL, external APIs.
-
-**[Chain](primitives/chain.md)** — a sequential pipeline. Each step's output flows forward as named variables. Mixes Skills, Tools, and Agents freely.
-
-**[Pool](primitives/pool.md)** — run one Skill or Chain across many inputs in parallel. Total time is the slowest item, not the sum.
-
-**[Agent](agents/overview.md)** — one loop: each turn the model calls tools or answers, and `stop_when` decides when the run ends. Runs inside a Chain or standalone.
-
-**[State](primitives/state.md)** — park a run until an external signal (human, webhook, cron) and resume it later, even in another process: a `Wait`/`Gate` step in a Chain, or the same tool in an agent's hands, with a `store=`.
-
-**[Eval](primitives/eval.md)** — run the same cases through several models, prompts or modes, several times each, and get accuracy, reliability and cost side by side. Reports on other benchmarks' data too.
-
----
-
-## What's in the box
-
-<!-- g:provider-list -->**10 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](getting-started/private-models.md) you run yourself (vLLM, Ollama, LM Studio, …)
-
-**Built-in tools** — web search (Perplexity, Brave, Exa, Firecrawl, Tavily, Parallel), pages by URL (Firecrawl, Tavily, Exa, Parallel, local), speech (TTS / STT), embeddings, vector DB, REST API, and `Wait` / `Gate` suspend tools
-
-**Full persistence** — Skills and Chains serialise to YAML. API keys are never stored.
-
----
-
 ## Requirements
 
 - Python 3.10+
-- At least one provider API key
+- A provider's API key — or none, for a model on your own server
 - `pip install pyyaml` for YAML save/load
 
 See [Installation](getting-started/installation.md) for optional dependencies and setup.

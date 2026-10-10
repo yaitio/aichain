@@ -1,9 +1,11 @@
 # yait-aichain
 
-> A small Python library for LLM pipelines and tool-using agents that do not
-> depend on one provider. Five primitives — Skill, Chain, Pool, Agent, Tool —
-> over one `Model` that speaks to 11 cloud providers and any OpenAI-compatible
-> server you run. Switching provider is changing the model name.
+> A small Python library for AI pipelines and agents, written to be built on
+> by coding agents. Deterministic pipelines — Skill, Chain, Pool; an Agent
+> whose mode follows the task — agile, waterfall, a team; tools, any REST API
+> or MCP server, utilities for vectors and a working folder; cost, budgets,
+> permissions, events and eval on every run. The same code runs on a laptop
+> and in production, and switching provider is changing the model name.
 
 Install: `pip install yait-aichain`. Keys come from the environment
 (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, …).
