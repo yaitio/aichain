@@ -29,8 +29,8 @@ EXEMPT = {
     "UNIVERSAL_OPTIONS": "rendered as the parameters reference",
     "Decision": "base of the decision tools", "Search": "base of the search tools",
     "Fetch": "base of the fetch tools", "Embedder": "base of the embedding tools",
-    "RerankBase": "base of the reranking tools", "convertToSpeech": "base of the tts* tools",
-    "convertToText": "base of the stt* tools", "Image": "what image() returns, on its page",
+    "RerankBase": "base of the reranking tools", "Speech": "base of the tts* tools",
+    "Transcription": "base of the stt* tools", "Image": "what image() returns, on its page",
 }
 
 #: Each is one string, named in the table of risk classes or decisions on the control page.
@@ -39,7 +39,7 @@ RISK_AND_DECISION_CONSTANTS = {"READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL"
 
 #: Parameters (of a constructor, function or method on an API page) that no
 #: docstring describes. Lowered as they are written, never raised.
-UNDOCUMENTED_CEILING = 140
+UNDOCUMENTED_CEILING = 52
 
 
 def _covered() -> tuple:

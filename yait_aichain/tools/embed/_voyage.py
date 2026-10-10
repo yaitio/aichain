@@ -1,6 +1,6 @@
 """
-tools.embedding._voyage — EmbeddingVoyage
-==========================================
+tools.embed._voyage — EmbeddingVoyage
+======================================
 
 Wraps the Voyage AI Embeddings API (``POST /v1/embeddings``).
 
@@ -54,9 +54,9 @@ class EmbeddingVoyage(Embedder):
     --------
     ::
 
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools import embed
 
-        embedder = Embedding("voyage/voyage-3-large")
+        embedder = embed("voyage", model="voyage-3-large")
         result   = embedder.embed(
             "Explain transformer architecture",
             input_type="query",
@@ -105,5 +105,3 @@ class EmbeddingVoyage(Embedder):
         return embeddings, total_tokens, {}
 
 
-# Backward-compatible alias
-VoyageEmbedder = EmbeddingVoyage

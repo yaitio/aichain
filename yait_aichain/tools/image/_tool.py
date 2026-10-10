@@ -15,7 +15,6 @@ import base64
 import hashlib
 import os
 import time
-import warnings
 
 from .._base import Record, Tool
 from ...models._usage import price_per_image
@@ -34,15 +33,6 @@ OPTIONS = {
 }
 
 _EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "image/gif": "gif"}
-
-
-class ImageSkillWarning(FutureWarning):
-    """
-    The Skill-with-an-image-model notice, which this tool's own Skill does not
-    raise. A FutureWarning, not a DeprecationWarning: Python hides the second
-    by default unless it is raised from ``__main__``, and the 3.9.0 notice was
-    found hidden that way when the examples were run (2026-10-10).
-    """
 
 
 class Image(Tool):
@@ -90,13 +80,12 @@ class Image(Tool):
         if unknown := sorted(set(opts) - set(OPTIONS)):
             raise ValueError(f"{self.name}: unknown option(s) {unknown}; it takes {sorted(OPTIONS)}")
         parts = [_image_part(i) for i in (images or [])] + [input.strip()]
-        # The Skill-with-an-image-model notice fires when the Skill is made, so
-        # the making goes inside the filter as well as the run.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ImageSkillWarning)
-            skill = Skill(self._model, input={"messages": [{"role": "user", "parts": parts}]},
-                          output={"modalities": ["image"], "format": {"type": "image", **opts}})
-            out = skill.run()
+        # Through a Skill, by the seam only this tool uses: retries, the budget
+        # and the record of adaptations come with it.
+        skill = Skill(self._model, input={"messages": [{"role": "user", "parts": parts}]},
+                      output={"modalities": ["image"], "format": {"type": "image", **opts}},
+                      _image=True)
+        out = skill.run()
         picture = {"url": out.get("url"), "base64": out.get("base64"), "mime_type": out.get("mime_type"),
                    "revised_prompt": out.get("revised_prompt"), "path": None}
         if self.output_dir and picture["base64"]:

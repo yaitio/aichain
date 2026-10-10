@@ -108,49 +108,6 @@ class TestEmbedAndRerankAreTools(unittest.TestCase):
         self.assertNotIn("0.1", text)
 
 
-class TestOldPathsStillResolve(unittest.TestCase):
-
-    OLD = {
-        "yait_aichain.tools.embedding":          "yait_aichain.tools.embed",
-        "yait_aichain.tools.embedding._openai":  "yait_aichain.tools.embed._openai",
-        "yait_aichain.tools.reranking":          "yait_aichain.tools.rerank",
-        "yait_aichain.tools.reranking._cohere":  "yait_aichain.tools.rerank._cohere",
-        "yait_aichain.tools.convert.to_speech":  "yait_aichain.tools.speech._tts",
-        "yait_aichain.tools.convert.to_text":    "yait_aichain.tools.transcribe._stt",
-        "yait_aichain.tools.vectordb._chunk":    "yait_aichain.tools.chunk._chunk",
-        "yait_aichain.tools._wait":              "yait_aichain.tools.general._wait",
-    }
-
-    def test_by_import_module_as_chain_load_does(self):
-        for old, new in self.OLD.items():
-            with self.subTest(old):
-                self.assertIs(importlib.import_module(old), importlib.import_module(new))
-
-    def test_by_from_import_and_import_as_and_attribute(self):
-        import yait_aichain
-        from yait_aichain.tools.convert.to_speech import ttsOpenAI
-        from yait_aichain.tools.embedding import Embedding
-        import yait_aichain.tools.reranking._cohere as cohere_module
-        self.assertEqual(ttsOpenAI.__module__, "yait_aichain.tools.speech._tts")
-        self.assertTrue(callable(Embedding))
-        self.assertIs(cohere_module, sys.modules["yait_aichain.tools.rerank._cohere"])
-        self.assertIs(yait_aichain.tools.convert.to_text, sys.modules["yait_aichain.tools.transcribe._stt"])
-
-    def test_by_mock_patch(self):
-        # 3.10 and 3.11 resolve a patch path through attributes.
-        with patch("yait_aichain.tools.convert.to_speech.os") as p:
-            self.assertIs(sys.modules["yait_aichain.tools.speech._tts"].os, p)
-        with patch("yait_aichain.tools.embedding._base.make_http") as p:
-            self.assertIs(sys.modules["yait_aichain.tools.embed._base"].make_http, p)
-
-    def test_a_chain_saved_with_an_old_path_loads(self):
-        path = os.path.join(tempfile.mkdtemp(), "old.yaml")
-        with open(path, "w") as fh:
-            fh.write("steps:\n- kind: tool\n  output_key: pieces\n  tool:\n"
-                     "    class: yait_aichain.tools.vectordb._chunk.VectorChunkTool\n"
-                     "    init_args: {max_chars: 700}\n")
-        tool = Chain.load(path)._steps[0][0]
-        self.assertEqual((type(tool).__name__, tool._max_chars), ("VectorChunkTool", 700))
 
 
 @patch.dict(os.environ, KEYS)
@@ -162,9 +119,9 @@ class TestASavedChainKeepsWhatEachToolIs(unittest.TestCase):
         return Chain.load(path)._steps[0][0], open(path).read()
 
     def test_an_embedder_keeps_its_model_and_settings(self):
-        from yait_aichain.tools import Embedding
-        back, text = self._round_trip(Embedding("qwen/text-embedding-v4", api_key="secret",
-                                                region="intl", dimensions=512))
+        from yait_aichain.tools import EmbeddingQwen
+        back, text = self._round_trip(EmbeddingQwen("text-embedding-v4", api_key="secret",
+                                                    region="intl", dimensions=512))
         self.assertEqual((back.model, back._region, back.dimensions), ("text-embedding-v4", "intl", 512))
         self.assertNotIn("secret", text)
 
@@ -193,8 +150,8 @@ class TestTheReadmeRagChainRuns(unittest.TestCase):
     def test_query_then_rerank(self):
         import json
         from unittest.mock import MagicMock
-        from yait_aichain.tools.vectordb import vectorQuery
-        from yait_aichain.tools.vectordb._base import VectorRecord
+        from yait_aichain.utilities.vectors import VectorQueryTool
+        from yait_aichain.utilities.vectors._base import VectorRecord
         store = MagicMock()
         store._collection = "docs"
         store.query.return_value = [VectorRecord(id=f"c{i}", text=t, score=0.5, metadata={}) for i, t in
@@ -206,7 +163,7 @@ class TestTheReadmeRagChainRuns(unittest.TestCase):
         reranker._http.request.return_value = reply
 
         res = Chain(steps=[
-            (vectorQuery(store), "candidates", {"input": "{question}", "options": {"n": 20}}),
+            (VectorQueryTool(store), "candidates", {"input": "{question}", "options": {"n": 20}}),
             (reranker,           "context",    {"input": "{candidates}",
                                                 "options": {"query": "{question}", "top_n": 2}}),
         ]).run(variables={"question": "How does KV caching work?"})

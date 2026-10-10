@@ -611,45 +611,19 @@ class Model:
         return path, body
 
     def _canonical_format(self, output: dict) -> dict:
-        """Rename an option that has been renamed, and say so once.
-
-        Removing the old name would break working code; accepting it in
-        silence would leave a caller writing a name that no longer exists in
-        the documentation. So it is translated and reported, which is what
-        the channel is for."""
-        from ._adaptation import Adaptation, TRANSLATED, record
-        from ._options import ALIASES, canonical_value
+        """Resolve a value's shorthand to the vocabulary's one type —
+        ``fidelity="high"`` to ``0.9`` — before anything else looks at it, so
+        a range declared for one provider does not reject a word another
+        needs. Not an adaptation: it normalises the caller's own input."""
+        from ._options import canonical_value
 
         fmt = output.get("format") or {}
-        renamed = {k: v for k, v in fmt.items() if k in ALIASES}
-        # A shorthand is resolved to the canonical type before anything else
-        # looks at it, so a range declared for one provider does not reject a
-        # word another provider needs.
-        shorthand = {}
+        fixed, changed = dict(fmt), False
         for key, value in fmt.items():
-            fixed_value, note = canonical_value(ALIASES.get(key, key), value)
+            new_value, note = canonical_value(key, value)
             if note:
-                shorthand[key] = (fixed_value, note)
-        if not renamed and not shorthand:
-            return output
-        fixed = {k: v for k, v in fmt.items() if k not in ALIASES}
-        # Not recorded as an adaptation: resolving 'high' to 0.9 is
-        # normalising the caller's own input to the vocabulary's one type,
-        # not something a provider did. Recording it made every provider that
-        # then drops the option report "translated" for an option that never
-        # left.
-        for key, (value, _note) in shorthand.items():
-            if key not in ALIASES:
-                fixed[key] = value
-        for old, value in renamed.items():
-            new = ALIASES[old]
-            value = shorthand.get(old, (value, None))[0]
-            fixed.setdefault(new, value)
-            record(Adaptation(
-                kind=TRANSLATED, option=old, asked=value, sent=new,
-                model=self.name,
-                why=f"{old!r} is now called {new!r}; both are accepted"))
-        return {**output, "format": fixed}
+                fixed[key], changed = new_value, True
+        return {**output, "format": fixed} if changed else output
 
     def _check_values(self, output: dict) -> dict:
         """Refuse a value this model does not take, before the wire.

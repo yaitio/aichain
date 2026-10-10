@@ -16,8 +16,8 @@ endpoint is a tool.
     get_booking.run(id=1)
     Agent(model, tools=api.tools)                    # every endpoint made so far
 
-``RestApiTool`` — one endpoint configured whole — is what it is built on, and
-still works.
+Each endpoint is a ``RestApiTool``, which can also be built on its own when
+an API has a single endpoint.
 """
 
 from __future__ import annotations

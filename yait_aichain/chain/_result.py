@@ -6,11 +6,10 @@ What ``Chain.run()`` and ``Chain.resume()`` return, in the same shape as
 ``AgentResult`` and ``PoolResult``: ``output``, ``success``, ``error``,
 ``history``, ``usage``, ``tokens_used``, ``cost``.
 
-Until 3.0.0 ``run()`` returned the last step's output as a bare value. Measured
-2026-09-13 (``evals/agent_builds``): given the documentation, a model indexed
-that value by step name — ``result["tweet"]`` — in twenty of forty-seven failed
-attempts. A chain names its steps, so reading a step by its name is what the
-result now allows: ``result["tweet"]``.
+A chain names its steps, so a step's output is read by its name:
+``result["tweet"]``. Measured 2026-09-13 (``evals/agent_builds``): given the
+documentation, a model reached for exactly that in twenty of forty-seven
+failed attempts.
 """
 
 from __future__ import annotations

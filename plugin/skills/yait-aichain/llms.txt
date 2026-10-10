@@ -10,11 +10,13 @@
 Install: `pip install yait-aichain`. Keys come from the environment
 (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, …).
 
-This is the 3.x API. Older tutorials use names that no longer exist —
-`orchestrator=`, `max_steps=`, `max_attempts=`, `executors=`, `memory=`,
-`searchPerplexity()`-style classes as the way in, `VectorDB`, `convertToMD`.
-Tools are made by service name now — `search("exa")`, `fetch("local")` — and
-a function becomes one with `@tool`.
+This is the 4.x API. Names an agent may remember from older tutorials do not
+exist, and each raises with the one to use: `orchestrator=`, `max_steps=`,
+`max_attempts=`, `executors=`, `memory=`, `VectorDB`, `vectorQuery`,
+`Embedding(...)`, `Reranker(...)`, `LocalTools`, `MCPTools`, `TTS`, `STT`,
+`convertToMD`. Tools are made by service name — `search("exa")`,
+`fetch("local")` — a function becomes one with `@tool`, and an image is
+`image(service, model=…)`, never a `Skill`.
 
 ## The rules an agent gets wrong
 

@@ -116,13 +116,13 @@ class TestTheRestToolDropsNothing(unittest.TestCase):
     fix."""
 
     def test_response_field_is_consumed(self):
-        from yait_aichain.tools.rest_api import RestApiTool
+        from yait_aichain.utilities.rest._tool import RestApiTool
         source = inspect.getsource(RestApiTool)
         self.assertIn("self._response_field", source)
         self.assertIn("result.get(self._response_field", source)
 
     def test_auth_and_static_headers_are_applied(self):
-        from yait_aichain.tools.rest_api import RestApiTool
+        from yait_aichain.utilities.rest._tool import RestApiTool
         source = inspect.getsource(RestApiTool)
         self.assertIn("self._apply_auth(headers", source)
         self.assertIn("headers.update(self._static_headers)", source)

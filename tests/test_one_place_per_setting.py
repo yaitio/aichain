@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from yait_aichain import Agent, Chain, Model
-from yait_aichain.tools import Embedding, Reranker, chunk, embed, speech, transcribe
+from yait_aichain.tools import RerankCohere, chunk, embed, speech, transcribe
 
 KEYS = {"OPENAI_API_KEY": "k", "COHERE_API_KEY": "k", "DASHSCOPE_API_KEY": "k", "XAI_API_KEY": "k",
         "GOOGLE_AI_API_KEY": "k", "VOYAGE_API_KEY": "k"}
@@ -47,7 +47,7 @@ class TestEmbedder(unittest.TestCase):
 
     def test_an_unknown_setting_or_option_is_refused(self):
         with self.assertRaises(TypeError):
-            Embedding("openai/text-embedding-3-small", input_type="document")
+            embed("openai", model="text-embedding-3-small", input_type="document")
         with self.assertRaisesRegex(ValueError, "unknown option"):
             embed("openai", model="text-embedding-3-small").run(["a"], {"truncate": "END"})
 
@@ -105,9 +105,9 @@ class TestReranker(unittest.TestCase):
 
     def test_an_unknown_keyword_is_refused(self):
         with self.assertRaisesRegex(TypeError, "top_n and query are options of the call"):
-            Reranker("rerank-v3.5", top_n=3)
+            RerankCohere("rerank-v3.5", top_n=3)
         with self.assertRaisesRegex(TypeError, "got bogus"):
-            Reranker("rerank-v3.5", bogus=1)
+            RerankCohere("rerank-v3.5", bogus=1)
 
 
 @patch.dict(os.environ, {"AICHAIN_ALLOW_PRIVATE_URLS": "1"})

@@ -1,8 +1,8 @@
 """
-tools.vectordb._chunk
-======================
+tools.chunk._chunk
+==================
 
-VectorChunkTool — intelligent text chunker for RAG pipelines.
+Chunk — intelligent text chunker for RAG pipelines.
 
 Splits long text into overlapping chunks suitable for embedding and
 vector-store ingestion.  Supports plain text and Markdown with dedicated
@@ -67,25 +67,21 @@ Edge cases
   empty string          → ``[]``
   headings only         → ``[]``
   unclosed code block   → treated as plain text to end of input
-  overlap_chars ≥ max_chars → ``ValueError`` on construction and on run()
+  overlap_chars ≥ max_chars → ``ValueError`` on construction
 
-Chain usage
------------
-::
+Into a vector store
+-------------------
+A piece has no ``"id"``; a record in a store needs one::
 
-    from yait_aichain.tools.vectordb import VectorDB, vectorChunk, vectorUpsert
-    from yait_aichain.tools.embedding import Embedding
+    from yait_aichain.tools import chunk, embed
+    from yait_aichain.utilities import Vectors
 
-    chunker = vectorChunk(max_chars=800, overlap_chars=80)
-    store   = VectorDB("chroma", "docs",
-                        embedder=Embedding("openai/text-embedding-3-small"))
-    upserter = vectorUpsert(store)
+    kb = Vectors("qdrant", collection="docs", description="the product documentation",
+                 embedder=embed("openai", model="text-embedding-3-small"))
+    kb.create(dimension=1536)
 
-    chunks  = chunker.run(long_markdown_text)
-    records = [{"id": f"doc_{i}", **c} for i, c in enumerate(chunks)]
-    upserter.run(records)
-
-    # Or inside a Chain — chunker output feeds directly into vectorUpsert
+    pieces = chunk(max_chars=800, overlap_chars=80).run(long_markdown_text)
+    kb.upsert([{"id": f"doc-{i}", **p} for i, p in enumerate(pieces)])
 """
 
 from __future__ import annotations
@@ -475,16 +471,16 @@ def _parse_markdown(text: str) -> list[_Segment]:
 
 
 # ---------------------------------------------------------------------------
-# VectorChunkTool
+# Chunk
 # ---------------------------------------------------------------------------
 
-class VectorChunkTool(Tool):
+class Chunk(Tool):
     """
     Split text into overlapping chunks for embedding and vector-store ingestion.
 
     Handles plain text and Markdown with dedicated logic for headings, code
-    blocks, and tables.  Output is a list of dicts ready to pass directly to
-    :class:`VectorUpsertTool` (after adding an ``"id"`` field).
+    blocks, and tables.  Output is a list of dicts ready for
+    ``Vectors.upsert`` once each has an ``"id"``.
 
     Parameters
     ----------
@@ -499,16 +495,17 @@ class VectorChunkTool(Tool):
     Raises
     ------
     ValueError
-        When ``overlap_chars >= max_chars`` at construction or at ``run()``
-        time (when overridden via options).
+        When ``overlap_chars >= max_chars`` at construction, or when a call
+        passes ``max_chars``, ``overlap_chars`` or ``merge_peers`` — they are
+        settings of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools.vectordb import vectorChunk
+        from yait_aichain.tools import chunk
 
-        chunker = vectorChunk(max_chars=800, overlap_chars=80)
+        chunker = chunk(max_chars=800, overlap_chars=80)
         chunks  = chunker.run(markdown_text)
         # chunks[0] == {"text": "...", "chars": 247, "metadata": {"headings": ["Intro"], "is_code": False}}
     """
@@ -536,9 +533,9 @@ class VectorChunkTool(Tool):
         overlap_chars: "int | None" = None,
         merge_peers:   bool = True,
     ) -> None:
-        # A tenth of a piece unless given: 150 at the default 1 500, as before.
-        # A fixed 150 cut 780 characters into 30 near-identical windows at
-        # max_chars=200 — every piece three-quarters its neighbour (3.7.0).
+        # A tenth of a piece unless given: 150 at the default 1 500. A fixed
+        # 150 cut 780 characters into 30 near-identical windows at
+        # max_chars=200 — every piece three-quarters its neighbour.
         if overlap_chars is None:
             overlap_chars = max_chars // 10
         if overlap_chars >= max_chars:
@@ -570,8 +567,8 @@ class VectorChunkTool(Tool):
         input : str
             Text to chunk.  Returns ``[]`` for empty or whitespace-only input.
         options : dict | None
-            Per-call overrides for ``max_chars``, ``overlap_chars``,
-            ``merge_peers``.
+            Takes no keys. ``max_chars``, ``overlap_chars`` and
+            ``merge_peers`` are settings of the tool and raise here.
 
         Returns
         -------
@@ -582,7 +579,7 @@ class VectorChunkTool(Tool):
             return []
 
         # The sizes are the tool's settings: a store is filled with pieces cut
-        # one way. Until 3.7.0 a call's options overrode them.
+        # one way.
         if options and (given := [k for k in ("max_chars", "overlap_chars", "merge_peers") if k in options]):
             raise ValueError(f"{self.name}: {', '.join(given)} is a setting of the chunker, not of a call "
                              f"— chunk({given[0]}=…)")
@@ -759,7 +756,7 @@ class VectorChunkTool(Tool):
 
     def __repr__(self) -> str:
         return (
-            f"VectorChunkTool(max_chars={self._max_chars}, "
+            f"Chunk(max_chars={self._max_chars}, "
             f"overlap_chars={self._overlap_chars}, "
             f"merge_peers={self._merge_enabled})"
         )
@@ -769,31 +766,3 @@ class VectorChunkTool(Tool):
 # Convenience factory
 # ---------------------------------------------------------------------------
 
-def vectorChunk(
-    max_chars:     int  = 1500,
-    overlap_chars: "int | None" = None,
-    merge_peers:   bool = True,
-) -> VectorChunkTool:
-    """
-    Return a configured :class:`VectorChunkTool`.
-
-    Parameters
-    ----------
-    max_chars     : int  — maximum characters per chunk (default 1500)
-    overlap_chars : int  — overlap in characters (default 150)
-    merge_peers   : bool — merge adjacent small chunks with identical headings
-
-    Examples
-    --------
-    ::
-
-        from yait_aichain.tools.vectordb import vectorChunk
-
-        chunker = vectorChunk(max_chars=800, overlap_chars=80)
-        chunks  = chunker.run(my_text)
-    """
-    return VectorChunkTool(
-        max_chars     = max_chars,
-        overlap_chars = overlap_chars,
-        merge_peers   = merge_peers,
-    )

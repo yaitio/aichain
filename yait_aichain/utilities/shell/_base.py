@@ -1,10 +1,10 @@
 """
-tools.local._base
-=================
+utilities.shell._base
+=====================
 
-Shared sandbox enforcement for all local filesystem tools.
+Shared sandbox enforcement for the four tools of :class:`Shell`.
 
-Every local tool receives a ``root_dir`` at construction time.
+Every tool receives a ``root_dir`` — the Shell's folder — at construction time.
 All path operations are validated against it — any attempt to
 navigate above the root raises ``PermissionError``.
 

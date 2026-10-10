@@ -782,21 +782,19 @@ Build an evidence record, validating *kind*.
 AgentMemory(initial: dict | None = None, backend: MemoryBackend | None = None)
 ```
 
-Shared key-value store for agent execution state.
+A key-value store with a pluggable backend.
 
-Stores any Python value: strings, dicts, lists, numbers.  All contents
-are included verbatim in orchestrator prompts, so keep values reasonably
-sized — large blobs (e.g. full web-page markdown) are automatically
-truncated in prompts but stored in full here.
+Stores any Python value: strings, dicts, lists, numbers.  Nothing reads
+it on its own — the agent loop does not use it — so what goes in comes
+out only where your own code asks for it.
 
 **Parameters**
 
-- `initial` (*dict | None, optional*, default `None`) — Seed the memory with these key/value pairs before any step runs.
-  Typically the variables passed to `agent.run(variables=...)`.
-  Applied *on top of* any state loaded from the backend.
+- `initial` (*dict | None, optional*, default `None`) — Seed the memory with these key/value pairs.  Applied *on top of*
+  any state loaded from the backend.
 - `backend` (*MemoryBackend | None, optional*, default `None`) — Persistence backend.  When omitted, an `InMemoryBackend` is
-  used (volatile, identical to the original behaviour).  Supply a
-  `FileBackend` to persist state across `run()` calls.
+  used (volatile, gone with the process).  Supply a
+  `FileBackend` to persist state across processes.
 
 **Examples**
 
@@ -857,10 +855,9 @@ AgentMemory.reset()
 Restore the in-process store to its construction-time baseline.
 
 The baseline is the state loaded from the backend plus any `initial`
-seed.  Called by `agent.run()` at the start of every run so that
-scratch values from a previous run are discarded while persistent
-state (FileBackend contents, `initial`) is preserved.  The backend
-itself is never touched.
+seed.  Call it to discard scratch values while keeping persistent
+state (FileBackend contents, `initial`).  The backend itself is
+never touched.
 
 ### `AgentMemory.clear()`
 
@@ -869,8 +866,8 @@ AgentMemory.clear()
 ```
 
 Remove all entries from the in-process store, the baseline, and the
-backend.  This is a destructive, explicit operation — `agent.run()`
-does **not** call it (it calls `reset`).
+backend.  This is a destructive, explicit operation; `reset`
+is the one that keeps persistent state.
 
 ### `AgentMemory.flush()`
 
@@ -880,10 +877,10 @@ AgentMemory.flush()
 
 Persist the current in-process state to the backend without clearing.
 
-Call this explicitly after `agent.run()` completes to checkpoint
-the final memory state.  The flushed state also becomes the new
-baseline, so a subsequent `run()` on the same instance starts from
-the checkpoint instead of the construction-time snapshot.
+Call it to checkpoint the current state.  The flushed state also
+becomes the new baseline, so a later `reset` on the same
+instance returns to the checkpoint instead of the construction-time
+snapshot.
 
 ### `AgentMemory.all()`
 
@@ -942,7 +939,7 @@ Volatile in-process backend.
 State lives only in `self._data`; nothing is written to disk.
 
 This is the default backend: with no `initial` seed the baseline is
-empty, so each `agent.run()` starts with a clean store.
+empty, so each new `AgentMemory` starts with a clean store.
 
 ### `InMemoryBackend.load()`
 
@@ -992,12 +989,11 @@ crash during `save()` never leaves a corrupt file.
 backend = FileBackend("~/.agent_memory.json")
 memory  = AgentMemory(backend=backend)
 
-# After a run, persist the final state:
+# Persist the current state:
 memory.flush()
 
-# The same instance can be reused for the next run() — it starts
-# from the flushed checkpoint.  A new process restores the state
-# the same way:
+# After reset() the same instance starts from the flushed
+# checkpoint.  A new process restores the state the same way:
 memory2 = AgentMemory(backend=FileBackend("~/.agent_memory.json"))
 ```
 

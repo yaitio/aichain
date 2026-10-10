@@ -37,12 +37,6 @@ COLLECT = "collect"
 
 POLICIES = frozenset({RAISE, STOP, SKIP, COLLECT})
 
-#: The old spellings, kept working. Renaming a parameter breaks code that has
-#: no other way to say the same thing, and the library's own rule is that a
-#: caller is told what changed rather than left to find out.
-ALIASES: dict = {}
-
-
 def check(value: str, *, parameter: str) -> str:
     """Validate a policy, naming the whole vocabulary when it is wrong."""
     if value not in POLICIES:

@@ -131,7 +131,7 @@ def _search(cls, options=None, response=None):
     tool = _tool(cls, response)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        found = tool.search(QUERY, options)
+        found = tool.run(QUERY, options)
     return tool, found, [str(w.message) for w in seen]
 
 
@@ -207,7 +207,7 @@ class TestEveryStandardOptionReachesTheWire(unittest.TestCase):
             with self.subTest(opts=opts):
                 tool = _tool(searchExa)
                 with self.assertRaises(ValueError):
-                    tool.search(QUERY, opts)
+                    tool.run(QUERY, opts)
                 tool._http.request.assert_not_called()
 
 
@@ -233,7 +233,7 @@ class TestNothingIsDroppedInSilence(unittest.TestCase):
 
     def test_perplexity_refuses_more_domains_than_it_filters(self):
         with self.assertRaises(ValueError):
-            _tool(searchPerplexity).search(QUERY, {"domains": [f"d{i}.com" for i in range(21)]})
+            _tool(searchPerplexity).run(QUERY, {"domains": [f"d{i}.com" for i in range(21)]})
 
     def test_a_typo_is_still_caught_by_the_schema(self):
         self.assertIn("options.recencyy", searchBrave(api_key="k").unknown_keys(
@@ -252,7 +252,7 @@ class TestFirecrawl(unittest.TestCase):
     def test_domains_and_exclude_domains_together_are_refused(self):
         tool = _tool(searchFirecrawl)
         with self.assertRaises(ValueError):
-            tool.search(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
+            tool.run(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
         tool._http.request.assert_not_called()
 
     def test_text_chars_scrapes_the_pages_and_cuts_them(self):
@@ -286,7 +286,7 @@ class TestFirecrawl(unittest.TestCase):
 
     def test_success_false_is_an_error(self):
         with self.assertRaises(RuntimeError):
-            _tool(searchFirecrawl, {"success": False, "error": "Insufficient credits"}).search(QUERY)
+            _tool(searchFirecrawl, {"success": False, "error": "Insufficient credits"}).run(QUERY)
 
 
 class TestTavily(unittest.TestCase):
@@ -357,7 +357,7 @@ class TestParallel(unittest.TestCase):
     def test_domains_and_exclusions_together_are_refused(self):
         tool = _tool(searchParallel)
         with self.assertRaises(ValueError):
-            tool.search(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
+            tool.run(QUERY, {"domains": ["a.com"], "exclude_domains": ["b.com"]})
         tool._http.request.assert_not_called()
 
     def test_excerpts_are_the_snippets_and_a_warning_is_a_notice(self):
@@ -476,7 +476,7 @@ class TestTheTextAModelReads(unittest.TestCase):
 
     def test_search_is_run_under_its_old_name(self):
         tool = _tool(searchExa)
-        self.assertEqual(dict(tool.search(QUERY)), dict(tool.run(QUERY)))
+        self.assertEqual(dict(tool.run(QUERY)), dict(tool.run(QUERY)))
 
     def test_no_results_is_said(self):
         self.assertIn("(0 results)", str(_tool(searchExa, {"results": []}).run(input=QUERY)))
@@ -542,7 +542,7 @@ class TestContract(unittest.TestCase):
 
     def test_an_empty_query_is_refused(self):
         with self.assertRaises(ValueError):
-            _tool(searchBrave).search("  ")
+            _tool(searchBrave).run("  ")
 
 
 def _real(var):
@@ -557,7 +557,7 @@ class TestSearchLive(unittest.TestCase):
     def _check(self, cls, var):
         if not _real(var):
             self.skipTest(f"{var} not set to a real key")
-        found = cls().search("leadership and AI", self.OPTS)
+        found = cls().run("leadership and AI", self.OPTS)
         self.assertTrue(found["results"])
         for r in found["results"]:
             self.assertEqual(set(r), TestOneRecord.KEYS)

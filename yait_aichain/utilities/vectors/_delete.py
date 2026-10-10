@@ -1,19 +1,19 @@
 """
-tools.vectordb._delete
-=======================
+utilities.vectors._delete
+=========================
 
 VectorDeleteTool — remove documents from the vector store.
 
 Supports deletion by explicit IDs, by metadata filter, or both.
 
-Chain usage
------------
+Usage
+-----
 ::
 
-    from yait_aichain.tools.vectordb import VectorDB, vectorDelete
+    from yait_aichain.utilities.vectors import VectorDB, VectorDeleteTool
 
     store = VectorDB("chroma", collection="docs")
-    tool  = vectorDelete(store)
+    tool  = VectorDeleteTool(store)
 
     # Delete by IDs
     tool.run(["doc_1", "doc_2"])
@@ -110,8 +110,8 @@ class VectorDeleteTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting — until 3.7.0 a call's
-        ``collection`` option switched it, so a model could read or write
+        """The store. Its collection is a setting, not a call's: a
+        ``collection`` option is refused, so a model cannot read or write
         another collection than the one the code chose."""
         if "collection" in opts:
             raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
@@ -122,7 +122,3 @@ class VectorDeleteTool(Tool):
         return f"VectorDeleteTool(store={self._store!r})"
 
 
-# ── Convenience alias ─────────────────────────────────────────────────────────
-def vectorDelete(store: VectorStore) -> VectorDeleteTool:
-    """Return a :class:`VectorDeleteTool` bound to *store*."""
-    return VectorDeleteTool(store)

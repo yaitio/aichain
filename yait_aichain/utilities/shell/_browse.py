@@ -1,6 +1,6 @@
 """
-tools.local._browse — LocalBrowseTool
-=======================================
+utilities.shell._browse — LocalBrowseTool
+=========================================
 
 List the contents of a directory as a formatted tree.
 
@@ -140,6 +140,3 @@ class LocalBrowseTool(Tool, SandboxedTool):
         return f"{n:.1f} GB"
 
 
-def localBrowse(root_dir: str | None = None) -> LocalBrowseTool:
-    """Return a :class:`LocalBrowseTool` sandboxed to *root_dir*."""
-    return LocalBrowseTool(root_dir)

@@ -251,10 +251,6 @@ class Search(Tool):
                        "cost": round(cost["usd"], 6), "cost_basis": cost["basis"], "usage": cost.get("usage", {})},
                       self.render)
 
-    def search(self, input: str, options: "dict | None" = None) -> Record:
-        """The same as :meth:`run` — kept from 3.2, when ``run()`` returned the text."""
-        return self.run(input, options)
-
     def render(self, found: dict) -> str:
         """What a model reads: the results as a numbered list, then any notes."""
         return self.format(found)

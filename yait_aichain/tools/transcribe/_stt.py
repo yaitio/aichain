@@ -1,6 +1,6 @@
 """
-tools.transcribe._stt — convertToText
-======================================
+tools.transcribe._stt — Transcription
+=====================================
 
 Base class and provider implementations for speech-to-text transcription.
 
@@ -56,7 +56,7 @@ from .._base import Tool
 
 def _model_setting(tool, model):
     """The tool's model: the one given, or the provider's default. A setting,
-    fixed for the tool — a call no longer chooses it (3.7.0)."""
+    fixed for the tool — a call does not choose it."""
     default = getattr(type(tool), "_DEFAULT_MODEL", None)
     if model is not None and default is None:
         raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
@@ -80,7 +80,7 @@ def _without_options(parameters: dict, *keys: str) -> dict:
     return out
 
 
-class convertToText(Tool):
+class Transcription(Tool):
     """
     Transcribe an audio file to text.
 
@@ -95,7 +95,7 @@ class convertToText(Tool):
         is requested.
     """
 
-    name        = "convertToText"
+    name        = "transcription"
     description = (
         "Transcribe an audio file to text using an STT model.  "
         "Input is a file path; output is the transcript string."
@@ -173,7 +173,7 @@ class convertToText(Tool):
 # xAI simply points to a different base URL.
 # All shared logic lives here; subclasses set class-level variables only.
 
-class _OpenAICompatSTT(convertToText):
+class _OpenAICompatSTT(Transcription):
     """
     Shared implementation for STT providers with an OpenAI-compatible
     transcriptions endpoint (OpenAI Whisper, xAI STT).
@@ -216,7 +216,6 @@ class _OpenAICompatSTT(convertToText):
             m4a, wav, webm.
         options : dict | None, optional
             ``language``   — ISO-639-1 or BCP-47 code, e.g. ``"en"``.
-            ``model``      — model name.  Uses class default if omitted.
             ``timestamps`` — ``True`` for word-level timestamps (JSON output).
             ``prompt``     — context hint for accuracy.
             ``format``     — ``"text"`` (default) or ``"json"``.
@@ -390,23 +389,25 @@ class sttOpenAI(_OpenAICompatSTT):
     ----------
     api_key : str | None, optional
         OpenAI API key.  Falls back to ``OPENAI_API_KEY`` env var.
+    model : str | None, optional
+        One of the models above.  A setting of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools import sttOpenAI
+        from yait_aichain.tools import transcribe
 
-        tool = sttOpenAI()
+        tool = transcribe("openai")
 
         # Plain transcript
         text = tool.run(input="meeting.mp3", options={"language": "en"})
 
         # With word-level timestamps — returns JSON string
         import json
-        data  = tool.run(
+        data  = transcribe("openai", model="gpt-4o-transcribe").run(
             input="meeting.mp3",
-            options={"model": "gpt-4o-transcribe", "timestamps": True},
+            options={"timestamps": True},
         )
         words = json.loads(data)["words"]
     """
@@ -424,7 +425,7 @@ class sttOpenAI(_OpenAICompatSTT):
 
 # ── sttGoogle ─────────────────────────────────────────────────────────────────
 
-class sttGoogle(convertToText):
+class sttGoogle(Transcription):
     """
     Speech-to-text via Google Cloud Speech-to-Text.
 
@@ -443,25 +444,24 @@ class sttGoogle(convertToText):
     api_key : str | None, optional
         Google API key.  Falls back to ``GOOGLE_API_KEY`` env var.
         When absent ADC is used automatically.
+    model : str | None, optional
+        Default ``"latest_long"``.  A setting of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools import sttGoogle
+        from yait_aichain.tools import transcribe
 
-        tool = sttGoogle()
-        text = tool.run(
-            input="recording.wav",
-            options={"language": "en-US", "model": "latest_long"},
-        )
+        tool = transcribe("google", model="latest_long")
+        text = tool.run(input="recording.wav", options={"language": "en-US"})
     """
 
     # Google's speech-to-text has no prompt: biasing the transcription is
     # done with a speech context, which is a different shape and is not
     # wired. Declaring `prompt` offered the model something that fell on the
     # floor.
-    parameters = _without_options(convertToText.parameters, "prompt")
+    parameters = _without_options(Transcription.parameters, "prompt")
 
     name = "sttGoogle"
 
@@ -488,7 +488,7 @@ class sttGoogle(convertToText):
     def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
         self.model = _model_setting(self, model)
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
-        # the older spelling. Embeddings accept both, and so does this.
+        # accepted too. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
                          or os.environ.get("GOOGLE_API_KEY"))
         # No ValueError — ADC may be available without an explicit key.
@@ -503,7 +503,6 @@ class sttGoogle(convertToText):
             Path to the audio file.
         options : dict | None, optional
             ``language``   — BCP-47 code, e.g. ``"en-US"``.  Default: ``"en-US"``.
-            ``model``      — default ``"latest_long"``.
             ``timestamps`` — ``True`` for word-level timestamps (JSON output).
             ``format``     — ``"text"`` (default) or ``"json"``.
 
@@ -721,9 +720,9 @@ class sttXAI(_OpenAICompatSTT):
     --------
     ::
 
-        from yait_aichain.tools import sttXAI
+        from yait_aichain.tools import transcribe
 
-        tool = sttXAI()
+        tool = transcribe("xai")
         text = tool.run(input="recording.mp3", options={"language": "en"})
     """
 
@@ -769,9 +768,9 @@ class sttQwen(_OpenAICompatSTT):
     --------
     ::
 
-        from yait_aichain.tools import sttQwen
+        from yait_aichain.tools import transcribe
 
-        tool = sttQwen()
+        tool = transcribe("qwen", model="qwen3-asr")
         text = tool.run(input="meeting.mp3", options={"language": "zh"})
     """
 

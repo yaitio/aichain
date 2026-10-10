@@ -223,7 +223,7 @@ class TestQwenEdit(unittest.TestCase):
         m.client._post = MagicMock(return_value=json.dumps({"output": {"choices": [
             {"message": {"content": [{"image": "https://img/out.png"}]}}]}}).encode())
         m.client._download = MagicMock(return_value={"data": _PNG, "media_type": "image/png"})
-        img = Skill(model=m, input={"messages": _edit_msgs()}, output=_OUT).run()
+        img = Skill(model=m, input={"messages": _edit_msgs()}, output=_OUT, _image=True).run()   # the image tool's own seam
         self.assertEqual(img["base64"], _B64)
         self.assertEqual(img["mime_type"], "image/png")
 

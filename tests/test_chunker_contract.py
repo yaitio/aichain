@@ -16,7 +16,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from yait_aichain.tools.vectordb import vectorChunk               # noqa: E402
+from yait_aichain.tools import Chunk                                  # noqa: E402
 
 PROSE = ("Alpha beta gamma delta epsilon zeta eta theta iota kappa. " * 40)
 
@@ -51,32 +51,32 @@ class TestTheCeilingIsNeverExceeded(unittest.TestCase):
     def test_prose(self):
         for size in (60, 120, 400):
             with self.subTest(max_chars=size):
-                chunker = vectorChunk(max_chars=size, overlap_chars=size // 4)
+                chunker = Chunk(max_chars=size, overlap_chars=size // 4)
                 for chunk in chunker.run(PROSE):
                     self.assertLessEqual(chunk["chars"], size)
 
     def test_markdown_with_code_and_a_table(self):
-        for chunk in vectorChunk(max_chars=80, overlap_chars=20).run(MARKDOWN):
+        for chunk in Chunk(max_chars=80, overlap_chars=20).run(MARKDOWN):
             self.assertLessEqual(chunk["chars"], 80)
 
     def test_a_single_word_longer_than_the_ceiling(self):
         """Documented: hard-split at the character level. The alternative is
         one chunk that breaks the ceiling and the embedder downstream."""
-        chunker = vectorChunk(max_chars=20, overlap_chars=5)
+        chunker = Chunk(max_chars=20, overlap_chars=5)
         for chunk in chunker.run("x" * 205):
             self.assertLessEqual(chunk["chars"], 20)
 
     def test_chars_is_the_length_it_claims(self):
         """A count carried beside the text is a second source of truth, and
         the cheap failure is that it stops matching."""
-        for chunk in vectorChunk(max_chars=400).run(PROSE):
+        for chunk in Chunk(max_chars=400).run(PROSE):
             self.assertEqual(chunk["chars"], len(chunk["text"]))
 
 
 class TestOverlap(unittest.TestCase):
 
     def test_consecutive_chunks_share_their_boundary(self):
-        chunks = vectorChunk(max_chars=200, overlap_chars=40,
+        chunks = Chunk(max_chars=200, overlap_chars=40,
                              merge_peers=False).run(PROSE)
         self.assertGreater(len(chunks), 2)
         overlapped = 0
@@ -90,16 +90,16 @@ class TestOverlap(unittest.TestCase):
     def test_overlap_does_not_break_the_ceiling(self):
         """The documented reason the window is trimmed: overlap is prepended
         *inside* the budget, not on top of it."""
-        for chunk in vectorChunk(max_chars=150, overlap_chars=60).run(PROSE):
+        for chunk in Chunk(max_chars=150, overlap_chars=60).run(PROSE):
             self.assertLessEqual(chunk["chars"], 150)
 
     def test_an_overlap_at_least_as_wide_as_the_ceiling_is_refused(self):
         """Documented as a ValueError on construction *and* on run — because
         one of the two is the path a Chain takes."""
         with self.assertRaises(ValueError):
-            vectorChunk(max_chars=100, overlap_chars=100)
+            Chunk(max_chars=100, overlap_chars=100)
         with self.assertRaises(ValueError):
-            vectorChunk(max_chars=100, overlap_chars=120)
+            Chunk(max_chars=100, overlap_chars=120)
 
 
 class TestTheEdgeCasesItNames(unittest.TestCase):
@@ -107,17 +107,17 @@ class TestTheEdgeCasesItNames(unittest.TestCase):
     documented edge case with no test is a claim."""
 
     def test_empty_string(self):
-        self.assertEqual(vectorChunk().run(""), [])
+        self.assertEqual(Chunk().run(""), [])
 
     def test_whitespace_only(self):
-        self.assertEqual(vectorChunk().run("   \n\n  \t "), [])
+        self.assertEqual(Chunk().run("   \n\n  \t "), [])
 
     def test_headings_only(self):
-        self.assertEqual(vectorChunk().run("# One\n\n## Two\n\n### Three\n"), [])
+        self.assertEqual(Chunk().run("# One\n\n## Two\n\n### Three\n"), [])
 
     def test_an_unclosed_code_block_is_still_text(self):
         text = "# T\n\nBefore.\n\n```python\ndef f():\n    return 1\n"
-        chunks = vectorChunk(max_chars=400).run(text)
+        chunks = Chunk(max_chars=400).run(text)
         self.assertTrue(chunks)
         self.assertIn("def f()", " ".join(c["text"] for c in chunks))
 
@@ -125,7 +125,7 @@ class TestTheEdgeCasesItNames(unittest.TestCase):
 class TestSeparators(unittest.TestCase):
 
     def test_a_code_block_within_budget_is_kept_whole(self):
-        chunks = vectorChunk(max_chars=400).run(MARKDOWN)
+        chunks = Chunk(max_chars=400).run(MARKDOWN)
         code = [c for c in chunks if "def hello()" in c["text"]]
         self.assertTrue(code)
         self.assertIn('return "world"', code[0]["text"])
@@ -136,7 +136,7 @@ class TestSeparators(unittest.TestCase):
         wrongly."""
         words = PROSE.split()
         joined = " ".join(c["text"] for c in
-                          vectorChunk(max_chars=120, overlap_chars=0,
+                          Chunk(max_chars=120, overlap_chars=0,
                                       merge_peers=False).run(PROSE)).split()
         self.assertEqual([w for w in words if w not in joined], [])
 

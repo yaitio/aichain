@@ -143,34 +143,7 @@ REQUIREMENT: frozenset = frozenset({
 def is_requirement(option: str) -> bool:
     """True when dropping *option* changes what comes back, not how good it
     is — see :data:`REQUIREMENT`."""
-    return canonical(option) in REQUIREMENT
-
-#: Names that used to be ours, and what they are called now. Kept rather than
-#: removed: renaming a public option breaks working code, and the library's
-#: own rule is that a caller is told what changed, not left to find out.
-#:
-#: Only two names were replaced, and the measurement is why. Most of the
-#: vocabulary turned out to be the field's shared lexicon rather than one
-#: vendor's: `aspect_ratio` goes on the wire under that name at four
-#: providers, `size` at three, `output_format` at two. `output_compression`
-#: and `input_fidelity` were OpenAI's alone — the first carrying a redundant
-#: "output" inside a dict already called `output["format"]`, the second
-#: ambiguous about what the input is fidelity *to*.
-ALIASES: dict = {
-    "output_compression": "compression",
-    # `input_fidelity` and `strength` named the same axis from opposite ends:
-    # measured on Recraft 2026-09-09, strength=0.05 left a blue square blue
-    # and strength=0.95 replaced it with the prompt, while OpenAI's
-    # input_fidelity asks how much of the original to keep. One intent, one
-    # name — the direction a caller cares about is what survives.
-    "input_fidelity":     "fidelity",
-    "reference_fidelity": "fidelity",
-}
-
-
-def canonical(option: str) -> str:
-    """The current name for *option*, which may be its own."""
-    return ALIASES.get(option, option)
+    return option in REQUIREMENT
 
 
 #: Words a caller may write instead of a number. The canonical type is the

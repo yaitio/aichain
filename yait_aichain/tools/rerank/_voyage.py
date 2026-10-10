@@ -1,6 +1,6 @@
 """
-tools.reranking._voyage — RerankVoyage
-========================================
+tools.rerank._voyage — RerankVoyage
+===================================
 
 Wraps the Voyage AI Rerank API (``POST /v1/rerank``).
 
@@ -53,9 +53,9 @@ class RerankVoyage(RerankBase):
     --------
     ::
 
-        from yait_aichain.tools.reranking import Reranker
+        from yait_aichain.tools import rerank
 
-        reranker = Reranker("voyage/rerank-2")
+        reranker = rerank("voyage", model="rerank-2")
         result   = reranker.rerank(
             "transformer architecture",
             ["Attention is all you need …", "Python syntax …", "BERT uses …"],

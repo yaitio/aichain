@@ -19,9 +19,6 @@ Agent(model, tools=[sh.browse, sh.read])        # reads, and cannot write or run
 Agent(model, tools=sh.tools)                    # all four
 ```
 
-`LocalTools(root_dir)` — all four at once — is what it replaced, and
-still works.
-
 ---
 
 ## The classes behind it
@@ -34,7 +31,7 @@ List directory contents as a tree.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import LocalBrowseTool` |
+| Import | `from yait_aichain.utilities.shell import LocalBrowseTool` |
 | Risk class | `write` |
 
 ```python
@@ -63,7 +60,7 @@ Read a file's contents.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import LocalReadTool` |
+| Import | `from yait_aichain.utilities.shell import LocalReadTool` |
 | Risk class | `write` |
 
 ```python
@@ -92,7 +89,7 @@ Write content to a file.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import LocalWriteTool` |
+| Import | `from yait_aichain.utilities.shell import LocalWriteTool` |
 | Risk class | `write` |
 
 ```python
@@ -121,7 +118,7 @@ Execute a shell command or Python file.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import LocalRunTool` |
+| Import | `from yait_aichain.utilities.shell import LocalRunTool` |
 | Risk class | `write` |
 
 ```python

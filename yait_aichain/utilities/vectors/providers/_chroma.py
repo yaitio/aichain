@@ -1,6 +1,6 @@
 """
-tools.vectordb.providers._chroma
-=================================
+utilities.vectors.providers._chroma
+===================================
 
 ChromaBackend — VectorBackend adapter for ChromaDB via its REST API v2.
 
@@ -92,13 +92,13 @@ class ChromaBackend(VectorBackend):
     --------
     Local server::
 
-        from yait_aichain.tools.vectordb import VectorDB
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.utilities.vectors import VectorDB
+        from yait_aichain.tools import embed
 
         store = VectorDB(
             "chroma",
             collection = "my_docs",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
             url        = "http://localhost:8000",
         )
 
@@ -107,7 +107,7 @@ class ChromaBackend(VectorBackend):
         store = VectorDB(
             "chroma",
             collection = "my_docs",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
             url        = "https://api.trychroma.com",
             api_key    = "ch-...",
         )

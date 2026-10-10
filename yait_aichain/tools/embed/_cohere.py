@@ -1,6 +1,6 @@
 """
-tools.embedding._cohere — EmbeddingCohere
-==========================================
+tools.embed._cohere — EmbeddingCohere
+======================================
 
 Wraps the Cohere Embed v2 API (``POST /v2/embed``).
 
@@ -60,9 +60,9 @@ class EmbeddingCohere(Embedder):
     --------
     ::
 
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools import embed
 
-        embedder = Embedding("cohere/embed-v4.0")
+        embedder = embed("cohere", model="embed-v4.0")
         result   = embedder.embed(
             ["What is RAG?", "Retrieval-Augmented Generation combines …"],
             input_type="query",
@@ -120,5 +120,3 @@ class EmbeddingCohere(Embedder):
         return embeddings, total_tokens, metadata
 
 
-# Backward-compatible alias
-CohereEmbedder = EmbeddingCohere

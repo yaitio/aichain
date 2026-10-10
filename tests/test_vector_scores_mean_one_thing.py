@@ -25,7 +25,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from yait_aichain.tools.vectordb._base import (METRICS,               # noqa: E402
+from yait_aichain.utilities.vectors._base import (METRICS,               # noqa: E402
                                                normalise_score)
 
 
@@ -73,7 +73,7 @@ class TestEveryBackendAgrees(unittest.TestCase):
     a response, not about constructing a client."""
 
     def _qdrant(self, raw, metric):
-        from yait_aichain.tools.vectordb.providers._qdrant import QdrantBackend
+        from yait_aichain.utilities.vectors.providers._qdrant import QdrantBackend
         b = QdrantBackend.__new__(QdrantBackend)
         b._metric = metric
         b._post = lambda *a, **k: {"result": [
@@ -81,7 +81,7 @@ class TestEveryBackendAgrees(unittest.TestCase):
         return b.query("col", [0.1])[0]
 
     def _pinecone(self, raw, metric):
-        from yait_aichain.tools.vectordb.providers._pinecone import PineconeBackend
+        from yait_aichain.utilities.vectors.providers._pinecone import PineconeBackend
         b = PineconeBackend.__new__(PineconeBackend)
         b._metric = metric
         b._index_url = "https://h"
@@ -133,16 +133,16 @@ class TestTheMetricIsDeclaredNotGuessed(unittest.TestCase):
 
     def test_both_backends_take_a_metric(self):
         import inspect
-        from yait_aichain.tools.vectordb.providers._pinecone import PineconeBackend
-        from yait_aichain.tools.vectordb.providers._qdrant import QdrantBackend
+        from yait_aichain.utilities.vectors.providers._pinecone import PineconeBackend
+        from yait_aichain.utilities.vectors.providers._qdrant import QdrantBackend
         for cls in (QdrantBackend, PineconeBackend):
             with self.subTest(backend=cls.__name__):
                 self.assertIn("metric",
                               inspect.signature(cls.__init__).parameters)
 
     def test_and_default_to_the_same_one(self):
-        from yait_aichain.tools.vectordb.providers._pinecone import PineconeBackend
-        from yait_aichain.tools.vectordb.providers._qdrant import QdrantBackend
+        from yait_aichain.utilities.vectors.providers._pinecone import PineconeBackend
+        from yait_aichain.utilities.vectors.providers._qdrant import QdrantBackend
         self.assertEqual(QdrantBackend._metric, PineconeBackend._metric)
 
 

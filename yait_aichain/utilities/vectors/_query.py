@@ -1,26 +1,25 @@
 """
-tools.vectordb._query
-======================
+utilities.vectors._query
+========================
 
 VectorQueryTool — semantic similarity search (main RAG tool).
 
-This is the primary tool for retrieval-augmented generation pipelines.
-Drop it into any Chain step; it embeds the query text and returns the
-most relevant documents from the vector store.
+It embeds the query text and returns the most relevant documents from the
+vector store. ``Vectors`` builds one as ``kb.query``, the tool an agent gets.
 
-Chain usage
------------
+Usage
+-----
 ::
 
-    from yait_aichain.tools.vectordb import VectorDB, vectorQuery
-    from yait_aichain.tools.embedding import Embedding
+    from yait_aichain.utilities.vectors import VectorDB, VectorQueryTool
+    from yait_aichain.tools import embed
 
     store = VectorDB(
         "chroma",
         collection = "knowledge_base",
-        embedder   = Embedding("openai/text-embedding-3-small"),
+        embedder   = embed("openai", model="text-embedding-3-small"),
     )
-    tool = vectorQuery(store)
+    tool = VectorQueryTool(store)
 
     # Standalone
     results = tool.run("how does KV caching work?", {"n": 5})
@@ -105,8 +104,8 @@ class VectorQueryTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting — until 3.7.0 a call's
-        ``collection`` option switched it, so a model could read or write
+        """The store. Its collection is a setting, not a call's: a
+        ``collection`` option is refused, so a model cannot read or write
         another collection than the one the code chose."""
         if "collection" in opts:
             raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
@@ -117,7 +116,3 @@ class VectorQueryTool(Tool):
         return f"VectorQueryTool(store={self._store!r})"
 
 
-# ── Convenience alias (follows naming convention: camelCase factory) ───────────
-def vectorQuery(store: VectorStore) -> VectorQueryTool:
-    """Return a :class:`VectorQueryTool` bound to *store*."""
-    return VectorQueryTool(store)

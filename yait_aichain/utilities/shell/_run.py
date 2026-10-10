@@ -1,6 +1,6 @@
 """
-tools.local._run — LocalRunTool
-=================================
+utilities.shell._run — LocalRunTool
+===================================
 
 Execute a shell command or Python file. The working directory is set to the
 sandbox root (or a sub-directory of it).
@@ -145,6 +145,3 @@ class LocalRunTool(Tool, SandboxedTool):
         }
 
 
-def localRun(root_dir: str | None = None) -> LocalRunTool:
-    """Return a :class:`LocalRunTool` sandboxed to *root_dir*."""
-    return LocalRunTool(root_dir)

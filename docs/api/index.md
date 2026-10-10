@@ -20,7 +20,6 @@ What a thing is for, and how to use it well, is in the guides.
 | [State](state.md) | `RunContext`, `Suspend`, stores, `RunDocument` |
 | [Eval](eval.md) | `Eval`, `Case`, `Report`, the scorers |
 | [Errors](errors.md) | every exception a call can raise |
-| [Older names](compat.md) | names kept from before 3.x, and what replaced each |
 
 Data rather than code — the model registry, what each provider does with each
 option, environment variables, the YAML schema — is in [Reference](../reference/index.md).

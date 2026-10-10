@@ -30,7 +30,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from yait_aichain.tools.mcp import (
+from yait_aichain.utilities.mcp._tools import (
     MCPTool,
     MCPTools,
     _is_sse,
@@ -337,7 +337,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
         """Call tool.run() with a mocked client returning result_data."""
         call_result = _make_call_result(data=result_data)
         mock = _mock_client(call_tool_return=call_result)
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             return tool.run(input=arguments)
 
     # ── basic invocation ────────────────────────────────────────────────────
@@ -353,7 +353,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
     def test_run_with_no_args_passes_empty_dict(self):
         call_result = _make_call_result(data="ok")
         mock = _mock_client(call_tool_return=call_result)
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             result = self._tool().run()
         self.assertEqual(result, "ok")
 
@@ -369,14 +369,14 @@ class TestMCPToolRunMocked(unittest.TestCase):
             return call_result
 
         mock.call_tool = capture_call
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             self._tool().run(message="hello via kwarg")
         self.assertEqual(captured["args"], {"message": "hello via kwarg"})
 
     def test_an_argument_given_twice_is_refused(self):
         # 3.7.0: the keyword used to win over the dict in silence.
         mock = _mock_client(call_tool_return=_make_call_result(data="ok"))
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             with self.assertRaisesRegex(ValueError, r"\['message'\] given both"):
                 self._tool().run(input={"message": "from dict"}, message="from kwarg")
         mock.call_tool.assert_not_called()
@@ -391,7 +391,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
             return call_result
 
         mock.call_tool = capture_call
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             self._tool().run(input="plain string")
         self.assertEqual(captured["args"], {"input": "plain string"})
 
@@ -405,7 +405,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
             return call_result
 
         mock.call_tool = capture_call
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             self._tool().run(input=None)
         self.assertEqual(captured["args"], {})
 
@@ -414,7 +414,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
     def test_call_style_returns_tool_result(self):
         call_result = _make_call_result(data="value")
         mock = _mock_client(call_tool_return=call_result)
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             result = self._tool()(message="hi")
         self.assertIsInstance(result, ToolResult)
         self.assertTrue(result)
@@ -423,7 +423,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
     def test_call_style_error_returns_failure(self):
         mock = _mock_client()
         mock.call_tool = AsyncMock(side_effect=RuntimeError("tool failed"))
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             result = self._tool()(message="hi")
         self.assertIsInstance(result, ToolResult)
         self.assertFalse(result)
@@ -432,7 +432,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
     def test_call_style_never_raises(self):
         mock = _mock_client()
         mock.call_tool = AsyncMock(side_effect=RuntimeError("boom"))
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             try:
                 self._tool()(message="hi")
             except Exception as exc:
@@ -450,7 +450,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
             return call_result
 
         mock.call_tool = capture_call
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             MCPTool("echo", "Echo.", "https://example.com/mcp", call_timeout=30.0).run(message="hi")
         self.assertEqual(captured["kw"].get("timeout"), 30.0)
 
@@ -469,7 +469,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
             return call_result
 
         mock.call_tool = capture_call
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             self._tool().run()
         self.assertNotIn("timeout", captured.get("kw", {}))
 
@@ -486,7 +486,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
 
         mock.call_tool = capture_call
         tool = MCPTool("my_specific_tool", "desc", "https://example.com/mcp")
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tool.run()
         self.assertEqual(captured["name"], "my_specific_tool")
 
@@ -503,26 +503,26 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
             _make_mcp_tool_info("search", "Search."),
             _make_mcp_tool_info("summarise", "Summarise."),
         ])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertIsInstance(tools, list)
         self.assertEqual(len(tools), 2)
 
     def test_each_item_is_mcp_tool(self):
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("t1", "T1")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertIsInstance(tools[0], MCPTool)
 
     def test_tool_name_set_from_server(self):
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("weather", "Get wx.")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools[0].name, "weather")
 
     def test_tool_description_set_from_server(self):
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("wx", "Get weather data.")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools[0].description, "Get weather data.")
 
@@ -533,7 +533,7 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
             "required": ["city"],
         }
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("wx", "", schema)])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools[0].parameters, schema)
 
@@ -542,27 +542,27 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
         # it, so it is read only when `input_schema` is absent.
         schema = {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("wx", "", schema, field="inputSchema")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools[0].parameters, schema)
 
     def test_tool_inherits_server_spec(self):
         server = "https://example.com/mcp"
         mock   = _mock_client(list_tools_return=[_make_mcp_tool_info("t")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools(server)
         self.assertEqual(tools[0]._server, server)
 
     def test_tool_inherits_headers(self):
         hdrs = {"Authorization": "Bearer sk-x"}
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("t")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", headers=hdrs)
         self.assertEqual(tools[0]._headers, hdrs)
 
     def test_empty_server_returns_empty_list(self):
         mock = _mock_client(list_tools_return=[])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp")
         self.assertEqual(tools, [])
 
@@ -572,14 +572,14 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
             _make_mcp_tool_info("summarise"),
             _make_mcp_tool_info("translate"),
         ])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", filter=["search", "translate"])
         self.assertEqual(len(tools), 2)
         self.assertEqual({t.name for t in tools}, {"search", "translate"})
 
     def test_filter_empty_list_returns_nothing(self):
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("search")])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", filter=[])
         self.assertEqual(tools, [])
 
@@ -587,7 +587,7 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
         mock = _mock_client(list_tools_return=[
             _make_mcp_tool_info("a"), _make_mcp_tool_info("b"),
         ])
-        with patch("yait_aichain.tools.mcp._build_client", return_value=mock):
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", filter=None)
         self.assertEqual(len(tools), 2)
 

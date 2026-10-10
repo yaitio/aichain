@@ -1,6 +1,6 @@
 """
-tools.local._read — LocalReadTool
-===================================
+utilities.shell._read — LocalReadTool
+=====================================
 
 Read a file's contents, optionally restricted to a line range.
 All paths are sandboxed to the configured root directory.
@@ -99,6 +99,3 @@ class LocalReadTool(Tool, SandboxedTool):
         return header + "".join(chunk)
 
 
-def localRead(root_dir: str | None = None) -> LocalReadTool:
-    """Return a :class:`LocalReadTool` sandboxed to *root_dir*."""
-    return LocalReadTool(root_dir)

@@ -68,7 +68,7 @@ A single tool from an MCP server, exposed as a standard aichain Tool.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import MCPTool` |
+| Import | `from yait_aichain.utilities.mcp import MCPTool` |
 | Risk class | `write` |
 
 ```python

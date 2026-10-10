@@ -3,31 +3,33 @@ chain._chain
 ============
 
 ``Chain`` — a sequential pipeline of :class:`~skills.Skill`,
-:class:`~tools.Tool`, and :class:`~agent.Agent` instances.
+:class:`~tools.Tool` and :class:`~agent.Agent` instances, plain functions and
+utilities' methods.
 
 A Chain wires steps together so each step's output automatically feeds the
-next step's input as a named variable.  Skills, Tools, and Agents can be
-freely mixed in any order.
+next step's input as a named variable.  The kinds of step can be freely mixed
+in any order; a pause for a person or a signal is a step too, made with
+``wait(...)`` or ``gate(tool, ...)``.
 
 Step specification
 ------------------
 Each element of *steps* may be any of the following forms:
 
   * ``runner``
-        Bare Skill, Tool, or Agent.  String output stored under ``"result"``.
+        Bare Skill, tool, Agent, or function.  Output stored under
+        ``"result"``.
 
   * ``(runner, output_key: str)``
         String output stored under *output_key*.
 
   * ``(runner, output_key: str, input_map: dict)``
-        Same as above **plus** an *input_map* that renames accumulated
-        variables before they are injected into the step.
+        Same as above **plus** an *input_map* that fills the step's
+        arguments from the accumulated variables.
 
-        ``input_map`` has the form ``{"param_name": "accumulated_var"}``.
-        For example ``{"source": "url"}`` tells the step to pass
-        ``accumulated["url"]`` as the ``source`` argument.
-        Useful when the accumulated variable name differs from the parameter
-        name the runner expects.
+        ``input_map`` has the form ``{"param_name": value}``, where *value*
+        is a variable's name or a ``"{template}"``.  ``{"source": "url"}``
+        passes ``accumulated["url"]`` as the ``source`` argument;
+        ``{"text": "Title: {french}"}`` passes the template filled in.
 
   * ``(runner, output_key: str, input_map: dict, options: dict)``
         Same as above **plus** an *options* dict for step-level settings.
@@ -41,8 +43,7 @@ Each element of *steps* may be any of the following forms:
         ``output_field`` (str,  default ``"output"``)
             Which field of the :class:`~agent.AgentResult` to extract as
             the step's output.  Use ``"output"`` for the final answer
-            (default), ``"memory"`` for the agent's memory snapshot, or
-            any other ``AgentResult`` attribute name.
+            (default), or any other ``AgentResult`` attribute name.
 
 Variable flow
 -------------
@@ -62,6 +63,9 @@ Variable flow
      have a matching accumulated variable are forwarded, so extra variables
      are silently ignored and never cause unexpected keyword errors.
 
+   * **Function / method** — called with the arguments its signature names,
+     filled the same way; a required one the chain cannot fill is an error.
+
    * **Agent** — ``agent.run(task=accumulated[task_key],
      variables=accumulated)`` is called.  The task string is read from
      ``accumulated[task_key]`` (default key: ``"task"``).  The
@@ -73,15 +77,16 @@ Variable flow
      * ``str`` output  →  ``accumulated[output_key] = output``
      * ``dict`` output →  ``accumulated.update(output)``
 
-4. The final step's output is returned by ``run()``.
+4. ``run()`` returns a :class:`ChainResult`: ``.output`` is the final step's
+   output and ``result["key"]`` any step's.
 
-Memory / history
-----------------
+History
+-------
 After each ``run()`` call, ``chain.history`` holds one record per step::
 
     {
         "step":       int,                    # 0-based index
-        "kind":       "skill"|"tool"|"agent", # type of runner
+        "kind":       "skill"|"tool"|"agent"|"call", # type of runner
         "name":       str,                    # runner.name or "step_N"
         "input":      dict,                   # accumulated vars before step
         "output":     str|dict,               # raw output from the runner
@@ -180,9 +185,7 @@ def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
         a literal.
 
     A name or a template naming a variable the chain does not have, and a
-    parameter the tool does not take, are errors that say which. Until 3.4.0
-    a template was looked up as a variable's name, found nothing and was
-    dropped in silence; a dict raised ``TypeError: unhashable type``.
+    parameter the tool does not take, are errors that say which.
 
     Parameters
     ----------
@@ -351,7 +354,7 @@ class Chain:
         self.name           = name
         self.description    = description
         self.on_step_error  = on_step_error
-        self.hooks          = list(hooks or [])     # observability hooks (1.4.4)
+        self.hooks          = list(hooks or [])     # observability hooks
         # A store is always present (default: process-local in-memory) so the
         # engine has one uniform path; pass store= for persistence (FileStore,
         # S3, …). It holds suspended runs for resume.
@@ -393,7 +396,7 @@ class Chain:
         self.context = None
 
     def _emit(self, etype: str, **fields) -> None:
-        """Dispatch a step-boundary :class:`Event` to registered hooks (1.4.4)."""
+        """Dispatch a step-boundary :class:`Event` to registered hooks."""
         if self.hooks:
             emit(self.hooks, Event(type=etype, **fields))
 
@@ -418,7 +421,8 @@ class Chain:
             call-time values win.
         on_step_error : str | None, optional
             Override the instance-level ``on_step_error`` for this call only.
-            Must be ``"raise"``, ``"stop"``, or ``"skip"`` when provided.
+            Must be ``"raise"``, ``"stop"``, ``"skip"`` or ``"collect"`` when
+            provided.
         context : RunContext, optional
             The tenant and metadata of this request, ambient for every step; a
             ``Model(api_key=callable)`` resolves its key from it.
@@ -675,14 +679,10 @@ class Chain:
 
                 elif kind == "agent":
                     # An agent step always starts a run. An agent can park
-                    # its own run since 2026-09-18, but the chain does not
-                    # carry that pause: two levels of resume would need the
-                    # child's run id threaded through this document, and the
-                    # pause belongs in the chain as a step when the chain is
-                    # what waits. Until 2.19.1 this branch also "resumed a
-                    # child run" through `runner.resume`, which at the time
-                    # did not exist: unreachable, and mutation testing showed
-                    # no test could tell it from deleting it.
+                    # its own run, but the chain does not carry that pause:
+                    # two levels of resume would need the child's run id
+                    # threaded through this document, and the pause belongs
+                    # in the chain as a step when the chain is what waits.
                     task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
                     task     = accumulated.get(task_key, "")
                     if not task:
@@ -873,7 +873,7 @@ class Chain:
         Each record contains:
 
         ``step``       — 0-based step index
-        ``kind``       — ``"skill"`` or ``"tool"``
+        ``kind``       — ``"skill"``, ``"tool"``, ``"agent"`` or ``"call"``
         ``name``       — runner name (or ``"step_N"`` if unnamed)
         ``input``      — accumulated variable dict *before* this step ran
         ``output``     — raw output (``str`` or ``dict``)
@@ -956,17 +956,10 @@ class Chain:
             elif kind == "agent":
                 cls        = type(runner)
                 class_path = f"{cls.__module__}.{cls.__qualname__}"
-                # Serialise the Agent's constructor fields.
-                #
-                # Written against the pre-2.0 agent until 2026-09-11, entirely
-                # through `getattr(..., default)`: `orchestrator`, `max_steps`,
-                # `max_attempts`, `max_tokens` and `persona` stopped existing
-                # in 2.0 and every read fell back to its default, so a saved
-                # chain lost the model, the instructions and the stop
-                # conditions and gained three invented budget numbers — then
-                # `Chain.load` raised TypeError on the null model name. The
-                # defaults are what made it quiet: `getattr` with a fallback
-                # turns a renamed attribute into a plausible value.
+                # Serialise the Agent's constructor fields, read directly
+                # rather than through `getattr(..., default)`: a fallback
+                # turns a missing attribute into a plausible value and a
+                # saved chain into a different one, in silence.
                 agent_data: dict = {
                     "class":       class_path,
                     "model":       runner.model.name,
@@ -1091,12 +1084,6 @@ class Chain:
         Parameters
         ----------
         path : str
-            Path to a YAML file previously written by :meth:`save`.
-        api_key : str | None, optional
-            Override the API key used for **all** Skill models in this chain.
-            When omitted, each model's key is read from its provider's
-            environment variable.
-        path : str
             The YAML file ``save()`` wrote.
         api_key : str | None, optional
             A key for every Skill step's model; each reads its own provider's from
@@ -1196,15 +1183,12 @@ class Chain:
                         continue                     # and cannot come back
                     stop_when.append(build(spec["value"]))
 
-                # `model`, not `orchestrator`. A file written before
-                # 2026-09-11 carries the old key with a null value, which is
-                # not something to paper over: it never held the model name.
+                # An agent step with no `model` cannot be rebuilt; refuse it
+                # rather than guess one.
                 if "model" not in ad:
                     raise ValueError(
-                        "This chain was saved by a version whose agent "
-                        "serialisation was broken: the model name was never "
-                        "written (see CHANGELOG 2.6.1). Rebuild the chain in "
-                        "code and save it again.")
+                        "This chain file has an agent step with no model name. "
+                        "Rebuild the chain in code and save it again.")
                 agent = _Agent(
                     _Model(ad["model"], api_key=api_key),
                     tools        = tool_instances or None,
@@ -1321,7 +1305,7 @@ class Chain:
                 kind = "agent"
             elif callable(runner) and not hasattr(runner, "run"):
                 # A function or a utility's method — `kb.upsert` — called with
-                # the arguments its signature names (3.6.0).
+                # the arguments its signature names.
                 kind = "call"
             else:
                 kind = "skill"

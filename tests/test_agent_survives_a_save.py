@@ -94,7 +94,7 @@ class TestWhatCannotComeBackIsSaidOutLoud(unittest.TestCase):
         self.assertTrue(any("cannot be serialised" in str(w.message)
                             for w in caught))
 
-    def test_a_file_from_the_broken_versions_is_refused(self):
+    def test_an_agent_step_with_no_model_is_refused(self):
         """It carries `orchestrator: null` — a key that never held the model
         name. Papering over it would rebuild a different agent and say
         nothing."""
@@ -107,7 +107,7 @@ class TestWhatCannotComeBackIsSaidOutLoud(unittest.TestCase):
                           "max_steps": 10}}]}, fh)
         with self.assertRaises(ValueError) as caught:
             Chain.load(path, api_key="k")
-        self.assertIn("model name was never", str(caught.exception))
+        self.assertIn("no model name", str(caught.exception))
 
 
 if __name__ == "__main__":

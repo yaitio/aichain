@@ -94,7 +94,7 @@ is a [tool](tools/media.md).
 
 | | |
 |---|---|
-| **Start** | [Installation](start/installation.md) · [Quickstart](start/quickstart.md) — five minutes, four steps · [Concepts](start/concepts.md) — six ideas, one screen each |
+| **Start** | [Installation](start/installation.md) · [Quickstart](start/quickstart.md) — five minutes, four steps · [Concepts](start/concepts.md) — six ideas, one screen each · [Migrating to 4.0](start/migrating-to-4.md) |
 | **Guides** — what each part is for, why it is built the way it is, how to use it well | [Pipelines](pipelines/skills.md) · [Agents](agents/overview.md) · [Tools](tools/index.md) · [Utilities](utilities/index.md) · [Cost](control/cost-and-budget.md) · [Permissions](control/permissions.md) · [Observability](control/observability.md) · [Eval](control/eval.md) · [Models](models/models.md) |
 | **The three promises** | [Build with your coding agent](with-your-agent.md) · [From laptop to production](production.md) · [Never in silence](models/models.md#never-in-silence) |
 | **[API](api/index.md)** | every class, function and parameter — generated from the code, so it cannot drift from it |

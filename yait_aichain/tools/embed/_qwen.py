@@ -1,6 +1,6 @@
 """
-tools.embedding._qwen — EmbeddingQwen
-=======================================
+tools.embed._qwen — EmbeddingQwen
+=================================
 
 Wraps the Alibaba DashScope Embeddings API via the OpenAI-compatible
 endpoint (``POST /compatible-mode/v1/embeddings``).
@@ -20,7 +20,7 @@ Model notes
     ``"document"``  → ``"document"``
     ``None``        → omitted (provider picks the default)
 * ``text-embedding-v4`` and ``text-embedding-v3`` support variable
-  ``dimensions``; on any other model it is refused when the embedder is made (3.7.0).
+  ``dimensions``; on any other model it is refused when the embedder is made.
 * The API accepts up to 25 strings per request; the base class handles
   automatic chunking for larger inputs.
 
@@ -81,15 +81,14 @@ class EmbeddingQwen(Embedder):
     --------
     ::
 
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools import embed
 
-        # Provider-prefixed
-        e = Embedding("qwen/text-embedding-v4")
+        e = embed("qwen", model="text-embedding-v4")
         r = e.embed("What is machine learning?", input_type="query")
         print(r.dimensions)   # 1024
 
         # Custom dimensions
-        e = Embedding("qwen/text-embedding-v4", dimensions=512)
+        e = embed("qwen", model="text-embedding-v4", dimensions=512)
         r = e.embed(["text A", "text B"])
         print(len(r.embeddings[0]))   # 512
     """

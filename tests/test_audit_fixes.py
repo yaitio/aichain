@@ -66,7 +66,7 @@ class TestBrokenImports(unittest.TestCase):
 
     def test_qwen_embedder_internal_import(self):
         """EmbeddingQwen._embed_request must resolve its lazy import."""
-        from yait_aichain.tools.embedding._qwen import EmbeddingQwen
+        from yait_aichain.tools.embed._qwen import EmbeddingQwen
 
         emb = EmbeddingQwen("text-embedding-v4", api_key="test-key")
         emb._http = MagicMock()
@@ -85,7 +85,7 @@ class TestBrokenImports(unittest.TestCase):
 
     def test_qwen_reranker_internal_import(self):
         """RerankQwen._rerank_request must resolve its lazy import."""
-        from yait_aichain.tools.reranking._qwen import RerankQwen
+        from yait_aichain.tools.rerank._qwen import RerankQwen
 
         rr = RerankQwen("gte-rerank-v2", api_key="test-key")
         rr._http = MagicMock()
@@ -176,7 +176,7 @@ class TestRetryPolicy(unittest.TestCase):
 class TestDeleteEmptyIds(unittest.TestCase):
 
     def _store(self):
-        from yait_aichain.tools.vectordb._base import VectorStore
+        from yait_aichain.utilities.vectors._base import VectorStore
         backend = MagicMock()
         return VectorStore(backend, "test-collection"), backend
 
@@ -220,8 +220,8 @@ class TestDeleteEmptyIds(unittest.TestCase):
         )
 
     def test_delete_tool_rejects_empty_input(self):
-        from yait_aichain.tools.vectordb._delete import VectorDeleteTool
-        from yait_aichain.tools.vectordb._base import VectorStore
+        from yait_aichain.utilities.vectors._delete import VectorDeleteTool
+        from yait_aichain.utilities.vectors._base import VectorStore
 
         backend = MagicMock()
         store = VectorStore(backend, "test-collection")
@@ -377,7 +377,7 @@ class TestMcpBridgeTimeout(unittest.TestCase):
 
     def test_hung_coroutine_raises_timeout(self):
         import asyncio
-        from yait_aichain.tools.mcp import _run_sync
+        from yait_aichain.utilities.mcp._tools import _run_sync
 
         async def _hang():
             await asyncio.sleep(60)
@@ -387,7 +387,7 @@ class TestMcpBridgeTimeout(unittest.TestCase):
         self.assertIn("did not complete", str(ctx.exception))
 
     def test_fast_coroutine_unaffected(self):
-        from yait_aichain.tools.mcp import _run_sync
+        from yait_aichain.utilities.mcp._tools import _run_sync
 
         async def _quick():
             return 42
@@ -395,7 +395,7 @@ class TestMcpBridgeTimeout(unittest.TestCase):
         self.assertEqual(_run_sync(_quick(), timeout=5.0), 42)
 
     def test_no_timeout_still_works(self):
-        from yait_aichain.tools.mcp import _run_sync
+        from yait_aichain.utilities.mcp._tools import _run_sync
 
         async def _quick():
             return "ok"
@@ -486,7 +486,7 @@ class TestGoogleKeyInHeader(unittest.TestCase):
         self.assertEqual(m.client._auth_headers()["x-goog-api-key"], "SECRET")
 
     def test_embedder_uses_header(self):
-        from yait_aichain.tools.embedding._google import EmbeddingGoogle
+        from yait_aichain.tools.embed._google import EmbeddingGoogle
 
         emb = EmbeddingGoogle("gemini-embedding-001", api_key="SECRET")
         captured: dict = {}
@@ -509,8 +509,8 @@ class TestGoogleKeyInHeader(unittest.TestCase):
 class TestChunkerContract(unittest.TestCase):
 
     def _tool(self, **kw):
-        from yait_aichain.tools.vectordb._chunk import VectorChunkTool
-        return VectorChunkTool(**kw)
+        from yait_aichain.tools.chunk._chunk import Chunk
+        return Chunk(**kw)
 
     def test_code_respects_max_chars(self):
         doc    = "```python\nx = " + "a" * 200 + "\n```"
@@ -548,7 +548,7 @@ class TestChunkerContract(unittest.TestCase):
 class TestQdrantStringIds(unittest.TestCase):
 
     def test_point_id_mapping(self):
-        from yait_aichain.tools.vectordb.providers._qdrant import _point_id
+        from yait_aichain.utilities.vectors.providers._qdrant import _point_id
         import uuid as _uuid
 
         self.assertEqual(_point_id("42"), 42)            # digits → int
@@ -559,7 +559,7 @@ class TestQdrantStringIds(unittest.TestCase):
         self.assertEqual(mapped, _point_id("doc_1"))     # deterministic
 
     def test_upsert_and_query_roundtrip_original_id(self):
-        from yait_aichain.tools.vectordb.providers._qdrant import QdrantBackend
+        from yait_aichain.utilities.vectors.providers._qdrant import QdrantBackend
 
         backend = QdrantBackend(url="http://localhost:6333")
         sent: dict = {}
@@ -570,7 +570,7 @@ class TestQdrantStringIds(unittest.TestCase):
             "payload": sent["points"][0]["payload"],
         }]}
 
-        from yait_aichain.tools.vectordb._base import VectorRecord
+        from yait_aichain.utilities.vectors._base import VectorRecord
         rec = VectorRecord(id="doc_1", text="hello", metadata={"k": "v"})
         backend.upsert("col", [rec], [[0.1, 0.2]])
 
@@ -584,7 +584,7 @@ class TestQdrantStringIds(unittest.TestCase):
         self.assertNotIn("_aichain_id", results[0].metadata)
 
     def test_delete_empty_raises(self):
-        from yait_aichain.tools.vectordb.providers._qdrant import QdrantBackend
+        from yait_aichain.utilities.vectors.providers._qdrant import QdrantBackend
 
         backend = QdrantBackend(url="http://localhost:6333")
         with self.assertRaises(ValueError):
@@ -595,7 +595,7 @@ class TestVectordbProviders(unittest.TestCase):
 
     def test_pinecone_document_key_not_eaten(self):
         """User metadata key 'document' must survive when 'text' exists."""
-        from yait_aichain.tools.vectordb.providers._pinecone import PineconeBackend
+        from yait_aichain.utilities.vectors.providers._pinecone import PineconeBackend
 
         backend = PineconeBackend.__new__(PineconeBackend)
         backend._index_url = "https://h"
@@ -613,7 +613,7 @@ class TestVectordbProviders(unittest.TestCase):
         self.assertEqual(records[0].metadata.get("document"), "contract.pdf")
 
     def test_upsert_batches_large_ingests(self):
-        from yait_aichain.tools.vectordb._base import VectorStore
+        from yait_aichain.utilities.vectors._base import VectorStore
 
         backend = MagicMock()
         store   = VectorStore(backend, "col")
@@ -628,7 +628,7 @@ class TestVectordbProviders(unittest.TestCase):
         self.assertEqual(sizes, [50, 50, 20])
 
     def test_chroma_uses_v2_endpoints(self):
-        from yait_aichain.tools.vectordb.providers._chroma import ChromaBackend
+        from yait_aichain.utilities.vectors.providers._chroma import ChromaBackend
 
         backend = ChromaBackend(url="http://localhost:8000")
         called: list = []

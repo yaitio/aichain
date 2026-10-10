@@ -13,12 +13,12 @@ Quick start
 ::
 
     from yait_aichain.models import Model
-    from yait_aichain.tools  import BraveSearchTool, MarkItDownTool
+    from yait_aichain.tools  import search, fetch
     from yait_aichain.agent  import Agent, step_count, cost_budget
 
     agent = Agent(
-        Model("claude-opus-5"),
-        tools     = [BraveSearchTool(), MarkItDownTool()],
+        Model("claude-haiku-5-5"),
+        tools     = [search("exa"), fetch("local")],
         stop_when = [step_count(20), cost_budget(0.50)],
     )
 
@@ -106,8 +106,7 @@ __all__ = [
     "Journal",
     "JournalEntry",
     "evidence",
-    # Memory — no longer wired into the loop by default; kept for eviction,
-    # which is where it earns its place once a conversation outgrows the window.
+    # Memory — a standalone key-value store; the agent loop does not use it.
     "AgentMemory",
     "MemoryBackend",
     "InMemoryBackend",

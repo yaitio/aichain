@@ -1,10 +1,10 @@
 """
-tools.vectordb._base
-====================
+utilities.vectors._base
+=======================
 
 VectorRecord  — uniform data model across all vector DB providers.
 VectorBackend — abstract base class for provider REST adapters.
-VectorStore   — orchestrator: wraps a backend + optional Embedder.
+VectorStore   — a backend + optional embedder, bound to one collection.
 
 Design
 ------
@@ -17,11 +17,11 @@ Every concrete backend:
 
 VectorStore sits above the backend and:
   • Holds the active collection name (so callers don't repeat it)
-  • Owns the optional Embedder for auto-vectorising text
+  • Owns the optional embedder for auto-vectorising text
   • Exposes a clean public API: create / query / upsert / fetch / delete / count
 
-Use the VectorDB() factory in __init__.py rather than constructing
-VectorStore + backend directly.
+``Vectors`` is the way in; ``VectorDB()`` builds the store underneath it.
+Neither needs VectorStore + backend constructed by hand.
 """
 
 from __future__ import annotations
@@ -283,14 +283,15 @@ class VectorBackend:
 
 
 # ---------------------------------------------------------------------------
-# VectorStore — orchestrator
+# VectorStore
 # ---------------------------------------------------------------------------
 
 class VectorStore:
     """
     Provider-agnostic vector store.
 
-    Wraps a :class:`VectorBackend` and an optional :class:`~tools.embedding.Embedder`.
+    Wraps a :class:`VectorBackend` and an optional embedder (``embed(...)``).
+    This is what ``Vectors`` is built on — ``kb.store``.
     Fixes the active ``collection`` so callers never repeat it.
 
     Parameters
@@ -308,13 +309,13 @@ class VectorStore:
     --------
     With auto-embedding::
 
-        from yait_aichain.tools.embedding import Embedding
-        from yait_aichain.tools.vectordb  import VectorDB
+        from yait_aichain.tools import embed
+        from yait_aichain.utilities.vectors  import VectorDB
 
         store = VectorDB(
             "chroma",
             collection = "knowledge_base",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
         )
         store.upsert([{"id": "1", "text": "LLMs use KV cache …"}])
         results = store.query("how does caching work?", n=3)

@@ -151,8 +151,3 @@ class TestOneAxisRunBothWays(unittest.TestCase):
             self._edit("gpt-image-1.5", fidelity="high")["input_fidelity"],
             "high")
 
-    def test_the_old_name_still_arrives(self):
-        """`input_fidelity` shipped in 2.2.x and cannot stop working."""
-        self.assertEqual(
-            self._edit("gpt-image-1.5", input_fidelity="high")["input_fidelity"],
-            "high")

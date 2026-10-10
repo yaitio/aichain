@@ -1,8 +1,9 @@
 """
-tools.rest_api — RestApiTool
-=============================
+utilities.rest._tool — RestApiTool
+===================================
 
-A universal REST endpoint tool.  One instance = one configured endpoint.
+A REST endpoint as a tool.  One instance = one configured endpoint; the
+usual way to make one is ``REST(base_url, …).endpoint(…)``.
 No boilerplate, no framework — drop any REST call directly into a Chain,
 Agent, or standalone script.
 
@@ -20,7 +21,7 @@ both directly and inside a Chain:
                                                          Chain auto-passes
                                                          from accumulated vars
 
-The two forms are merged, so partial overlap is fine.
+The two forms are merged; a field given in both is an error.
 
 Parameter routing
 -----------------
@@ -69,28 +70,21 @@ Quick example
 -------------
 ::
 
-    from yait_aichain.tools import RestApiTool
+    from yait_aichain.utilities import REST
 
-    # Declare the endpoint once
-    create_user = RestApiTool(
-        name        = "create_user",
-        description = "Create a new user account.",
-        method      = "POST",
-        url         = "https://api.example.com/users",
-        body_params = ["username", "email", "role"],
-        required_params = ["username", "email"],
-        auth        = {"type": "bearer", "env": "EXAMPLE_API_KEY"},
-    )
+    api = REST("https://api.example.com", description="Example user directory",
+               auth={"type": "bearer", "env": "EXAMPLE_API_KEY"})
+    create_user = api.endpoint("create_user", "POST", "/users",
+                               description="Create a new user account.",
+                               body_params=["username", "email", "role"],
+                               required_params=["username", "email"])
 
     # Call it directly
-    result = create_user.run(input={"username": "alice", "email": "a@b.com"})
+    result = create_user.run({"username": "alice", "email": "a@b.com"})
 
     # Or in a Chain — the Chain passes matching accumulated variables
     # automatically as individual kwargs:
     (create_user, "user_response")
-
-See ``examples/booking_api.py`` for a complete Chain example with
-the Restful Booker test API.
 """
 
 from __future__ import annotations
@@ -123,6 +117,9 @@ _DEFAULT_RETRIES = urllib3.Retry(total=2, backoff_factor=0.5,
 class RestApiTool(Tool):
     """
     A single REST endpoint exposed as a library Tool.
+
+    ``REST(...).endpoint(...)`` builds one with the API's base URL, auth and
+    headers filled in; construct it directly for a lone endpoint.
 
     Parameters
     ----------
@@ -247,9 +244,9 @@ class RestApiTool(Tool):
         self._content_type   = content_type
         self._response_field = response_field
         self._timeout        = timeout
-        # The token has one source (3.7.0): a callable, a field the code or a
-        # chain fills, or an environment variable — until now a field won over
-        # the variable in silence when both were set.
+        # The token has one source: a callable, a field the code or a chain
+        # fills, or an environment variable. Two of them is an error, so none
+        # can win over another in silence.
         sources = [k for k in ("token", "token_field", "env") if self._auth.get(k)]
         if len(sources) > 1:
             raise ValueError(f"RestApiTool {name!r}: auth takes one source of its token; got "
@@ -303,11 +300,11 @@ class RestApiTool(Tool):
         ----------
         input : dict | str | None, optional
             Field values as a dict.  A string value is treated as a
-            single ``"input"`` field (compatibility shim for plain-string
-            Chain steps).
+            single ``"input"`` field, for Chain steps that pass a plain
+            string.
         options : dict | None, optional
-            None. Headers and the timeout are settings of the tool since
-            3.7.0; options given here are an error that says so.
+            None. Headers and the timeout are settings of the tool; options
+            given here are an error that says so.
         **kwargs
             Individual field values, merged with *input*; a field given in
             both is an error.  This is the form used by Chains — each accumulated
@@ -339,8 +336,7 @@ class RestApiTool(Tool):
                              "as keyword arguments — pass each field once")
         data.update(kwargs)
 
-        # Headers and the timeout are the tool's settings since 3.7.0; a call's
-        # headers were merged over them, and the call won.
+        # Headers and the timeout are the tool's settings, not per-call options.
         if options:
             moved = [k for k in options if k in ("headers", "timeout")]
             raise ValueError(f"RestApiTool {self.name!r}: "

@@ -1,6 +1,6 @@
 """
-tools.vectordb.providers._pinecone
-====================================
+utilities.vectors.providers._pinecone
+=====================================
 
 PineconeBackend — VectorBackend adapter for Pinecone via its REST API.
 
@@ -86,13 +86,13 @@ class PineconeBackend(VectorBackend):
     --------
     ::
 
-        from yait_aichain.tools.vectordb import VectorDB
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.utilities.vectors import VectorDB
+        from yait_aichain.tools import embed
 
         store = VectorDB(
             "pinecone",
             collection = "my_namespace",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
             index      = "my-index",
         )
         store.upsert([{"id": "1", "text": "hello world"}])

@@ -20,7 +20,6 @@ the :meth:`Skill.load` class method.
 """
 
 import json
-import warnings
 import os
 import time
 from typing import TYPE_CHECKING
@@ -84,12 +83,12 @@ class Skill:
               ]
             }
 
-        **Multi-turn (directed reasoning, 1.5.0).** Several ``user`` turns
+        **Multi-turn (directed reasoning).** Several ``user`` turns
         separated by a "generate here" marker — an ``assistant`` turn with no
         ``parts`` — run as a sequence: each marker is one model call whose reply
         is appended to the running context (an ``assistant`` turn *with* parts
         is a fixed/seed turn, not a call). ``run()`` returns the last reply;
-        ``history`` holds each turn. Backward compatible: no markers → one call.
+        ``history`` holds each turn. No markers → one call.
 
     output : dict | None, optional
         Declares the expected output format.  Omit entirely (or pass ``None``
@@ -109,8 +108,8 @@ class Skill:
             # validated JSON schema
             output={"format": {"type": "json_schema", "schema": { ... }}}
 
-            # image generation
-            output={"modalities": ["image"], "format": {"type": "image"}}
+        A Skill makes text: ``output={"modalities": ["image"]}`` raises
+        ``ValueError``. Images are a tool — ``image(service, model=…)``.
 
     variables : dict | None, optional
         Default variable values.  Can be overridden or extended at call
@@ -147,7 +146,7 @@ class Skill:
         from yait_aichain.skills import Skill
 
         skill = Skill(
-            model=Model("gpt-4o"),
+            model=Model("gpt-6-luna"),
             input={
                 "messages": [
                     {"role": "system", "parts": ["Be concise."]},
@@ -163,7 +162,7 @@ class Skill:
     JSON output::
 
         skill = Skill(
-            model=Model("claude-sonnet-4-5"),
+            model=Model("claude-haiku-5-5"),
             input={
                 "messages": [
                     {"role": "user", "parts": [{"text": "List 3 facts about {topic} as JSON."}]},
@@ -197,6 +196,7 @@ class Skill:
         hooks:        list  | None  = None,
         max_cost:     "float | object | None" = None,
         _tools:       list  | None  = None,
+        _image:       bool          = False,
     ) -> None:
         # `prompt=` is the shortcut for the commonest shape there is: one
         # user message, one text part. The long form stays the only way to say
@@ -222,23 +222,21 @@ class Skill:
 
         # A single model or a fallback chain: on a transient failure
         # (rate limit / server / network) the next model is tried.  A bare
-        # model behaves exactly as before — self.model stays the primary.
+        # model is a chain of one — self.model is always the primary.
         self.models = list(model) if isinstance(model, (list, tuple)) else [model]
         if not self.models:
             raise ValueError("Skill requires at least one model.")
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
-        if output and "image" in (output.get("modalities") or []):
-            # An image model is a tool since 3.9.0 — it cannot be an agent's
-            # mind — and this path raises in 4.0. The tool builds its request
-            # through a Skill too, and hides this one notice for its own call.
-            from ..tools.image._tool import ImageSkillWarning
-            warnings.warn(ImageSkillWarning(
-                "a Skill with an image model is deprecated since 3.9.0 and raises in 4.0: an image "
-                "model is a tool — image(service, model=…).run(prompt, options={…})"),
-                # The caller's line: Skill.__init__ is wrapped once by _hints.
-                stacklevel=3)
+        if output and "image" in (output.get("modalities") or []) and not _image:
+            # An image model is a tool: it cannot be an agent's mind. The image
+            # tool builds its request through a Skill, by the `_image` seam,
+            # and that seam is the tool's alone.
+            raise ValueError(
+                "a Skill makes text; an image model is a tool — "
+                "image(service, model=…).run(prompt, options={…}), or "
+                "images=[…] to edit")
         # Internal seam, not public API — the leading underscore is the
         # contract. The Agent declares its tools here so the provider receives
         # them natively; Skill only *transports* declarations and returns the
@@ -252,7 +250,7 @@ class Skill:
         self.description = description
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self.hooks       = list(hooks or [])     # observability hooks (1.4.4)
+        self.hooks       = list(hooks or [])     # observability hooks
 
         # Token usage of the most recent run() — None until the first call.
         # Reading it is optional; it never affects run()'s inputs or output.
@@ -280,7 +278,7 @@ class Skill:
         self.last_result: "str | dict | None" = None
 
     def _emit(self, etype: str, **fields) -> None:
-        """Dispatch an observability :class:`Event` to registered hooks (1.4.4)."""
+        """Dispatch an observability :class:`Event` to registered hooks."""
         if self.hooks:
             emit(self.hooks, Event(type=etype, **fields))
 
@@ -375,11 +373,9 @@ class Skill:
 
         * **Retries stop at the first piece; there is no fallback chain.**
           Both work by throwing the attempt away and starting again, which is
-          impossible once the caller has seen something. 2.5.0 refused to
-          retry at all, reasoning that a rule holding only before the first
-          byte "holds sometimes", and that was wrong: *before the first piece*
-          is not a sometimes, it is a state the caller can see — nothing has
-          been yielded. So a transient failure (429, 5xx, network) retries
+          impossible once the caller has seen something. *Before the first
+          piece* is a state the caller can see — nothing has been yielded —
+          so a transient failure (429, 5xx, network) retries
           while the attempt is still discardable, exactly as ``run()`` does,
           and is raised once it is not. The fallback chain does stay out: a
           second model is a different answer, not a retry of this one, and
@@ -503,8 +499,8 @@ class Skill:
         """
         Run *messages* against a single model.
 
-        Single-shot when there are no ``assistant`` generate markers (the
-        original behavior). With markers (multi-turn directed reasoning), each
+        Single-shot when there are no ``assistant`` generate markers. With
+        markers (multi-turn directed reasoning), each
         marker — and the implicit final generate after a trailing ``user`` turn
         — is one model call; each reply is appended to the running context so
         later turns see it. The last call uses the skill's real output format;

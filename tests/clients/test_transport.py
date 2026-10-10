@@ -60,8 +60,8 @@ class TestMakeHttp(unittest.TestCase):
 
     def test_tool_client_uses_factory(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
-        from yait_aichain.tools import PerplexitySearchTool
-        tool = PerplexitySearchTool(api_key="k")
+        from yait_aichain.tools import search
+        tool = search("perplexity", api_key="k")
         self.assertIsInstance(tool._http, urllib3.ProxyManager)
 
 

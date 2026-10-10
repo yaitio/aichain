@@ -3,8 +3,8 @@ tools.general
 =============
 
 Tools that belong to no provider: ``wait`` parks a run until a signal arrives,
-``gate`` holds another tool until its call is approved. Until 3.5.0 they lived
-in ``tools._wait`` as ``Wait`` and ``Gate``, which still work.
+``gate`` holds another tool until its call is approved. The classes behind
+them are :class:`Wait` and :class:`Gate`.
 """
 
 from ._wait import Gate, Wait

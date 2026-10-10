@@ -1,6 +1,6 @@
 """
-tools.reranking._qwen — RerankQwen
-=====================================
+tools.rerank._qwen — RerankQwen
+===============================
 
 Wraps the Alibaba DashScope Text-Rerank API.
 
@@ -69,9 +69,9 @@ class RerankQwen(RerankBase):
     --------
     ::
 
-        from yait_aichain.tools.reranking import Reranker
+        from yait_aichain.tools import rerank
 
-        reranker = Reranker("qwen/gte-rerank")
+        reranker = rerank("qwen", model="gte-rerank")
         result   = reranker.rerank(
             "machine learning basics",
             ["ML is a subset of AI …", "Python syntax …", "Neural networks …"],

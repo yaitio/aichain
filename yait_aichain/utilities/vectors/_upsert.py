@@ -1,25 +1,25 @@
 """
-tools.vectordb._upsert
-=======================
+utilities.vectors._upsert
+=========================
 
 VectorUpsertTool — insert or update documents in a vector store.
 
 Typical use: ingestion pipeline step that indexes new content before
 the RAG query step can retrieve it.
 
-Chain usage
------------
+Usage
+-----
 ::
 
-    from yait_aichain.tools.vectordb import VectorDB, vectorUpsert
-    from yait_aichain.tools.embedding import Embedding
+    from yait_aichain.utilities.vectors import VectorDB, VectorUpsertTool
+    from yait_aichain.tools import embed
 
     store = VectorDB(
         "qdrant",
         collection = "docs",
-        embedder   = Embedding("openai/text-embedding-3-small"),
+        embedder   = embed("openai", model="text-embedding-3-small"),
     )
-    tool = vectorUpsert(store)
+    tool = VectorUpsertTool(store)
 
     # Standalone
     result = tool.run([
@@ -42,7 +42,7 @@ class VectorUpsertTool(Tool):
     """
     Insert or update records in a :class:`VectorStore`.
 
-    When an :class:`~tools.embedding.Embedder` is configured on the store,
+    When an embedder (``embed(...)``) is configured on the store,
     text is embedded automatically in a single batched call.  Records that
     already include a ``vector`` field bypass embedding entirely.
 
@@ -128,8 +128,8 @@ class VectorUpsertTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting — until 3.7.0 a call's
-        ``collection`` option switched it, so a model could read or write
+        """The store. Its collection is a setting, not a call's: a
+        ``collection`` option is refused, so a model cannot read or write
         another collection than the one the code chose."""
         if "collection" in opts:
             raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
@@ -140,7 +140,3 @@ class VectorUpsertTool(Tool):
         return f"VectorUpsertTool(store={self._store!r})"
 
 
-# ── Convenience alias ─────────────────────────────────────────────────────────
-def vectorUpsert(store: VectorStore) -> VectorUpsertTool:
-    """Return a :class:`VectorUpsertTool` bound to *store*."""
-    return VectorUpsertTool(store)

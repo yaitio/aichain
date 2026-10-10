@@ -1,6 +1,6 @@
 """
-tools.embedding._openai — EmbeddingOpenAI
-==========================================
+tools.embed._openai — EmbeddingOpenAI
+======================================
 
 Wraps the OpenAI Embeddings API (``POST /v1/embeddings``).
 
@@ -14,8 +14,7 @@ Model notes
 -----------
 * ``text-embedding-3-*`` accept a ``dimensions`` parameter (1–max-dim).
 * ``text-embedding-ada-002`` has a fixed length; ``dimensions`` on it is refused when the
-  embedder is made (3.7.0) — it was
-  omitted from the request body for that model.
+  embedder is made.
 * OpenAI does not distinguish query vs document embeddings; ``input_type`` is
   accepted by the interface but ignored.
 * The API accepts up to 2 048 strings per request.
@@ -53,9 +52,9 @@ class EmbeddingOpenAI(Embedder):
     --------
     ::
 
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools import embed
 
-        embedder = Embedding("text-embedding-3-large")
+        embedder = embed("openai", model="text-embedding-3-large")
         result   = embedder.embed("What is machine learning?", input_type="query")
         print(result.dimensions)   # 3072
     """
@@ -77,7 +76,7 @@ class EmbeddingOpenAI(Embedder):
         Send one ``/v1/embeddings`` request and return
         ``(embeddings, total_tokens, metadata)``.
 
-        ``input_type`` is accepted for interface compatibility but ignored
+        ``input_type`` is accepted, as every embedder takes it, but ignored
         (OpenAI does not distinguish query vs document).
         ``dimensions`` is forwarded only for models that support it.
         """
@@ -102,5 +101,3 @@ class EmbeddingOpenAI(Embedder):
         return embeddings, total_tokens, {}
 
 
-# Backward-compatible alias
-OpenAIEmbedder = EmbeddingOpenAI

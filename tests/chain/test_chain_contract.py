@@ -24,7 +24,7 @@ from yait_aichain import Budget, Chain, Model, Tracer                  # noqa: E
 from yait_aichain.agent import Agent as RealAgent, check, step_count   # noqa: E402
 from yait_aichain.chain._chain import _require_safe_tool_class         # noqa: E402
 from yait_aichain.state import RunContext, current                     # noqa: E402
-from yait_aichain.tools import VectorChunkTool, Wait                   # noqa: E402
+from yait_aichain.tools import Chunk, Wait                   # noqa: E402
 from yait_aichain.tools._base import Tool                              # noqa: E402
 
 try:
@@ -116,7 +116,7 @@ class TestUntrustedFilesCannotNameArbitraryCode(unittest.TestCase):
             _require_safe_tool_class("yait_aichain_evil.tools.Steal", trusted=False)
 
     def test_the_package_itself_is_allowed(self):
-        _require_safe_tool_class("yait_aichain.tools.vectordb._chunk.VectorChunkTool", trusted=False)
+        _require_safe_tool_class("yait_aichain.tools.chunk._chunk.Chunk", trusted=False)
 
     def test_trusted_allows_anything(self):
         _require_safe_tool_class("subprocess.Popen", trusted=True)
@@ -156,7 +156,7 @@ class TestLoad(unittest.TestCase):
             Chain.load(path)
         self.assertIn("telepathy", str(ctx.exception))
 
-    def test_an_agent_step_saved_without_a_model_says_where_to_look(self):
+    def test_an_agent_step_saved_without_a_model_says_what_to_do(self):
         path = self._file("""
             steps:
               - kind: agent
@@ -165,7 +165,7 @@ class TestLoad(unittest.TestCase):
         """)
         with self.assertRaises(ValueError) as ctx:
             Chain.load(path)
-        self.assertIn("2.6.1", str(ctx.exception))
+        self.assertIn("Rebuild the chain in code", str(ctx.exception))
 
     def test_a_missing_tool_class_is_an_import_error(self):
         path = self._file("""
@@ -183,7 +183,7 @@ class TestAnAgentStepSurvivesSaveAndLoad(unittest.TestCase):
 
     def test_round_trip(self):
         agent = RealAgent(Model("gpt-4o", api_key="k"),
-                          tools=[VectorChunkTool()],
+                          tools=[Chunk()],
                           stop_when=[step_count(3), check(lambda s: True, name="done")],
                           instructions="be brief", name="researcher",
                           description="finds things")
@@ -201,7 +201,7 @@ class TestAnAgentStepSurvivesSaveAndLoad(unittest.TestCase):
         self.assertEqual(step.instructions, "be brief")
         self.assertEqual((step.name, step.description), ("researcher", "finds things"))
         self.assertEqual(len(step.stop_when), 1)
-        self.assertEqual([type(t).__name__ for t in step.tools], ["VectorChunkTool"])
+        self.assertEqual([type(t).__name__ for t in step.tools], ["Chunk"])
 
 
 class TestStepShapes(unittest.TestCase):

@@ -13,8 +13,8 @@ declares, each with the name, description and schema the server gives it.
     deepwiki.call("read_wiki_structure", repoName="yaitio/aichain")   # the same, for code
     Agent(model, tools=deepwiki.tools)
 
-``MCPTool`` and ``MCPTools(server)`` — one tool, or every tool of a server —
-are what it is built on, and still work.
+Each tool is an ``MCPTool``. Two settings: ``connect_timeout`` bounds reaching
+the server and listing its tools, ``call_timeout`` one call of a tool.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class MCP(Utility):
                  connect_timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT,
                  call_timeout: "float | None" = None) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
-        # and one call of a tool. MCPTools calls the first `timeout`.
+        # and one call of a tool. The discovery function calls the first `timeout`.
         self.server = server
         self._settings = dict(filter=filter, headers=headers, env=env, cwd=cwd, transport=transport,
                               timeout=connect_timeout, call_timeout=call_timeout)
@@ -71,4 +71,4 @@ class MCP(Utility):
         return f"MCP({self.server!r})"
 
 
-__all__ = ["MCP", "MCPTool", "MCPTools"]
+__all__ = ["MCP", "MCPTool"]

@@ -1,6 +1,6 @@
 """
-tools.speech._tts — convertToSpeech
-==========================================
+tools.speech._tts — Speech
+==========================
 
 Base class and provider implementations for text-to-speech synthesis.
 
@@ -55,7 +55,7 @@ _DEFAULT_SPEED  = 1.0
 
 def _model_setting(tool, model):
     """The tool's model: the one given, or the provider's default. A setting,
-    fixed for the tool — a call no longer chooses it (3.7.0)."""
+    fixed for the tool — a call does not choose it."""
     default = getattr(type(tool), "_DEFAULT_MODEL", None)
     if model is not None and default is None:
         raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
@@ -85,8 +85,8 @@ def _without_options(parameters: dict, *keys: str) -> dict:
     these subclasses share one schema and each honours a different part of
     it. Declaring an option a provider has no control for advertises it to
     the model, which then sets it and watches it fall on the floor — a claim
-    not established by effect, which is the defect 2.3.0 cleared out of the
-    model layer. Measured per tool by reading what its `run()` actually
+    not established by effect, the same defect the model layer refuses.
+    Measured per tool by reading what its `run()` actually
     consumes, not by reading the description.
 
     A copy, because the schemas are class attributes shared by inheritance.
@@ -113,7 +113,7 @@ def _deep_with_option(parameters: dict, key: str, spec: dict) -> dict:
     return out
 
 
-class convertToSpeech(Tool):
+class Speech(Tool):
     """
     Synthesise speech from text and save to an audio file.
 
@@ -126,7 +126,7 @@ class convertToSpeech(Tool):
         Absolute path to the saved audio file.
     """
 
-    name        = "convertToSpeech"
+    name        = "speech"
     description = (
         "Synthesise speech from text using a TTS model.  "
         "Returns the absolute path to the saved audio file."
@@ -199,7 +199,7 @@ class convertToSpeech(Tool):
 
 # ── ttsOpenAI ─────────────────────────────────────────────────────────────────
 
-class ttsOpenAI(convertToSpeech):
+class ttsOpenAI(Speech):
     """
     Text-to-speech via the OpenAI TTS API.
 
@@ -219,19 +219,21 @@ class ttsOpenAI(convertToSpeech):
     ----------
     api_key : str | None, optional
         OpenAI API key.  Falls back to ``OPENAI_API_KEY`` env var.
+    model : str | None, optional
+        ``"tts-1"`` (default) or ``"tts-1-hd"``.  A setting of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools import ttsOpenAI
+        from yait_aichain.tools import speech
 
-        tool = ttsOpenAI()
+        tool = speech("openai", model="tts-1-hd")
 
         # Call-style — returns ToolResult, never raises
         result = tool(
             input="Hello, world!",
-            options={"voice": "nova", "model": "tts-1-hd", "output_path": "hello.mp3"},
+            options={"voice": "nova", "output_path": "hello.mp3"},
         )
         if result:
             print("Saved to:", result.output)
@@ -242,7 +244,7 @@ class ttsOpenAI(convertToSpeech):
 
     # OpenAI's /v1/audio/speech has no language field — the voice and the
     # model carry it. The shared description claimed otherwise.
-    parameters = _without_options(convertToSpeech.parameters, "language")
+    parameters = _without_options(Speech.parameters, "language")
 
     name           = "ttsOpenAI"
     _DEFAULT_MODEL = "tts-1"
@@ -267,7 +269,6 @@ class ttsOpenAI(convertToSpeech):
             Text to synthesise (max 4 096 characters).
         options : dict | None, optional
             ``voice``       — voice ID.  Default: ``"alloy"``.
-            ``model``       — ``"tts-1"`` (default) or ``"tts-1-hd"``.
             ``speed``       — 0.25–4.0, default 1.0.
             ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``,
                               ``"flac"``, ``"pcm"``.
@@ -312,7 +313,7 @@ class ttsOpenAI(convertToSpeech):
 
 # ── ttsGoogle ─────────────────────────────────────────────────────────────────
 
-class ttsGoogle(convertToSpeech):
+class ttsGoogle(Speech):
     """
     Text-to-speech via Google Cloud Text-to-Speech.
 
@@ -337,9 +338,9 @@ class ttsGoogle(convertToSpeech):
     --------
     ::
 
-        from yait_aichain.tools import ttsGoogle
+        from yait_aichain.tools import speech
 
-        tool = ttsGoogle()
+        tool = speech("google")
         path = tool.run(
             input="Hello, world!",
             options={
@@ -353,7 +354,7 @@ class ttsGoogle(convertToSpeech):
 
     # Google picks the synthesiser from the voice name; there is no model to
     # name.
-    parameters = _without_options(convertToSpeech.parameters, "model")
+    parameters = _without_options(Speech.parameters, "model")
 
     name              = "ttsGoogle"
     _DEFAULT_LANGUAGE = "en-US"
@@ -451,7 +452,7 @@ class ttsGoogle(convertToSpeech):
 
 # ── ttsXAI ────────────────────────────────────────────────────────────────────
 
-class ttsXAI(convertToSpeech):
+class ttsXAI(Speech):
     """
     Text-to-speech via the xAI TTS API.
 
@@ -463,14 +464,16 @@ class ttsXAI(convertToSpeech):
     ----------
     api_key : str | None, optional
         xAI API key.  Falls back to ``XAI_API_KEY`` env var.
+    model : str | None, optional
+        Default ``"grok-tts"``.  A setting of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools import ttsXAI
+        from yait_aichain.tools import speech
 
-        tool = ttsXAI()
+        tool = speech("xai")
         path = tool.run(
             input="Hello from xAI!",
             options={"output_path": "hello_xai.mp3"},
@@ -478,7 +481,7 @@ class ttsXAI(convertToSpeech):
     """
 
     # Same as OpenAI's: the xAI speech endpoint takes no language.
-    parameters = _without_options(convertToSpeech.parameters, "language")
+    parameters = _without_options(Speech.parameters, "language")
 
     name           = "ttsXAI"
     _BASE_URL      = "https://api.x.ai/v1"
@@ -504,7 +507,6 @@ class ttsXAI(convertToSpeech):
             Text to synthesise.
         options : dict | None, optional
             ``voice``       — voice ID.  Default: ``"default"``.
-            ``model``       — model name.  Default: ``"grok-tts"``.
             ``speed``       — 0.25–4.0, default 1.0.
             ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``.
             ``output_path`` — destination path.  Auto-generated if omitted.
@@ -548,7 +550,7 @@ class ttsXAI(convertToSpeech):
 
 # ── ttsQwen ───────────────────────────────────────────────────────────────────
 
-class ttsQwen(convertToSpeech):
+class ttsQwen(Speech):
     """
     Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API.
 
@@ -571,8 +573,8 @@ class ttsQwen(convertToSpeech):
 
     Region
     ------
-    The base URL is derived from ``DASHSCOPE_REGION`` (ap|us|cn|hk)
-    or the ``region`` option key.  Default: ``"ap"``
+    The base URL is derived from the ``region`` setting, else
+    ``DASHSCOPE_REGION`` (ap|us|cn|hk).  Default: ``"ap"``
     (``dashscope-intl.aliyuncs.com``).
 
     Parameters
@@ -582,14 +584,16 @@ class ttsQwen(convertToSpeech):
     region : str | None, optional
         Region selector: ``"ap"`` (default), ``"us"``, ``"cn"``, ``"hk"``.
         Overrides the ``DASHSCOPE_REGION`` env var.
+    model : str | None, optional
+        Default ``"cosyvoice-v2"``.  A setting of the tool.
 
     Examples
     --------
     ::
 
-        from yait_aichain.tools import ttsQwen
+        from yait_aichain.tools import speech
 
-        tool = ttsQwen()
+        tool = speech("qwen", region="us")
 
         path = tool.run(
             input="Hello from Qwen TTS!",
@@ -609,18 +613,11 @@ class ttsQwen(convertToSpeech):
         "flac": "flac",
     }
 
-    # `region` is read from `options` by this class and by no other TTS tool,
-    # and the shared schema above does not carry it — so a model could not
-    # discover an option the tool honours, and a caller who used it was
-    # passing a key the schema calls unknown. Declared here rather than in the
-    # parent, because advertising it on OpenAI, Google and xAI would be the
-    # opposite defect: an option offered where nothing reads it.
-    # `language` and `speed` are dropped for the same reason `region` is
-    # added: this endpoint reads neither, and an option a model can set and
-    # watch vanish is worse than one it never saw.
-    # `region` was also an option of the call until 3.7.0 — the same setting
-    # in two places, the call winning. It is the tool's alone now.
-    parameters = _without_options(convertToSpeech.parameters, "language", "speed")
+    # `language` and `speed` are dropped from the shared schema: this
+    # endpoint reads neither, and an option a model can set and watch vanish
+    # is worse than one it never saw. `region` is a setting of the tool, not
+    # an option of a call, so the schema does not carry it either.
+    parameters = _without_options(Speech.parameters, "language", "speed")
 
     def __init__(
         self,
@@ -657,10 +654,8 @@ class ttsQwen(convertToSpeech):
             Text to synthesise.
         options : dict | None, optional
             ``voice``       — voice name.  Default: ``"longxiaochun"``.
-            ``model``       — model name.  Default: ``"cosyvoice-v2"``.
             ``format``      — ``"mp3"`` (default), ``"wav"``, ``"pcm"``,
                               ``"flac"``.
-            ``region``      — override region: ``"ap"``/``"us"``/``"cn"``/``"hk"``.
             ``output_path`` — destination path.  Auto-generated if omitted.
 
         Returns

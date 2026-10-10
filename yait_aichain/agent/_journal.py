@@ -2,8 +2,8 @@
 agent._journal — the attempt journal
 ====================================
 
-An append-only, typed record of **what the agent did** — as opposed to
-``AgentMemory``, which holds the *data* the agent works with.
+An append-only, typed record of **what the agent did** — as opposed to the
+conversation, which holds what was said.
 
 One log, three views:
 
@@ -24,7 +24,7 @@ goal-loop iteration has no step index.
 Evidence is deliberately typed. Today the honest split is:
 
 * ``check``       — a programmatic fact (a tool raised, a permission denied);
-* ``model_claim`` — the orchestrator asserts it worked. Nothing verified it.
+* ``model_claim`` — the model asserts it worked. Nothing verified it.
 
 Success is normally a *claim*; failure is usually a *check*. Surfacing that
 asymmetry is the point: a run whose "done" entries are all ``model_claim`` has

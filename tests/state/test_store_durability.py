@@ -48,7 +48,7 @@ class TestFileStoreLoad(unittest.TestCase):
 class TestChromaEmptyDeleteGuard(unittest.TestCase):
 
     def test_empty_delete_refused(self):
-        from yait_aichain.tools.vectordb.providers._chroma import ChromaBackend
+        from yait_aichain.utilities.vectors.providers._chroma import ChromaBackend
         backend = ChromaBackend(url="http://localhost:8000")
         with self.assertRaises(ValueError):
             backend.delete("docs")                 # no ids, no filter

@@ -101,11 +101,6 @@ class TestTheTwoClasses(unittest.TestCase):
                        "fidelity", "output_format", "compression"):
             self.assertTrue(_options.is_requirement(option), option)
 
-    def test_an_old_name_lands_in_the_same_class(self):
-        """`input_fidelity` is `fidelity`; a rename must not change what a
-        caller's strictness setting does."""
-        self.assertTrue(_options.is_requirement("input_fidelity"))
-        self.assertTrue(_options.is_requirement("output_compression"))
 
 
 if __name__ == "__main__":

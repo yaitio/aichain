@@ -2,12 +2,11 @@
 chain
 =====
 
-Public API for the aichain 2.0 chain layer.
+``Chain`` — steps in a fixed order, sharing one set of variables.
 
-A ``Chain`` wires a sequence of :class:`~skills.Skill` and
-:class:`~tools.Tool` instances into a pipeline where each step's output
-automatically flows into the next step's input as a named variable.
-Skills and Tools can be freely mixed in any order.
+A step is a :class:`~skills.Skill`, a tool, an :class:`~agent.Agent`, or a
+plain function or a utility's method; each step's output flows into the next
+step's input as a named variable.  The kinds can be freely mixed in any order.
 
 Typical usage — Skills only
 -----------------------------
@@ -17,50 +16,38 @@ Typical usage — Skills only
     from yait_aichain.skills import Skill
     from yait_aichain.chain  import Chain
 
-    analyst = Skill(
-        model=Model("gpt-4o"),
-        input={"messages": [
-            {"role": "user", "parts": [
-                {"type": "text", "text": "Briefly analyse: {topic}"},
-            ]},
-        ]},
-        output={"modalities": ["text"], "format": {"type": "text"}},
-        name="analyst",
-    )
+    analyst    = Skill(Model("claude-haiku-5-5"), prompt="Briefly analyse: {topic}",
+                       name="analyst")
+    translator = Skill(Model("gpt-6-luna"),
+                       prompt="Translate the following text to {language}:\\n\\n{analysis}",
+                       name="translator")
 
-    translator = Skill(
-        model=Model("gpt-4o"),
-        input={"messages": [
-            {"role": "user", "parts": [
-                {"type": "text",
-                 "text": "Translate the following text to {language}:\\n\\n{result}"},
-            ]},
-        ]},
-        output={"modalities": ["text"], "format": {"type": "text"}},
-        name="translator",
-    )
-
-    chain = Chain([analyst, translator], name="analyse_and_translate")
+    chain = Chain([(analyst, "analysis"), (translator, "translation")],
+                  name="analyse_and_translate")
     result = chain.run(variables={"topic": "renewable energy", "language": "Spanish"})
     print(result.output)            # the last step
-    print(result["summary"])        # any step, by its key
+    print(result["analysis"])       # any step, by its key
 
-Typical usage — Mixed Tool + Skill pipeline
+Typical usage — tools, Skills and functions
 --------------------------------------------
 ::
 
-    from yait_aichain.tools import MarkItDownTool
+    from yait_aichain.tools import fetch
     from yait_aichain.chain import Chain
 
-    fetch      = MarkItDownTool()          # Tool: converts URL → Markdown
+    def word_count(text: str) -> int:
+        return len(text.split())
+
+    reader     = fetch("local")            # tool: URL → Markdown
     cleaner    = Skill(...)                # Skill: strips boilerplate
     translator = Skill(...)                # Skill: translates
 
     chain = Chain(
         steps=[
-            (fetch,      "raw_markdown", {"source": "url"}),  # input_map
+            (reader,     "raw_markdown"),                  # takes `url`
             (cleaner,    "article"),
             (translator, "translation"),
+            (word_count, "words", {"text": "translation"}),  # input_map
         ],
     )
 
@@ -73,19 +60,25 @@ Step specification
 ------------------
 Each element of *steps* may be:
 
-  * A bare ``Skill`` or ``Tool`` — output stored as ``"result"``.
+  * A bare runner — output stored as ``"result"``.
 
   * ``(runner, output_key: str)`` — output stored under *output_key*.
 
   * ``(runner, output_key: str, input_map: dict)`` — same, plus an
-    *input_map* that renames accumulated variables before they are passed
-    to a Tool: ``{"tool_param": "accumulated_var"}``.
+    *input_map* that fills the step's arguments:
+    ``{"param": "variable"}`` passes a variable, ``{"param": "{template}"}``
+    the template filled in.
+
+A pause for a person or a signal is a step made with ``wait(reason=…)`` or
+``gate(tool, reason=…)``; the run parks there and ``Chain.resume()`` carries
+it on.
 
 How variables are forwarded
 ---------------------------
   * **Skill** receives the full accumulated dict for template substitution.
   * **Tool** receives only the kwargs matching its declared
     ``parameters["properties"]`` keys (remapped via *input_map* if given).
+  * **Function / method** receives the arguments its signature names.
 
 When a step returns a **dict**, all keys are merged directly into the
 accumulated variable dict (``output_key`` is ignored for dict outputs).
@@ -107,7 +100,8 @@ The YAML file stores all step metadata.  For Skill steps the model name,
 input template, and output spec are persisted.  For Tool steps the
 fully-qualified class path and any serialisable ``init_args`` are stored;
 API keys are **never** written and are resolved from environment variables
-at load time.
+at load time.  A function step is code, not configuration, and cannot be
+saved.
 """
 
 from ._chain import Chain

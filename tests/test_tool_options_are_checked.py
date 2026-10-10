@@ -29,7 +29,7 @@ import yait_aichain.tools as tools_pkg                              # noqa: E402
 from yait_aichain.tools._base import Tool                           # noqa: E402
 from yait_aichain.tools.search.perplexity import searchPerplexity   # noqa: E402
 from yait_aichain.tools.speech import (                             # noqa: E402
-    convertToSpeech, ttsOpenAI, ttsQwen)
+    Speech, ttsOpenAI, ttsQwen)
 
 
 def _tool_classes():
@@ -117,7 +117,7 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
         The MRO, not the class body. The first version of this looked at
         `inspect.getsource(tool)` alone, and most of these tools implement
         `run()` in a shared base — `sttOpenAI` in `_OpenAICompatSTT`,
-        `ttsOpenAI` in `convertToSpeech` — so a read in a base was invisible
+        `ttsOpenAI` in `Speech` — so a read in a base was invisible
         and the check under-reported. It found `region` on `ttsQwen` only
         because that one read happened to be in the subclass. An instrument
         that can only see half of what it measures gives a clean answer for
@@ -154,7 +154,7 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
         subclasses implement against, so having no reader of their own is
         what they are for.
         """
-        abstract = {"Search", "convertToSpeech", "convertToText"}
+        abstract = {"Search", "Speech", "Transcription"}
         # Options handed on whole to a layer that reads each one itself: the
         # image tool passes its options as the model's `output["format"]`, whose
         # every key the parameters matrix holds (tests/test_parameters_matrix.py)
@@ -180,7 +180,7 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
         setting in two places, the call winning — so it is the tool's alone
         now: declared on no TTS's options, taken by Qwen's constructor."""
         import inspect
-        for cls in (ttsQwen, ttsOpenAI, convertToSpeech):
+        for cls in (ttsQwen, ttsOpenAI, Speech):
             self.assertNotIn("region", _declared_options(cls))
         self.assertIn("region", inspect.signature(ttsQwen.__init__).parameters)
         self.assertNotIn("region", inspect.signature(ttsOpenAI.__init__).parameters)
@@ -188,7 +188,7 @@ class TestTheSchemaMatchesWhatTheToolReads(unittest.TestCase):
     def test_extending_a_shared_schema_does_not_mutate_it(self):
         """Schemas are class attributes shared by inheritance: extending one
         in place would add the key to every sibling."""
-        shared = convertToSpeech.parameters["properties"]["options"]
+        shared = Speech.parameters["properties"]["options"]
         self.assertIsNot(shared,
                          ttsQwen.parameters["properties"]["options"])
 

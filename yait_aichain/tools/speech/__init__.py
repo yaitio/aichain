@@ -3,9 +3,8 @@ tools.speech
 ============
 
 Text read aloud into an audio file — one format of options, a provider per
-tool. ``speech(service)`` makes one by the provider's name; until 3.5.0 these
-lived in ``tools.convert.to_speech`` and were made by ``TTS(provider)``, and
-both still work.
+tool. ``speech(service)`` makes one by the provider's name; the classes
+behind it share the base :class:`Speech`.
 
 Tools
 -----
@@ -15,7 +14,7 @@ ttsXAI      xAI.
 ttsQwen     Qwen (DashScope); takes ``region``.
 """
 
-from ._tts import convertToSpeech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
+from ._tts import Speech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
 
 #: Provider name → tool class, for :func:`speech`.
 SERVICES = {"openai": ttsOpenAI, "google": ttsGoogle, "xai": ttsXAI, "qwen": ttsQwen}
@@ -23,7 +22,7 @@ SERVICES = {"openai": ttsOpenAI, "google": ttsGoogle, "xai": ttsXAI, "qwen": tts
 
 def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = None,
            region: "str | None" = None, name: "str | None" = None,
-           description: "str | None" = None) -> convertToSpeech:
+           description: "str | None" = None) -> Speech:
     """
     A text-to-speech tool for *service* — one of ``SERVICES``.
 
@@ -46,12 +45,7 @@ def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = 
     return named(tool, name, description)
 
 
-def TTS(provider: str, *, api_key: "str | None" = None) -> convertToSpeech:
-    """The 3.4 name of :func:`speech` — ``TTS("openai")`` is ``speech("openai")``."""
-    return speech(provider, api_key=api_key)
-
-
-__all__ = ["speech", "TTS", "SERVICES", "convertToSpeech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen"]
+__all__ = ["speech", "SERVICES", "Speech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen"]
 
 from .._callable import callable_package as _callable_package
 _callable_package(__name__, speech)

@@ -121,7 +121,7 @@ class TestAsyncFlow(unittest.TestCase):
         from yait_aichain.skills import Skill
         m = Model("flux-kontext-pro", api_key="k")
         m.client = self._ready_client()
-        img = Skill(model=m, input={"messages": _edit_msgs()}, output=_OUT).run()
+        img = Skill(model=m, input={"messages": _edit_msgs()}, output=_OUT, _image=True).run()   # the image tool's own seam
         self.assertEqual(img["base64"], _B64)
 
 

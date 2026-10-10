@@ -55,8 +55,8 @@ class TestEveryKeyOnlyToolConstructs(unittest.TestCase):
                 required = [p for p in list(inspect.signature(cls.__init__).parameters.values())[1:]
                             if p.default is p.empty
                             and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)]
-                if required or name == "Search":
-                    continue                    # needs a store, a server, a tool; or is the base
+                if required or name in ("Search", "Fetch"):
+                    continue                    # needs a store, a server, a tool; or is a base
                 with self.subTest(tool=name):
                     cls()
                     built += 1

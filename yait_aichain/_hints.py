@@ -180,7 +180,49 @@ MODULES: dict = {
     "yait_aichain.workflow": "`from yait_aichain import Chain`",
     "yait_aichain.budget": "`from yait_aichain import Budget`",
     "yait_aichain.results": "`from yait_aichain import ChainResult, PoolResult`; AgentResult comes from yait_aichain.agent",
+    # Paths from tutorials written before 4.0; nothing lives at them.
+    "yait_aichain.tools.vectordb": "a vector store is `from yait_aichain.utilities import Vectors`",
+    "yait_aichain.tools.embedding": "`from yait_aichain.tools import embed` — embed('openai', model='…')",
+    "yait_aichain.tools.reranking": "`from yait_aichain.tools import rerank` — rerank('cohere', model='…')",
+    "yait_aichain.tools.local": "a folder is `from yait_aichain.utilities import Shell`",
+    "yait_aichain.tools.mcp": "an MCP server is `from yait_aichain.utilities import MCP`",
+    "yait_aichain.tools.rest_api": "a REST API is `from yait_aichain.utilities import REST`",
+    "yait_aichain.tools.convert": ("speech and transcription are `from yait_aichain.tools import speech, "
+                                  "transcribe`; a page by URL is fetch('local'); file conversion is not "
+                                  "part of the library"),
 }
+
+#: Names an agent may write after ``from yait_aichain.tools import`` that do not
+#: exist, and what to write instead. Raised as an ImportError, never accepted.
+TOOL_NAMES: dict = {
+    "VectorDB": "a vector store is `from yait_aichain.utilities import Vectors` — Vectors(backend, collection=…, description=…, embedder=…)",
+    **{n: "the store's search is a tool of the utility: kb = Vectors(...); kb.query.run(question, {'n': 5})"
+       for n in ("vectorQuery", "VectorQueryTool")},
+    **{n: "a store's administration is the utility's methods: kb.upsert(records), kb.fetch(ids), kb.delete(ids)"
+       for n in ("vectorUpsert", "vectorFetch", "vectorDelete")},
+    "vectorChunk": "chunk(max_chars=800).run(text)",
+    "Embedding": "embed('openai', model='text-embedding-3-small')",
+    "Reranker": "rerank('cohere', model='rerank-v3.5')",
+    "TTS": "speech('openai')",
+    "STT": "transcribe('openai')",
+    "LocalTools": "a folder is `from yait_aichain.utilities import Shell` — Shell(folder).tools",
+    **{n: "a folder is `from yait_aichain.utilities import Shell` — Shell(folder).browse / .read / .write / .run"
+       for n in ("localBrowse", "localRead", "localWrite", "localRun")},
+    "MCPTools": "an MCP server is `from yait_aichain.utilities import MCP` — MCP(server).tools",
+    "RestApiTool": "a REST API is `from yait_aichain.utilities import REST` — REST(url, description=…).endpoint(…)",
+    "PerplexitySearchTool": "search('perplexity')",
+    "BraveSearchTool": "search('brave')",
+    **{n: "embed(service, model=…)" for n in ("OpenAIEmbedder", "CohereEmbedder", "VoyageEmbedder", "GoogleEmbedder")},
+    **{n: "file conversion is not part of the library; a page by URL is fetch('local')"
+       for n in ("convertToMD", "convertToHTML", "convertToPDF", "MarkItDownTool", "WeasyprintTool", "MistletoeTool")},
+}
+
+
+def tool_name(name: str) -> ImportError:
+    """The ImportError for a name ``yait_aichain.tools`` does not have."""
+    hint = TOOL_NAMES.get(name)
+    return ImportError(f"cannot import name {name!r} from 'yait_aichain.tools'"
+                       + (f" — {hint}" if hint else ""), name=name)
 
 
 #: What a model client reads from ``Model(client_options=...)``. Every family

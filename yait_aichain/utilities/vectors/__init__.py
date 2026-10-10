@@ -1,38 +1,40 @@
 """
-tools.vectordb
-==============
+utilities.vectors
+=================
 
-Provider-agnostic vector database interface for aichain.
+A vector database as a utility, over Chroma, Pinecone or Qdrant.
 
 Public API
 ----------
+``Vectors(backend, collection, *, description, embedder, url, api_key, ...)``
+    The way in: ``create``, ``upsert``, ``fetch``, ``delete`` and ``count``
+    for code, and ``kb.query`` — the one tool an agent gets.
+
+Underneath
+----------
 ``VectorDB(provider, collection, *, embedder, url, api_key, ...)``
-    Factory function — returns a :class:`VectorStore` bound to the
-    requested backend.  Mirrors the ``Embedding(model)`` factory pattern.
+    Returns the :class:`VectorStore` a ``Vectors`` is built on (``kb.store``).
 
 ``VectorStore``
-    Orchestrator wrapping a backend + optional Embedder.
+    A backend plus an optional embedder, bound to one collection.
     Methods: ``create``, ``query``, ``upsert``, ``fetch``, ``delete``, ``count``.
 
 ``VectorRecord``
     Uniform data model: ``id``, ``text``, ``score``, ``metadata``.
 
-Tools (bind to a VectorStore instance)
----------------------------------------
-``vectorQuery(store)``   → VectorQueryTool   — semantic RAG retrieval  [main]
-``vectorUpsert(store)``  → VectorUpsertTool  — insert / update documents
-``vectorFetch(store)``   → VectorFetchTool   — retrieve by ID
-``vectorDelete(store)``  → VectorDeleteTool  — delete by ID or filter
+``VectorQueryTool``, ``VectorUpsertTool``, ``VectorFetchTool``, ``VectorDeleteTool``
+    Tools constructed with a store. ``Vectors`` uses ``VectorQueryTool`` for
+    ``kb.query``.
 
-Provider routing
-----------------
-``provider`` may be a full name or common alias:
+Backends
+--------
+``backend`` is a name, or an alias:
 
   "chroma"   / "chromadb"  → ChromaBackend   (default URL: http://localhost:8000)
   "pinecone"               → PineconeBackend (requires api_key or PINECONE_API_KEY)
   "qdrant"                 → QdrantBackend   (default URL: http://localhost:6333)
 
-Constructor kwargs are forwarded to the backend:
+Further keyword arguments are forwarded to the backend:
   ``url``      — server base URL (overrides env var default)
   ``api_key``  — API key (overrides env var default)
   ``index``    — Pinecone index name (or set PINECONE_INDEX env var)
@@ -41,109 +43,49 @@ Constructor kwargs are forwarded to the backend:
 
 Examples
 --------
-Chroma (local, auto-embed)::
+Qdrant, text embedded on the way in::
 
-    from yait_aichain.tools.vectordb  import VectorDB, vectorQuery, vectorUpsert
-    from yait_aichain.tools.embedding import Embedding
+    from yait_aichain.utilities import Vectors
+    from yait_aichain.tools import embed, chunk
 
-    store = VectorDB(
-        "chroma",
-        collection = "knowledge_base",
-        embedder   = Embedding("openai/text-embedding-3-small"),
-        url        = "http://localhost:8000",
-    )
-    store.create(dimension=1536)
+    kb = Vectors("qdrant", collection="docs", description="the product documentation",
+                 embedder=embed("openai", model="text-embedding-3-small"))
+    kb.create(dimension=1536)
 
-    vectorUpsert(store).run([
-        {"id": "1", "text": "LLMs use KV cache to avoid recomputing attention."},
-        {"id": "2", "text": "RAG grounds generation in retrieved documents."},
-    ])
+    pieces = chunk(max_chars=800).run(text)
+    kb.upsert([{"id": f"doc-{i}", **p} for i, p in enumerate(pieces)])
 
-    results = vectorQuery(store).run("how does caching work in LLMs?", {"n": 3})
-    for r in results:
+    for r in kb.query.run("how does caching work?", {"n": 3}):
         print(r["score"], r["text"][:60])
 
-Pinecone (cloud, pre-computed vectors)::
+Pinecone, vectors computed by the caller::
 
-    store = VectorDB(
-        "pinecone",
-        collection = "my_namespace",
-        index      = "my-index",
-        api_key    = "pk-...",
-    )
-    store.upsert([{"id": "1", "text": "…", "vector": [0.1, 0.2, …]}])
+    kb = Vectors("pinecone", collection="my_namespace", description="support tickets",
+                 index="my-index", api_key="pk-...")
+    kb.upsert([{"id": "1", "text": "…", "vector": [0.1, 0.2, …]}])
 
-Qdrant (local)::
+Given to an agent::
 
-    store = VectorDB("qdrant", collection="docs",
-                     embedder=Embedding("cohere/embed-v4.0"))
-    store.create(dimension=1024, metric="dot")
-
-In a Chain::
-
-    from yait_aichain.chain import Chain
-    from yait_aichain.skills import Skill
+    from yait_aichain.agent import Agent, step_count
     from yait_aichain.models import Model
 
-    retriever = vectorQuery(store)
-    answer_skill = Skill(
-        model = Model("claude-sonnet-4-6"),
-        input = {
-            "messages": [{
-                "role": "user",
-                "parts": [{"type": "text",
-                           "text": "Context:\n{context}\n\nQuestion: {question}"}],
-            }]
-        },
-        output = {"modalities": ["text"]},
-    )
-    pipeline = Chain(
-        steps = [
-            (retriever, "context", {"input": "{question}"}),
-            answer_skill,
-        ]
-    )
-    pipeline.run(variables={"question": "How does KV caching work?"})
+    agent = Agent(Model("claude-haiku-5-5"), tools=[kb.query], stop_when=[step_count(10)])
 """
 
 from ._base    import VectorRecord, VectorBackend, VectorStore
-from ...tools.chunk._chunk import VectorChunkTool, vectorChunk
-from ...tools.chunk import _chunk                     # still an attribute here, as before 3.5.0
-from ._query   import VectorQueryTool,  vectorQuery
-from ._upsert  import VectorUpsertTool, vectorUpsert
-from ._fetch   import VectorFetchTool,  vectorFetch
-from ._delete  import VectorDeleteTool, vectorDelete
+from ._query import VectorQueryTool
+from ._upsert import VectorUpsertTool
+from ._fetch import VectorFetchTool
+from ._delete import VectorDeleteTool
 
 from .providers._chroma   import ChromaBackend
 from .providers._pinecone import PineconeBackend
 from .providers._qdrant   import QdrantBackend
 
 
-__all__ = [
-    "Vectors",
-    # Factory
-    "VectorDB",
-    # Core classes
-    "VectorStore",
-    "VectorRecord",
-    "VectorBackend",
-    # Provider backends
-    "ChromaBackend",
-    "PineconeBackend",
-    "QdrantBackend",
-    # Tools — factories (camelCase, follow existing convention)
-    "vectorChunk",
-    "vectorQuery",
-    "vectorUpsert",
-    "vectorFetch",
-    "vectorDelete",
-    # Tool classes (PascalCase, for isinstance / subclassing)
-    "VectorChunkTool",
-    "VectorQueryTool",
-    "VectorUpsertTool",
-    "VectorFetchTool",
-    "VectorDeleteTool",
-]
+__all__ = ["Vectors", "VectorDB", "VectorStore", "VectorRecord", "VectorBackend", "ChromaBackend",
+           "PineconeBackend", "QdrantBackend", "VectorQueryTool", "VectorUpsertTool",
+           "VectorFetchTool", "VectorDeleteTool"]
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +114,8 @@ def VectorDB(
     **kwargs,
 ) -> VectorStore:
     """
-    Return a :class:`VectorStore` for *provider*.
+    Return a :class:`VectorStore` for *provider* — what :class:`Vectors` is
+    built on, and ``kb.store`` on one.
 
     Parameters
     ----------
@@ -180,10 +123,10 @@ def VectorDB(
         Backend name: ``"chroma"``, ``"pinecone"``, or ``"qdrant"``.
         Aliases: ``"chromadb"``.
     collection : str
-        Default collection (Chroma/Qdrant) or namespace (Pinecone) used for
-        all operations.  Can be overridden per-call via ``options["collection"]``.
+        Collection (Chroma/Qdrant) or namespace (Pinecone) used for all
+        operations.  It is the store's setting; a tool call cannot change it.
     embedder : Embedder | None, optional
-        An :class:`~tools.embedding.Embedder` instance used to auto-vectorise
+        An embedder, as made by ``embed(...)``, used to auto-vectorise
         text on ``upsert()`` and ``query()``.  When ``None``, callers must
         supply pre-computed ``vector`` fields in their records.
     url : str | None, optional
@@ -214,13 +157,13 @@ def VectorDB(
     --------
     ::
 
-        from yait_aichain.tools.vectordb  import VectorDB
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.utilities.vectors import VectorDB
+        from yait_aichain.tools import embed
 
         store = VectorDB(
             "chroma",
             collection = "docs",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
         )
     """
     key = provider.lower().strip()
@@ -243,5 +186,5 @@ def VectorDB(
     return VectorStore(backend=backend, collection=collection, embedder=embedder)
 
 
-# ── The utility (3.6.0) ──────────────────────────────────────────────────────
+# ── The utility ──────────────────────────────────────────────────────────
 from ._utility import Vectors

@@ -111,6 +111,7 @@ class TestSynthesisFlow(unittest.TestCase):
             model=m,
             input={"messages": [{"role": "user", "parts": ["a fox"]}]},
             output={"modalities": ["image"], "format": {"type": "image", "size": "1024x1024"}},
+            _image=True,                    # the image tool's own seam
         ).run()
         self.assertEqual(img["base64"], base64.b64encode(_PNG).decode("ascii"))
         self.assertEqual(img["mime_type"], "image/png")
@@ -145,6 +146,7 @@ class TestSynthesisFlow(unittest.TestCase):
             input={"messages": [{"role": "user", "parts": ["a fox"]}]},
             output={"modalities": ["image"], "format": {"type": "image"}},
             max_retries=2,
+            _image=True,                    # the image tool's own seam
         )
         with self.assertRaises(TaskFailedError):
             skill.run()

@@ -7,9 +7,9 @@ description: Build AI features in Python — an LLM call, a multi-step pipeline,
 
 Read `llms.txt` next to this file before writing code. It holds the real
 constructor signatures, one working example per primitive, and the rules that
-agents most often get wrong. Code from tutorials older than 3.x — `orchestrator=`,
-`max_steps=`, `VectorDB`, `searchPerplexity()` as the way in — does not
-run.
+agents most often get wrong. Names from older tutorials — `orchestrator=`,
+`max_steps=`, `VectorDB`, `Embedding(...)`, `LocalTools` — do not exist and
+raise.
 
 ## Pick the primitive
 

@@ -1,6 +1,6 @@
 """
-tools.embedding._google — EmbeddingGoogle
-==========================================
+tools.embed._google — EmbeddingGoogle
+======================================
 
 Wraps the Google AI (Gemini) Embeddings API
 (``POST /v1beta/models/{model}:batchEmbedContents``).
@@ -17,11 +17,11 @@ Model notes
 * Authentication is via the ``x-goog-api-key`` header.
 * The ``batchEmbedContents`` endpoint accepts a list of
   ``EmbedContentRequest`` objects in one POST, making it naturally batched.
-* ``task_type`` (RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, etc.) is supported only
-  by ``gemini-embedding-001``; on any other model it is refused when the embedder is
-  made (3.7.0).
-* ``output_dimensionality`` truncates the vector; only ``gemini-embedding-001``
-  and newer models support it — omitted otherwise.
+* ``task_type`` (RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, etc.) is sent only to
+  ``gemini-embedding-001`` and ``text-embedding-004``; other models omit it.
+* ``output_dimensionality`` truncates the vector and is taken by
+  ``gemini-embedding-001`` and ``gemini-embedding-exp-03-07``; ``dimensions``
+  on any other model is refused when the embedder is made.
 * The API accepts up to 100 requests per batch call.
 * Google does not return token counts from ``batchEmbedContents``; ``total_tokens``
   is always ``None``.
@@ -77,9 +77,9 @@ class EmbeddingGoogle(Embedder):
     --------
     ::
 
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.tools import embed
 
-        embedder = Embedding("google/gemini-embedding-001")
+        embedder = embed("google", model="gemini-embedding-001")
         result   = embedder.embed(
             ["What is RAG?", "RAG stands for Retrieval-Augmented Generation."],
             input_type="query",
@@ -141,5 +141,3 @@ class EmbeddingGoogle(Embedder):
         return embeddings, None, {}
 
 
-# Backward-compatible alias
-GoogleEmbedder = EmbeddingGoogle

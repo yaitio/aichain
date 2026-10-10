@@ -1,5 +1,52 @@
 # Changelog
 
+## [4.0.0] — 2026-10-11
+
+**No compatibility layer.** Every name and path 3.x kept alive for older code
+is removed, so the library has one way to do each thing. An old name does not
+work quietly: it raises, and the error names what to write instead. Every
+change, with its replacement: `docs/start/migrating-to-4.md`.
+
+### Changed
+
+- **A `Skill` with an image output raises**, naming `image(service, model=…)`.
+  It warned since 3.9.0. The image tool makes its request through a `Skill`
+  by a seam of its own, `_image=True`, so retries, the budget and the record
+  of adaptations come with it.
+- **Renamed:** `convertToSpeech` → `Speech`, `convertToText` → `Transcription`,
+  `VectorChunkTool` → `Chunk`.
+- **The tools package exports the tools.** Utilities' classes —
+  `LocalBrowseTool` and the other three, `VectorQueryTool` and its siblings,
+  `RestApiTool`, `MCPTool` — import from `yait_aichain.utilities.shell`,
+  `.vectors`, `.rest` and `.mcp`, where they live.
+
+### Removed
+
+- **Old factories and aliases:** `Embedding(...)`, `Reranker(...)`, `TTS()`,
+  `STT()`, `LocalTools()`, `localBrowse`/`localRead`/`localWrite`/`localRun`,
+  `vectorChunk`/`vectorQuery`/`vectorUpsert`/`vectorFetch`/`vectorDelete`,
+  `MCPTools` as a public name, `PerplexitySearchTool`, `BraveSearchTool`,
+  `OpenAIEmbedder`, `CohereEmbedder`, `VoyageEmbedder`, `GoogleEmbedder`, and
+  a search tool's `.search()`, the 3.2 name of `.run()`.
+- **Old module paths** — `tools.vectordb`, `tools.embedding`,
+  `tools.reranking`, `tools.local`, `tools.mcp`, `tools.rest_api`,
+  `tools.convert` — and the import finder that kept them resolving.
+- **Renamed image options' old names:** `output_compression`,
+  `input_fidelity`, `reference_fidelity` are unknown keys now.
+- **A `Hook`'s `step_started` / `step_ended`** for an agent's tool calls,
+  which fired with a warning since 2.7.0.
+- `ImageSkillWarning`, and the API page of older names.
+
+### Added
+
+- **An old name says what replaced it.** `from yait_aichain.tools import
+  VectorDB` raises `ImportError` naming `Vectors`, and `import
+  yait_aichain.tools.vectordb` names `yait_aichain.utilities`; the same for
+  every name and path above. Not compatibility — nothing old runs — but the
+  error an agent writing from its weights needs to fix itself in one retry.
+  Held by `tests/test_old_names_say_what_to_write.py`.
+- **`docs/start/migrating-to-4.md`.**
+
 ## [3.10.0] — 2026-10-10
 
 **The registry, brought to what providers sell and charge on 2026-10-10.**

@@ -69,8 +69,8 @@ Image models are priced two ways, and the result says which it used:
 `cost_basis` names the basis, and `cost` is `None` — with the reason — for a
 model the registry has no price for. → [Cost and budget](../control/cost-and-budget.md)
 
-The old way, `Skill(Model("gpt-image-1.5"), output={"modalities": ["image"], …})`,
-still works and warns with an `ImageSkillWarning`; it raises in 4.0.
+A `Skill` asked for an image output raises, naming `image(...)`: a Skill makes
+text.
 
 Which model for what, with prices and speeds, measured:
 [`design/image-edit.md`](../../design/image-edit.md).

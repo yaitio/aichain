@@ -200,64 +200,6 @@ class TestAChainTakesAMethod(unittest.TestCase):
             Chain(steps=[(_vectors().upsert, "n", {"records": "x"})]).save(path)
 
 
-class TestOldPathsUnderTools(unittest.TestCase):
-
-    OLD = {
-        "yait_aichain.tools.vectordb":                    "yait_aichain.utilities.vectors",
-        "yait_aichain.tools.vectordb._query":             "yait_aichain.utilities.vectors._query",
-        "yait_aichain.tools.vectordb.providers._qdrant":  "yait_aichain.utilities.vectors.providers._qdrant",
-        "yait_aichain.tools.vectordb._chunk":             "yait_aichain.tools.chunk._chunk",
-        "yait_aichain.tools.mcp":                         "yait_aichain.utilities.mcp._tools",
-        "yait_aichain.tools.rest_api":                    "yait_aichain.utilities.rest._tool",
-        "yait_aichain.tools.local":                       "yait_aichain.utilities.shell",
-        "yait_aichain.tools.local._read":                 "yait_aichain.utilities.shell._read",
-    }
-
-    def test_each_is_the_moved_module(self):
-        for old, new in self.OLD.items():
-            with self.subTest(old):
-                self.assertIs(importlib.import_module(old), importlib.import_module(new))
-
-    def test_the_old_names_still_import_from_tools(self):
-        from yait_aichain.tools import (LocalTools, MCPTools, RestApiTool, VectorDB, localRead,
-                                        vectorQuery)
-        self.assertEqual(VectorDB.__module__, "yait_aichain.utilities.vectors")
-        self.assertEqual(len(LocalTools(tempfile.mkdtemp())), 4)
-        self.assertTrue(callable(MCPTools) and callable(vectorQuery) and callable(localRead))
-        self.assertTrue(issubclass(RestApiTool, Tool))
-
-    def test_import_as_attribute_and_mock_patch(self):
-        import yait_aichain
-        import yait_aichain.tools.vectordb.providers._chroma as chroma
-        self.assertIs(chroma, sys.modules["yait_aichain.utilities.vectors.providers._chroma"])
-        self.assertIs(yait_aichain.tools.rest_api, sys.modules["yait_aichain.utilities.rest._tool"])
-        with patch("yait_aichain.tools.rest_api.make_http") as p:
-            self.assertIs(sys.modules["yait_aichain.utilities.rest._tool"].make_http, p)
-
-    def test_attribute_access_in_a_fresh_process(self):
-        # Order-free: in one process another test may have imported the old
-        # path first, which is how 3.6.0 broke `tools.convert.to_text` unseen.
-        import subprocess
-        code = ("import yait_aichain as y; "
-                "print(y.tools.convert.to_text.__name__, y.tools.vectordb._chunk.__name__, "
-                "y.tools.vectordb.providers.__name__, y.tools.rest_api.__name__, y.tools.embedding._openai.__name__)")
-        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                             cwd=os.path.join(os.path.dirname(__file__), ".."))
-        self.assertEqual(out.returncode, 0, out.stderr[-500:])
-        self.assertEqual(out.stdout.split(), ["yait_aichain.tools.transcribe._stt", "yait_aichain.tools.chunk._chunk",
-                                              "yait_aichain.utilities.vectors.providers",
-                                              "yait_aichain.utilities.rest._tool", "yait_aichain.tools.embed._openai"])
-
-    def test_a_chain_saved_with_an_old_class_path_loads(self):
-        d = tempfile.mkdtemp()
-        path = os.path.join(d, "old.yaml")
-        with open(path, "w") as fh:
-            fh.write("steps:\n- kind: tool\n  output_key: text\n  tool:\n"
-                     "    class: yait_aichain.tools.local._read.LocalReadTool\n"
-                     f"    init_args: {{root_dir: {d!r}}}\n")
-        tool = Chain.load(path)._steps[0][0]
-        self.assertEqual(type(tool).__module__, "yait_aichain.utilities.shell._read")
-        self.assertEqual(tool.root, os.path.realpath(d))
 
 
 if __name__ == "__main__":

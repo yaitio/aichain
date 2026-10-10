@@ -222,7 +222,7 @@ steps:
 | `options.task_key` | | Accumulated variable holding the agent's task. Default `"task"`. |
 | `options.output_field` | | `AgentResult` attribute to extract. Default `"output"`. |
 | `agent.class` | ✓ | Fully-qualified class path. |
-| `agent.model` | ✓ | Model name. Written as `orchestrator` before 2.6.1, where it was always `null` — such a file is refused on load rather than rebuilt wrong. |
+| `agent.model` | ✓ | Model name. |
 | `agent.mode` | | `"waterfall"` or `"agile"`. |
 | `agent.stop_when` | | List of `{kind, value}` — `step_count`, `token_budget`, `cost_budget`. A `check` is a closure and cannot be written; saving one warns. |
 | `agent.verbose` | | `0`, `1`, or `2`. |

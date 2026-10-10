@@ -1,6 +1,6 @@
 """
-tools.reranking._base
-======================
+tools.rerank._base
+==================
 
 RerankResult  — uniform return type for every reranking call.
 RerankBase    — abstract base class for all provider implementations.
@@ -23,8 +23,8 @@ Document normalisation
 ----------------------
 All rerankers accept documents as:
   • ``list[str]``       — plain text strings
-  • ``list[dict]``      — dicts with a ``"text"`` key (direct output from
-                          :class:`~tools.vectordb.VectorQueryTool`)
+  • ``list[dict]``      — dicts with a ``"text"`` key, such as the output
+                          of ``Vectors(...).query``
 
 The original dict fields (``id``, ``metadata``, etc.) are preserved and
 merged back into the result so the caller never loses context.
@@ -37,14 +37,11 @@ run() interface
       ``query``  str  — the search query  (required)
       ``top_n``  int  — how many results to return (default: all)
 
-This makes the reranker a drop-in Chain step after
-:class:`~tools.vectordb.VectorQueryTool`:
+This makes the reranker a drop-in Chain step after a vector search::
 
-::
-
-    (vectorQuery(store), "candidates", {"input": "{question}"}),
-    (reranker,           "top5",       {"input": "{candidates}",
-                                        "options": {"query": "{question}", "top_n": 5}}),
+    (kb.query, "candidates", {"input": "{question}"}),
+    (reranker, "top5",       {"input": "{candidates}",
+                              "options": {"query": "{question}", "top_n": 5}}),
 """
 
 from __future__ import annotations
@@ -151,7 +148,7 @@ class RerankBase(Tool):
     provider: str = ""
     _ENV_KEY: str = ""
 
-    # A tool since 3.5.0: code, a chain and an agent call it alike.
+    # A tool: code, a chain and an agent call it alike.
     risk        = "read"
     parameters  = {
         "type": "object",
@@ -178,8 +175,8 @@ class RerankBase(Tool):
         **kwargs: Any,
     ) -> None:
         if kwargs:
-            # Accepted and dropped until 3.7.0: Reranker("rerank-v3.5", top_n=3)
-            # built a reranker that returned every document, and said nothing.
+            # A setting here that belongs to the call would otherwise be
+            # dropped: the reranker would return every document, and say nothing.
             hint = (" — top_n and query are options of the call: .run(docs, {\"query\": …, \"top_n\": …})"
                     if set(kwargs) & {"top_n", "query"} else "")
             raise TypeError(f"{type(self).__name__} takes model, api_key, name and description; "
@@ -227,7 +224,7 @@ class RerankBase(Tool):
             The search query.
         documents : list[str | dict]
             Documents to rerank.  Accepts plain strings or dicts with a
-            ``"text"`` key (direct output from :class:`~tools.vectordb.VectorQueryTool`).
+            ``"text"`` key, such as the output of ``Vectors(...).query``.
         top_n : int | None, optional
             Return only the top *N* results.  ``None`` returns all.
 

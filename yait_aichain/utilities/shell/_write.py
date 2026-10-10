@@ -1,6 +1,6 @@
 """
-tools.local._write — LocalWriteTool
-=====================================
+utilities.shell._write — LocalWriteTool
+=======================================
 
 Create or overwrite a file within the sandbox.
 Parent directories are created automatically.
@@ -100,6 +100,3 @@ class LocalWriteTool(Tool, SandboxedTool):
         }
 
 
-def localWrite(root_dir: str | None = None) -> LocalWriteTool:
-    """Return a :class:`LocalWriteTool` sandboxed to *root_dir*."""
-    return LocalWriteTool(root_dir)

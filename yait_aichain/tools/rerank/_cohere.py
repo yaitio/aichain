@@ -1,6 +1,6 @@
 """
-tools.reranking._cohere — RerankCohere
-=======================================
+tools.rerank._cohere — RerankCohere
+===================================
 
 Wraps the Cohere Rerank API v2 (``POST /v2/rerank``).
 
@@ -54,9 +54,9 @@ class RerankCohere(RerankBase):
     --------
     ::
 
-        from yait_aichain.tools.reranking import Reranker
+        from yait_aichain.tools import rerank
 
-        reranker = Reranker("cohere/rerank-v3.5")
+        reranker = rerank("cohere", model="rerank-v3.5")
         result   = reranker.rerank(
             "how does KV caching work?",
             ["LLMs use KV cache …", "Python is a language …", "Attention is …"],

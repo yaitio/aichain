@@ -2,7 +2,7 @@
 tools.image
 ===========
 
-An image model as a tool (3.9.0). ``image(service, model=…)`` makes one —
+An image model as a tool. ``image(service, model=…)`` makes one —
 ``openai``, ``google``, ``bfl``, ``xai``, ``qwen`` or ``recraft`` —
 built on the model layer's provider data: the same request, the same option
 vocabulary, the same notices when a provider adapts or declines an option.
@@ -15,8 +15,8 @@ vocabulary, the same notices when a provider adapts or declines an option.
     picture.run("make the sky stormy", images=[out["images"][0]["path"]])   # an edit
     Agent(model, tools=[picture])
 
-Until 3.9.0 this was ``Skill(Model("gpt-image-1.5"), output={"modalities": ["image"], …})``,
-which still works and warns; it raises in 4.0.
+Images are made only here: a ``Skill`` asked for image output raises and
+points to ``image()``.
 """
 
 from ._tool import OPTIONS, Image
@@ -25,7 +25,7 @@ from ._tool import OPTIONS, Image
 SERVICES = ("openai", "google", "bfl", "xai", "qwen", "recraft")
 
 #: Providers that were here and closed, with what to say instead of "unknown".
-CLOSED = {"reve": "Reve closed its API on 2026-08-14; it was removed in 3.10.0"}
+CLOSED = {"reve": "Reve closed its API on 2026-08-14"}
 
 
 def image(service: str, *, model: str, api_key: "str | None" = None, output_dir: "str | None" = None,

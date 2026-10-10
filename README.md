@@ -143,7 +143,7 @@ The skill alone works too: copy `plugin/skills/yait-aichain/` into
 
 | | |
 |---|---|
-| **Start** | [Quickstart](docs/start/quickstart.md) — five minutes, four steps · [Concepts](docs/start/concepts.md) — six ideas, one screen each |
+| **Start** | [Quickstart](docs/start/quickstart.md) — five minutes, four steps · [Concepts](docs/start/concepts.md) — six ideas, one screen each · [Migrating to 4.0](docs/start/migrating-to-4.md) |
 | **Pipelines** | [Skill](docs/pipelines/skills.md) · [Chain](docs/pipelines/chain.md) · [Pool](docs/pipelines/pool.md) · [Pause and resume](docs/pipelines/pause-and-resume.md) |
 | **Agents** | [The loop and its modes](docs/agents/overview.md) · [Driving the loop](docs/agents/driving-the-loop.md) · [An agent as a chain step](docs/agents/agent-as-chain-step.md) |
 | **Tools** | [How tools work](docs/tools/index.md) · [Search](docs/tools/search.md) · [Fetch](docs/tools/fetch.md) · [Decide](docs/tools/decide.md) · [Chunk, embed, rerank](docs/tools/retrieval.md) · [Speech and images](docs/tools/media.md) |

@@ -1,16 +1,15 @@
 """
-tools.mcp — MCPTool, MCPTools
-==============================
+utilities.mcp._tools — MCPTool, MCPTools
+=========================================
 
-Integrate any MCP (Model Context Protocol) server as a first-class
-aichain tool.  One ``MCPTool`` instance wraps one callable operation on
-an MCP server behind the standard ``run(input, options=None)`` interface.
-``MCPTools()`` discovers every tool a server exposes and returns them as
-a ready-to-use list.
+One ``MCPTool`` wraps one operation on an MCP (Model Context Protocol)
+server behind the standard ``run(input, options=None)`` interface.
+``MCPTools()`` is the internal discovery function :class:`~yait_aichain.utilities.MCP`
+uses to list a server's tools; the way in is ``MCP(server)``.
 
-Both primitives work anywhere a Tool is accepted: Chain steps, Agent
-tool lists, or direct ``run()`` calls.  No async boilerplate — the
-library manages a background event loop internally.
+A tool works anywhere a Tool is accepted: Chain steps, Agent tool lists,
+or direct ``run()`` calls.  No async boilerplate — the library manages a
+background event loop internally.
 
 Supported transports
 ---------------------
@@ -29,58 +28,25 @@ Quick examples
 --------------
 ::
 
-    from yait_aichain.tools import MCPTools, MCPTool
+    from yait_aichain.utilities import MCP
 
-    # ── Discover all tools on a server ─────────────────────────────────
-    tools = MCPTools("https://api.example.com/mcp")
-    # → [MCPTool("search"), MCPTool("summarise"), ...]
+    server = MCP("https://api.example.com/mcp",
+                 headers={"Authorization": "Bearer sk-..."})
+    server.names                                   # ['search', 'summarise', ...]
+    server.tool("search").run({"query": "latest AI research"})
 
-    # ── Use in an Agent ────────────────────────────────────────────────
-    from yait_aichain.agent import Agent
-    from yait_aichain.models import Model
+    # STDIO subprocess, only two of its tools
+    fs = MCP({"command": "npx", "args": ["@modelcontextprotocol/server-filesystem", "/data"]},
+             filter=["read_file", "list_directory"])
+    Agent(Model("claude-haiku-5-5"), tools=fs.tools)
 
-    agent = Agent(
-        model = Model("claude-sonnet-4-6"),
-        tools = MCPTools("https://api.example.com/mcp"),
-    )
-
-    # ── Use a single tool in a Chain ───────────────────────────────────
-    tools = MCPTools("https://api.example.com/mcp")
-    search = next(t for t in tools if t.name == "search")
-    # Then use `search` as a Chain step
-
-    # ── Direct call ────────────────────────────────────────────────────
-    result = search.run(input={"query": "latest AI research"})
-
-    # ── HTTP with auth header ──────────────────────────────────────────
-    tools = MCPTools(
-        "https://api.example.com/mcp",
-        headers={"Authorization": "Bearer sk-..."},
-    )
-
-    # ── STDIO subprocess ───────────────────────────────────────────────
-    tools = MCPTools({"command": "python", "args": ["./my_server.py"]})
-
-    # ── npx MCP server with env vars ───────────────────────────────────
-    tools = MCPTools(
-        {"command": "npx", "args": ["@modelcontextprotocol/server-filesystem", "/data"]},
-        env={"READ_ONLY": "true"},
-    )
-
-    # ── Filter to specific tools ───────────────────────────────────────
-    tools = MCPTools(
-        "https://api.example.com/mcp",
-        filter=["search", "summarise"],
-    )
-
-    # ── Build a single tool directly (skip discovery) ──────────────────
+    # One tool built directly, skipping discovery
     tool = MCPTool(
         name        = "search_web",
         description = "Search the web for recent information.",
         server      = "https://api.example.com/mcp",
-        headers     = {"Authorization": "Bearer sk-..."},
     )
-    result = tool.run(input={"query": "MCP protocol"})
+    tool.run({"query": "MCP protocol"})
 
 Installation
 ------------
@@ -236,8 +202,8 @@ def _build_client(
 
     # ── Dict spec ─────────────────────────────────────────────────────────
     if isinstance(server, dict):
-        # One source for each (3.7.0): given both as an argument and in the
-        # server dict, they were merged and the dict won, in silence.
+        # One source for each: given both as an argument and in the server
+        # dict, it is an error rather than a merge where one side wins.
         for key, given in (("headers", headers), ("env", env), ("cwd", cwd), ("transport", transport)):
             if given and server.get(key):
                 raise ValueError(f"MCP {key} given twice — as {key}= and in the server dict; "
@@ -349,11 +315,10 @@ class MCPTool(Tool):
     A single tool from an MCP server, exposed as a standard aichain Tool.
 
     ``MCPTool`` opens a connection to the MCP server, calls the specified
-    tool, and closes the connection on every ``run()`` call.  The most
-    convenient way to create instances is via the :func:`MCPTools`
-    factory, which discovers all tools on a server at once.  Build an
-    ``MCPTool`` directly when you already know the tool name and want to
-    skip the discovery round-trip.
+    tool, and closes the connection on every ``run()`` call.  The usual
+    way to get one is ``MCP(server).tool(name)``, which discovers the
+    server's tools once.  Build an ``MCPTool`` directly when you already
+    know the tool name and want to skip the discovery round-trip.
 
     Parameters
     ----------
@@ -362,8 +327,8 @@ class MCPTool(Tool):
     description : str
         Human-readable description (shown to agents choosing tools).
     server : str | dict | object
-        MCP server specification.  See :func:`MCPTools` for all accepted
-        forms.
+        MCP server specification, in any form :class:`MCP` accepts
+        (a path or command, a URL, or a dict).
     parameters : dict | None, optional
         JSON Schema describing the tool's input arguments.  Used by
         Chains and Agents to match accumulated variables to tool inputs.
@@ -431,7 +396,7 @@ class MCPTool(Tool):
         self._cwd        = cwd
         self._transport  = transport
 
-        # Exact schema when available (from MCPTools discovery); otherwise
+        # Exact schema when available (from discovery); otherwise
         # a permissive fallback so Chain/Agent can still pass kwargs.
         self.parameters = parameters or {
             "type":                 "object",
@@ -456,11 +421,11 @@ class MCPTool(Tool):
         ----------
         input : dict | str | None, optional
             Tool arguments as a dict.  A bare string is treated as a
-            single ``"input"`` field (compatibility shim for plain-string
-            Chain steps).
+            single ``"input"`` field, for Chain steps that pass a plain
+            string.
         options : dict | None, optional
-            None. A call's timeout is the tool's ``call_timeout`` since
-            3.7.0; options given here are an error that says so.
+            None. A call's timeout is the tool's ``call_timeout`` setting;
+            options given here are an error that says so.
         **kwargs
             Individual argument values, merged with *input*; an argument
             given in both is an error.  This is the form used by Chains — accumulated
@@ -490,11 +455,10 @@ class MCPTool(Tool):
                              "keyword arguments — pass each argument once")
         arguments.update(kwargs)
 
-        # A call's timeout is the tool's setting since 3.7.0: the word meant the
-        # connection on MCPTools and one call here.
+        # A call's timeout is the tool's setting, not a per-call option.
         if options:
             raise ValueError(f"MCP tool {self.name!r}: "
-                             + ("timeout is a setting — MCPTools(…, call_timeout=…) or MCP(…, call_timeout=…)"
+                             + ("timeout is a setting — MCP(…, call_timeout=…)"
                                 if "timeout" in options else
                                 f"a call takes the server's arguments, not options {sorted(options)}"))
         return _run_sync(self._acall(arguments, timeout=self._call_timeout))
@@ -574,7 +538,7 @@ class MCPTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# MCPTools factory
+# Discovery (internal; MCP calls it)
 # ---------------------------------------------------------------------------
 
 def MCPTools(
@@ -591,6 +555,10 @@ def MCPTools(
     """
     Connect to an MCP server, discover all exposed tools, and return one
     :class:`MCPTool` per tool.
+
+    Internal: this is the discovery function :class:`MCP` calls on first
+    use of ``tools``. Callers use ``MCP(server)``, whose ``connect_timeout``
+    becomes ``timeout`` here.
 
     The discovery connection is opened and closed within this call.  Each
     returned ``MCPTool`` opens its own connection independently when
@@ -658,42 +626,10 @@ def MCPTools(
     --------
     ::
 
-        from yait_aichain.tools import MCPTools
-        from yait_aichain.agent import Agent
-        from yait_aichain.models import Model
-
-        # ── HTTP server ────────────────────────────────────────────────
-        tools = MCPTools("https://api.example.com/mcp")
-        for t in tools:
-            print(f"{t.name}: {t.description}")
-
-        # ── HTTP with auth ─────────────────────────────────────────────
-        tools = MCPTools(
-            "https://api.example.com/mcp",
-            headers={"Authorization": "Bearer sk-..."},
-        )
-
-        # ── STDIO subprocess ───────────────────────────────────────────
-        tools = MCPTools({"command": "python", "args": ["./server.py"]})
-
-        # ── npx server ────────────────────────────────────────────────
-        tools = MCPTools(
-            {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-brave-search"]},
-            env={"BRAVE_API_KEY": "..."},
-        )
-
-        # ── Only specific tools ────────────────────────────────────────
-        tools = MCPTools(
-            "https://api.example.com/mcp",
-            filter=["search_web", "get_weather"],
-        )
-
-        # ── Register in an Agent ───────────────────────────────────────
-        agent = Agent(
-            model = Model("claude-sonnet-4-6"),
-            tools = MCPTools("https://api.example.com/mcp"),
-        )
+        tools = MCPTools("https://api.example.com/mcp", filter=["search_web"])
+        # what MCP("https://api.example.com/mcp", filter=["search_web"]).tools returns
     """
+
     return _run_sync(
         _discover_tools(
             server    = server,

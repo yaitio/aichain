@@ -192,44 +192,6 @@ class TestTheStreamCarriesTheSameThing(unittest.TestCase):
         self.assertEqual({e.run_id for e in events}, {ended.run_id})
 
 
-class TestTheOldSpellingStillReachesAHook(unittest.TestCase):
-    """Renaming is a breaking change for a hook written against `step.*`, and
-    the agent's spelling collided with Chain's own step events. A hook using
-    the old method keeps firing, once, with a warning naming the new one."""
-
-    def test_a_hook_written_for_step_started_is_still_called(self):
-        import warnings
-        from yait_aichain import Hook
-
-        seen = []
-
-        class Old(Hook):
-            def step_started(self, event):
-                seen.append(event.name)
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            Agent(_model(_calls(("c1", "report", {"region": "x"})),
-                         _text("d")),
-                  tools=[Report()], hooks=[Old()], verbose=0).run("go")
-        self.assertEqual(seen, ["report"])
-        self.assertTrue(any(issubclass(w.category, DeprecationWarning)
-                            for w in caught))
-
-    def test_the_new_name_wins_when_both_are_defined(self):
-        from yait_aichain import Hook
-        seen = []
-
-        class Both(Hook):
-            def step_started(self, event):
-                seen.append("old")
-
-            def tool_call_started(self, event):
-                seen.append("new")
-
-        Agent(_model(_calls(("c1", "report", {"region": "x"})), _text("d")),
-              tools=[Report()], hooks=[Both()], verbose=0).run("go")
-        self.assertEqual(seen, ["new"])
 
 
 if __name__ == "__main__":

@@ -1,20 +1,20 @@
 """
-tools.vectordb._fetch
-======================
+utilities.vectors._fetch
+========================
 
 VectorFetchTool — retrieve specific records by ID (no similarity ranking).
 
 Use this when you already know which IDs you need — e.g. after a query
 that returned IDs, or to verify what was indexed.
 
-Chain usage
------------
+Usage
+-----
 ::
 
-    from yait_aichain.tools.vectordb import VectorDB, vectorFetch
+    from yait_aichain.utilities.vectors import VectorDB, VectorFetchTool
 
     store = VectorDB("qdrant", collection="docs")
-    tool  = vectorFetch(store)
+    tool  = VectorFetchTool(store)
 
     records = tool.run(["doc_1", "doc_2"])
     # → [{"id": "doc_1", "text": "…", "metadata": {…}}, …]
@@ -81,8 +81,8 @@ class VectorFetchTool(Tool):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting — until 3.7.0 a call's
-        ``collection`` option switched it, so a model could read or write
+        """The store. Its collection is a setting, not a call's: a
+        ``collection`` option is refused, so a model cannot read or write
         another collection than the one the code chose."""
         if "collection" in opts:
             raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
@@ -93,7 +93,3 @@ class VectorFetchTool(Tool):
         return f"VectorFetchTool(store={self._store!r})"
 
 
-# ── Convenience alias ─────────────────────────────────────────────────────────
-def vectorFetch(store: VectorStore) -> VectorFetchTool:
-    """Return a :class:`VectorFetchTool` bound to *store*."""
-    return VectorFetchTool(store)

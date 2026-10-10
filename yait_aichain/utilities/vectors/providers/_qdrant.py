@@ -1,6 +1,6 @@
 """
-tools.vectordb.providers._qdrant
-==================================
+utilities.vectors.providers._qdrant
+===================================
 
 QdrantBackend — VectorBackend adapter for Qdrant via its REST API.
 
@@ -95,13 +95,13 @@ class QdrantBackend(VectorBackend):
     --------
     Local server::
 
-        from yait_aichain.tools.vectordb import VectorDB
-        from yait_aichain.tools.embedding import Embedding
+        from yait_aichain.utilities.vectors import VectorDB
+        from yait_aichain.tools import embed
 
         store = VectorDB(
             "qdrant",
             collection = "knowledge_base",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
             url        = "http://localhost:6333",
         )
 
@@ -110,7 +110,7 @@ class QdrantBackend(VectorBackend):
         store = VectorDB(
             "qdrant",
             collection = "knowledge_base",
-            embedder   = Embedding("openai/text-embedding-3-small"),
+            embedder   = embed("openai", model="text-embedding-3-small"),
             url        = "https://xyz.us-east4-0.gcp.cloud.qdrant.io",
             api_key    = "qdrant-...",
         )

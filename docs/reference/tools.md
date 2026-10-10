@@ -17,14 +17,14 @@ Chains and Agents identically.
 <!-- g:tools-index -->
 | Group | Tool | Class | What it does | Key | Risk |
 |---|---|---|---|---|---|
-| Search | [`searchPerplexity`](../api/tools/search.md#searchperplexity) | `PerplexitySearchTool` | Web search powered by the Perplexity Search API — each result with a substantive passage from the page. | `PERPLEXITY_API_KEY` | `read` |
-| Search | [`searchBrave`](../api/tools/search.md#searchbrave) | `BraveSearchTool` | Web search powered by the Brave Search API — titles, URLs, the page's description and, with `extra_snippets`, more passages from it. | `BRAVE_SEARCH_API_KEY` | `read` |
+| Search | [`searchPerplexity`](../api/tools/search.md#searchperplexity) | `searchPerplexity` | Web search powered by the Perplexity Search API — each result with a substantive passage from the page. | `PERPLEXITY_API_KEY` | `read` |
+| Search | [`searchBrave`](../api/tools/search.md#searchbrave) | `searchBrave` | Web search powered by the Brave Search API — titles, URLs, the page's description and, with `extra_snippets`, more passages from it. | `BRAVE_SEARCH_API_KEY` | `read` |
 | Search | [`searchExa`](../api/tools/search.md#searchexa) | `searchExa` | Web search powered by the Exa Search API — results with the passages that answer the query. | `EXA_API_KEY` | `read` |
 | Search | [`searchFirecrawl`](../api/tools/search.md#searchfirecrawl) | `searchFirecrawl` | Web search powered by Firecrawl — results with a description and, on request, each page's content as Markdown. | `FIRECRAWL_API_KEY` | `read` |
 | Search | [`searchTavily`](../api/tools/search.md#searchtavily) | `searchTavily` | Web search powered by Tavily — each page with the passages chosen for the query, and on request the page itself. | `TAVILY_API_KEY` | `read` |
 | Search | [`searchParallel`](../api/tools/search.md#searchparallel) | `searchParallel` | Web search powered by Parallel — the excerpts of each page that serve the objective of the search. | `PARALLEL_API_KEY` | `read` |
 | Embeddings | [`embedOpenAI`](../api/tools/embed.md#embeddingopenai) | `EmbeddingOpenAI` | Embedder for the OpenAI Embeddings API. | `OPENAI_API_KEY` | `read` |
-| Embeddings | [`embedCohere`](../api/tools/embed.md#embeddingcohere) | `CohereEmbedder` | Embedder for the Cohere Embed API (v2). | `COHERE_API_KEY` | `read` |
+| Embeddings | [`embedCohere`](../api/tools/embed.md#embeddingcohere) | `EmbeddingCohere` | Embedder for the Cohere Embed API (v2). | `COHERE_API_KEY` | `read` |
 | Embeddings | [`embedVoyage`](../api/tools/embed.md#embeddingvoyage) | `EmbeddingVoyage` | Embedder for the Voyage AI Embeddings API. | `VOYAGE_API_KEY` | `read` |
 | Embeddings | [`embedGoogle`](../api/tools/embed.md#embeddinggoogle) | `EmbeddingGoogle` | Embedder for the Google AI (Gemini) Embeddings API. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `read` |
 | Embeddings | [`embedQwen`](../api/tools/embed.md#embeddingqwen) | `EmbeddingQwen` | Embedder for the Alibaba DashScope Embeddings API. | `DASHSCOPE_API_KEY` | `read` |
@@ -49,7 +49,7 @@ Chains and Agents identically.
 | Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `write` |
 | Local | [`local_write`](../api/utilities/shell.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |
 | Local | [`local_run`](../api/utilities/shell.md#localruntool) | `LocalRunTool` | Execute a shell command or Python file. | — | `write` |
-| Vector store | [`vector_chunk`](../api/utilities/vectors.md#vectorchunktool) | `VectorChunkTool` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `write` |
+| Vector store | [`vector_chunk`](../api/utilities/vectors.md#chunk) | `Chunk` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `write` |
 | Vector store | [`vector_upsert`](../api/utilities/vectors.md#vectorupserttool) | `VectorUpsertTool` | Insert or update records in a `VectorStore`. | — | `write` |
 | Vector store | [`vector_query`](../api/utilities/vectors.md#vectorquerytool) | `VectorQueryTool` | Semantic similarity search over a `VectorStore`. | — | `write` |
 | Vector store | [`vector_fetch`](../api/utilities/vectors.md#vectorfetchtool) | `VectorFetchTool` | Retrieve records from a `VectorStore` by exact ID. | — | `write` |

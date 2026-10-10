@@ -22,6 +22,61 @@ A reranking tool for *service* — one of `SERVICES` — and *model*.
 top = rerank("cohere", model="rerank-v3.5").run(docs, {"query": "how does caching work?", "top_n": 5})
 ```
 
+## `RerankResult`
+
+```python
+RerankResult(
+    results: list[dict],
+    model: str,
+    provider: str,
+    total_tokens: int | None = None,
+    metadata: dict = <factory>,
+)
+```
+
+Uniform return type for every `RerankBase` call.
+
+**Attributes**
+
+- `results` (*list[dict]*) — Reranked documents, sorted by descending relevance score.
+  Each item:
+    `index`    int   — position in the original input list
+    `text`     str   — document text
+    `score`    float — relevance score (higher = more relevant)
+    All original dict fields from the input are preserved when
+    documents were passed as dicts.
+- `model` (*str*)
+- `provider` (*str*)
+- `total_tokens` (*int | None*, default `None`)
+- `metadata` (*dict*, default `<factory>`) — Provider-specific extras (e.g. Cohere billed units).
+
+**Examples**
+
+```python
+result = reranker.rerank("how does caching work?", documents)
+for item in result:
+    print(item["score"], item["text"][:60])
+
+texts = result.texts()    # list[str], top to bottom
+scores = result.scores()  # list[float]
+```
+
+### `RerankResult.texts()`
+
+```python
+RerankResult.texts() -> list[str]
+```
+
+Return document texts in ranked order.
+
+### `RerankResult.scores()`
+
+```python
+RerankResult.scores() -> list[float]
+```
+
+Return relevance scores in ranked order.
+
 ---
 
 ## The classes behind it

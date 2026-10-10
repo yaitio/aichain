@@ -1,14 +1,15 @@
 """
-tools.reranking
-===============
+tools.rerank
+============
 
-Provider-agnostic reranking interface for RAG pipelines.
+Reranking as a tool, for RAG pipelines: one interface over three providers.
 
 Public API
 ----------
-``Reranker(model, *, api_key=None, **kwargs)``
-    Factory function — returns the right :class:`RerankBase` subclass.
-    Mirrors the ``Embedding(model)`` factory pattern.
+``rerank(service, *, model, api_key=None)``
+    Makes the reranking tool for *service* — one of ``SERVICES``:
+    ``"cohere"`` (:class:`RerankCohere`), ``"voyage"`` (:class:`RerankVoyage`),
+    ``"qwen"`` (:class:`RerankQwen`).
 
 ``RerankResult``
     Uniform return type: ``results``, ``model``, ``provider``,
@@ -17,24 +18,6 @@ Public API
 
 ``RerankBase``
     Abstract base class.  Subclass to add a new provider.
-
-Provider routing
-----------------
-The ``model`` argument follows the ``"provider/model"`` convention:
-
-  ``"cohere/rerank-v3.5"``       → :class:`RerankCohere`
-  ``"cohere/rerank-english-v3.0"``
-  ``"cohere/rerank-multilingual-v3.0"``
-
-  ``"voyage/rerank-2"``          → :class:`RerankVoyage`
-  ``"voyage/rerank-2-lite"``
-
-  ``"qwen/gte-rerank"``          → :class:`RerankQwen`
-  ``"qwen/gte-rerank-v2"``
-
-Bare model names are resolved by prefix heuristics:
-  starts with ``"rerank-"``      → Cohere
-  starts with ``"gte-rerank"``   → Qwen
 
 Interface
 ---------
@@ -47,12 +30,14 @@ Every reranker exposes two call styles:
     Standard Tool interface for Chains and Agents.
     ``options = {"query": str, "top_n": int}``
 
+The model is a setting of the tool; ``query`` and ``top_n`` belong to a call.
+
 Document input
 --------------
 Both methods accept documents as:
   • ``list[str]``   — plain text
-  • ``list[dict]``  — dicts with ``"text"`` key (direct output from
-                       :class:`~tools.vectordb.VectorQueryTool`)
+  • ``list[dict]``  — dicts with a ``"text"`` key, such as the output of
+                       ``Vectors(...).query``
 
 Original dict fields (``id``, ``metadata``, …) are preserved in the results.
 
@@ -60,9 +45,9 @@ Examples
 --------
 Standalone::
 
-    from yait_aichain.tools.reranking import Reranker
+    from yait_aichain.tools import rerank
 
-    reranker = Reranker("cohere/rerank-v3.5")
+    reranker = rerank("cohere", model="rerank-v3.5")
     result   = reranker.rerank(
         "how does KV caching work?",
         ["LLMs cache key-value pairs …", "Python is a language …"],
@@ -70,27 +55,27 @@ Standalone::
     )
     print(result[0]["score"], result[0]["text"][:60])
 
-With vectorQuery output (dicts preserved)::
+After a vector search (dicts preserved)::
 
-    from yait_aichain.tools.vectordb  import VectorDB, vectorQuery
-    from yait_aichain.tools.reranking import Reranker
+    from yait_aichain.tools import embed, rerank
+    from yait_aichain.utilities import Vectors
 
-    store     = VectorDB("chroma", "docs", embedder=...)
-    candidates = vectorQuery(store).run("KV caching", {"n": 20})
+    kb = Vectors("qdrant", collection="docs", description="the product documentation",
+                 embedder=embed("openai", model="text-embedding-3-small"))
+    candidates = kb.query.run("KV caching", {"n": 20})
 
-    reranker  = Reranker("voyage/rerank-2")
-    top5      = reranker.run(candidates, {"query": "KV caching", "top_n": 5})
-    # top5[0] still has "id" and "metadata" from the original vectorQuery result
+    reranker = rerank("voyage", model="rerank-2")
+    top5     = reranker.run(candidates, {"query": "KV caching", "top_n": 5})
+    # top5[0] still has "id" and "metadata" from the search
 
 In a Chain::
 
     from yait_aichain.chain import Chain
 
-    pipeline = Chain(steps=[
-        (vectorQuery(store),  "candidates", {"input": "{question}"}),
-        (reranker,            "top5",       {"input": "{candidates}",
-                                             "options": {"query": "{question}",
-                                                         "top_n": 5}}),
+    pipeline = Chain([
+        (kb.query, "candidates", {"input": "{question}"}),
+        (reranker, "top5",       {"input": "{candidates}",
+                                  "options": {"query": "{question}", "top_n": 5}}),
         answer_skill,
     ])
 """
@@ -100,14 +85,7 @@ from ._cohere import RerankCohere
 from ._voyage import RerankVoyage
 from ._qwen   import RerankQwen
 
-__all__ = [
-    "Reranker",
-    "RerankBase",
-    "RerankResult",
-    "RerankCohere",
-    "RerankVoyage",
-    "RerankQwen",
-]
+__all__ = ["rerank", "SERVICES", "RerankBase", "RerankResult", "RerankCohere", "RerankVoyage", "RerankQwen"]
 
 
 # ---------------------------------------------------------------------------
@@ -120,94 +98,10 @@ _PREFIX_MAP: dict[str, type] = {
     "qwen":   RerankQwen,
 }
 
-_HEURISTICS: list[tuple[str, type]] = [
-    ("rerank-",     RerankCohere),   # rerank-v3.5, rerank-english-v3.0
-    ("gte-rerank",  RerankQwen),     # gte-rerank, gte-rerank-v2
-]
 
 
 # ---------------------------------------------------------------------------
-# Reranker factory
-# ---------------------------------------------------------------------------
-
-def Reranker(
-    model:   str,
-    *,
-    api_key: str | None = None,
-    **kwargs,
-) -> RerankBase:
-    """
-    Return a :class:`RerankBase` instance for *model*.
-
-    Parameters
-    ----------
-    model : str
-        Model identifier.  Accepts ``"provider/model"`` (unambiguous) or
-        a bare model name resolved by heuristic.
-
-        Supported provider prefixes:
-          ``"cohere/"``  — Cohere Rerank
-          ``"voyage/"``  — Voyage AI Rerank
-          ``"qwen/"``    — Alibaba DashScope GTE-Rerank
-
-    api_key : str | None, optional
-        Override the provider's environment variable.
-    **kwargs
-        Extra arguments forwarded to the backend constructor.
-        Common extras:
-          ``region`` (str) — DashScope region for Qwen (``"ap"``, ``"us"``, ``"cn"``, ``"hk"``)
-
-    Returns
-    -------
-    RerankBase
-        A concrete reranker ready to call :meth:`~RerankBase.rerank`.
-
-    Raises
-    ------
-    ValueError
-        When the provider cannot be inferred from *model*.
-
-    Examples
-    --------
-    ::
-
-        from yait_aichain.tools.reranking import Reranker
-
-        r1 = Reranker("cohere/rerank-v3.5")
-        r2 = Reranker("voyage/rerank-2")
-        r3 = Reranker("qwen/gte-rerank")
-
-        # Bare model name
-        r4 = Reranker("rerank-v3.5")         # → Cohere
-        r5 = Reranker("gte-rerank")           # → Qwen
-    """
-    # ── Explicit provider/model prefix ────────────────────────────────────
-    if "/" in model:
-        prefix, bare = model.split("/", 1)
-        cls = _PREFIX_MAP.get(prefix.lower())
-        if cls is None:
-            supported = ", ".join(sorted(_PREFIX_MAP))
-            raise ValueError(
-                f"Unknown reranking provider prefix {prefix!r}.  "
-                f"Supported: {supported}."
-            )
-        return cls(bare, api_key=api_key, **kwargs)
-
-    # ── Heuristic routing for bare model names ────────────────────────────
-    lower = model.lower()
-    for prefix, cls in _HEURISTICS:
-        if lower.startswith(prefix):
-            return cls(model, api_key=api_key, **kwargs)
-
-    raise ValueError(
-        f"Cannot infer reranking provider from model name {model!r}.  "
-        f"Use a provider-prefixed name such as 'cohere/{model}', "
-        f"'voyage/{model}', or 'qwen/{model}'."
-    )
-
-
-# ---------------------------------------------------------------------------
-# rerank(service, model=…) — the factory the documentation shows (3.5.0)
+# rerank(service, model=…) — the factory
 # ---------------------------------------------------------------------------
 
 #: Provider name → tool class, for :func:`rerank`.

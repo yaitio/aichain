@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from yait_aichain import Agent, Chain, Model, Skill
 from yait_aichain.agent import step_count
 from yait_aichain.agent._prompts import result_message
-from yait_aichain.tools import Record, Reranker, Tool, search
+from yait_aichain.tools import Record, Tool, rerank, search
 
 
 def _render(d):
@@ -107,13 +107,13 @@ class TestAgentRefusesWhatCannotBeATool(unittest.TestCase):
     def test_a_non_tool_by_its_class(self):
         # A reranker was the example until 3.5.0 made it a tool; a vector
         # store is a utility, not a tool.
-        from yait_aichain.tools.vectordb._base import VectorStore
+        from yait_aichain.utilities.vectors._base import VectorStore
         store = VectorStore.__new__(VectorStore)
         with self.assertRaisesRegex(TypeError, "VectorStore is not a tool"):
             Agent(self.model, tools=[store])
 
-    def test_a_reranker_is_a_tool_since_3_5(self):
-        Agent(self.model, tools=[Reranker("rerank-v3.5", api_key="k")])
+    def test_a_reranker_is_a_tool(self):
+        Agent(self.model, tools=[rerank("cohere", model="rerank-v3.5", api_key="k")])
 
     def test_a_skill_says_where_it_belongs(self):
         with self.assertRaisesRegex(TypeError, "a step for a Chain, not a tool for an Agent"):

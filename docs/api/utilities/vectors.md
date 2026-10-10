@@ -91,7 +91,7 @@ chunk(
     merge_peers: bool = True,
     name: str | None = None,
     description: str | None = None,
-) -> yait_aichain.tools.chunk._chunk.VectorChunkTool
+) -> yait_aichain.tools.chunk._chunk.Chunk
 ```
 
 A chunking tool. The sizes are settings: a store is filled with pieces cut
@@ -100,7 +100,7 @@ one way, so they are fixed for the tool, not chosen per call.
 default size.
 
 ```python
-pieces = chunk(max_chars=800).run(long_text)    # [{"text", "headings", …}, …]
+pieces = chunk(max_chars=800).run(long_text)    # [{"text", "chars", "metadata"}, …]
 ```
 
 ---
@@ -109,17 +109,17 @@ pieces = chunk(max_chars=800).run(long_text)    # [{"text", "headings", …}, �
 
 What the factory returns, with the schema a model is shown.
 
-### `vector_chunk` — `VectorChunkTool`
+### `vector_chunk` — `Chunk`
 
 Split text into overlapping chunks for embedding and vector-store ingestion.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import VectorChunkTool` |
+| Import | `from yait_aichain.tools import Chunk` |
 | Risk class | `write` |
 
 ```python
-VectorChunkTool(
+Chunk(
     max_chars: int = 1500,
     overlap_chars: int | None = None,
     merge_peers: bool = True,
@@ -131,7 +131,7 @@ VectorChunkTool(
 | `input` | `string` | ✓ | The text to chunk. |
 
 ```python
-result = VectorChunkTool()(
+result = Chunk()(
     input="…",
 )
 ```
@@ -142,7 +142,7 @@ Insert or update records in a `VectorStore`.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import VectorUpsertTool` |
+| Import | `from yait_aichain.utilities.vectors import VectorUpsertTool` |
 | Risk class | `write` |
 
 ```python
@@ -168,7 +168,7 @@ Semantic similarity search over a `VectorStore`.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import VectorQueryTool` |
+| Import | `from yait_aichain.utilities.vectors import VectorQueryTool` |
 | Risk class | `write` |
 
 ```python
@@ -196,7 +196,7 @@ Retrieve records from a `VectorStore` by exact ID.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import VectorFetchTool` |
+| Import | `from yait_aichain.utilities.vectors import VectorFetchTool` |
 | Risk class | `write` |
 
 ```python
@@ -222,7 +222,7 @@ Delete records from a `VectorStore`.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import VectorDeleteTool` |
+| Import | `from yait_aichain.utilities.vectors import VectorDeleteTool` |
 | Risk class | `write` |
 
 ```python

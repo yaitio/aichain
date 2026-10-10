@@ -1,6 +1,6 @@
 """
-tools.embedding._base
-=====================
+tools.embed._base
+=================
 
 ``EmbeddingResult`` — uniform return type for every embedding call.
 ``Embedder``        — abstract base class for all provider implementations.
@@ -21,8 +21,7 @@ The base ``embed()`` method handles everything above that layer:
 normalisation, chunking, fan-out across batches, result assembly.
 
 The convenience methods ``run()`` and ``batch()`` wrap ``embed()`` with the
-standard ``run(input, options=None)`` interface shared by all Tool/Embedder
-implementations.
+standard ``run(input, options=None)`` interface every tool has.
 
 Universal input_type values
 ---------------------------
@@ -43,7 +42,7 @@ To process a list larger than any single provider limit:
 
 To cap the slice size for rate-limiting purposes:
 
-    embedder = Embedding("openai/text-embedding-3-small", batch_size=32)
+    embedder = embed("openai", model="text-embedding-3-small", batch_size=32)
 """
 
 from __future__ import annotations
@@ -197,7 +196,7 @@ class Embedder(Tool):
     #: Models that take a ``dimensions``; ``None`` means every model does.
     _DIMENSION_MODELS: "frozenset | None" = None
 
-    # A tool since 3.5.0: code, a chain and an agent call it alike. An agent
+    # A tool: code, a chain and an agent call it alike. An agent
     # reads a summary, never the vectors (see EmbeddingResult.__str__).
     risk        = "read"
     parameters  = {
@@ -239,13 +238,12 @@ class Embedder(Tool):
             )
         self.model    = model
         self._api_key = key
-        # Settings, in one place (3.7.0). They used to be `**defaults` that
-        # any call's options overrode — so one store could be filled with
-        # vectors of two lengths — and that took any other key in silence.
+        # Settings, in one place, and never options of a call: one store must
+        # not be filled with vectors of two lengths.
         if (dimensions is not None and self._DIMENSION_MODELS is not None
                 and model not in self._DIMENSION_MODELS):
-            # It was sent nowhere and said nowhere: a store built for 512 got
-            # the model's own length. Refused where it is set (3.7.0).
+            # A fixed-length model would ignore it, and a store built for 512
+            # would get the model's own length. Refused where it is set.
             raise ValueError(f"{type(self).__name__}: {model} has a fixed length and takes no "
                              f"dimensions; the models that do: {', '.join(sorted(self._DIMENSION_MODELS))}")
         self.dimensions = dimensions
@@ -331,7 +329,7 @@ class Embedder(Tool):
 
         Large list with custom chunk size (useful for rate-limiting)::
 
-            embedder = Embedding("openai/text-embedding-3-small", batch_size=32)
+            embedder = embed("openai", model="text-embedding-3-small", batch_size=32)
             result   = embedder.embed(my_10k_list)
         """
         # ── Normalise input ───────────────────────────────────────────
@@ -383,18 +381,17 @@ class Embedder(Tool):
         """
         Embed one text (or a short list) and return an EmbeddingResult.
 
-        This is the standard interface shared by all Embedder implementations.
-        For large batches, prefer :meth:`batch` which makes the intent explicit.
+        This is the standard tool interface. For large batches, prefer
+        :meth:`batch`, which makes the intent explicit.
 
         Parameters
         ----------
         input : str | list[str]
             A single string or a list of strings to embed.
         options : dict | None, optional
-            Embedding options:
-              ``input_type``  — ``"query"`` | ``"document"`` | ``None``
-              ``dimensions``  — output vector size override
-              ``batch_size``  — chunk size cap for large lists
+            Takes one key, ``input_type`` — ``"query"`` | ``"document"`` |
+            ``None``. ``dimensions`` and ``batch_size`` are settings of the
+            embedder and raise here, as does any other key.
 
         Returns
         -------

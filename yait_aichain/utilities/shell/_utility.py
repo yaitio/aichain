@@ -17,16 +17,14 @@ class Shell(Utility):
         Agent(model, tools=[sh.browse, sh.read])        # reads, and cannot write or run anything
         Agent(model, tools=sh.tools)                    # all four
 
-    ``LocalTools(root_dir)`` — all four at once — is what it replaced, and
-    still works.
     """
 
     TOOLS = ("browse", "read", "write", "run")
 
     def __init__(self, folder: "str | None" = None) -> None:
-        from . import localBrowse, localRead, localRun, localWrite
-        self.browse = localBrowse(folder)
-        self.read = localRead(folder)
-        self.write = localWrite(folder)
-        self.run = localRun(folder)
+        from . import LocalBrowseTool, LocalReadTool, LocalRunTool, LocalWriteTool
+        self.browse = LocalBrowseTool(folder)
+        self.read = LocalReadTool(folder)
+        self.write = LocalWriteTool(folder)
+        self.run = LocalRunTool(folder)
         self.folder = self.read.root

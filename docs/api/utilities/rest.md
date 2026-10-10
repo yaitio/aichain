@@ -70,7 +70,7 @@ A single REST endpoint exposed as a library Tool.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import RestApiTool` |
+| Import | `from yait_aichain.utilities.rest import RestApiTool` |
 | Risk class | `write` |
 
 ```python

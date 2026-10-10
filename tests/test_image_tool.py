@@ -19,7 +19,6 @@ import os
 import sys
 import tempfile
 import unittest
-import warnings
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -152,26 +151,19 @@ class TestTheResult(unittest.TestCase):
 
 
 @patch.dict(os.environ, KEYS)
-class TestTheOldWay(unittest.TestCase):
+class TestAnImageIsNotASkill(unittest.TestCase):
 
-    def test_a_skill_with_an_image_model_warns(self):
-        with warnings.catch_warnings(record=True) as seen:
-            warnings.simplefilter("always")
+    def test_a_skill_with_an_image_output_raises_with_the_way_forward(self):
+        with self.assertRaisesRegex(ValueError, r"an image model is a tool — image\(service"):
             Skill(Model("grok-imagine-image"), prompt="x",
                   output={"modalities": ["image"], "format": {"type": "image"}})
-        mine = [w for w in seen if "raises in 4.0" in str(w.message)]
-        self.assertTrue(mine)
-        # Shown by default — a DeprecationWarning from library code is not —
-        # and pointing at the caller's line, not at the library's wrapper.
-        self.assertTrue(issubclass(mine[0].category, FutureWarning))
-        self.assertEqual(os.path.basename(mine[0].filename), "test_image_tool.py")
 
-    def test_the_tools_own_skill_does_not(self):
-        fake, _ = _run_with({"base64": PNG, "mime_type": "image/png"})
-        with warnings.catch_warnings(record=True) as seen, fake:
-            warnings.simplefilter("always")
-            image("xai", model="grok-imagine-image").run("x")
-        self.assertFalse([w for w in seen if "raises in 4.0" in str(w.message)])
+    def test_the_tool_itself_makes_the_request(self):
+        fake, asked = _run_with({"base64": PNG, "mime_type": "image/png"})
+        with fake:
+            out = image("xai", model="grok-imagine-image").run("x")
+        self.assertEqual(out["images"][0]["base64"], PNG)
+        self.assertEqual(asked["output"]["modalities"], ["image"])
 
     def test_a_saved_chain_keeps_the_model_and_the_directory(self):
         path = os.path.join(tempfile.mkdtemp(), "c.yaml")

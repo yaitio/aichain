@@ -14,7 +14,7 @@ speech(
     region: str | None = None,
     name: str | None = None,
     description: str | None = None,
-) -> yait_aichain.tools.speech._tts.convertToSpeech
+) -> yait_aichain.tools.speech._tts.Speech
 ```
 
 A text-to-speech tool for *service* — one of `SERVICES`.
@@ -37,10 +37,14 @@ transcribe(
     api_key: str | None = None,
     name: str | None = None,
     description: str | None = None,
-) -> yait_aichain.tools.transcribe._stt.convertToText
+) -> yait_aichain.tools.transcribe._stt.Transcription
 ```
 
 A speech-to-text tool for *service* — one of `SERVICES`.
+
+`model` defaults to the provider's and is a setting of the tool, not an
+option of a call; `api_key` defaults to the provider's environment
+variable.
 
 ```python
 transcribe("openai").run("call.mp3", {"language": "ru"})    # the transcript

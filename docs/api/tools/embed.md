@@ -31,6 +31,44 @@ vectors.embeddings[0][:3], vectors.dimensions
 str(vectors)          # what a model reads: "2 vector(s) of 1536 dimensions …"
 ```
 
+## `EmbeddingResult`
+
+```python
+EmbeddingResult(
+    embeddings: list[list[float]],
+    model: str,
+    provider: str,
+    dimensions: int,
+    total_tokens: int | None = None,
+    metadata: dict = <factory>,
+)
+```
+
+Uniform return type for every `Embedder` call.
+
+**Attributes**
+
+- `embeddings` (*list[list[float]]*) — One float vector per input text, in the same order as the input.
+- `model` (*str*) — The model name actually used (may differ from the requested name when
+  a provider applies an alias).
+- `provider` (*str*) — Canonical provider identifier: `"openai"`, `"cohere"`,
+  `"voyage"`, or `"google"`.
+- `dimensions` (*int*) — Length of each embedding vector.  `0` when *embeddings* is empty.
+- `total_tokens` (*int | None*, default `None`) — Total input tokens consumed, as reported by the provider.
+  `None` when the provider does not expose token counts.
+- `metadata` (*dict*, default `<factory>`) — Provider-specific extras (e.g. Cohere's billed units, Voyage's usage
+  object).  Empty dict when nothing extra is returned.
+
+**Examples**
+
+```python
+result = embedder.embed(["hello world", "foo bar"])
+print(len(result.embeddings))      # 2
+print(len(result.embeddings[0]))   # e.g. 1536
+print(result.dimensions)           # 1536
+print(result.total_tokens)         # e.g. 4
+```
+
 ---
 
 ## The classes behind it
@@ -45,7 +83,6 @@ Embedder for the OpenAI Embeddings API.
 |---|---|
 | Import | `from yait_aichain.tools import EmbeddingOpenAI` |
 | Risk class | `read` |
-| Also exported as | `OpenAIEmbedder` |
 | Key | `OPENAI_API_KEY` |
 
 ```python
@@ -72,19 +109,18 @@ result = EmbeddingOpenAI("<model>")(
 )
 ```
 
-### `embedCohere` — `CohereEmbedder`
+### `embedCohere` — `EmbeddingCohere`
 
 Embedder for the Cohere Embed API (v2).
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import CohereEmbedder` |
+| Import | `from yait_aichain.tools import EmbeddingCohere` |
 | Risk class | `read` |
-| Also exported as | `EmbeddingCohere` |
 | Key | `COHERE_API_KEY` |
 
 ```python
-CohereEmbedder(
+EmbeddingCohere(
     model: str,
     *,
     api_key: str | None = None,
@@ -101,7 +137,7 @@ CohereEmbedder(
 | `options.input_type` | `string` |  | What the texts are, for providers that embed the two differently. One of `query`, `document`. |
 
 ```python
-result = CohereEmbedder("<model>")(
+result = EmbeddingCohere("<model>")(
     input="…",
     options={"input_type": …},
 )
@@ -115,7 +151,6 @@ Embedder for the Voyage AI Embeddings API.
 |---|---|
 | Import | `from yait_aichain.tools import EmbeddingVoyage` |
 | Risk class | `read` |
-| Also exported as | `VoyageEmbedder` |
 | Key | `VOYAGE_API_KEY` |
 
 ```python
@@ -150,7 +185,6 @@ Embedder for the Google AI (Gemini) Embeddings API.
 |---|---|
 | Import | `from yait_aichain.tools import EmbeddingGoogle` |
 | Risk class | `read` |
-| Also exported as | `GoogleEmbedder` |
 | Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` |
 
 ```python

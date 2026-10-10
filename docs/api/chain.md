@@ -89,7 +89,8 @@ Execute all steps in order and return a `ChainResult`.
 - `variables` (*dict | None, optional*, default `None`) — Variables for this invocation.  Merged with `self.variables`;
   call-time values win.
 - `on_step_error` (*str | None, optional*, default `None`) — Override the instance-level `on_step_error` for this call only.
-  Must be `"raise"`, `"stop"`, or `"skip"` when provided.
+  Must be `"raise"`, `"stop"`, `"skip"` or `"collect"` when
+  provided.
 - `context` (*RunContext, optional*, default `None`) — The tenant and metadata of this request, ambient for every step; a
   `Model(api_key=callable)` resolves its key from it.
 
@@ -201,7 +202,7 @@ Returns an empty list before the first `run()`.
 Each record contains:
 
 `step`       — 0-based step index
-`kind`       — `"skill"` or `"tool"`
+`kind`       — `"skill"`, `"tool"`, `"agent"` or `"call"`
 `name`       — runner name (or `"step_N"` if unnamed)
 `input`      — accumulated variable dict *before* this step ran
 `output`     — raw output (`str` or `dict`)
@@ -271,10 +272,6 @@ Each step is reconstructed from the serialised data:
 
 **Parameters**
 
-- `path` (*str*) — Path to a YAML file previously written by `save`.
-- `api_key` (*str | None, optional*, default `None`) — Override the API key used for **all** Skill models in this chain.
-  When omitted, each model's key is read from its provider's
-  environment variable.
 - `path` (*str*) — The YAML file `save()` wrote.
 - `api_key` (*str | None, optional*, default `None`) — A key for every Skill step's model; each reads its own provider's from
   the environment otherwise.

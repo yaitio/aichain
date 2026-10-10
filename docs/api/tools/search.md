@@ -33,19 +33,18 @@ Agent(model, tools=[search("perplexity")])
 
 What the factory returns, with the schema a model is shown.
 
-### `searchPerplexity` — `PerplexitySearchTool`
+### `searchPerplexity`
 
 Web search powered by the Perplexity Search API — each result with a substantive passage from the page.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import PerplexitySearchTool` |
+| Import | `from yait_aichain.tools import searchPerplexity` |
 | Risk class | `read` |
-| Also exported as | `searchPerplexity` |
 | Key | `PERPLEXITY_API_KEY` |
 
 ```python
-PerplexitySearchTool(
+searchPerplexity(
     api_key: str | None = None,
     *,
     name: str | None = None,
@@ -67,25 +66,24 @@ PerplexitySearchTool(
 | `options.before_date` | `string` |  | Perplexity's own MM/DD/YYYY upper bound; wins over end_date. |
 
 ```python
-result = PerplexitySearchTool()(
+result = searchPerplexity()(
     input="…",
     options={"max_results": …},
 )
 ```
 
-### `searchBrave` — `BraveSearchTool`
+### `searchBrave`
 
 Web search powered by the Brave Search API — titles, URLs, the page's description and, with `extra_snippets`, more passages from it.
 
 | | |
 |---|---|
-| Import | `from yait_aichain.tools import BraveSearchTool` |
+| Import | `from yait_aichain.tools import searchBrave` |
 | Risk class | `read` |
-| Also exported as | `searchBrave` |
 | Key | `BRAVE_SEARCH_API_KEY` |
 
 ```python
-BraveSearchTool(
+searchBrave(
     api_key: str | None = None,
     *,
     name: str | None = None,
@@ -109,7 +107,7 @@ BraveSearchTool(
 | `options.freshness` | `string` |  | Brave's own time filter — 'pd', 'pw', 'pm', 'py' or 'YYYY-MM-DDtoYYYY-MM-DD'; wins over recency and the dates. |
 
 ```python
-result = BraveSearchTool()(
+result = searchBrave()(
     input="…",
     options={"max_results": …},
 )

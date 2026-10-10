@@ -18,10 +18,6 @@ searchParallel     Parallel — excerpts that serve an objective; built for agen
 ``search(service)`` makes one by the provider's name — ``search("exa")`` — and
 is the way the documentation shows. ``Search`` is the base; a new provider is a
 subclass that implements ``_search``, and an entry in ``SERVICES``.
-
-Backward-compatible aliases
----------------------------
-PerplexitySearchTool, BraveSearchTool
 """
 
 from ._base      import Search
@@ -64,9 +60,6 @@ def search(service: str, *, api_key: "str | None" = None, name: "str | None" = N
     return cls(api_key, name=name, description=description)
 
 
-# ── Backward-compatible aliases ──────────────────────────────────────────────
-PerplexitySearchTool = searchPerplexity
-BraveSearchTool      = searchBrave
 
 __all__ = [
     "search",
@@ -78,9 +71,6 @@ __all__ = [
     "searchFirecrawl",
     "searchTavily",
     "searchParallel",
-    # aliases
-    "PerplexitySearchTool",
-    "BraveSearchTool",
 ]
 
 

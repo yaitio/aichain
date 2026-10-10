@@ -25,6 +25,7 @@ Skill(
     hooks: list | None = None,
     max_cost: float | object | None = None,
     _tools: list | None = None,
+    _image: bool = False,
 )
 ```
 
@@ -58,12 +59,12 @@ A reusable, model-bound task unit.
   }
   ```
 
-  **Multi-turn (directed reasoning, 1.5.0).** Several `user` turns
+  **Multi-turn (directed reasoning).** Several `user` turns
   separated by a "generate here" marker — an `assistant` turn with no
   `parts` — run as a sequence: each marker is one model call whose reply
   is appended to the running context (an `assistant` turn *with* parts
   is a fixed/seed turn, not a call). `run()` returns the last reply;
-  `history` holds each turn. Backward compatible: no markers → one call.
+  `history` holds each turn. No markers → one call.
 - `output` (*dict | None, optional*, default `None`) — Declares the expected output format.  Omit entirely (or pass `None`
   / `{}`) for the default plain-text output.
 
@@ -81,10 +82,10 @@ A reusable, model-bound task unit.
 
   # validated JSON schema
   output={"format": {"type": "json_schema", "schema": { ... }}}
-
-  # image generation
-  output={"modalities": ["image"], "format": {"type": "image"}}
   ```
+
+  A Skill makes text: `output={"modalities": ["image"]}` raises
+  `ValueError`. Images are a tool — `image(service, model=…)`.
 - `variables` (*dict | None, optional*, default `None`) — Default variable values.  Can be overridden or extended at call
   time via `run(variables={...})`.  Merged at run time; call-time
   values take precedence.
@@ -109,7 +110,7 @@ from yait_aichain.models import Model
 from yait_aichain.skills import Skill
 
 skill = Skill(
-    model=Model("gpt-4o"),
+    model=Model("gpt-6-luna"),
     input={
         "messages": [
             {"role": "system", "parts": ["Be concise."]},
@@ -127,7 +128,7 @@ JSON output:
 
 ```python
 skill = Skill(
-    model=Model("claude-sonnet-4-5"),
+    model=Model("claude-haiku-5-5"),
     input={
         "messages": [
             {"role": "user", "parts": [{"text": "List 3 facts about {topic} as JSON."}]},
@@ -198,11 +199,9 @@ rather than incidental, so they are stated instead of discovered:
 
 * **Retries stop at the first piece; there is no fallback chain.**
   Both work by throwing the attempt away and starting again, which is
-  impossible once the caller has seen something. 2.5.0 refused to
-  retry at all, reasoning that a rule holding only before the first
-  byte "holds sometimes", and that was wrong: *before the first piece*
-  is not a sometimes, it is a state the caller can see — nothing has
-  been yielded. So a transient failure (429, 5xx, network) retries
+  impossible once the caller has seen something. *Before the first
+  piece* is a state the caller can see — nothing has been yielded —
+  so a transient failure (429, 5xx, network) retries
   while the attempt is still discardable, exactly as `run()` does,
   and is raised once it is not. The fallback chain does stay out: a
   second model is a different answer, not a retry of this one, and
