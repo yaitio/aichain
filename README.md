@@ -1,9 +1,10 @@
 # aichain
 
-**Let your coding agent write your agents. Ship the code you tested. Leave any provider with one word.**
+**The provider-agnostic AI toolkit for Python.**
 
-A Python library for AI pipelines and agents, small enough for Claude Code or
-Codex to learn from one file and build on.
+Let your coding agent write your agents. Ship the code you tested. Leave any
+provider with one word. Pipelines and agents, small enough for Claude Code,
+Codex or Cursor to learn from one file and build on.
 
 ```python
 from yait_aichain import Model, Skill
@@ -25,12 +26,11 @@ Change `"claude-haiku-5-5"` to `"gpt-6-luna"`, `"gemini-3-flash-preview"` or
 
 **Your coding agent writes the agents.** The whole contract is one 25 KB
 [`llms.txt`](llms.txt), and the [plugin for Claude Code, Codex and Cursor](#use-it-from-claude-code-codex-or-cursor)
-carries it with twenty worked recipes. Measured on twenty tasks the docs were
-not written against: a small model with the docs passed 15 of them in all three
-tries, Claude Code passed 19, and the same small model without the docs passed
-none ([`evals/agent_builds/`](evals/agent_builds/HOLDOUT-RESULTS-2.md)). On eleven more
-for what 3.x added — `@tool`, tools by name, utilities, templated chains — both
-passed all eleven ([measurement 3](evals/agent_builds/HOLDOUT-RESULTS-3.md)).
+carries it with twenty worked recipes. Measured on tasks the docs were not
+written against: on twenty, a small model with the docs passed 15 in all three
+tries and Claude Code passed 19; on eleven for what 3.x added, both passed all
+eleven; and without the docs the same small model passed none of an earlier
+twenty ([the measurements](docs/with-your-agent.md#how-well-it-works)).
 
 **The code you tested is the code you ship.** Only what you inject changes
 between a laptop and production: where state is stored, whose keys are used,

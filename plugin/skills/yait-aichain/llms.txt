@@ -1,7 +1,7 @@
 # yait-aichain
 
-> A small Python library for AI pipelines and agents, written to be built on
-> by coding agents. Deterministic pipelines — Skill, Chain, Pool; an Agent
+> The provider-agnostic AI toolkit for Python: a small library for AI
+> pipelines and agents, written to be built on by coding agents. Deterministic pipelines — Skill, Chain, Pool; an Agent
 > whose mode follows the task — agile, waterfall, a team; tools, any REST API
 > or MCP server, utilities for vectors and a working folder; cost, budgets,
 > permissions, events and eval on every run. The same code runs on a laptop

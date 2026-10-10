@@ -145,7 +145,8 @@ from yait_aichain.utilities import Vectors
 kb = Vectors("qdrant", collection="docs", description="the product documentation",
              embedder=embed("openai", model="text-embedding-3-small"))
 kb.create(dimension=1536)
-kb.upsert(chunk(max_chars=800).run(text))           # a method: code and chain
+pieces = chunk(max_chars=800).run(text)             # no ids: a record needs one
+kb.upsert([{"id": f"doc-{i}", **p} for i, p in enumerate(pieces)])   # a method: code and chain
 kb.query.run("how does caching work?", {"n": 5})    # a tool: .run, and an agent can take it
 Agent(model, tools=[kb.query])                      # the agent searches, and can do nothing else
 ```

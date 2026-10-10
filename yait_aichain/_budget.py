@@ -57,7 +57,7 @@ class Budget:
     ::
 
         budget = Budget(0.50)
-        Chain(steps=[...], budget=budget).run()
+        Chain(steps=[...], max_cost=budget).run()
         budget.spent        # what it cost
         budget.remaining    # what is left
     """

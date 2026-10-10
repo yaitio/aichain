@@ -1,9 +1,10 @@
 # aichain
 
-**Let your coding agent write your agents. Ship the code you tested. Leave any provider with one word.**
+**The provider-agnostic AI toolkit for Python.**
 
-A Python library for AI pipelines and agents, small enough for Claude Code or
-Codex to learn from one file and build on.
+Let your coding agent write your agents. Ship the code you tested. Leave any
+provider with one word. Pipelines and agents, small enough for Claude Code,
+Codex or Cursor to learn from one file and build on.
 
 ```python
 from yait_aichain import Model, Skill
@@ -21,11 +22,12 @@ result = skill.run(variables={"text": "Your content here..."})
 ## Three promises
 
 **Your coding agent writes the agents.** The whole contract is one 25 KB
-`llms.txt`, and the Claude Code plugin carries it with twenty worked recipes.
-On twenty tasks the docs were not written against, a small model with the docs
-passed 15 in all three tries, Claude Code passed 19, and the same small model
-without the docs passed none. On eleven more for what 3.x added, both passed
-all eleven.
+`llms.txt`, and one plugin for Claude Code, Codex and Cursor carries it with
+twenty worked recipes. On twenty tasks the docs were not written against, a
+small model with the docs passed 15 in all three tries and Claude Code passed
+19; on eleven for what 3.x added, both passed all eleven; without the docs the
+same small model passed none of an earlier twenty.
+[How it was measured →](with-your-agent.md#how-well-it-works)
 
 **The code you tested is the code you ship.** Only what you inject changes
 between a laptop and production: where state is stored, whose keys are used,

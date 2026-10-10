@@ -1,218 +1,178 @@
 # Concepts
 
-aichain is a gateway: one interface in, any AI provider out. The five building blocks below are what make that gateway programmable.
+Six ideas, each on one screen. Everything else in the documentation is detail
+of one of them.
 
----
-
-## The five building blocks
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                         Agent                           │
-│   plans → acts → reflects → (replans) → final answer   │
-│                                                         │
-│   uses Tools and Skills at each step                    │
-└─────────────────────────────────────────────────────────┘
-                          │ uses
-┌─────────────────────────────────────────────────────────┐
-│                         Chain                           │
-│   step 1 → step 2 → step 3 → ... → final output        │
-│                                                         │
-│   each step is a Skill, Tool, or Agent                  │
-│   outputs flow forward as named variables               │
-└─────────────────────────────────────────────────────────┘
-              │                    │
-    ┌─────────────────┐   ┌────────────────┐
-    │      Skill      │   │      Tool      │
-    │                 │   │                │
-    │  Model + prompt │   │  Python func   │
-    │  + output spec  │   │  + JSON Schema │
-    └─────────────────┘   └────────────────┘
-              │
-    ┌─────────────────┐
-    │      Model      │
-    │                 │
-    │  provider API   │
-    │  auto-detected  │
-    └─────────────────┘
+```text
+           your code ─────────────── or ─────────────── your coding agent
+               │                                               │
+               ▼                                               ▼
+   ┌───────────────────────── pipelines ──────────────────────────┐
+   │   Skill        one model call                                │
+   │   Chain        steps in order:  Skill · tool · Agent · fn    │
+   │   Pool         one Skill or Chain over many inputs at once   │
+   └──────────────────────────────┬───────────────────────────────┘
+                                  │ a step can be
+   ┌──────────────────────────────▼───────────────────────────────┐
+   │   Agent        a loop: the model calls tools or answers      │
+   └──────────────────────────────┬───────────────────────────────┘
+                                  │ calls
+   ┌──────────────────────────────▼───────────────────────────────┐
+   │   tools        search("exa") · @tool functions · kb.query    │
+   │   utilities    Vectors · Shell · REST · MCP — code calls the │
+   │                methods, an agent gets only the tools         │
+   └──────────────────────────────┬───────────────────────────────┘
+                                  │ all of it runs on
+   ┌──────────────────────────────▼───────────────────────────────┐
+   │   Model        a name: "claude-haiku-5-5", "gpt-6-luna", …   │
+   └──────────────────────────────────────────────────────────────┘
+          and around every run: cost, budget, permissions, events
 ```
 
 ---
 
-## Model
-
-A **Model** wraps one provider's API. You create one by name — the library detects the provider automatically:
+## Model — the name is the provider
 
 ```python
-Model("gpt-4o")            # → provider "openai"
-Model("claude-sonnet-4-6") # → provider "anthropic"
-Model("gemini-2.0-flash")  # → provider "google"
-Model("grok-3")            # → provider "xai"
-Model("sonar-pro")         # → provider "perplexity"
+Model("claude-haiku-5-5")         # Anthropic
+Model("gpt-6-luna")               # OpenAI
+Model("gemini-3-flash-preview")   # Google
+Model("private/llama3.3")         # your own server — no key, nothing leaves it
 ```
 
-A Model does exactly two things: format a request and parse a response. It knows nothing about prompts, pipelines, or tools. That separation is intentional — you can swap the model in any Skill or Chain without touching the logic around it.
+A Model formats one request and reads one response. It knows nothing about
+prompts or pipelines, which is why changing the name changes the provider and
+nothing else. When the new provider cannot do what the code asked — a
+`top_k`, a `seed`, an image size — the result says what was adapted or
+dropped. Text and vision are models. Image generation is a tool, because a
+model here is what can be an agent's mind, and an image model cannot.
+
+→ [Models](../models/models.md) · [what each provider does with each option](../reference/parameters.md)
 
 ---
 
-## Skill
-
-A **Skill** is a single reusable task: one Model + one prompt template + one output format.
+## Skill — one model call
 
 ```python
-Skill(model=..., input={...}, output={...})
+summarise = Skill(Model("claude-haiku-5-5"), prompt="Summarise in one line: {text}")
+summarise.run(variables={"text": "…"})          # a str
 ```
 
-The prompt template uses `{placeholder}` tokens:
+One model, one prompt template, one output format: `text`, `json`, or
+`json_schema` validated against your schema. `run()` returns the value itself.
+A Skill saves to YAML and loads back as it was; keys are never written.
 
+→ [Skill](../pipelines/skills.md)
+
+---
+
+## Chain, Pool — pipelines you can list
+
+```python
+chain = Chain(steps=[
+    (summarise,                 "summary"),
+    (translate,                 "french"),
+    (count_words,               "length", {"text": "{french}"}),   # a tool, its argument templated
+    (shout,                     "loud"),                           # a plain function
+])
+result = chain.run(variables={"text": "…"})
+result["french"], result.output, result.cost
 ```
-"Translate {text} into {language}."
+
+A Chain runs steps in order and keeps one set of variables. A Skill reads any
+of them in its prompt; a tool or a function gets the ones its parameters
+name, or what the step's mapping gives it — a variable's name, or a
+`"{template}"` the chain fills in. A dict a step returns is merged into the
+variables. A Pool runs one Skill or Chain over many inputs, in parallel, and
+total time is the slowest item rather than the sum.
+
+When the steps can be listed, a Chain is cheaper, faster and more predictable
+than an Agent that rediscovers them.
+
+→ [Chain](../pipelines/chain.md) · [Pool](../pipelines/pool.md) · [Pause and resume](../pipelines/pause-and-resume.md)
+
+---
+
+## Agent — when the next step depends on the last
+
+```python
+agent = Agent(Model("gpt-6-luna"), tools=[search("exa"), fetch("local")],
+              stop_when=[step_count(10)])
+agent.run("What changed in Python 3.14?").output
 ```
 
-At runtime, `skill.run(variables={"text": "...", "language": "French"})` fills in the placeholders and calls the model.
+One loop: each turn the model calls tools or answers. The reply decides —
+tool calls continue, prose ends the turn — so the model chooses content, never
+control flow. `stop_when` decides how a run ends: a ceiling (`step_count`,
+`token_budget`, `cost_budget`) ends it as a failure, `check(fn)` ends it on a
+fact your code verified, and `stalled(k)` / `repeating(k)` speak to the model
+and let it go on.
 
-Three output formats are supported:
+How hard the task is picks the mode. `agile` decides at every turn.
+`waterfall` writes a plan first — from a stronger `planner_model` if you like —
+and holds to it. `team=` lets it hand work to agents with conversations of
+their own. An agent's state is its conversation, a message list, so a run can
+park on a `wait()` and `agent.resume()` it in another process.
 
-| Format | What you get back |
+→ [Agent](../agents/overview.md)
+
+---
+
+## Tools and utilities — what can act
+
+```python
+search("exa").run("vector databases")            # a built-in tool, made by service name
+
+@tool(risk="read")
+def word_count(text: str) -> int:
+    """Count the words in a text.
+
+    text: the text to count.
+    """
+    return len(text.split())                     # any function, made a tool
+
+sh = Shell("notes")                              # a utility: a folder
+Agent(model, tools=[sh.browse, sh.read])         # the agent may read, not write or run
+```
+
+A **tool** is anything a chain, an agent and your code can all call, with
+`.run()`. What a tool *is* — the service, the model, the folder — is set when
+it is made; what one call asks goes in `.run()`. A setting never appears in
+both.
+
+A **utility** is an object your code holds: `Vectors`, `Shell`, `REST`, `MCP`.
+Your code calls its methods directly — `kb.upsert(records)`. Some of its
+members are tools — `kb.query`, `sh.read`, each REST endpoint — and those are
+what an agent gets, one by one. An agent handed a utility's method refuses it
+by name.
+
+→ [Tools](../tools/index.md) · [Utilities](../utilities/index.md)
+
+---
+
+## Control — what every run reports
+
+Every result carries `usage` and `cost`, priced from the registry.
+`max_cost=` is one ceiling in dollars shared by every step of a Skill, Chain,
+Pool or Agent. A tool's `risk` class and a `PermissionPolicy` decide whether it
+runs, asks `approve=` first, or never runs. Every step emits an event a tracer
+or a UI can read, and `eval/` runs the same cases through several models,
+prompts or modes and reports accuracy, `Pass^k` and cost side by side.
+
+→ [Cost and budget](../control/cost-and-budget.md) · [Permissions](../control/permissions.md) · [Observability](../control/observability.md) · [Eval](../control/eval.md)
+
+---
+
+## Which one
+
+| The task | Use |
 |---|---|
-| `{"type": "text"}` | A plain string |
-| `{"type": "json"}` | A Python dict (model returns JSON, Skill parses it) |
-| `{"type": "json_schema", ...}` | A validated Python dict matching your schema |
-
-Skills can be saved to YAML and reloaded later — useful for sharing prompts across projects without embedding them in code.
-
----
-
-## Tool
-
-A **Tool** is a Python function with a declared JSON Schema interface. It does something in the real world: searches the web, fetches a URL, converts a file, calls an external API.
-
-```python
-class MyTool(Tool):
-    name        = "my_tool"
-    description = "Does something useful."
-    parameters  = {
-        "type": "object",
-        "properties": {
-            "query": {"type": "string", "description": "The input."},
-        },
-        "required": ["query"],
-    }
-
-    def run(self, query: str) -> str:
-        return do_something(query)
-```
-
-Tools have two call styles:
-
-- `tool.run(query="...")` — returns the raw result, raises on error
-- `tool(query="...")` — returns a `ToolResult`; never raises
-
-The `ToolResult` wrapper is what Chain and Agent use internally. The declared `parameters` schema is what Agent uses to decide how to call the tool.
-
----
-
-## Chain
-
-A **Chain** is an ordered sequence of Steps. Each step is a Skill, Tool, or Agent.
-
-The key design: every step shares a single **accumulated variable dict**. Each step reads variables it needs from that dict and writes its output back into it.
-
-```
-initial variables: {"article": "...", "language": "Spanish"}
-                          │
-                    ┌─────▼──────┐
-                    │ summariser │  reads {article}
-                    │  (Skill)   │  writes → accumulated["summary"]
-                    └─────┬──────┘
-                          │  accumulated: {article, language, summary}
-                    ┌─────▼──────┐
-                    │ translator │  reads {summary} and {language}
-                    │  (Skill)   │  writes → accumulated["translation"]
-                    └─────┬──────┘
-                          │
-                    final output: accumulated["translation"]
-```
-
-This means you never write glue code to pass data between steps. If a skill's prompt contains `{summary}`, it will automatically receive the value that the previous step stored under that name.
-
-When a Tool or Agent returns a **dict**, all keys are merged into the accumulated dict at once — a single step can produce multiple named outputs.
-
----
-
-## Agent
-
-An **Agent** runs one loop. Each turn the model either calls tools or
-answers; tool results go back into the conversation and the loop asks again.
-Routing is decided by the reply — tool calls continue, prose ends the turn —
-so the model chooses content, not control flow.
-
-`stop_when` decides how a run ends, and keeps the three endings apart:
-
-- a **ceiling** — `step_count(30)` is the default, `token_budget`, `cost_budget`
-  — ends it as a failure and says which one;
-- a **check** — `check(fn)` — ends it on a fact the harness verified itself;
-- a **nudge** — `stalled(k)`, `repeating(k)` — says something to the model and
-  lets the run continue.
-
-| Mode | Behaviour |
-|---|---|
-| `agile` (default) | Decides one action at a time from what the last one returned. |
-| `waterfall` | Writes a plan at step 0 and holds to it; `planner_model` can be a stronger model for that one turn. |
-
-Nothing suspends an agent from outside it: its state is the conversation, a
-message list. It parks only where a tool the model called asks the world for an
-answer — a `Wait` or a `Gate`, with `store=` — and `agent.resume(run_id,
-signal=...)` carries on. A person deciding within one invocation is cheaper
-through `approve=`. Agents run standalone or as a step inside a Chain
-(`kind="agent"`).
-
----
-
-## Which primitive should I use?
-
-| Situation | Use |
-|---|---|
-| Single model call | **Skill** |
-| Fixed sequence of steps with known data flow | **Chain** of Skills and Tools |
-| Need to call an external API or service | **Tool** in a Chain |
-| Task requires searching, reading, and reasoning across multiple sources | **Agent** |
-| Long document that would exceed the model's output limit | **Chain** — one Skill per section, joined by a final step |
-| Research phase followed by document generation | **Agent** inside a **Chain** |
-
----
-
-## Variable flow in detail
-
-The accumulated dict is the spine of every pipeline. Understanding it removes 90% of potential confusion.
-
-**Before the first step**, the dict is seeded with the Chain's default variables merged with any variables you pass to `run()`. Call-time values win on conflict.
-
-**After each step:**
-
-- If the step output is a `str` → `accumulated[output_key] = output`
-- If the step output is a `dict` → `accumulated.update(output)`
-
-**Skills** receive the full accumulated dict as their variable namespace. Any `{placeholder}` in the prompt is filled from it.
-
-**Tools** receive only the kwargs that match their declared `parameters` keys — extra variables are silently ignored.
-
-**Agents** receive `accumulated[task_key]` as their task string and the full accumulated dict as their variables.
-
-After `chain.run()` completes, `chain.accumulated` holds the final state of the entire dict — all initial variables plus every step's output.
-
----
-
-## Persistence
-
-Both Skill and Chain can be serialised to YAML and reloaded:
-
-```python
-skill.save("skills/translator.yaml")
-skill = Skill.load("skills/translator.yaml")
-
-chain.save("chains/summarise_and_translate.yaml")
-chain = Chain.load("chains/summarise_and_translate.yaml")
-```
-
-API keys are **never** written to YAML. They are resolved from environment variables when the file is loaded.
+| One model call — summarise, extract, classify, translate | `Skill` |
+| Known steps in a fixed order | `Chain` |
+| The same work over many inputs | `Pool` |
+| The next step depends on what the last one returned | `Agent` with tools |
+| A step that is plain code | a function, as a chain step |
+| Something a model may call | `@tool`, or a built-in tool by name |
+| An outside API, server, folder or vector store | a utility, and its tools to the agent |
+| A picture | `image(service, model=…)` |
+| A run that waits for a person or a webhook | `wait()` / `gate(tool)` with `store=` |

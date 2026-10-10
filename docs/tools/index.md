@@ -1,24 +1,70 @@
-# Tool
+# Tools
 
-A **Tool** is a Python callable with a declared JSON-Schema interface that does
-something in the real world: search the web, fetch and convert a file, embed
-text, call a REST API, pause a run for approval. Skills reason about text; Tools
-act.
+A model reads and writes text. A tool does the rest: searches the web, reads a
+page, counts, draws, calls an API, waits for a person. A tool is anything your
+code, a chain and an agent can all call, the same way:
+
+```python
+from yait_aichain.tools import search
+
+found = search("exa").run("managed vector databases", {"max_results": 5})
+found["results"][0]["url"]       # fields, for code
+str(found)                       # one readable text, which is what a model is shown
+```
 
 ---
 
-## Quick start
+## What a tool is
 
-Use a built-in tool, or define your own in a few lines:
+Three things, and the model sees two of them:
+
+- a **name** and a **description** — what a model reads to decide whether to
+  call it;
+- a **schema** — the arguments it takes, as JSON Schema;
+- **`run()`** — the code that does the work.
+
+What a tool *is* — the service, the model, the folder, the key — is set when
+it is made. What one call asks goes in `.run()`. A setting never appears in
+both places:
 
 ```python
-from yait_aichain.tools import search, tool, Tool
+search("exa")                                    # made: which service
+    .run("vector databases", {"domains": ["arxiv.org"], "max_results": 5})   # asked: this call
+```
 
-# built-in — made by the provider's name; run() returns the data
-found = search("perplexity").run("best managed vector databases")   # reads PERPLEXITY_API_KEY
-print(found["results"][0]["url"], str(found)[:200])                 # fields for code, text for a model
+`run()` returns the data, and raises on failure. Calling the tool itself —
+`tool(...)` — returns a `ToolResult` that never raises: `.success`, `.output`,
+`.error`, and `bool(result)` is `.success`. Chains and agents use that form.
 
-# any function — the name, the docstring and the annotations are the schema
+---
+
+## Kinds of tools
+
+### Built-in tools, made by service name
+
+```python
+from yait_aichain.tools import search, fetch, chunk, embed, rerank, image
+
+search("perplexity")                             # web search: perplexity, brave, exa, firecrawl, tavily, parallel
+fetch("local")                                   # a page by URL: firecrawl, tavily, exa, parallel, local
+chunk(max_chars=800)                             # text → pieces
+embed("openai", model="text-embedding-3-small")  # texts → vectors
+rerank("cohere", model="rerank-v3.5")            # documents → in order of relevance
+image("openai", model="gpt-image-1.5", output_dir="images")   # prompt → picture
+```
+
+Each reads its key from the environment, and its name and description come
+from the service — `search("exa")` is `searchExa` to a model. `name=` and
+`description=` override both.
+
+**When to use:** whenever one exists. The list, with keys, risks and every
+parameter: [Tools reference](../reference/tools.md).
+
+### Your own function, with `@tool`
+
+```python
+from yait_aichain.tools import tool
+
 @tool(risk="read")
 def word_count(text: str, unique: bool = False) -> dict:
     """Count the words in a text.
@@ -30,241 +76,133 @@ def word_count(text: str, unique: bool = False) -> dict:
     return {"words": len(set(words)) if unique else len(words)}
 
 word_count.run(text="to be or not to be")       # {'words': 6}
+```
 
-# a subclass — when the tool holds state or needs a schema annotations cannot say
-class ReverseTool(Tool):
-    name        = "reverse"
-    description = "Reverse a string."
+The function's name is the tool's name, the first line of its docstring the
+description, its annotated parameters the schema, each described by its
+`name: text` line. A function with no docstring, or a parameter with no JSON
+type, is refused when the tool is made. `risk` defaults to `"write"`: the
+library cannot tell what a function does, so saying `"read"` is yours to do.
+
+**When to use:** almost always, for your own code. A chain holding a `@tool`
+cannot be saved to YAML — a function is code.
+
+### A `Tool` subclass
+
+```python
+from yait_aichain.tools import Tool
+
+class Counter(Tool):
+    name        = "counter"
+    description = "Add to a running total and return it."
     parameters  = {"type": "object",
-                   "properties": {"input": {"type": "string"}},
+                   "properties": {"input": {"type": "number"}},
                    "required": ["input"]}
+
+    def __init__(self):
+        self.total = 0
+
     def run(self, input, options=None):
-        return input[::-1]
-
-print(ReverseTool()(input="hello").output)       # 'olleh'
+        self.total += input
+        return self.total
 ```
 
-▶ Built-in fetch tool: [`examples/05_tool_fetch.py`](../../examples/05_tool_fetch.py) ·
-Custom tool: [`examples/07_tool_custom.py`](../../examples/07_tool_custom.py) ·
-Deep dive ↓
+**When to use:** the tool holds state between calls, or needs a schema
+annotations cannot say.
+
+### A utility's tool
+
+```python
+from yait_aichain.utilities import REST, Shell
+
+api = REST("https://api.example.com", description="The shop's order API.")
+get_order = api.endpoint("get_order", "GET", "/orders/{id}", path_params=["id"],
+                         description="Return one order by its id.")
+sh = Shell("notes")
+
+Agent(model, tools=[get_order, sh.browse, sh.read])
+```
+
+A utility — `Vectors`, `Shell`, `REST`, `MCP` — is an object your code holds;
+some of its members are tools, and those are what an agent gets.
+
+**When to use:** an outside API, an MCP server, a folder, a vector store.
+→ [Utilities](../utilities/index.md)
+
+### Comparison
+
+| | Who writes the schema | Settings | Saved with a chain | Typical use |
+|---|---|---|---|---|
+| Built-in | the library | the factory: service, model, key | yes | search, fetch, chunk, embed, rerank, images, speech |
+| `@tool` | your annotations and docstring | `name`, `description`, `risk` | no | your own code |
+| `Tool` subclass | you, by hand | your `__init__` | yes, if its arguments are | a tool with state |
+| A utility's tool | the utility | the utility: URL, folder, server, collection | the utility decides | APIs, MCP servers, folders, vector stores |
 
 ---
 
-## Common gotchas
+## In a chain
 
-- **Two call styles, different error behaviour.** `tool(...)` returns a
-  `ToolResult` and **never raises**; `tool.run(...)` returns the bare value and
-  **propagates** exceptions. Chains and Agents use the safe form internally.
-- **`bool(result)` is `result.success`**, so `if result:` works — but a failed
-  call is *falsy*, so don't forget the `else`.
-- **The standard shape is `run(self, input, options=None)`** — one primary
-  input. Tools that need several named fields declare them in `parameters` and
-  take them as kwargs (see [Tool shapes](#tool-shapes)); those are driven by
-  Chain/Agent, not by the single-input `tool(input=…)` form.
-- **A `dict` return merges** into a Chain's accumulated variables (many keys at
-  once); a `str` return is stored under one key.
-
----
-
-## Reference
-
-### The contract
-
-A Tool sets three class attributes and implements `run()`:
+A tool step gets the arguments its schema names, from the chain's variables.
+The step's third element maps them — to a variable's name, or to a string with
+`{variables}` the chain fills in:
 
 ```python
-from yait_aichain.tools import Tool
-
-class WordCountTool(Tool):
-    name        = "word_count"                       # function name in tool-use schemas
-    description = "Count the words in a text."        # what an LLM reads to decide to use it
-    parameters  = {                                   # JSON Schema for the arguments
-        "type": "object",
-        "properties": {"input": {"type": "string", "description": "Text to count."}},
-        "required": ["input"],
-    }
-    def run(self, input, options=None) -> int:
-        return len(input.split())
-```
-
-Validation, error wrapping, and schema export come from the base class — you
-write only `run()`.
-
-### Tool shapes
-
-| Shape | `run` signature | Called as | Use for |
-|---|---|---|---|
-| **Single-input** | `run(self, input, options=None)` | `tool(input=…)` / `tool.run(input=…)` | Most tools — one main argument plus an optional `options` dict. All built-ins use this. |
-| **Multi-parameter** | `run(self, a, b, …)` | inside a Chain/Agent (matched kwargs), or `tool.run(a=…, b=…)` | Tools that produce several named outputs or need several inputs. |
-
-In a Chain/Agent, the engine reads the tool's declared `parameters`, pulls the
-matching values from the accumulated variables, and calls `run(**kwargs)`. The
-single-input safe form `tool(input, options)` is the convenience for standalone
-use.
-
-### Two call styles
-
-```python
-result = tool(input="…")        # safe  → ToolResult; never raises
-if result: print(result.output)
-else:      print(result.error)
-
-raw = tool.run(input="…")       # raw   → bare output; raises on error
-```
-
-`ToolResult` has `success: bool`, `output: Any`, `error: str | None`, and is
-truthy when `success`.
-
-### Governance: what a call may say, and what a tool may do
-
-**A call is checked against the schema.** The schema a tool declares is also
-the authority over its calls, one level into a declared object:
-
-- `tool(input=…, options={"recencyy": "day"})` warns with a `RuntimeWarning`
-  that names the accepted keys. It warns rather than refuses because the caller
-  is a person whose subclass may read an option its schema does not advertise.
-- Inside an Agent the caller is a model, so `check_args` turns a missing
-  required argument or an unknown key into a message the model reads and
-  corrects within its step budget — a bad call comes back as a tool result,
-  not as a crash.
-- `tool.unknown_keys(kwargs)` returns the offending paths, e.g.
-  `["options.recencyy"]`.
-
-**Risk is data on the tool.** `risk` is a class attribute — `read`, `draft`,
-`write` (the default), `external`, `financial`, `destructive`, `privileged` —
-and an Agent's `PermissionPolicy` reads it before the tool runs. With no policy
-attached it is inert, so you tag only the tools that matter.
-
-```python
-from yait_aichain.agent import Agent
-from yait_aichain.tools import Tool, PermissionPolicy, ApprovalDecision, FINANCIAL
-
-class IssueRefund(Tool):
-    name        = "issue_refund"
-    description = "Issue a refund to the customer."
-    risk        = FINANCIAL
-    parameters  = {"type": "object",
-                   "properties": {"amount": {"type": "number"}},
-                   "required": ["amount"]}
-
-    def run(self, amount, options=None):
-        return f"refunded {amount}"
-
-def manager(request):                  # an ApprovalRequest: tool, risk, arguments, call id
-    if request.arguments["amount"] <= 50:
-        return True
-    return ApprovalDecision(False, "refunds over $50 need a ticket")
-
-agent = Agent(model, tools=[IssueRefund()],
-              permissions=PermissionPolicy({"financial": "approve"}),
-              approve=manager)
-```
-
-`allow` runs the tool, `deny` never does, and `approve` asks `approve=` and
-runs only on a yes — **with no `approve=` attached, the call is refused**. A
-refusal reaches the model as a tool result carrying its reason. The full
-contract, including the approval events a UI consumes:
-[Observability](../control/observability.md).
-[`examples/20_observability.py`](../../examples/20_observability.py) runs it offline.
-
-### Provider function-calling schema
-
-Every tool exposes an OpenAI/Anthropic-ready schema via `tool.schema()` — useful
-if you drive a provider SDK directly:
-
-```python
-tool.schema()
-# {"type": "function", "function": {"name": …, "description": …, "parameters": {…}}}
-```
-
-An [Agent](../agents/overview.md) does this for you.
-
-### Using a Tool in a Chain
-
-A tool slots into a Chain step. It receives only the kwargs matching its
-declared `parameters`; `input_map` renames an accumulated variable to a
-parameter name:
-
-```python
-from yait_aichain.chain  import Chain
-from yait_aichain.tools  import fetch
-
 chain = Chain(steps=[
-    (fetch("local"), "content", {"url": "link"}),     # accumulated["link"] → param "url"
-    (summariser,     "summary"),
+    (fetch("local"),  "page",    {"url": "link"}),                 # the variable `link`
+    (word_count,      "count",   {"text": "Title: {title}"}),      # a template
+    (summarise,       "summary"),
 ])
-chain.run(variables={"link": "https://example.com/article"})
+chain.run(variables={"link": "https://example.com", "title": "the quick brown fox"})
 ```
 
-A tool whose `run()` returns a **dict** writes several named outputs at once —
-the dict is merged into the accumulated variables. See [Chain](../pipelines/chain.md) for the
-full step syntax.
+A template naming a variable the chain does not have is an error with its name.
+What a tool returns is kept under its key; a plain dict is merged into the
+variables, so one step can write several. → [Chain](../pipelines/chain.md)
 
-### Built-in tools
-
-Search, fetch, speech, local files, vector-store operations, REST, MCP,
-and `Wait`/`Gate`. Every one — its wire name, class, key, risk class and full
-parameter table — is in the [Tools reference](../reference/tools.md),
-which is generated from the classes themselves.
-
-Embeddings (`Embedding`), rerankers (`Reranker`) and vector stores (`VectorDB`)
-are not tools: they are what the vector tools are built from.
-
-### Wait & Gate
-
-`Wait` and `Gate` are tools that *pause* a run instead of returning immediately —
-the basis of suspend/resume. Drop a `Wait` into a Chain to pause for human
-input, or wrap any tool in a `Gate` to require approval before it runs. Full
-treatment in [State — suspend & resume](../pipelines/pause-and-resume.md).
-
-### Writing a custom Tool
-
-A multi-parameter tool that fetches weather (returns a dict, so it writes two
-variables in one Chain step):
+## In an agent
 
 ```python
-import os, json, urllib3
-from yait_aichain.tools import Tool
-
-class WeatherTool(Tool):
-    name        = "get_weather"
-    description = "Get the current temperature (°C) for a city."
-    parameters  = {
-        "type": "object",
-        "properties": {
-            "city":    {"type": "string", "description": "City name."},
-            "country": {"type": "string", "description": "ISO country code."},
-        },
-        "required": ["city"],
-    }
-
-    def __init__(self, api_key=None):
-        self._api_key = api_key or os.getenv("OPENWEATHER_API_KEY")
-        if not self._api_key:
-            raise ValueError("Set OPENWEATHER_API_KEY or pass api_key=...")
-        self._http = urllib3.PoolManager()
-
-    def run(self, city, country="") -> dict:
-        q = f"{city},{country}" if country else city
-        r = self._http.request("GET",
-            f"https://api.openweathermap.org/data/2.5/weather"
-            f"?q={q}&units=metric&appid={self._api_key}")
-        if r.status != 200:
-            raise RuntimeError(f"Weather API returned {r.status}")
-        d = json.loads(r.data.decode())
-        return {"temperature_c": d["main"]["temp"], "description": d["weather"][0]["description"]}
+agent = Agent(Model("gpt-6-luna"), tools=[search("exa"), fetch("local"), word_count])
 ```
 
-Notes: the constructor reads its key from the environment (the built-in
-pattern); `run` declares its parameters as kwargs (so Chain/Agent can call it);
-and it raises on error — the safe `__call__` wrapper turns that into a failed
-`ToolResult`.
+The agent offers each tool's name, description and schema to the model, and
+checks every call against the schema before it runs: a missing argument or an
+unknown key comes back to the model as a message it can correct, not as a
+crash. Two tools with one name, or something that is not a tool, are refused
+when the agent is made. → [Agent](../agents/overview.md)
 
 ---
 
-## See also
+## Risk and permission
 
-- [Chain](../pipelines/chain.md) — use Tools as pipeline steps.
-- [Agent](../agents/overview.md) — let an LLM choose and call tools.
-- [State](../pipelines/pause-and-resume.md) — `Wait` / `Gate` and suspend/resume.
-- [Tools reference](../reference/tools.md) — every built-in tool in detail.
+`risk` is a property of the tool — `read`, `draft`, `write` (the default),
+`external`, `financial`, `destructive`, `privileged` — and an agent's
+`PermissionPolicy` reads it before the tool runs: `allow` runs it, `deny` never
+does, `approve` asks your `approve=` function and runs only on a yes.
+
+```python
+from yait_aichain.tools import ApprovalDecision, PermissionPolicy
+
+agent = Agent(model, tools=[issue_refund],
+              permissions=PermissionPolicy({"financial": "approve"}),
+              approve=lambda request: request.arguments["amount"] <= 50
+                                      or ApprovalDecision(False, "over $50 needs a ticket"))
+```
+
+With `approve` in the policy and no `approve=` attached, the call is refused,
+and the refusal reaches the model with its reason. → [Permissions](../control/permissions.md)
+
+---
+
+## Wait and gate
+
+Two tools that pause instead of returning: `wait(reason=…)` parks a run until a
+signal arrives, and `gate(tool)` runs a tool only when the signal approves. In
+a chain or in an agent's hands, with a `store=`, the run resumes later in
+another process. → [Pause and resume](../pipelines/pause-and-resume.md)
+
+---
+
+▶ [`examples/05_tool_fetch.py`](../../examples/05_tool_fetch.py) ·
+[`examples/07_tool_custom.py`](../../examples/07_tool_custom.py) ·
+[`examples/14_agent_tools.py`](../../examples/14_agent_tools.py)

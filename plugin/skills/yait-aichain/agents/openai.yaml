@@ -1,5 +1,5 @@
 interface:
   display_name: "yait-aichain"
-  short_description: "Build AI features in Python with yait-aichain — pipelines, fan-outs and tool-using agents on any model provider."
+  short_description: "The provider-agnostic AI toolkit for Python — pipelines, fan-outs and tool-using agents on any model provider."
 policy:
   allow_implicit_invocation: true

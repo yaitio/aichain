@@ -1,6 +1,6 @@
 {
   "name": "yait-aichain",
-  "description": "Build AI features in Python with yait-aichain \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
+  "description": "The provider-agnostic AI toolkit for Python \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
   "version": "3.10.0",
   "author": {
     "name": "YAIT"
