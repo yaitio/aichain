@@ -62,9 +62,10 @@ class TestThePlugin(unittest.TestCase):
     def test_no_held_out_task_reaches_the_plugin(self):
         from holdout import HOLDOUT
         from holdout2 import HOLDOUT2
-        bundle = "".join(p.read_text() for p in skill.SKILL_DIR.iterdir())
+        from holdout3 import HOLDOUT3
+        bundle = "".join(p.read_text() for p in skill.SKILL_DIR.rglob("*") if p.is_file())
         self.assertNotIn("holdout", bundle.lower())
-        for t in HOLDOUT + HOLDOUT2:
+        for t in HOLDOUT + HOLDOUT2 + HOLDOUT3:
             with self.subTest(task=t.id):
                 self.assertNotIn(t.text, bundle)
                 self.assertNotIn(t.reference.strip(), bundle)
