@@ -493,6 +493,120 @@
    ]
   }
  },
+ "glm-5.3": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort, type",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "muse-spark-1.3": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "mistral-small-2603": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
  "gpt-image-2.5-flare": {
   "size": {
    "outcome": "passed",

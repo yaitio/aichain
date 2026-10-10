@@ -1,0 +1,70 @@
+# mistral — Mistral AI: provider settings + its models (data tier)
+#
+# Read 2026-10-11 from docs.mistral.ai: the API reference and the model pages.
+# OpenAI-compatible chat completions at api.mistral.ai/v1. Not yet called
+# live — the key is still to come. The one European provider here, which is
+# its own reason to exist for data that has to stay in the EU.
+#
+# Differences from OpenAI's wire, from the reference: the seed is
+# `random_seed`; `tool_choice` adds "any"; `safe_prompt` injects a safety
+# prompt; reasoning is `reasoning_effort` (none..xhigh) and, on some models,
+# `prompt_mode = "reasoning"`. Model ids: the model pages render them with a
+# "+1" beside them, so the ids of Large 4 and Medium 3.5 below are taken from
+# the pages' version numbers and are the first thing to check live.
+
+[provider]
+key      = "mistral"
+client   = "openai"
+base_url = "https://api.mistral.ai"
+env_key  = "MISTRAL_API_KEY"
+label    = "Mistral AI"
+keys_url = "https://console.mistral.ai/api-keys"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
+[provider.defaults]
+temperature = 0.7
+max_tokens  = 16384
+top_p       = 1.0
+
+[provider.default_notes]
+temperature = "ours · Mistral's default differs by model and is read from /models; 0.7 is the top of the range its docs recommend"
+top_p       = "vendor · the OpenAI-compatible default"
+max_tokens  = "ours · the API leaves it unbounded up to the context; a ceiling is ours to pick"
+
+[provider.reasoning_map]
+none   = "none"
+low    = "low"
+medium = "medium"
+high   = "high"
+
+[provider.reasoning]
+field = "reasoning_effort"
+
+# Prices: the model pages on docs.mistral.ai, read 2026-10-11, USD per 1M
+# tokens. Large 4 was on sale at half its list price that day; the list price
+# is kept, as for every introductory price in this registry.
+[models."mistral-large-2610"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.36, output = 4.18, cache_read = 0.14 }
+
+[models."mistral-medium-2604"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.5, output = 7.5 }
+
+[models."mistral-small-2603"]
+caps  = ["text-to-text"]
+price = { input = 0.15, output = 0.6 }
+
+[models."ministral-14b-2512"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.2, output = 0.2 }
+
+[models."codestral-2508"]
+caps  = ["text-to-text"]
+price = { input = 0.3, output = 0.9 }

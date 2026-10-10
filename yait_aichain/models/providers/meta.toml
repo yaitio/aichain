@@ -1,0 +1,75 @@
+# meta — Meta Model API (Muse): provider settings + its models (data tier)
+#
+# Read 2026-10-11 from dev.meta.ai/docs: authentication, models, pricing and
+# rate limits, the Chat Completions protocol and reasoning. OpenAI-compatible
+# chat completions at api.meta.ai/v1 (Responses and Anthropic Messages are
+# served too; this uses chat completions). Not yet called live — the key is
+# still to come. Meta's own SDKs read MODEL_API_KEY; this library reads
+# META_API_KEY, a name that says whose key it is.
+#
+# Differences from OpenAI's wire, from the protocol page: `max_tokens` is a
+# deprecated alias of `max_completion_tokens`; `reasoning_effort` takes
+# minimal..xhigh, and `none` is refused because Muse Spark always reasons;
+# `stop`, `logprobs` and `n` > 1 are refused; temperature or top_p, not both;
+# every assistant tool call must be answered by a tool result or the request
+# is refused — the same rule `Agent.step()` checks before the network.
+
+[provider]
+key      = "meta"
+client   = "openai"
+base_url = "https://api.meta.ai"
+env_key  = "META_API_KEY"
+label    = "Meta (Muse)"
+keys_url = "https://dev.meta.ai"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
+[provider.options.values]
+temperature = [0.0, 2.0]
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+
+[provider.default_notes]
+temperature = "vendor · Meta's default, and the value Muse Spark is tuned for"
+max_tokens  = "ours · the API defaults per model; reasoning shares this budget with the answer, so it is set generously"
+top_p       = "ours · left unset on purpose: Meta asks for temperature or top_p, not both"
+
+[provider.reasoning_map]
+low    = "low"
+medium = "medium"
+high   = "high"
+
+# `none` is not a level here: Muse Spark always reasons, and the API refuses
+# reasoning_effort=none, so the library refuses it first.
+[provider.reasoning]
+field = "reasoning_effort"
+
+# Prices: dev.meta.ai/docs/pricing-rate-limits, read 2026-10-11. USD per 1M
+# tokens. Contributor models are cheaper in exchange for training on the
+# prompts and answers — a data term, not only a price.
+[models."muse-spark-1.3"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 4.25, cache_read = 0.15 }
+
+[models."muse-spark-1.2"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 4.25, cache_read = 0.15 }
+
+[models."muse-spark-1.1"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 4.25, cache_read = 0.15 }
+
+[models."muse-spark-1.3-contributor"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.10, output = 0.20, cache_read = 0.002 }
+
+[models."muse-spark-1.2-contributor"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.10, output = 0.20, cache_read = 0.002 }

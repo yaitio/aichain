@@ -37,11 +37,14 @@ on your own server needs no key and sends nothing outside your network.
 | DeepSeek | `DEEPSEEK_API_KEY` | <https://platform.deepseek.com/api_keys> |
 | Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
 | Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |
+| Meta (Muse) | `META_API_KEY` | <https://dev.meta.ai> |
+| Mistral AI | `MISTRAL_API_KEY` | <https://console.mistral.ai/api-keys> |
 | OpenAI | `OPENAI_API_KEY` | <https://platform.openai.com/api-keys> |
 | Perplexity | `PERPLEXITY_API_KEY` | <https://www.perplexity.ai/settings/api> |
 | Qwen (DashScope) | `DASHSCOPE_API_KEY` | <https://dashscope.aliyuncs.com> |
 | Recraft | `RECRAFT_API_TOKEN` | — |
 | xAI | `XAI_API_KEY` | <https://console.x.ai/> |
+| Z.ai (GLM) | `ZAI_API_KEY` | <https://z.ai/manage-apikey/apikey-list> |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
 | TypeSafe | `TYPESAFE_API_KEY` | <https://console.typesafe.ai> |

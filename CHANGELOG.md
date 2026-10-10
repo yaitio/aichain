@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased] — 4.1.0
+
+**More providers, described by data.** Each is a provider file on the OpenAI
+family, written from the provider's own documentation read 2026-10-11, and
+none has been called live yet: the keys are still to come, and a provider
+ships when its live calls pass.
+
+### Added
+
+- **Z.ai (GLM)** — `glm-5.3`, `glm-5.2`, `glm-5.1`, `glm-5`, `glm-4.7`,
+  `glm-5.3-flash`, `glm-5.3-flashx`; `ZAI_API_KEY`. Its chat path is
+  `/api/paas/v4/chat/completions`; `reasoning` turns its `thinking` switch on
+  and sets `reasoning_effort`, and `"none"` turns thinking off; a JSON Schema
+  is asked for as JSON with the schema in the prompt, and said so.
+- **Meta (Muse)** — `muse-spark-1.3`, `1.2`, `1.1` and the cheaper
+  `-contributor` models, which Meta trains on; `META_API_KEY`. Sent as
+  `max_completion_tokens` and `reasoning_effort`; `reasoning="none"` is
+  refused before the network, as the API refuses it.
+- **Mistral** — `mistral-large-2610`, `mistral-medium-2604`,
+  `mistral-small-2603`, `ministral-14b-2512`, `codestral-2508`;
+  `MISTRAL_API_KEY`. The ids of Large 4 and Medium 3.5 are read from version
+  numbers and are the first thing to check live.
+- **A provider the OpenAI family has no branch for is built from its data**:
+  `[provider.reasoning]` names the reasoning field and what to merge to switch
+  thinking on or off, and `[provider.options] json_schema = false` says a
+  provider takes JSON but not a schema. A new provider in this dialect is a
+  TOML file.
+- **A cost the provider reports is the cost.** OpenRouter returns the call's
+  price in `usage.cost`; it is read now and wins over the registry's estimate,
+  so a model reached through `private/` with OpenRouter's URL reports what it
+  cost instead of `None`. Verified live on two models.
+
 ## [4.0.0] — 2026-10-11
 
 **No compatibility layer.** Every name and path 3.x kept alive for older code

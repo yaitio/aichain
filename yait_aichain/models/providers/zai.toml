@@ -1,0 +1,90 @@
+# zai — Z.ai (GLM): provider settings + its models (data tier)
+#
+# Read 2026-10-11 from docs.z.ai: the API reference introduction, the chat
+# completion reference and the pricing page. OpenAI-compatible chat
+# completions under /api/paas/v4 rather than /v1. Not yet called live — the
+# key is still to come; every value below is the documentation's until then.
+#
+# Differences from OpenAI's wire, from the reference: `thinking` is a switch
+# of its own ({"type": "enabled" | "disabled"}, enabled by default) and
+# `reasoning_effort` a level beside it; `response_format` takes `text` and
+# `json_object` only, and on text models only; `tool_choice` takes only
+# "auto"; at most one stop word. The China host is open.bigmodel.cn with the
+# same paths — `Model(client_options={"url": "https://open.bigmodel.cn/api/paas/v4"})`.
+
+[provider]
+key      = "zai"
+client   = "openai"
+base_url = "https://api.z.ai/api/paas/v4"
+env_key  = "ZAI_API_KEY"
+label    = "Z.ai (GLM)"
+keys_url = "https://z.ai/manage-apikey/apikey-list"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/models"
+chat_path        = "/chat/completions"
+
+[provider.options]
+# No top_k. A JSON Schema is not taken: JSON is asked for and the schema rides
+# in the prompt, which the answer is checked against.
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+json_schema = false
+
+[provider.options.values]
+temperature = [0.0, 1.0]
+top_p       = [0.01, 1.0]
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p       = 0.95
+
+[provider.default_notes]
+temperature = "vendor · Z.ai's documented default; the range here is 0.0-1.0"
+top_p       = "vendor · Z.ai's documented default"
+max_tokens  = "ours · the API defaults per model and takes up to 131072; a reply this long covers the thinking that comes first"
+
+# `none` turns thinking off; a level keeps it on and sets its depth. The API's
+# own levels run minimal..xhigh..max, max being the default when unset.
+[provider.reasoning_map]
+low    = "low"
+medium = "medium"
+high   = "high"
+
+[provider.reasoning]
+field = "reasoning_effort"
+on    = { thinking = { type = "enabled" } }
+off   = { thinking = { type = "disabled" } }
+why   = "sent as this provider's thinking switch and reasoning_effort"
+
+# Prices: docs.z.ai/guides/overview/pricing, read 2026-10-11. USD per 1M
+# tokens; cached input billed apart, cache storage free for a limited time.
+[models."glm-5.3"]
+caps  = ["text-to-text"]
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5.2"]
+caps  = ["text-to-text"]
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5.1"]
+caps  = ["text-to-text"]
+price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+
+[models."glm-5"]
+caps  = ["text-to-text"]
+price = { input = 1.0, output = 3.2, cache_read = 0.2 }
+
+[models."glm-4.7"]
+caps  = ["text-to-text"]
+price = { input = 0.6, output = 2.2, cache_read = 0.11 }
+
+# The chat reference lists the 5.3 Flash models under vision: they read
+# images, and take no response_format.
+[models."glm-5.3-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.15, output = 0.5, cache_read = 0.03 }
+
+[models."glm-5.3-flashx"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.37, output = 1.25, cache_read = 0.075 }

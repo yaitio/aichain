@@ -99,6 +99,9 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^(qwen|qwq|wanx|wan\d)"),                            "qwen"),
     (re.compile(r"^recraft"),                                          "recraft"),
     (re.compile(r"^flux"),                                             "bfl"),
+    (re.compile(r"^glm-"),                                             "zai"),
+    (re.compile(r"^muse-"),                                            "meta"),
+    (re.compile(r"^(mistral-|ministral-|codestral-|magistral-|devstral-)"), "mistral"),
     (re.compile(r"^(gpt-|dall-e-|chatgpt-image-|text-embedding-|whisper-|tts-|o\d)"), "openai"),
 ]
 
@@ -107,7 +110,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "private",
+    "recraft", "bfl", "zai", "meta", "mistral", "private",
 })
 
 
@@ -140,10 +143,11 @@ def _resolve_provider(name: str) -> str:
             return provider
     raise ValueError(
         f"Cannot detect provider for model {name!r}.\n"
-        "Supported prefixes: claude-, gemini-, grok-, sonar, r1-1776, "
-        "kimi-, deepseek-, gpt-, dall-e-, text-embedding-, whisper-, tts-, o<digit>.\n"
-        "Use an explicit \"provider/model\" prefix (e.g. \"openai/my-custom\") "
-        "or a provider subclass directly if you need a custom model name."
+        "Supported prefixes: claude-, gemini-, grok-, sonar, kimi-, deepseek-, "
+        "qwen, glm-, muse-, mistral-, ministral-, codestral-, gpt-, o<digit>, "
+        "flux, recraft.\n"
+        "Use an explicit \"provider/model\" prefix (e.g. \"openai/my-custom\", "
+        "\"private/llama3.3\") for a name the prefixes do not cover."
     )
 
 
@@ -477,7 +481,11 @@ class Model:
         # the day openai gained "none" the copy rejected a value the provider
         # itself accepts.
         reasoning = opts.get("reasoning", None)
-        rmap      = prov.get("reasoning_map", {})
+        rmap      = dict(prov.get("reasoning_map", {}))
+        # A provider that switches thinking off rather than naming a level for
+        # it says so as `[provider.reasoning] off`; "none" is then a level too.
+        if (prov.get("reasoning") or {}).get("off"):
+            rmap.setdefault("none", None)
         if reasoning is not None and reasoning not in rmap:
             allowed = ", ".join(repr(k) for k in rmap) or "(none for this provider)"
             raise ValueError(

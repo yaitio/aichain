@@ -396,7 +396,49 @@ class OpenAIClient(BaseClient):
                     why="this model has no thinking switch"))
             return path, body
 
-        raise ValueError(f"Unknown openai-family provider {p!r}")
+        # Every other provider on this family is described by its data: the
+        # request is the compatible one, and what differs — how reasoning is
+        # asked for, whether a JSON Schema is taken — is read from
+        # `[provider.reasoning]` and `[provider.options]`. A new provider that
+        # speaks this dialect is a data file, not a branch here (4.1).
+        return self._described_request(m, messages, output, tools)
+
+    def _described_request(self, m, messages, output, tools):
+        prov = self._data["provider"]
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        how = prov.get("reasoning") or {}
+        if m.reasoning is not None:
+            level = m.reasoning
+            value = m._REASONING_MAP.get(level)
+            extra = how.get("off") if level == "none" else how.get("on")
+            if value is None and not (level == "none" and how.get("off")):
+                record(Adaptation(
+                    kind=DECLINED, option="reasoning", asked=level, sent=None, model=m.name,
+                    why=how.get("declined", "this provider has no setting for this level")))
+            else:
+                field = how.get("field", "reasoning_effort")
+                if value is not None:
+                    body[field] = value
+                for key, val in (extra or {}).items():
+                    body[key] = val
+                record(Adaptation(
+                    kind=ADAPTED, option="reasoning", asked=level,
+                    sent=", ".join([f"{field}={value}"] * (value is not None) + list(extra or {})),
+                    model=m.name, why=how.get("why", "sent as this provider's reasoning setting")))
+        fmt = output.get("format", {})
+        if fmt.get("type") == "json_schema" and not (prov.get("options") or {}).get("json_schema", True):
+            # The provider takes JSON but not a schema: ask for JSON and carry
+            # the schema in the prompt, as for DeepSeek, and say so.
+            body["response_format"] = {"type": "json_object"}
+            if fmt.get("schema"):
+                hint = ("Respond with a JSON object that strictly follows this JSON Schema:\n"
+                        + _json.dumps(fmt["schema"]))
+                body["messages"] = [{"role": "system", "content": hint}, *body["messages"]]
+            record(Adaptation(
+                kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
+                model=m.name, why="this provider takes JSON but not a schema; the schema "
+                                  "is in the prompt and the answer is checked against it"))
+        return path, body
 
     # ── format: provider response → our result ───────────────────────
     def parse_response(self, response, output) -> "str | dict":

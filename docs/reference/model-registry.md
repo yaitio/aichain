@@ -28,7 +28,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `recraft`, `xai`.
+`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `xai`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -39,11 +39,14 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | DeepSeek | 4 | — | — | — |
 | Google AI | 9 | 5 | 9 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
+| Meta (Muse) | 5 | — | 5 | — |
+| Mistral AI | 5 | — | 3 | — |
 | OpenAI | 20 | 7 | 20 | 7 |
 | Perplexity | 4 | — | — | — |
 | Qwen (DashScope) | 18 | 2 | 3 | 3 |
 | Recraft | — | 9 | — | 3 |
 | xAI | 14 | 3 | 13 | 3 |
+| Z.ai (GLM) | 7 | — | 2 | — |
 
 ---
 
@@ -206,6 +209,56 @@ kimi-k3                   # $3 in / $15 out per 1M tokens
 
 ```
 kimi-k2.6  # $0.95 in / $4 out per 1M tokens
+```
+
+---
+
+## Meta (Muse)
+
+`provider = "meta"` · key `META_API_KEY`
+
+### `text-to-text`
+
+```
+muse-spark-1.1              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.2              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.2-contributor  # $0.1 in / $0.2 out per 1M tokens
+muse-spark-1.3              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.3-contributor  # $0.1 in / $0.2 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+muse-spark-1.1              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.2              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.2-contributor  # $0.1 in / $0.2 out per 1M tokens
+muse-spark-1.3              # $1.25 in / $4.25 out per 1M tokens
+muse-spark-1.3-contributor  # $0.1 in / $0.2 out per 1M tokens
+```
+
+---
+
+## Mistral AI
+
+`provider = "mistral"` · key `MISTRAL_API_KEY`
+
+### `text-to-text`
+
+```
+codestral-2508       # $0.3 in / $0.9 out per 1M tokens
+ministral-14b-2512   # $0.2 in / $0.2 out per 1M tokens
+mistral-large-2610   # $1.36 in / $4.18 out per 1M tokens
+mistral-medium-2604  # $1.5 in / $7.5 out per 1M tokens
+mistral-small-2603   # $0.15 in / $0.6 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+ministral-14b-2512   # $0.2 in / $0.2 out per 1M tokens
+mistral-large-2610   # $1.36 in / $4.18 out per 1M tokens
+mistral-medium-2604  # $1.5 in / $7.5 out per 1M tokens
 ```
 
 ---
@@ -441,6 +494,31 @@ grok-imagine-image          # per_image $0.02
 grok-imagine-image-2.0      # per_image $0.04
 grok-imagine-image-quality  # per_image $0.05
 ```
+
+---
+
+## Z.ai (GLM)
+
+`provider = "zai"` · key `ZAI_API_KEY`
+
+### `text-to-text`
+
+```
+glm-4.7         # $0.6 in / $2.2 out per 1M tokens
+glm-5           # $1 in / $3.2 out per 1M tokens
+glm-5.1         # $1.4 in / $4.4 out per 1M tokens
+glm-5.2         # $1.4 in / $4.4 out per 1M tokens
+glm-5.3         # $1.4 in / $4.4 out per 1M tokens
+glm-5.3-flash   # $0.15 in / $0.5 out per 1M tokens
+glm-5.3-flashx  # $0.37 in / $1.25 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+glm-5.3-flash   # $0.15 in / $0.5 out per 1M tokens
+glm-5.3-flashx  # $0.37 in / $1.25 out per 1M tokens
+```
 <!-- /g:registry-models -->
 
 ---
@@ -512,7 +590,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'openai', 'perplexity', 'qwen', 'recraft', 'xai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'meta', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'xai', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

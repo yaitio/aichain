@@ -73,7 +73,7 @@ for a person to decide; an [event for every step](control/observability.md);
 [Eval](control/eval.md) runs arms × cases × trials and reports accuracy,
 `Pass^k` and cost side by side.
 
-**Models.** <!-- g:provider-list -->**10 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](models/private-models.md)
+**Models.** <!-- g:provider-list -->**13 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI, Z.ai (GLM)<!-- /g:provider-list -->, and any [private OpenAI-compatible server](models/private-models.md)
 you run yourself (vLLM, Ollama, LM Studio, …), where nothing leaves your
 perimeter. Text and vision are [models](models/models.md); image generation
 is a [tool](tools/media.md).
@@ -81,9 +81,9 @@ is a [tool](tools/media.md).
 <!-- g:modalities -->
 | Modality | Providers |
 |---|---|
-| **Text → Text** | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI, [your own private server](models/private-models.md) |
+| **Text → Text** | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Perplexity, Qwen (DashScope), xAI, Z.ai (GLM), [your own private server](models/private-models.md) |
 | **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
-| **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
+| **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Qwen (DashScope), xAI, Z.ai (GLM) |
 | **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchTavily` |
 <!-- /g:modalities -->

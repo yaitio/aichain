@@ -35,11 +35,11 @@ You ask for `temperature`, `max_tokens`, `reasoning` the same way everywhere:
 <!-- g:model-options -->
 | Key | What it asks for | Providers with a control for it |
 |---|---|---|
-| `temperature` | how much randomness the model is allowed | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
-| `top_p` | nucleus sampling: the probability mass to sample from | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
+| `temperature` | how much randomness the model is allowed | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Perplexity, Qwen (DashScope), xAI, Z.ai (GLM) |
+| `top_p` | nucleus sampling: the probability mass to sample from | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Perplexity, Qwen (DashScope), xAI, Z.ai (GLM) |
 | `top_k` | sample only from the k most likely tokens | Anthropic, Google AI |
-| `max_tokens` | ceiling on the answer's length | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), xAI |
-| `reasoning` | how much deliberation before answering: low / medium / high | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Qwen (DashScope), xAI |
+| `max_tokens` | ceiling on the answer's length | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Perplexity, Qwen (DashScope), xAI, Z.ai (GLM) |
+| `reasoning` | how much deliberation before answering: low / medium / high | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), Mistral AI, OpenAI, Qwen (DashScope), xAI, Z.ai (GLM) |
 | `cache_control` | cache the stable prefix so a repeated one is not re-billed: True, an int, or 'last' for an agent loop | Anthropic |
 | `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | Anthropic |
 
