@@ -8,7 +8,7 @@ Shows the pattern:
   3. Plug it into a Chain with a Skill
 
 A Tool subclass is the other way, when a tool holds state or needs a schema
-annotations cannot say — see docs/primitives/tools.md.
+annotations cannot say — see docs/tools/index.md.
 
 No API key needed for the tool (uses the free Frankfurter API).
 

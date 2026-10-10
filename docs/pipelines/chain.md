@@ -178,7 +178,7 @@ chain.run(..., on_step_error="raise")   # per-call override
 
 A chain can **pause** mid-pipeline until an external signal arrives — a human
 approval, a webhook, a cron tick — and **resume** later, even in a different
-process. This is the durable-run mechanism (see [State](state.md) for the full
+process. This is the durable-run mechanism (see [State](pause-and-resume.md) for the full
 model).
 
 You pause by putting a `Wait` or `Gate` tool in the chain, and you make the run
@@ -249,6 +249,6 @@ orchestrator + tools). **Not** stored: API keys.
 
 ## See also
 
-- [Skill](skills.md), [Tool](tools.md), [Agent](../agents/overview.md) — the step runners.
-- [State](state.md) — suspend/resume, stores, `Wait`/`Gate`, `RunContext`.
+- [Skill](skills.md), [Tool](../tools/index.md), [Agent](../agents/overview.md) — the step runners.
+- [State](pause-and-resume.md) — suspend/resume, stores, `Wait`/`Gate`, `RunContext`.
 - [Agent as a Chain step](../agents/agent-as-chain-step.md).

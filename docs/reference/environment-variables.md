@@ -26,7 +26,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 <!-- /g:env-providers -->
 
 Private servers are the exception to "required": the `private/` prefix works with
-no key at all (see [Private models](../getting-started/private-models.md)).
+no key at all (see [Private models](../models/private-models.md)).
 
 | Variable | Provider | Meaning |
 |---|---|---|
@@ -154,5 +154,5 @@ set -a && source .env && set +a
 
 ## See also
 
-- [Installation](../getting-started/installation.md) — which packages to install alongside which keys.
+- [Installation](../start/installation.md) — which packages to install alongside which keys.
 - [Model registry](model-registry.md) — which model belongs to which provider.

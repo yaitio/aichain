@@ -50,7 +50,7 @@ cookbooks show it done with MarkItDown, mistletoe and WeasyPrint directly.
 
 Set keys only for the providers you use — or none at all: a model you host
 yourself needs no key and sends nothing outside your network. See
-[Private models](private-models.md).
+[Private models](../models/private-models.md).
 
 <!-- g:install-keys -->
 | Service | Environment variable | Get a key |

@@ -263,4 +263,4 @@ Rule of thumb: the moment you catch yourself writing `if/else` logic to decide w
 - **The loop and its stop conditions** → [Overview](overview.md)
 - **Model, tools, stop conditions, permissions** → [Configuration](configuration.md)
 - **Seeding memory and persisting it across runs** → [Memory](memory.md)
-- **Full Chain step syntax** → [Chain](../primitives/chain.md)
+- **Full Chain step syntax** → [Chain](../pipelines/chain.md)

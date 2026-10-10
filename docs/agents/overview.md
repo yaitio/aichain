@@ -4,7 +4,7 @@ An **Agent** is a conversation that can act. You give it a task; it is asked
 what to do, the world answers, the answer is appended, and the loop goes round
 until it replies without asking for anything more. Use it when the *sequence*
 of steps is not known upfront. For a fixed pipeline, use a
-[Chain](../primitives/chain.md) — it spends no model call deciding an order you
+[Chain](../pipelines/chain.md) — it spends no model call deciding an order you
 already know.
 
 ---
@@ -72,7 +72,7 @@ Agent(model, tools=None, instructions="", mode="agile", team=None,
 | `mode` | `"agile"` | `"agile"` decides at every step; `"waterfall"` writes a plan at step 0 and holds to it. |
 | `team` | `None` | `None` — nobody else. `[agents]` — delegate only to these. `"auto"` — describe and spawn workers as needed. |
 | `stop_when` | `[step_count(30)]` | Everything that can end a run other than answering. |
-| `hooks` | `None` | Observability sinks ([Observability](observability.md)). |
+| `hooks` | `None` | Observability sinks ([Observability](../control/observability.md)). |
 | `permissions` | `None` | Tool governance. |
 | `verbose` | `0` | `0` silent · `1` per-action status · `2` token breakdowns. |
 
@@ -179,7 +179,7 @@ result = agent.run("Find the combination and record it.")
 
 Each iteration the model sees the objective and the conversation so far —
 every attempt *with what came back* — then picks one action. The
-[journal](observability.md#the-attempt-journal) is not a side-effect here, it
+[journal](../control/observability.md#the-attempt-journal) is not a side-effect here, it
 is the record of that.
 
 **Stopping.** An open-ended loop needs stop rules a plan gives for free, and
@@ -270,7 +270,7 @@ agent = Agent(Model("gpt-4o"), tools=[IssueRefund()],
               approve=lambda req: ask_the_manager(req.tool, req.arguments))
 ```
 
-See [Observability](observability.md#permission-matrix) for the request an
+See [Observability](../control/observability.md#permission-matrix) for the request an
 approver is handed and what happens when there is none.
 
 > **Corrected in 2.6.0.** This section previously showed `Agent(store=...)`,
@@ -292,15 +292,15 @@ stricter for children than for their parent.
 
 > **Corrected in 2.6.0.** `allow_spawn=True` and `spawn_agent` are the older
 > names; the parameter is `team=` and the tool is `delegate`. See
-> [design/default-agent.md](../design/default-agent.md), which recorded the
+> [design/default-agent.md](../../design/default-agent.md), which recorded the
 > rename while this page kept the old spelling.
 
 ### When to reach for an Agent
 
 | Situation | Use |
 |---|---|
-| One model call, known prompt | [Skill](../primitives/skills.md) |
-| Fixed sequence with known data flow | [Chain](../primitives/chain.md) |
+| One model call, known prompt | [Skill](../pipelines/skills.md) |
+| Fixed sequence with known data flow | [Chain](../pipelines/chain.md) |
 | Search → read → cross-reference → reason | **Agent** |
 | Exploratory; next step depends on what you learned | **Agent (agile)** |
 | No plan is possible; only a finish line | **Agent (goal)** |
@@ -314,6 +314,6 @@ phase, the Chain handles the rest. See [Agent as a Chain step](agent-as-chain-st
 
 - [Configuration](configuration.md) — tools, executors, persona, modes in depth.
 - [Memory](memory.md) — shared step state and persistent cross-run memory.
-- [Observability & control](observability.md) — hooks, events, the permission matrix, tool-call repair.
-- [State](../primitives/state.md) — suspend/resume, stores, `Wait`/`Gate`.
+- [Observability & control](../control/observability.md) — hooks, events, the permission matrix, tool-call repair.
+- [State](../pipelines/pause-and-resume.md) — suspend/resume, stores, `Wait`/`Gate`.
 - [Agent as a Chain step](agent-as-chain-step.md).

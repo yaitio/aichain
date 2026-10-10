@@ -199,7 +199,7 @@ value; a dict stays a dict.
 
 Built-in tools (search, fetch, decisions, speech, embeddings, reranking, chunking,
 local files, vector stores, REST, MCP) are in
-`docs/tools-reference/index.md`. A provider tool is made by its provider's name —
+`docs/reference/tools.md`. A provider tool is made by its provider's name —
 `speech("openai")`, `transcribe("openai")`, `embed("openai", model=…)`,
 `rerank("cohere", model=…)`; `chunk(max_chars=…)`, `wait(…)` and `gate(tool, …)` take
 no provider. An embedding reaches a model as a one-line summary, never as the vectors.

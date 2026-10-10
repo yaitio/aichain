@@ -241,7 +241,7 @@ inline base64:
 ```
 
 Whether a given model accepts image input depends on its capabilities — see
-[Models](models.md) for the per-provider vision support.
+[Models](../models/models.md) for the per-provider vision support.
 
 ### Multi-turn (directed reasoning)
 
@@ -445,6 +445,6 @@ See [Chain](chain.md) for the full step syntax and variable flow.
 
 ## See also
 
-- [Model](models.md) — the providers and models a Skill can bind to.
+- [Model](../models/models.md) — the providers and models a Skill can bind to.
 - [Chain](chain.md) — wire Skills in sequence with automatic variable flow.
-- [Tools](tools.md) — add real-world actions (search, convert, embeddings).
+- [Tools](../tools/index.md) — add real-world actions (search, convert, embeddings).

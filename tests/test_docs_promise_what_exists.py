@@ -26,7 +26,7 @@ PAGES = sorted((ROOT / "docs").rglob("*.md")) + [ROOT / "README.md"]
 
 #: Historical records, not instructions: they describe what was planned at a
 #: past version and are wrong on purpose the moment the plan changed.
-EXEMPT = {"docs/design"}
+EXEMPT = {"design"}
 
 #: Read with `ast`, not with a regex. `Skill(model=Model("gpt-4o",
 #: api_key="k"))` stops a non-greedy `[^)]*` at the inner bracket, so the
@@ -39,7 +39,7 @@ EXEMPT = {"docs/design"}
 #: `instructions`, folded `max_steps` / `max_tokens` / `max_attempts` /
 #: `done_when` into `stop_when`, dropped `memory`, `store`, `executors` and
 #: the `goal` mode, and turned `allow_spawn` into `team`. Every one of those
-#: decisions is written down in `docs/design/default-agent.md`, with reasons —
+#: decisions is written down in `design/default-agent.md`, with reasons —
 #: the design record was kept and the pages that teach the API were not
 #: touched, so for four minor versions a reader copying the README's agent
 #: example got a TypeError on line one.

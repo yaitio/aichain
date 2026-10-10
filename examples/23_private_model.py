@@ -16,7 +16,7 @@ parser to get a clean answer instead:
     vllm serve Qwen/Qwen3-0.6B --reasoning-parser qwen3
 
 The flag belongs to the server, not to this library — see the "No quirk
-handling" limit in docs/getting-started/private-models.md. Without it the
+handling" limit in docs/models/private-models.md. Without it the
 example still runs; you just see the model's reasoning before its answer.
 
 Required env vars:

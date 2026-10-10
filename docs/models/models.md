@@ -241,7 +241,7 @@ current lists live in `models/providers/*.toml` and the
 | Qwen | `DASHSCOPE_API_KEY` | `qwen3.8-max`, `qwen3.7-plus`, `qwen3.8-flash`, `qwen3-vl-plus` |
 | Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
 | BFL (FLUX) | `BFL_API_KEY` | `flux-2-pro`, `flux-pro-1.1`, `flux-kontext-pro`, `flux-kontext-max` *(image only)* |
-| Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](../getting-started/private-models.md) |
+| Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](private-models.md) |
 
 ### What a Model does (and doesn't)
 
@@ -252,15 +252,15 @@ A Model does exactly two things:
 - **`from_response(response, output) → str | dict`** — raw response → clean value.
 
 It knows nothing about prompts, variables, retries, or pipelines — those belong
-to [Skill](skills.md) and [Chain](chain.md). That isolation is the whole point.
+to [Skill](../pipelines/skills.md) and [Chain](../pipelines/chain.md). That isolation is the whole point.
 
 ---
 
 ## See also
 
-- [Private models](../getting-started/private-models.md) — the same interface against a server you
+- [Private models](private-models.md) — the same interface against a server you
   control (vLLM, Ollama, LM Studio), with the data staying in your perimeter.
-- [Skill](skills.md) — bind a Model to a prompt and run it.
-- [Chain](chain.md) — sequence model calls with automatic variable flow.
+- [Skill](../pipelines/skills.md) — bind a Model to a prompt and run it.
+- [Chain](../pipelines/chain.md) — sequence model calls with automatic variable flow.
 - [Agent](../agents/overview.md) — let a model plan and call tools.
 - [Model registry](../reference/model-registry.md) — the full model catalogue.

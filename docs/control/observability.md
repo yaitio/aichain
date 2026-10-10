@@ -486,6 +486,6 @@ ordinary callable and the wait lives wherever the application already waits —
 [`examples/20_observability.py`](../../examples/20_observability.py) runs it
 offline. A run that must stop, leave the process and be picked up by another
 one is a **Chain** with a `Wait` or `Gate` step and a shared store (see
-[state](../primitives/state.md)) —
+[state](../pipelines/pause-and-resume.md)) —
 [`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py)
 is that pattern end to end.

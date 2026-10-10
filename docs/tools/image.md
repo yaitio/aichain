@@ -74,4 +74,4 @@ pixels, `size` to a ratio), and a notice where it cannot honour one.
 
 `Skill(Model("gpt-image-1.5"), output={"modalities": ["image"], …})` — the way
 images were made until now — still works and warns; it raises in 4.0.
-Which model for what, with prices and speeds: `docs/design/image-edit.md`.
+Which model for what, with prices and speeds: [`design/image-edit.md`](../../design/image-edit.md).

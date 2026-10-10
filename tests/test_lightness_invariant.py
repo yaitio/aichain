@@ -46,7 +46,7 @@ PAGES = (sorted((ROOT / "docs").rglob("*.md"))
 EXAMPLES = sorted((ROOT / "examples").glob("*.py"))
 
 #: Historical records: they describe a past version on purpose.
-EXEMPT = ("docs/design",)
+EXEMPT = ("design",)
 
 CLASSES = {"Agent": Agent, "Chain": Chain, "Skill": Skill, "Pool": Pool,
            "Model": Model}

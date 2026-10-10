@@ -34,7 +34,7 @@ class TestGeneratedPagesAreCurrent(unittest.TestCase):
         docs._check_paging()                    # raises SystemExit when one is missing
 
     def test_a_lost_marker_is_an_error(self):
-        rel = "docs/primitives/pool.md"
+        rel = "docs/pipelines/pool.md"
         text = (ROOT / rel).read_text().replace("<!-- g:policy -->", "", 1)
         with self.assertRaises(SystemExit):
             docs.render(rel, text)
@@ -82,7 +82,7 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
     schema declares; a Chain step's input map names only parameters the tool
     has."""
 
-    PAGES = sorted((ROOT / "docs" / "tools-reference").glob("*.md"))
+    PAGES = sorted((ROOT / "docs" / "tools").glob("*.md")) + sorted((ROOT / "docs" / "utilities").glob("*.md"))
 
     def _tools_in(self, tree):
         import ast
@@ -144,6 +144,7 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
     def test_calls(self):
         import ast
         import re
+        import types
         import yait_aichain.tools as tools
         problems = []
         for page in self.PAGES:
@@ -189,7 +190,11 @@ class TestToolPagesCallToolsTheWayTheyAreCalled(unittest.TestCase):
                                     and isinstance(step.elts[0].func, ast.Name)
                                     and hasattr(tools, step.elts[0].func.id)
                                     and isinstance(step.elts[2], ast.Dict)):
-                                schema = self._schema(getattr(tools, step.elts[0].func.id))
+                                made = getattr(tools, step.elts[0].func.id)
+                                if isinstance(made, types.ModuleType):
+                                    # A factory step — `(fetch("local"), "page", {...})`.
+                                    made = self._from_factory(made, step.elts[0])
+                                schema = self._schema(made) if made is not None else None
                                 if not schema:
                                     continue
                                 for k in step.elts[2].keys:

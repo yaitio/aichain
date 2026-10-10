@@ -222,6 +222,6 @@ spellings answer.
 
 ## See also
 
-- [Model](../primitives/models.md) — the shared interface this provider plugs into.
+- [Model](models.md) — the shared interface this provider plugs into.
 - [Environment variables](../reference/environment-variables.md) —
   `PRIVATE_BASE_URL`, `PRIVATE_API_KEY`.

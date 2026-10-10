@@ -132,8 +132,8 @@ print(result.output if result else f"Agent failed: {result.error}")
 ## Next steps
 
 - **Understand the design** → [Concepts](concepts.md)
-- **All Skill options** (JSON output, schemas, save/load) → [Skills](../primitives/skills.md)
-- **All Chain options** (error handling, history, input_map) → [Chain](../primitives/chain.md)
+- **All Skill options** (JSON output, schemas, save/load) → [Skills](../pipelines/skills.md)
+- **All Chain options** (error handling, history, input_map) → [Chain](../pipelines/chain.md)
 - **All Agent options** (modes, memory, persona) → [Agent](../agents/overview.md)
-- **Suspend & resume** → [State](../primitives/state.md)
-- **Available tools** → [Tools reference](../tools-reference/)
+- **Suspend & resume** → [State](../pipelines/pause-and-resume.md)
+- **Available tools** → [Tools reference](../reference/tools.md)

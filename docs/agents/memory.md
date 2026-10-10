@@ -93,5 +93,5 @@ and nothing else.
 ## See also
 
 - [Configuration](configuration.md) — the parameters that exist
-- [Observability](observability.md) — the journal, which *is* the loop's record
-- [State](../primitives/state.md) — `Chain`'s store, suspend and resume
+- [Observability](../control/observability.md) — the journal, which *is* the loop's record
+- [State](../pipelines/pause-and-resume.md) — `Chain`'s store, suspend and resume

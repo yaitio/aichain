@@ -264,7 +264,7 @@ result = searchParallel()(
 The providers sell the same thing — ranked pages for a query, filtered by
 time, place and site — and spell every part of it differently. The library
 holds one vocabulary of options and one record of results, and each provider
-tool translates them, the way the [decision tools](decision.md) work.
+tool translates them, the way the [decision tools](decide.md) work.
 
 | Tool | Strength | Results | Key |
 |---|---|---|---|

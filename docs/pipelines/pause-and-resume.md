@@ -269,7 +269,7 @@ for.
 >
 > For a human deciding **inside** an invocation that can afford to wait, the
 > cheaper mechanism is still `approve=` — see
-> [Permissions](../agents/observability.md#permission-matrix). Park when the
+> [Permissions](../control/observability.md#permission-matrix). Park when the
 > waiting cannot be held: a Lambda cannot sit in front of a person.
 
 ---
@@ -278,4 +278,4 @@ for.
 
 - [Chain](chain.md) — `store=`, `run()` pausing, `resume()`.
 - [Agent](../agents/overview.md) — the same suspend/resume on autonomous runs.
-- [Tools](tools.md) — `Wait` and `Gate` alongside the other built-in tools.
+- [Tools](../tools/index.md) — `Wait` and `Gate` alongside the other built-in tools.

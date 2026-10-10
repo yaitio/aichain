@@ -30,7 +30,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 `anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `recraft`, `xai`.
 
-The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../getting-started/private-models.md).
+The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
 | Provider | `text-to-text` | `text-to-image` | `image-to-text` | `image-to-image` |
 |---|---|---|---|---|
@@ -520,6 +520,6 @@ Importable from `models.registry`:
 
 ## See also
 
-- [Model factory](../primitives/models.md) — how model names are routed to provider clients.
+- [Model factory](../models/models.md) — how model names are routed to provider clients.
 - [Environment variables](environment-variables.md) — which key each provider needs.
-- [Tools reference](../tools-reference/index.md) — all built-in tools.
+- [Tools reference](tools.md) — all built-in tools.

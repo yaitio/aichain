@@ -147,7 +147,7 @@ A longer list is split into calls of what the provider takes; the pages come
 back in the order asked, duplicates once.
 
 **`fetchLocal` is not installed by default.** It runs
-[MarkItDown](markitdown.md) on this machine, and MarkItDown comes only with the
+[MarkItDown](https://github.com/microsoft/markitdown) on this machine, and MarkItDown comes only with the
 extra:
 
 ```bash

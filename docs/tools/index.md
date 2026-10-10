@@ -44,7 +44,7 @@ class ReverseTool(Tool):
 print(ReverseTool()(input="hello").output)       # 'olleh'
 ```
 
-▶ Built-in convert tool: [`examples/05_tool_convert.py`](../../examples/05_tool_convert.py) ·
+▶ Built-in fetch tool: [`examples/05_tool_fetch.py`](../../examples/05_tool_fetch.py) ·
 Custom tool: [`examples/07_tool_custom.py`](../../examples/07_tool_custom.py) ·
 Deep dive ↓
 
@@ -164,7 +164,7 @@ agent = Agent(model, tools=[IssueRefund()],
 runs only on a yes — **with no `approve=` attached, the call is refused**. A
 refusal reaches the model as a tool result carrying its reason. The full
 contract, including the approval events a UI consumes:
-[Observability](../agents/observability.md).
+[Observability](../control/observability.md).
 [`examples/20_observability.py`](../../examples/20_observability.py) runs it offline.
 
 ### Provider function-calling schema
@@ -197,14 +197,14 @@ chain.run(variables={"link": "https://example.com/article"})
 ```
 
 A tool whose `run()` returns a **dict** writes several named outputs at once —
-the dict is merged into the accumulated variables. See [Chain](chain.md) for the
+the dict is merged into the accumulated variables. See [Chain](../pipelines/chain.md) for the
 full step syntax.
 
 ### Built-in tools
 
 Search, fetch, speech, local files, vector-store operations, REST, MCP,
 and `Wait`/`Gate`. Every one — its wire name, class, key, risk class and full
-parameter table — is in the [Tools reference](../tools-reference/index.md),
+parameter table — is in the [Tools reference](../reference/tools.md),
 which is generated from the classes themselves.
 
 Embeddings (`Embedding`), rerankers (`Reranker`) and vector stores (`VectorDB`)
@@ -215,7 +215,7 @@ are not tools: they are what the vector tools are built from.
 `Wait` and `Gate` are tools that *pause* a run instead of returning immediately —
 the basis of suspend/resume. Drop a `Wait` into a Chain to pause for human
 input, or wrap any tool in a `Gate` to require approval before it runs. Full
-treatment in [State — suspend & resume](state.md).
+treatment in [State — suspend & resume](../pipelines/pause-and-resume.md).
 
 ### Writing a custom Tool
 
@@ -264,7 +264,7 @@ and it raises on error — the safe `__call__` wrapper turns that into a failed
 
 ## See also
 
-- [Chain](chain.md) — use Tools as pipeline steps.
+- [Chain](../pipelines/chain.md) — use Tools as pipeline steps.
 - [Agent](../agents/overview.md) — let an LLM choose and call tools.
-- [State](state.md) — `Wait` / `Gate` and suspend/resume.
-- [Tools reference](../tools-reference/) — every built-in tool in detail.
+- [State](../pipelines/pause-and-resume.md) — `Wait` / `Gate` and suspend/resume.
+- [Tools reference](../reference/tools.md) — every built-in tool in detail.

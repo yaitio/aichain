@@ -22,7 +22,7 @@ agent = Agent(
 > `orchestrator`, `executors`, `goal` mode, `done_when`, `max_steps`,
 > `max_attempts`, `max_tokens`, `persona`, `memory`. Every one of those is
 > either renamed or gone, every decision is recorded in
-> [design/default-agent.md](../design/default-agent.md), and none of it
+> [design/default-agent.md](../../design/default-agent.md), and none of it
 > reached this page: an example copied from here raised `TypeError` on its
 > first line. What follows is checked against the constructor by
 > `tests/test_docs_promise_what_exists.py`.
@@ -178,7 +178,7 @@ behaviour matters, express it as one.
 A tool declares a risk class as data; the policy maps it to `allow`,
 `approve` or `deny` before the tool runs. `approve` asks `approve=` and runs
 only on a yes — **with no approver attached the call is refused.** See
-[Observability](observability.md#permission-matrix).
+[Observability](../control/observability.md#permission-matrix).
 
 ### `hooks: list | None`
 
@@ -263,5 +263,5 @@ accumulated values down.
 ## See also
 
 - [Overview](overview.md) — what the loop does
-- [Observability](observability.md) — events, permissions, the journal
+- [Observability](../control/observability.md) — events, permissions, the journal
 - [Agent as a Chain step](agent-as-chain-step.md) — composition and persistence

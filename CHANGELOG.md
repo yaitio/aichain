@@ -1556,7 +1556,7 @@ the defect the third one found on its first run.
 ## [2.9.0] — 2026-09-11
 
 **Approval travels on the same channel.** R5 of
-[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md), and the last
+[design/streaming-to-a-ui.md](design/streaming-to-a-ui.md), and the last
 of the five. A UI can now present the prompt, return a decision and render the
 outcome without reaching into the permission layer at all.
 
@@ -1614,7 +1614,7 @@ the product's half, exactly as the document says of transport.
 ## [2.8.0] — 2026-09-11
 
 **The agent streams the answer, not only its actions.** R2 of
-[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md).
+[design/streaming-to-a-ui.md](design/streaming-to-a-ui.md).
 `Agent.stream()` said why it did not: *a turn in an agent loop is usually a
 tool call, not prose, so token deltas would be empty for most of a run*. True
 of the middle of a run and false of its end — the last turn **is** the answer,
@@ -1661,7 +1661,7 @@ as the model takes.
 ## [2.7.0] — 2026-09-11
 
 **The event channel carries enough to reconstruct a turn.** R1, R3 and R4 of
-[design/streaming-to-a-ui.md](docs/design/streaming-to-a-ui.md). It carried a
+[design/streaming-to-a-ui.md](design/streaming-to-a-ui.md). It carried a
 description: `step.started` emitted the tool's name and nothing else, and a
 call's arguments and its result reached only the message list — the model's
 view — and the journal, where the result had already been rendered to prose

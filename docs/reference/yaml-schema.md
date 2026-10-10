@@ -243,6 +243,6 @@ steps:
 
 ## See also
 
-- [Chain primitives](../primitives/chain.md) — the full step specification in Python.
-- [Skill primitives](../primitives/skills.md) — the input/output format.
+- [Chain primitives](../pipelines/chain.md) — the full step specification in Python.
+- [Skill primitives](../pipelines/skills.md) — the input/output format.
 - [Environment variables](environment-variables.md) — keys resolved at load time.
