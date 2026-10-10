@@ -73,14 +73,25 @@ class TestProviderDataConsistency(unittest.TestCase):
                          "max_tokens")
 
     def test_prices_well_formed(self):
-        # Every priced model carries numeric input/output USD-per-1M rates.
+        # Every priced model carries numeric input/output USD-per-1M rates, or
+        # — an image model the provider bills by the picture — a per_image
+        # price and nothing else. Every key is one estimate_cost reads.
+        known = {"input", "output", "image_input", "cache_read", "long_context", "per_image"}
         priced = 0
         for prov, data in PROVIDERS.items():
             for name, mdl in data.get("models", {}).items():
                 if "price" in mdl:
                     priced += 1
-                    self.assertIsInstance(mdl["price"]["input"], (int, float), name)
-                    self.assertIsInstance(mdl["price"]["output"], (int, float), name)
+                    price = mdl["price"]
+                    self.assertLessEqual(set(price), known, name)
+                    if "per_image" in price:
+                        self.assertEqual(set(price), {"per_image"}, name)
+                        self.assertIsInstance(price["per_image"], (int, float), name)
+                        continue
+                    self.assertIsInstance(price["input"], (int, float), name)
+                    self.assertIsInstance(price["output"], (int, float), name)
+                    if "long_context" in price:
+                        self.assertEqual(set(price["long_context"]), {"above", "input", "output"}, name)
         self.assertGreater(priced, 0)
 
     def test_caps_within_vocabulary(self):

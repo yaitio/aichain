@@ -39,9 +39,22 @@ low = 4000
 medium = 10000
 high = 20000
 
+# Prices: platform.claude.com pricing page, read 2026-10-10. USD per 1M tokens.
+# `cache_read` is carried wherever it is not a tenth of the input rate — the
+# 5.x generation reads its cache cheaper than that, and each model at its own
+# fraction. Writes keep the 1.25x / 2x premium on every model listed.
+
+[models."claude-fable-5-1"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 10.0, output = 50.0, cache_read = 0.25 }
+
 [models."claude-fable-5"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 10.0, output = 50.0 }
+price = { input = 10.0, output = 50.0, cache_read = 1.0 }
+
+[models."claude-opus-5-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 4.0, output = 20.0, cache_read = 0.20 }
 
 [models."claude-opus-5"]
 caps  = ["image-to-text", "text-to-text"]
@@ -59,17 +72,34 @@ price = { input = 5.0, output = 25.0 }
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
 
-# Standard rate. An introductory 2.0/10.0 runs through 2026-08-31, so cost
-# estimates read high until then — deliberately, since the discount expires
-# and a price that has to be edited back up is worse than one that is right
-# a month from now.
+[models."claude-opus-4-5-20251101"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 5.0, output = 25.0 }
+
+[models."claude-sonnet-5-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 10.0, cache_read = 0.10 }
+
+# The introductory 2.0/10.0 became the list price; the registry carried the
+# 3.0/15.0 it was expected to return to, and read half again too high.
 [models."claude-sonnet-5"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 3.0, output = 15.0 }
+price = { input = 2.0, output = 10.0 }
 
 [models."claude-sonnet-4-6"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 3.0, output = 15.0 }
+
+# Deprecated; retires 2026-11-30.
+[models."claude-sonnet-4-5-20250929"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 3.0, output = 15.0 }
+
+# Past 100K prompt tokens the whole call is billed at the long-context rate —
+# five times the short one, so a long prompt is not a cheap call on this model.
+[models."claude-haiku-5-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.10, output = 0.50, cache_read = 0.01, long_context = { above = 100000, input = 0.50, output = 2.50 } }
 
 [models."claude-haiku-4-5-20251001"]
 caps  = ["image-to-text", "text-to-text"]

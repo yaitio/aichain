@@ -1,5 +1,84 @@
 # Changelog
 
+## [3.10.0] — 2026-10-10
+
+**The registry, brought to what providers sell and charge on 2026-10-10.**
+Every price was read from the provider's own pricing page that day, and each
+file names its source. Every new text model answered a live call and reported
+a cost, 35 of 35; six new image models drew a picture.
+
+### Added
+
+- **Models.** Anthropic: `claude-fable-5-1`, `claude-opus-5-5`,
+  `claude-sonnet-5-5`, `claude-haiku-5-5`, and `claude-opus-4-5-20251101` and
+  `claude-sonnet-4-5-20250929`, which were reachable and unlisted. OpenAI:
+  `gpt-6.1-sol`, `gpt-5.2`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1`.
+  Google: `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`,
+  `gemini-3.1-flash-lite`, and the image models `gemini-nano-banana-2.1` and
+  `gemini-3.1-flash-lite-image`. xAI: `grok-4.7`, `grok-4.6`, `grok-4.5`,
+  `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`,
+  `grok-build-0.1`, and `grok-imagine-image-2.0` and
+  `grok-imagine-image-quality`. DeepSeek: `deepseek-flash`, `deepseek-v4-pro`.
+  Kimi: `kimi-k2.7-code-highspeed`. Qwen: `qwen3.8-max`, `qwen3.7-max`,
+  `qwen3.7-plus`, `qwen3.6-plus`, `qwen3.5-plus`, `qwen3.8-flash`,
+  `qwen3.7-flash`, `qwen3.6-flash`, `qwen-flash`. BFL: `flux-3-image`,
+  `flux-2-max`, `flux-2-flex`, `flux-2-klein-9b`, `flux-2-klein-4b`, each
+  checked to be an endpoint. Recraft: `recraftv4_1_flash`.
+- **Three price fields a model can carry.** `cache_read`, where a cached
+  prefix is not a tenth of the input rate: Claude 5.5 reads at a twentieth and
+  Fable 5.1 at a fortieth, so a cached loop on them was estimated two to four
+  times too dear. `long_context = {above, input, output}`: Claude Haiku 5.5
+  bills a whole call at five times the rate once the prompt passes 100K
+  tokens. `per_image`, for a model priced by the picture rather than by the
+  token; `image(...)` reports it as `cost` when the provider reports no usage,
+  and says in `cost_basis` that it is the base size's rate. Twenty-five image
+  models carry one; twenty were in the registry already, and `cost` was `None`
+  on every one of them.
+
+### Changed
+
+- **Prices.** `claude-sonnet-5` 3.0/15.0 → 2.0/10.0: the introductory rate
+  became the list price. The retired xAI names (`grok-4-0709`, the
+  `grok-4-fast` and `grok-4-1-fast` models, `grok-3`) still answer and are
+  billed at grok-4.3's 1.25/2.5, which they now carry. `chatgpt-image-latest`
+  output 30 → 32. `image_input` added to `gpt-image-2`, `gpt-image-1.5`,
+  `chatgpt-image-latest` (8.0), `gpt-image-1-mini` (2.5) and `gpt-image-1`,
+  which had no price at all (5.0/40.0, image input 10.0).
+  `qwen3-32b` priced. `gpt-5.6-sol` keeps its 5.0/30.0 standard rate against a
+  promotional 4.0/20.0 with no end date, as the registry does with every
+  introductory price.
+
+### Removed
+
+- **Models the provider retired.** `gemini-3.1-flash-lite-preview` (shut down
+  2026-05-25; `gemini-3.1-flash-lite` is the same price). `kimi-k2-0905-preview`,
+  `kimi-k2-turbo-preview`, `kimi-k2-thinking`, `kimi-k2-thinking-turbo`
+  (discontinued 2026-05-25) and `kimi-k2.5` (2026-08-31). `sonar-reasoning`,
+  which the API now refuses as deprecated. A name not in the registry still
+  resolves by its prefix, so code naming one reaches the provider and hears its
+  refusal.
+
+### Not settled
+
+- **Reve answers nothing**: `POST /v1/image/create` and `/v1/image/edit` return
+  HTTP 405 and the API root redirects to the app. Third-party reports date the
+  API's end to 2026-08-14. The provider stays until Reve says so.
+- **Qwen**: `qwen3-max`, `qwen3-235b-a22b`, `qwen3-32b`, `qwen3-72b`,
+  `QwQ-32B`, `qwen-vl-max`, `qwen-vl-plus` and the `qwen-image-edit` and
+  `wan2.2` models answer "does not exist" to this project's key while the
+  international catalogue lists them — the account's workspace, not the
+  catalogue. Kept.
+- **Not priced**: `flux-dev`, `flux-3-image` (tiered by resolution), the rest
+  of the flux-2 family, the Recraft utility models, `grok-3-fast`. Perplexity's
+  per-request search fee and DeepSeek's off-peak half price are outside the
+  estimate. Per-image prices are the base size's; a larger picture on a
+  tiered model costs more.
+- **Deprecated, still listed**: `claude-sonnet-4-5-20250929` (retires
+  2026-11-30), `gpt-image-1` (2026-10-23), `chatgpt-image-latest`,
+  `gpt-image-1.5`, `gpt-image-1-mini` (2026-12-01), `gpt-5.4-nano`
+  (2027-04-01), `gemini-2.5-flash-image`, `grok-imagine-image-quality`,
+  `deepseek-chat` and `deepseek-reasoner`.
+
 ## [3.9.0] — 2026-10-10
 
 **An image model is a tool.** A model is what can be an agent's mind — it

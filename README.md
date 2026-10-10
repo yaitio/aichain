@@ -33,7 +33,7 @@ Every major AI library makes you choose: LangChain is too complex, LlamaIndex is
 | Rerank results | `Reranker` |
 | Call any tool or MCP server | `Tool` / `MCPTools` |
 
-All of these work identically across **<!-- g:count-models -->93 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
+All of these work identically across **<!-- g:count-models -->131 models from 11 cloud providers<!-- /g:count-models -->** — plus any open-weight model you host yourself, where the data never leaves your perimeter — with one line to swap any of them.
 
 ---
 
@@ -104,7 +104,7 @@ Model("gpt-4o")              # OpenAI
 Model("gemini-2.5-flash")    # Google
 Model("grok-3")              # xAI
 Model("sonar-pro")           # Perplexity
-Model("kimi-k2.5")           # Kimi
+Model("kimi-k2.6")           # Kimi
 Model("deepseek-chat")       # DeepSeek
 Model("qwen-max")            # Qwen
 Model("private/llama3.3")    # your own server — vLLM, Ollama, LM Studio, …

@@ -34,17 +34,17 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 
 | Provider | `text-to-text` | `text-to-image` | `image-to-text` | `image-to-image` |
 |---|---|---|---|---|
-| Anthropic | 8 | — | 8 | — |
-| Black Forest Labs (FLUX) | — | 6 | — | 2 |
-| DeepSeek | 2 | — | — | — |
-| Google AI | 6 | 3 | 6 | 3 |
-| Kimi (Moonshot AI) | 8 | — | 2 | — |
-| OpenAI | 14 | 7 | 14 | 7 |
-| Perplexity | 5 | — | — | — |
-| Qwen (DashScope) | 9 | 2 | 3 | 3 |
-| Recraft | — | 8 | — | 3 |
+| Anthropic | 14 | — | 14 | — |
+| Black Forest Labs (FLUX) | — | 11 | — | 2 |
+| DeepSeek | 4 | — | — | — |
+| Google AI | 9 | 5 | 9 | 5 |
+| Kimi (Moonshot AI) | 4 | — | 1 | — |
+| OpenAI | 20 | 7 | 20 | 7 |
+| Perplexity | 4 | — | — | — |
+| Qwen (DashScope) | 18 | 2 | 3 | 3 |
+| Recraft | — | 9 | — | 3 |
 | Reve | — | 1 | — | 1 |
-| xAI | 7 | 1 | 7 | 1 |
+| xAI | 14 | 3 | 13 | 3 |
 
 ---
 
@@ -55,27 +55,39 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 ### `text-to-text`
 
 ```
-claude-fable-5             # $10 in / $50 out per 1M tokens
-claude-haiku-4-5-20251001  # $1 in / $5 out per 1M tokens
-claude-opus-4-6            # $5 in / $25 out per 1M tokens
-claude-opus-4-7            # $5 in / $25 out per 1M tokens
-claude-opus-4-8            # $5 in / $25 out per 1M tokens
-claude-opus-5              # $5 in / $25 out per 1M tokens
-claude-sonnet-4-6          # $3 in / $15 out per 1M tokens
-claude-sonnet-5            # $3 in / $15 out per 1M tokens
+claude-fable-5              # $10 in / $50 out per 1M tokens
+claude-fable-5-1            # $10 in / $50 out per 1M tokens
+claude-haiku-4-5-20251001   # $1 in / $5 out per 1M tokens
+claude-haiku-5-5            # $0.1 in / $0.5 out per 1M tokens
+claude-opus-4-5-20251101    # $5 in / $25 out per 1M tokens
+claude-opus-4-6             # $5 in / $25 out per 1M tokens
+claude-opus-4-7             # $5 in / $25 out per 1M tokens
+claude-opus-4-8             # $5 in / $25 out per 1M tokens
+claude-opus-5               # $5 in / $25 out per 1M tokens
+claude-opus-5-5             # $4 in / $20 out per 1M tokens
+claude-sonnet-4-5-20250929  # $3 in / $15 out per 1M tokens
+claude-sonnet-4-6           # $3 in / $15 out per 1M tokens
+claude-sonnet-5             # $2 in / $10 out per 1M tokens
+claude-sonnet-5-5           # $2 in / $10 out per 1M tokens
 ```
 
 ### `image-to-text`
 
 ```
-claude-fable-5             # $10 in / $50 out per 1M tokens
-claude-haiku-4-5-20251001  # $1 in / $5 out per 1M tokens
-claude-opus-4-6            # $5 in / $25 out per 1M tokens
-claude-opus-4-7            # $5 in / $25 out per 1M tokens
-claude-opus-4-8            # $5 in / $25 out per 1M tokens
-claude-opus-5              # $5 in / $25 out per 1M tokens
-claude-sonnet-4-6          # $3 in / $15 out per 1M tokens
-claude-sonnet-5            # $3 in / $15 out per 1M tokens
+claude-fable-5              # $10 in / $50 out per 1M tokens
+claude-fable-5-1            # $10 in / $50 out per 1M tokens
+claude-haiku-4-5-20251001   # $1 in / $5 out per 1M tokens
+claude-haiku-5-5            # $0.1 in / $0.5 out per 1M tokens
+claude-opus-4-5-20251101    # $5 in / $25 out per 1M tokens
+claude-opus-4-6             # $5 in / $25 out per 1M tokens
+claude-opus-4-7             # $5 in / $25 out per 1M tokens
+claude-opus-4-8             # $5 in / $25 out per 1M tokens
+claude-opus-5               # $5 in / $25 out per 1M tokens
+claude-opus-5-5             # $4 in / $20 out per 1M tokens
+claude-sonnet-4-5-20250929  # $3 in / $15 out per 1M tokens
+claude-sonnet-4-6           # $3 in / $15 out per 1M tokens
+claude-sonnet-5             # $2 in / $10 out per 1M tokens
+claude-sonnet-5-5           # $2 in / $10 out per 1M tokens
 ```
 
 ---
@@ -87,19 +99,24 @@ claude-sonnet-5            # $3 in / $15 out per 1M tokens
 ### `text-to-image`
 
 ```
-flux-2-pro
+flux-2-flex
+flux-2-klein-4b
+flux-2-klein-9b
+flux-2-max
+flux-2-pro          # per_image $0.03
+flux-3-image
 flux-dev
-flux-kontext-max
-flux-kontext-pro
-flux-pro-1.1
-flux-pro-1.1-ultra
+flux-kontext-max    # per_image $0.08
+flux-kontext-pro    # per_image $0.04
+flux-pro-1.1        # per_image $0.04
+flux-pro-1.1-ultra  # per_image $0.06
 ```
 
 ### `image-to-image`
 
 ```
-flux-kontext-max
-flux-kontext-pro
+flux-kontext-max  # per_image $0.08
+flux-kontext-pro  # per_image $0.04
 ```
 
 ---
@@ -112,7 +129,9 @@ flux-kontext-pro
 
 ```
 deepseek-chat      # $0.27 in / $1.1 out per 1M tokens
+deepseek-flash     # $0.3 in / $1.2 out per 1M tokens
 deepseek-reasoner  # $0.55 in / $2.19 out per 1M tokens
+deepseek-v4-pro    # $1.32 in / $3.96 out per 1M tokens
 ```
 
 ---
@@ -124,39 +143,49 @@ deepseek-reasoner  # $0.55 in / $2.19 out per 1M tokens
 ### `text-to-text`
 
 ```
-gemini-2.5-flash               # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-flash-lite          # $0.1 in / $0.4 out per 1M tokens
-gemini-2.5-pro                 # $1.25 in / $10 out per 1M tokens
-gemini-3-flash-preview         # $0.5 in / $3 out per 1M tokens
-gemini-3.1-flash-lite-preview  # $0.25 in / $1.5 out per 1M tokens
-gemini-3.1-pro-preview         # $2 in / $12 out per 1M tokens
+gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
+gemini-2.5-flash-lite   # $0.1 in / $0.4 out per 1M tokens
+gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
+gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
+gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
+gemini-3.1-pro-preview  # $2 in / $12 out per 1M tokens
+gemini-3.5-flash-lite   # $0.3 in / $2.5 out per 1M tokens
+gemini-3.6-flash        # $0.75 in / $3.75 out per 1M tokens
+gemini-3.8-flash        # $0.75 in / $3.75 out per 1M tokens
 ```
 
 ### `text-to-image`
 
 ```
-gemini-2.5-flash-image
-gemini-3-pro-image
-gemini-3.1-flash-image
+gemini-2.5-flash-image       # per_image $0.039
+gemini-3-pro-image           # per_image $0.134
+gemini-3.1-flash-image       # per_image $0.067
+gemini-3.1-flash-lite-image  # per_image $0.0336
+gemini-nano-banana-2.1       # per_image $0.0336
 ```
 
 ### `image-to-text`
 
 ```
-gemini-2.5-flash               # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-flash-lite          # $0.1 in / $0.4 out per 1M tokens
-gemini-2.5-pro                 # $1.25 in / $10 out per 1M tokens
-gemini-3-flash-preview         # $0.5 in / $3 out per 1M tokens
-gemini-3.1-flash-lite-preview  # $0.25 in / $1.5 out per 1M tokens
-gemini-3.1-pro-preview         # $2 in / $12 out per 1M tokens
+gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
+gemini-2.5-flash-lite   # $0.1 in / $0.4 out per 1M tokens
+gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
+gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
+gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
+gemini-3.1-pro-preview  # $2 in / $12 out per 1M tokens
+gemini-3.5-flash-lite   # $0.3 in / $2.5 out per 1M tokens
+gemini-3.6-flash        # $0.75 in / $3.75 out per 1M tokens
+gemini-3.8-flash        # $0.75 in / $3.75 out per 1M tokens
 ```
 
 ### `image-to-image`
 
 ```
-gemini-2.5-flash-image
-gemini-3-pro-image
-gemini-3.1-flash-image
+gemini-2.5-flash-image       # per_image $0.039
+gemini-3-pro-image           # per_image $0.134
+gemini-3.1-flash-image       # per_image $0.067
+gemini-3.1-flash-lite-image  # per_image $0.0336
+gemini-nano-banana-2.1       # per_image $0.0336
 ```
 
 ---
@@ -168,20 +197,15 @@ gemini-3.1-flash-image
 ### `text-to-text`
 
 ```
-kimi-k2-0905-preview    # $0.6 in / $2.5 out per 1M tokens
-kimi-k2-thinking
-kimi-k2-thinking-turbo
-kimi-k2-turbo-preview
-kimi-k2.5
-kimi-k2.6               # $0.95 in / $4 out per 1M tokens
-kimi-k2.7-code          # $0.95 in / $4 out per 1M tokens
-kimi-k3                 # $3 in / $15 out per 1M tokens
+kimi-k2.6                 # $0.95 in / $4 out per 1M tokens
+kimi-k2.7-code            # $0.95 in / $4 out per 1M tokens
+kimi-k2.7-code-highspeed  # $1.9 in / $8 out per 1M tokens
+kimi-k3                   # $3 in / $15 out per 1M tokens
 ```
 
 ### `image-to-text`
 
 ```
-kimi-k2.5
 kimi-k2.6  # $0.95 in / $4 out per 1M tokens
 ```
 
@@ -194,8 +218,13 @@ kimi-k2.6  # $0.95 in / $4 out per 1M tokens
 ### `text-to-text`
 
 ```
+gpt-4.1        # $2 in / $8 out per 1M tokens
 gpt-4o         # $2.5 in / $10 out per 1M tokens
 gpt-4o-mini    # $0.15 in / $0.6 out per 1M tokens
+gpt-5          # $1.25 in / $10 out per 1M tokens
+gpt-5-mini     # $0.25 in / $2 out per 1M tokens
+gpt-5-nano     # $0.05 in / $0.4 out per 1M tokens
+gpt-5.2        # $1.75 in / $14 out per 1M tokens
 gpt-5.4        # $2.5 in / $15 out per 1M tokens
 gpt-5.4-mini   # $0.75 in / $4.5 out per 1M tokens
 gpt-5.4-nano   # $0.2 in / $1.25 out per 1M tokens
@@ -208,13 +237,14 @@ gpt-5.6-terra  # $2 in / $12 out per 1M tokens
 gpt-6-astra    # $10 in / $50 out per 1M tokens
 gpt-6-luna     # $0.1 in / $0.5 out per 1M tokens
 gpt-6-sol      # $2 in / $10 out per 1M tokens
+gpt-6.1-sol    # $2 in / $10 out per 1M tokens
 ```
 
 ### `text-to-image`
 
 ```
-chatgpt-image-latest    # $5 in / $30 out per 1M tokens
-gpt-image-1
+chatgpt-image-latest    # $5 in / $32 out per 1M tokens
+gpt-image-1             # $5 in / $40 out per 1M tokens
 gpt-image-1-mini        # $2 in / $8 out per 1M tokens
 gpt-image-1.5           # $5 in / $32 out per 1M tokens
 gpt-image-2             # $5 in / $30 out per 1M tokens
@@ -225,8 +255,13 @@ gpt-image-2.5-sunburst  # $5 in / $30 out per 1M tokens
 ### `image-to-text`
 
 ```
+gpt-4.1        # $2 in / $8 out per 1M tokens
 gpt-4o         # $2.5 in / $10 out per 1M tokens
 gpt-4o-mini    # $0.15 in / $0.6 out per 1M tokens
+gpt-5          # $1.25 in / $10 out per 1M tokens
+gpt-5-mini     # $0.25 in / $2 out per 1M tokens
+gpt-5-nano     # $0.05 in / $0.4 out per 1M tokens
+gpt-5.2        # $1.75 in / $14 out per 1M tokens
 gpt-5.4        # $2.5 in / $15 out per 1M tokens
 gpt-5.4-mini   # $0.75 in / $4.5 out per 1M tokens
 gpt-5.4-nano   # $0.2 in / $1.25 out per 1M tokens
@@ -239,13 +274,14 @@ gpt-5.6-terra  # $2 in / $12 out per 1M tokens
 gpt-6-astra    # $10 in / $50 out per 1M tokens
 gpt-6-luna     # $0.1 in / $0.5 out per 1M tokens
 gpt-6-sol      # $2 in / $10 out per 1M tokens
+gpt-6.1-sol    # $2 in / $10 out per 1M tokens
 ```
 
 ### `image-to-image`
 
 ```
-chatgpt-image-latest    # $5 in / $30 out per 1M tokens
-gpt-image-1
+chatgpt-image-latest    # $5 in / $32 out per 1M tokens
+gpt-image-1             # $5 in / $40 out per 1M tokens
 gpt-image-1-mini        # $2 in / $8 out per 1M tokens
 gpt-image-1.5           # $5 in / $32 out per 1M tokens
 gpt-image-2             # $5 in / $30 out per 1M tokens
@@ -265,7 +301,6 @@ gpt-image-2.5-sunburst  # $5 in / $30 out per 1M tokens
 sonar                # $1 in / $1 out per 1M tokens
 sonar-deep-research  # $2 in / $8 out per 1M tokens
 sonar-pro            # $3 in / $15 out per 1M tokens
-sonar-reasoning      # $1 in / $5 out per 1M tokens
 sonar-reasoning-pro  # $2 in / $8 out per 1M tokens
 ```
 
@@ -279,21 +314,30 @@ sonar-reasoning-pro  # $2 in / $8 out per 1M tokens
 
 ```
 QwQ-32B
+qwen-flash       # $0.05 in / $0.4 out per 1M tokens
 qwen-max         # $1.6 in / $6.4 out per 1M tokens
 qwen-plus        # $0.4 in / $1.2 out per 1M tokens
 qwen-turbo       # $0.05 in / $0.2 out per 1M tokens
 qwen3-235b-a22b  # $0.7 in / $2.8 out per 1M tokens
-qwen3-32b
+qwen3-32b        # $0.16 in / $0.64 out per 1M tokens
 qwen3-72b
 qwen3-max        # $1.2 in / $6 out per 1M tokens
 qwen3-vl-plus    # $0.2 in / $1.6 out per 1M tokens
+qwen3.5-plus     # $0.4 in / $2.4 out per 1M tokens
+qwen3.6-flash    # $0.25 in / $1.5 out per 1M tokens
+qwen3.6-plus     # $0.5 in / $3 out per 1M tokens
+qwen3.7-flash    # $0.03 in / $0.13 out per 1M tokens
+qwen3.7-max      # $2.5 in / $7.5 out per 1M tokens
+qwen3.7-plus     # $0.4 in / $1.6 out per 1M tokens
+qwen3.8-flash    # $0.15 in / $0.47 out per 1M tokens
+qwen3.8-max      # $2 in / $6 out per 1M tokens
 ```
 
 ### `text-to-image`
 
 ```
-wan2.2-t2i-flash
-wan2.2-t2i-plus
+wan2.2-t2i-flash  # per_image $0.025
+wan2.2-t2i-plus   # per_image $0.05
 ```
 
 ### `image-to-text`
@@ -307,9 +351,9 @@ qwen3-vl-plus  # $0.2 in / $1.6 out per 1M tokens
 ### `image-to-image`
 
 ```
-qwen-image-edit
-qwen-image-edit-max
-qwen-image-edit-plus
+qwen-image-edit       # per_image $0.045
+qwen-image-edit-max   # per_image $0.075
+qwen-image-edit-plus  # per_image $0.03
 ```
 
 ---
@@ -321,22 +365,23 @@ qwen-image-edit-plus
 ### `text-to-image`
 
 ```
-recraftv3
-recraftv3_vector
-recraftv4_1
-recraftv4_1_pro
+recraftv3                   # per_image $0.04
+recraftv3_vector            # per_image $0.08
+recraftv4_1                 # per_image $0.035
+recraftv4_1_flash           # per_image $0.007
+recraftv4_1_pro             # per_image $0.21
 recraftv4_1_utility
 recraftv4_1_utility_pro
 recraftv4_1_utility_vector
-recraftv4_1_vector
+recraftv4_1_vector          # per_image $0.08
 ```
 
 ### `image-to-image`
 
 ```
-recraft-vectorize
-recraftv3
-recraftv3_vector
+recraft-vectorize  # per_image $0.01
+recraftv3          # per_image $0.04
+recraftv3_vector   # per_image $0.08
 ```
 
 ---
@@ -366,37 +411,54 @@ reve-image
 ### `text-to-text`
 
 ```
-grok-3                     # $3 in / $15 out per 1M tokens
+grok-3                        # $1.25 in / $2.5 out per 1M tokens
 grok-3-fast
-grok-3-mini                # $0.3 in / $0.5 out per 1M tokens
-grok-4-0709                # $3 in / $15 out per 1M tokens
-grok-4-1-fast-reasoning    # $0.2 in / $0.5 out per 1M tokens
-grok-4-fast-non-reasoning  # $0.2 in / $0.5 out per 1M tokens
-grok-4-fast-reasoning      # $0.2 in / $0.5 out per 1M tokens
+grok-3-mini                   # $0.3 in / $0.5 out per 1M tokens
+grok-4-0709                   # $1.25 in / $2.5 out per 1M tokens
+grok-4-1-fast-reasoning       # $1.25 in / $2.5 out per 1M tokens
+grok-4-fast-non-reasoning     # $1.25 in / $2.5 out per 1M tokens
+grok-4-fast-reasoning         # $1.25 in / $2.5 out per 1M tokens
+grok-4.20-0309-non-reasoning  # $1.25 in / $2.5 out per 1M tokens
+grok-4.20-0309-reasoning      # $1.25 in / $2.5 out per 1M tokens
+grok-4.3                      # $1.25 in / $2.5 out per 1M tokens
+grok-4.5                      # $2 in / $6 out per 1M tokens
+grok-4.6                      # $2 in / $6 out per 1M tokens
+grok-4.7                      # $2 in / $6 out per 1M tokens
+grok-build-0.1                # $1 in / $2 out per 1M tokens
 ```
 
 ### `text-to-image`
 
 ```
-grok-imagine-image
+grok-imagine-image          # per_image $0.02
+grok-imagine-image-2.0      # per_image $0.04
+grok-imagine-image-quality  # per_image $0.05
 ```
 
 ### `image-to-text`
 
 ```
-grok-3                     # $3 in / $15 out per 1M tokens
+grok-3                        # $1.25 in / $2.5 out per 1M tokens
 grok-3-fast
-grok-3-mini                # $0.3 in / $0.5 out per 1M tokens
-grok-4-0709                # $3 in / $15 out per 1M tokens
-grok-4-1-fast-reasoning    # $0.2 in / $0.5 out per 1M tokens
-grok-4-fast-non-reasoning  # $0.2 in / $0.5 out per 1M tokens
-grok-4-fast-reasoning      # $0.2 in / $0.5 out per 1M tokens
+grok-3-mini                   # $0.3 in / $0.5 out per 1M tokens
+grok-4-0709                   # $1.25 in / $2.5 out per 1M tokens
+grok-4-1-fast-reasoning       # $1.25 in / $2.5 out per 1M tokens
+grok-4-fast-non-reasoning     # $1.25 in / $2.5 out per 1M tokens
+grok-4-fast-reasoning         # $1.25 in / $2.5 out per 1M tokens
+grok-4.20-0309-non-reasoning  # $1.25 in / $2.5 out per 1M tokens
+grok-4.20-0309-reasoning      # $1.25 in / $2.5 out per 1M tokens
+grok-4.3                      # $1.25 in / $2.5 out per 1M tokens
+grok-4.5                      # $2 in / $6 out per 1M tokens
+grok-4.6                      # $2 in / $6 out per 1M tokens
+grok-4.7                      # $2 in / $6 out per 1M tokens
 ```
 
 ### `image-to-image`
 
 ```
-grok-imagine-image
+grok-imagine-image          # per_image $0.02
+grok-imagine-image-2.0      # per_image $0.04
+grok-imagine-image-quality  # per_image $0.05
 ```
 <!-- /g:registry-models -->
 

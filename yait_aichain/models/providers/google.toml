@@ -49,11 +49,29 @@ low = 2048
 medium = 8192
 high = 24576
 
+# Prices: ai.google.dev pricing, read 2026-10-10. USD per 1M tokens; image
+# models per picture at 1K (the 4K tier of gemini-3-pro-image is $0.24).
+# gemini-3.1-flash-lite-preview was shut down 2026-05-25 and removed here;
+# gemini-3.1-flash-lite replaces it at the same price.
+
+# The 3.6 and 3.8 Flash prices double from 2027-01-01.
+[models."gemini-3.8-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.75, output = 3.75 }
+
+[models."gemini-3.6-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.75, output = 3.75 }
+
+[models."gemini-3.5-flash-lite"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.30, output = 2.50 }
+
 [models."gemini-3.1-pro-preview"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 2.0, output = 12.0 }
 
-[models."gemini-3.1-flash-lite-preview"]
+[models."gemini-3.1-flash-lite"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.25, output = 1.5 }
 
@@ -63,12 +81,24 @@ price = { input = 0.5, output = 3.0 }
 
 [models."gemini-3-pro-image"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.134 }
 
 [models."gemini-3.1-flash-image"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.067 }
 
+[models."gemini-nano-banana-2.1"]
+caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.0336 }
+
+[models."gemini-3.1-flash-lite-image"]
+caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.0336 }
+
+# Deprecated.
 [models."gemini-2.5-flash-image"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.039 }
 
 [models."gemini-2.5-pro"]
 caps  = ["image-to-text", "text-to-text"]

@@ -42,6 +42,19 @@ low = "deepseek-chat"
 medium = "deepseek-chat"
 high = "deepseek-reasoner"
 
+# Prices: api-docs.deepseek.com pricing, read 2026-10-10, at the peak rate —
+# off-peak hours bill half, which the estimate does not know about.
+[models."deepseek-flash"]
+caps  = ["text-to-text"]
+price = { input = 0.30, output = 1.20 }
+
+[models."deepseek-v4-pro"]
+caps  = ["text-to-text"]
+price = { input = 1.32, output = 3.96 }
+
+# Announced for discontinuation on 2026-07-24; they still answer (checked
+# 2026-10-10) and are no longer in the model list. Kept at their last listed
+# prices for code that names them.
 [models."deepseek-chat"]
 caps  = ["text-to-text"]
 price = { input = 0.27, output = 1.1 }

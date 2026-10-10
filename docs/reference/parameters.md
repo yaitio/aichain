@@ -121,7 +121,7 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 | `top_k` | sample only from the k most likely tokens | any | `anthropic`, `google` |
 | `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `perplexity`, `qwen`, `xai` |
 | `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `kimi`, `openai`, `qwen`, `xai` |
-| `cache_control` | cache the stable prefix so a repeated one is not re-billed | any | `anthropic` |
+| `cache_control` | cache the stable prefix so a repeated one is not re-billed: True, an int, or 'last' for an agent loop | any | `anthropic` |
 | `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | any | `anthropic` |
 
 ### Format keys
@@ -196,7 +196,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `thinkingBudget` | — |
 | `deepseek-chat` | ✓ | ✓ | — | ✓ | ⇄ `deepseek-chat → deepseek-reasoner` | — |
 | `deepseek-reasoner` | — | — | — | ✓ | — | — |
-| `kimi-k2-turbo-preview` | ✓ | ✓ | — | ✓ | ≈ `type` | — |
+| `kimi-k2.6` | ✓ | ✓ | — | ✓ | ≈ `type` | — |
 | `grok-3` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `grok-3-mini` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |

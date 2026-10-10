@@ -69,6 +69,12 @@ high = "high"
 # its prices. Rates given by the yait agents team on 2026-10-01, USD per 1M
 # tokens. `caps` mirror 5.6 and are an assumption, not a measurement: nobody
 # here has sent an image to one yet.
+# Prices: developers.openai.com/api/docs/pricing, read 2026-10-10. USD per
+# 1M tokens. `cache_read` where a cached prefix is not a tenth of the input.
+[models."gpt-6.1-sol"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 10.0, cache_read = 0.10 }
+
 [models."gpt-6-luna"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.10, output = 0.50 }
@@ -84,6 +90,8 @@ price = { input = 10.0, output = 50.0 }
 # GPT-5.6 — three tiers of one family rather than a size ladder; all three
 # carry the same 1.05M context and 128K output, and differ only in price and
 # depth. Terra and Luna were cut on 2026-07-30; these are the rates after.
+# Sol runs at a promotional 4.0/20.0 on 2026-10-10 with no end date given;
+# the standard rate is kept, as for every introductory price here.
 [models."gpt-5.6-sol"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 30.0 }
@@ -112,6 +120,7 @@ price = { input = 2.5, output = 15.0 }
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.75, output = 4.5 }
 
+# Deprecated; shuts down 2027-04-01.
 [models."gpt-5.4-nano"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.2, output = 1.25 }
@@ -119,6 +128,26 @@ price = { input = 0.2, output = 1.25 }
 [models."gpt-5.4-pro"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 30.0, output = 180.0 }
+
+[models."gpt-5.2"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.75, output = 14.0 }
+
+[models."gpt-5"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.25, output = 10.0 }
+
+[models."gpt-5-mini"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.25, output = 2.0 }
+
+[models."gpt-5-nano"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.05, output = 0.40 }
+
+[models."gpt-4.1"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 2.0, output = 8.0 }
 
 [models."gpt-4o"]
 caps  = ["image-to-text", "text-to-text"]
@@ -165,22 +194,25 @@ rejects = ["fidelity"]
 # what it would have done anyway.
 [models."gpt-image-2"]
 caps  = ["text-to-image", "image-to-image"]
-price = { input = 5.0, output = 30.0 }
+price = { input = 5.0, output = 30.0, image_input = 8.0 }
 rejects = ["fidelity"]
 
+# Deprecated, the next three; shut down 2026-12-01.
 # Always-current image model used by ChatGPT (alias to the latest snapshot).
 [models."chatgpt-image-latest"]
 caps  = ["text-to-image", "image-to-image"]
-price = { input = 5.0, output = 30.0 }
+price = { input = 5.0, output = 32.0, image_input = 8.0 }
 
 [models."gpt-image-1.5"]
 caps  = ["text-to-image", "image-to-image"]
-price = { input = 5.0, output = 32.0 }
+price = { input = 5.0, output = 32.0, image_input = 8.0 }
 
 [models."gpt-image-1-mini"]
 caps  = ["text-to-image", "image-to-image"]
-price = { input = 2.0, output = 8.0 }
+price = { input = 2.0, output = 8.0, image_input = 2.5 }
 rejects = ["fidelity"]
 
+# Shuts down 2026-10-23.
 [models."gpt-image-1"]
 caps  = ["text-to-image", "image-to-image"]
+price = { input = 5.0, output = 40.0, image_input = 10.0 }

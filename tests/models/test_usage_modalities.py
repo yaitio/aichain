@@ -91,5 +91,29 @@ class TestAddition(unittest.TestCase):
         self.assertEqual(total.image_input_tokens, 1024 + 258)
 
 
+class TestRatesAModelCarriesItself(unittest.TestCase):
+    """Prices the registry reads per model, not from a global rule (2026-10-10)."""
+
+    def test_a_cache_read_cheaper_than_a_tenth(self):
+        # Fable 5.1 reads at $0.25/M against $10/M fresh — a fortieth. The
+        # global tenth would bill a million cached tokens at $1.00.
+        u = Usage(cache_read_tokens=1_000_000)
+        self.assertAlmostEqual(estimate_cost(u, "claude-fable-5-1"), 0.25)
+        # A model without the field keeps the tenth.
+        self.assertAlmostEqual(estimate_cost(u, "claude-opus-4-8"), 0.50)
+
+    def test_past_the_long_context_line_the_whole_call_is_dearer(self):
+        short = Usage(input_tokens=100_000, output_tokens=1_000)
+        long_ = Usage(input_tokens=100_001, output_tokens=1_000)
+        self.assertAlmostEqual(estimate_cost(short, "claude-haiku-5-5"), 0.0105)
+        self.assertAlmostEqual(estimate_cost(long_, "claude-haiku-5-5"), 100_001 * 0.5e-6 + 0.0025)
+
+    def test_a_model_priced_by_the_picture_has_no_token_cost(self):
+        from yait_aichain.models._usage import price_per_image
+        self.assertIsNone(estimate_cost(Usage(input_tokens=10, output_tokens=10), "grok-imagine-image"))
+        self.assertEqual(price_per_image("grok-imagine-image"), 0.02)
+        self.assertIsNone(price_per_image("claude-haiku-5-5"))
+
+
 if __name__ == "__main__":
     unittest.main()

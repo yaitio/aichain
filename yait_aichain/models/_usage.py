@@ -197,7 +197,7 @@ def estimate_cost(usage: Usage, model_name: str,
                   cache_ttl: str = "5m") -> "float | None":
     """
     Estimate USD cost of *usage* for *model_name*, or ``None`` if the model
-    has no price entry in the provider data.
+    has no price per token in the provider data.
 
     Cached tokens are priced at their own rates. Folding them into the input
     line would overstate a long conversation's cost by close to an order of
@@ -208,26 +208,52 @@ def estimate_cost(usage: Usage, model_name: str,
     caller that asked for it; an unknown value is priced as the cheaper 5m
     rather than raising, since a cost estimate should never break a call.
 
-    Image input has its own rate where the provider charges one — ``price``
-    carries ``image_input`` then. Without it, an edit sending reference images
-    is billed at the text rate: measured on a real call, 22% under.
+    ``price`` may carry, beside ``input`` and ``output`` (USD per 1M):
+
+    * ``image_input`` — an image sent *in*, where it is dearer than text.
+      Without it an edit sending reference images is billed at the text rate:
+      measured on a real call, 22% under.
+    * ``cache_read`` — a reused prefix, where it is not the usual tenth of the
+      input rate. Claude 5.5 reads at a twentieth and Fable 5.1 at a fortieth;
+      priced at a tenth, a cached Fable 5.1 loop reads up to four times dear.
+    * ``long_context = {above, input, output}`` — the rates once the prompt
+      passes *above* tokens. Claude Haiku 5.5 charges five times as much past
+      100K, which is the difference between a cheap call and one that is not.
+
+    A model priced only ``per_image`` has no token rate and returns ``None``
+    here; the image tool prices it by the picture.
     """
     price = _price_of(model_name)
-    if price is None:
+    if price is None or "input" not in price or "output" not in price:
         return None
-    rate_in    = price["input"] / 1_000_000
+    rate_in, rate_out = price["input"], price["output"]
+    tier = price.get("long_context")
+    prompt = (usage.input_tokens + usage.image_input_tokens
+              + usage.cache_write_tokens + usage.cache_read_tokens)
+    if isinstance(tier, dict) and prompt > tier.get("above", float("inf")):
+        rate_in, rate_out = tier.get("input", rate_in), tier.get("output", rate_out)
+    rate_in /= 1_000_000
     # Falls back to the text rate: most models bill an image input at the
     # same price, and only those that do not carry the field.
     rate_img   = price.get("image_input", price["input"]) / 1_000_000
+    rate_read  = (price["cache_read"] / 1_000_000 if "cache_read" in price
+                  else rate_in * CACHE_READ_MULTIPLIER)
     write_mult = CACHE_WRITE_MULTIPLIERS.get(cache_ttl,
                                              CACHE_WRITE_MULTIPLIERS["5m"])
     return (
         usage.input_tokens  * rate_in
         + usage.image_input_tokens * rate_img
         + usage.cache_write_tokens * rate_in * write_mult
-        + usage.cache_read_tokens  * rate_in * CACHE_READ_MULTIPLIER
-        + usage.output_tokens / 1_000_000 * price["output"]
+        + usage.cache_read_tokens  * rate_read
+        + usage.output_tokens / 1_000_000 * rate_out
     )
+
+
+def price_per_image(model_name: str) -> "float | None":
+    """USD per picture for a model the provider prices by the image, else ``None``."""
+    price = _price_of(model_name)
+    value = price.get("per_image") if price else None
+    return float(value) if isinstance(value, (int, float)) else None
 
 
 def attach_cost(usage: Usage, model_name: str, cache_ttl: str = "5m") -> Usage:

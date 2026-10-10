@@ -39,14 +39,38 @@ max_tokens  = 4096
 [provider.default_notes]
 temperature = "unused · this provider renders images and reads neither of these"
 max_tokens  = "unused · this provider renders images and reads neither of these"
+
+# Prices: docs.bfl.ai pricing, read 2026-10-10 (1 credit = $0.01), per
+# picture at 1 megapixel. flux-2 models are billed by the megapixel, so a
+# larger picture costs more than this. No price is listed for flux-dev, the
+# rest of the flux-2 family or flux-3-image (tiered by resolution); each name
+# was checked to be an endpoint on 2026-10-10.
+[models."flux-3-image"]
+caps  = ["text-to-image"]
+
+[models."flux-2-max"]
+caps  = ["text-to-image"]
+
 [models."flux-2-pro"]
+caps  = ["text-to-image"]
+price = { per_image = 0.03 }
+
+[models."flux-2-flex"]
+caps  = ["text-to-image"]
+
+[models."flux-2-klein-9b"]
+caps  = ["text-to-image"]
+
+[models."flux-2-klein-4b"]
 caps  = ["text-to-image"]
 
 [models."flux-pro-1.1"]
 caps  = ["text-to-image"]
+price = { per_image = 0.04 }
 
 [models."flux-pro-1.1-ultra"]
 caps  = ["text-to-image"]
+price = { per_image = 0.06 }
 
 [models."flux-dev"]
 caps  = ["text-to-image"]
@@ -54,6 +78,8 @@ caps  = ["text-to-image"]
 # FLUX Kontext — context-aware editing (also generates from a bare prompt).
 [models."flux-kontext-pro"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.04 }
 
 [models."flux-kontext-max"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.08 }

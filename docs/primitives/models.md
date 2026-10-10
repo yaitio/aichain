@@ -168,7 +168,7 @@ Model("qwen-max", client_options={"region": "us"})
 ### The registry — discovering models
 
 The registry is **reference data**. Query it to discover what the library ships
-and is tested with (<!-- g:count-models -->93 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
+and is tested with (<!-- g:count-models -->131 models from 11 cloud providers<!-- /g:count-models --> — the `private` provider
 deliberately lists none, because its catalogue belongs to your server):
 
 ```python
@@ -231,14 +231,14 @@ current lists live in `models/providers/*.toml` and the
 
 | Provider | Env var | Representative models |
 |---|---|---|
-| OpenAI | `OPENAI_API_KEY` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-4o`, `gpt-image-2` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-5`, `claude-sonnet-5`, `claude-fable-5`, `claude-haiku-4-5-20251001` |
-| Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash` |
-| xAI | `XAI_API_KEY` | `grok-4-0709`, `grok-4-fast-reasoning`, `grok-3`, `grok-imagine-image-pro` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.5` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` |
+| Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-3-flash-preview` |
+| xAI | `XAI_API_KEY` | `grok-4.7`, `grok-4.3`, `grok-build-0.1` |
 | Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
-| Kimi | `MOONSHOT_API_KEY` | `kimi-k3`, `kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
-| Qwen | `DASHSCOPE_API_KEY` | `qwen3-max`, `qwen-max`, `qwen-vl-max`, `wan2.2-t2i-flash`, `qwen-image-edit` |
+| Kimi | `MOONSHOT_API_KEY` | `kimi-k3`, `kimi-k2.7-code`, `kimi-k2.6` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-flash`, `deepseek-v4-pro` |
+| Qwen | `DASHSCOPE_API_KEY` | `qwen3.8-max`, `qwen3.7-plus`, `qwen3.8-flash`, `qwen3-vl-plus` |
 | Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
 | BFL (FLUX) | `BFL_API_KEY` | `flux-2-pro`, `flux-pro-1.1`, `flux-kontext-pro`, `flux-kontext-max` *(image only)* |
 | Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](../getting-started/private-models.md) |

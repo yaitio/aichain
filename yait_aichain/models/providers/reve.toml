@@ -72,5 +72,8 @@ max_tokens  = 4096
 [provider.default_notes]
 temperature = "unused · this provider renders images and reads neither of these"
 max_tokens  = "unused · this provider renders images and reads neither of these"
+# Not answering on 2026-10-10: POST /v1/image/create and /v1/image/edit return
+# HTTP 405 and the API root redirects to the app; third-party reports date the
+# API's end to 2026-08-14. Kept until Reve says so itself.
 [models."reve-image"]
 caps  = ["text-to-image", "image-to-image"]

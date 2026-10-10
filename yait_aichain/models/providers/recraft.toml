@@ -54,11 +54,21 @@ max_tokens  = 4096
 [provider.default_notes]
 temperature = "unused · this provider renders images and reads neither of these"
 max_tokens  = "unused · this provider renders images and reads neither of these"
+# Prices: recraft.ai/docs pricing, read 2026-10-10, per picture (per
+# operation for vectorize). The utility models have no listed price, and
+# recraftv4_1_utility_vector is absent from the model list on 2026-10-10.
 [models."recraftv4_1"]
 caps  = ["text-to-image"]
+price = { per_image = 0.035 }
+
+# The fastest and cheapest of V4.1.
+[models."recraftv4_1_flash"]
+caps  = ["text-to-image"]
+price = { per_image = 0.007 }
 
 [models."recraftv4_1_vector"]
 caps  = ["text-to-image"]
+price = { per_image = 0.08 }
 
 # V4.1 variants (live-verified model names, 2026-06): `utility` is the
 # controlled raster model (flat light, front-facing, product/icon/e-commerce);
@@ -71,6 +81,7 @@ caps  = ["text-to-image"]
 
 [models."recraftv4_1_pro"]
 caps  = ["text-to-image"]
+price = { per_image = 0.21 }
 
 [models."recraftv4_1_utility_vector"]
 caps  = ["text-to-image"]
@@ -81,9 +92,12 @@ caps  = ["text-to-image"]
 # image-to-image (input image in, image out); 10 credits/op (verified live).
 [models."recraft-vectorize"]
 caps  = ["image-to-image"]
+price = { per_image = 0.01 }
 
 [models."recraftv3"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.04 }
 
 [models."recraftv3_vector"]
 caps  = ["text-to-image", "image-to-image"]
+price = { per_image = 0.08 }

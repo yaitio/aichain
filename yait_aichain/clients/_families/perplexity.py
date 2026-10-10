@@ -16,7 +16,7 @@ from .._errors import APIError
 
 # Fallback only — used when the live /v1/models call fails (e.g. offline).
 _KNOWN_MODELS = [
-    "sonar", "sonar-pro", "sonar-reasoning",
+    "sonar", "sonar-pro",
     "sonar-reasoning-pro", "sonar-deep-research", "r1-1776",
 ]
 

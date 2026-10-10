@@ -38,17 +38,17 @@ no key at all (see [Private models](../getting-started/private-models.md)).
 
 <!-- g:env-resolve -->
 ```python
-Model("claude-fable-5")        # reads ANTHROPIC_API_KEY
-Model("flux-2-pro")            # reads BFL_API_KEY
-Model("deepseek-chat")         # reads DEEPSEEK_API_KEY
-Model("gemini-2.5-flash")      # reads GOOGLE_AI_API_KEY
-Model("kimi-k2-0905-preview")  # reads MOONSHOT_API_KEY
-Model("gpt-4o")                # reads OPENAI_API_KEY
-Model("sonar")                 # reads PERPLEXITY_API_KEY
-Model("QwQ-32B")               # reads DASHSCOPE_API_KEY
-Model("recraft-vectorize")     # reads RECRAFT_API_TOKEN
-Model("reve-image")            # reads REVE_API_KEY
-Model("grok-3")                # reads XAI_API_KEY
+Model("claude-fable-5")     # reads ANTHROPIC_API_KEY
+Model("flux-2-flex")        # reads BFL_API_KEY
+Model("deepseek-chat")      # reads DEEPSEEK_API_KEY
+Model("gemini-2.5-flash")   # reads GOOGLE_AI_API_KEY
+Model("kimi-k2.6")          # reads MOONSHOT_API_KEY
+Model("gpt-4.1")            # reads OPENAI_API_KEY
+Model("sonar")              # reads PERPLEXITY_API_KEY
+Model("QwQ-32B")            # reads DASHSCOPE_API_KEY
+Model("recraft-vectorize")  # reads RECRAFT_API_TOKEN
+Model("reve-image")         # reads REVE_API_KEY
+Model("grok-3")             # reads XAI_API_KEY
 
 Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 ```

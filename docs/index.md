@@ -55,7 +55,7 @@ Model("gemini-2.0-flash")    # Google
 Model("grok-3")              # xAI
 Model("sonar-pro")           # Perplexity (with live web search)
 Model("gpt-image-1")         # OpenAI image generation
-Model("kimi-k2.5")           # Kimi
+Model("kimi-k2.6")           # Kimi
 Model("deepseek-chat")       # DeepSeek
 ```
 

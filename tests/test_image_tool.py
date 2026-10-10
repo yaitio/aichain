@@ -127,9 +127,18 @@ class TestTheResult(unittest.TestCase):
     def test_an_unknown_price_is_said(self):
         fake, _ = _run_with({"base64": PNG, "mime_type": "image/png"})
         with fake:
-            out = image("xai", model="grok-imagine-image").run("x")
+            out = image("bfl", model="flux-dev").run("x")
         self.assertIsNone(out["cost"])
         self.assertIn("not known", out["cost_basis"])
+
+    def test_a_price_per_picture_when_no_usage_is_reported(self):
+        # xAI reports no tokens for a picture; the registry's $0.02 stands in,
+        # and the basis says it is the base size's rate, not a measurement.
+        fake, _ = _run_with({"base64": PNG, "mime_type": "image/png"})
+        with fake:
+            out = image("xai", model="grok-imagine-image").run("x")
+        self.assertEqual(out["cost"], 0.02)
+        self.assertIn("price per image", out["cost_basis"])
 
     def test_only_notices_that_change_what_was_asked(self):
         a = [SimpleNamespace(kind="translated", option="aspect_ratio", why="this provider's word"),

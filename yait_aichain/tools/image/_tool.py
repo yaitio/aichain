@@ -18,6 +18,7 @@ import time
 import warnings
 
 from .._base import Record, Tool
+from ...models._usage import price_per_image
 
 #: The image vocabulary of the model layer — `output["format"]` keys every
 #: image provider is asked in (models._options.UNIVERSAL_FORMAT).
@@ -102,12 +103,17 @@ class Image(Tool):
             picture["path"] = self._save(picture)
         usage = skill.last_usage
         cost = getattr(usage, "cost", None)
+        basis = "the provider's reported usage, at the registry's rate"
+        if cost is None and (each := price_per_image(self.model)) is not None:
+            # Priced by the picture: the registry holds the base size's rate,
+            # so a larger picture on a tiered model costs more than this says.
+            cost, basis = each, "the registry's price per image, at the base size"
         # "translated" is an option passed exactly, in the provider's word; the
         # rest change what was asked — those are what a reader needs to know.
         notices = [_notice(a) for a in skill.last_adaptations if getattr(a, "kind", "") != "translated"]
         return Record({"images": [picture], "model": self.model, "service": self.service, "notices": notices,
                        "cost": cost,
-                       "cost_basis": ("the provider's reported usage, at the registry's rate" if cost is not None
+                       "cost_basis": (basis if cost is not None
                                       else f"not known — {self.service} reports no usage for {self.model} "
                                            "and the registry has no price for it"),
                        "usage": _usage_dict(usage)}, self.render)

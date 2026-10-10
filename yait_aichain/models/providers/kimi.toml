@@ -42,6 +42,10 @@ low = "enabled"
 medium = "enabled"
 high = "enabled"
 
+# Prices: platform.kimi.ai pricing, read 2026-10-10. The k2 series was
+# discontinued 2026-05-25 and kimi-k2.5 on 2026-08-31; both were removed
+# here on 2026-10-10 (the API answers 404 or refuses them).
+
 # Flagship: 1M context, and the first Kimi priced like a frontier model —
 # output at 15.0 is nearly four times k2.6, and every reply carries a
 # reasoning trace billed at that same output rate, so a short answer is not a
@@ -57,21 +61,10 @@ price = { input = 3.0, output = 15.0 }
 caps  = ["text-to-text"]
 price = { input = 0.95, output = 4.0 }
 
-[models."kimi-k2-0905-preview"]
+# The same model served faster, at twice the price.
+[models."kimi-k2.7-code-highspeed"]
 caps  = ["text-to-text"]
-price = { input = 0.6, output = 2.5 }
-
-[models."kimi-k2-turbo-preview"]
-caps  = ["text-to-text"]
-
-[models."kimi-k2-thinking"]
-caps  = ["text-to-text"]
-
-[models."kimi-k2-thinking-turbo"]
-caps  = ["text-to-text"]
-
-[models."kimi-k2.5"]
-caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.9, output = 8.0 }
 
 [models."kimi-k2.6"]
 caps  = ["image-to-text", "text-to-text"]
