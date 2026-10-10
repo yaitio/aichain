@@ -30,8 +30,11 @@ data, with the same option vocabulary and the same notices.
 ### Deprecated
 
 - **A `Skill` with an image model** — `Skill(Model("gpt-image-1.5"),
-  output={"modalities": ["image"], …})` — warns with a `DeprecationWarning`
-  pointing at `image(...)`, and raises in 4.0. It works as before until then.
+  output={"modalities": ["image"], …})` — warns with an `ImageSkillWarning`, a
+  `FutureWarning`, pointing at `image(...)`, and raises in 4.0. It works as
+  before until then. A `DeprecationWarning` was the first choice and was found
+  hidden when the examples were run: Python shows one only when it is raised
+  from `__main__`, and this one is raised in the library.
 
 ## [3.8.0] — 2026-10-10
 

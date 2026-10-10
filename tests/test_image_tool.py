@@ -148,8 +148,12 @@ class TestTheOldWay(unittest.TestCase):
             warnings.simplefilter("always")
             Skill(Model("grok-imagine-image"), prompt="x",
                   output={"modalities": ["image"], "format": {"type": "image"}})
-        self.assertTrue(any("raises in 4.0" in str(w.message) and issubclass(w.category, DeprecationWarning)
-                            for w in seen))
+        mine = [w for w in seen if "raises in 4.0" in str(w.message)]
+        self.assertTrue(mine)
+        # Shown by default — a DeprecationWarning from library code is not —
+        # and pointing at the caller's line, not at the library's wrapper.
+        self.assertTrue(issubclass(mine[0].category, FutureWarning))
+        self.assertEqual(os.path.basename(mine[0].filename), "test_image_tool.py")
 
     def test_the_tools_own_skill_does_not(self):
         fake, _ = _run_with({"base64": PNG, "mime_type": "image/png"})
