@@ -1,56 +1,33 @@
 # Installation
 
-## Library
-
 ```bash
 pip install yait-aichain
 ```
 
-Optional extras — install only what you need:
+One dependency comes with it, `urllib3`, which most Python environments
+already have. Nothing else is installed until you use what needs it — a
+library meant to run in a serverless function cannot bring a hundred
+megabytes it might not use.
 
-```bash
-pip install yait-aichain[convert]   # file/URL → Markdown (markitdown)
-pip install yait-aichain[yaml]      # save & load Skills and Chains (pyyaml)
-pip install yait-aichain[mcp]       # MCP server integration (fastmcp)
-pip install yait-aichain[all]       # everything above
-```
+## Extras, when you need them
 
-Or install extras individually:
-
-```bash
-pip install markitdown   # file/URL → Markdown
-pip install pyyaml       # Skill.save() / Chain.save() / load()
-pip install fastmcp      # MCP server integration
-```
-
----
-
-## Dependencies
-
-All HTTP calls use `urllib3`. It ships with most Python environments — if missing:
-
-```bash
-pip install urllib3
-```
-
-### Optional — by feature
-
-| Feature | Package | Install |
+| You use | Install | Brings |
 |---|---|---|
-| A page by URL on this machine, `fetch("local")` | markitdown | `pip install "yait-aichain[fetch]"` |
-| Save & load Skills/Chains | pyyaml | `pip install "yait-aichain[yaml]"` |
-| MCP server tools | fastmcp | `pip install "yait-aichain[mcp]"` |
+| `Skill.save()` / `Chain.save()` and `load()` | `pip install "yait-aichain[yaml]"` | `pyyaml` |
+| the `MCP` utility | `pip install "yait-aichain[mcp]"` | `fastmcp` |
+| `fetch("local")` — reading a page on this machine | `pip install "yait-aichain[fetch]"` | `markitdown` |
+| all three | `pip install "yait-aichain[all]"` | |
 
-Converting files to Markdown, HTML or PDF left the library in 3.8.0; the
-cookbooks show it done with MarkItDown, mistletoe and WeasyPrint directly.
+A vector store's own client — Chroma, Pinecone, Qdrant — is installed only if
+you use that backend. Converting files to Markdown, HTML or PDF left the
+library in 3.8.0; the cookbooks show it done with MarkItDown, mistletoe and
+WeasyPrint directly.
 
----
+## Keys
 
-## API keys
-
-Set keys only for the providers you use — or none at all: a model you host
-yourself needs no key and sends nothing outside your network. See
-[Private models](../models/private-models.md).
+Set keys only for the providers and services you use — or none at all: a model
+on your own server needs no key and sends nothing outside your network.
+→ [Private models](../models/private-models.md)
 
 <!-- g:install-keys -->
 | Service | Environment variable | Get a key |
@@ -75,44 +52,21 @@ yourself needs no key and sends nothing outside your network. See
 | Voyage | `VOYAGE_API_KEY` | <https://dash.voyageai.com> |
 <!-- /g:install-keys -->
 
-Set for the current session:
+The library does not read `.env` files by itself:
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
+set -a && source .env && set +a
 ```
 
-Or put them all in a `.env` file:
+Keys are never written by `save()`; a saved Skill or Chain names its model, and
+the key is read from the environment again when it is loaded. Every variable,
+and which tool reads which: [Environment variables](../reference/environment-variables.md).
+
+## Check it works
 
 ```bash
-# .env
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-export GOOGLE_AI_API_KEY="AIza..."
+python -c "from yait_aichain import Model, Skill; print('ok')"
+python examples/01_skill.py          # one real call; needs ANTHROPIC_API_KEY
 ```
 
-```bash
-source .env
-```
-
-> Keys are **never** written to YAML files by `save()`. They are always resolved from environment variables at load time.
-
----
-
-## Verify installation
-
-```bash
-python -c "from models import Model; from skills import Skill; print('OK')"
-```
-
-Or run a live example (requires `ANTHROPIC_API_KEY`):
-
-```bash
-python examples/simple/01_skill.py
-```
-
-Expected output:
-```
-Machine learning is a branch of artificial intelligence that enables computers
-to learn from data and improve their performance without being explicitly programmed.
-```
+Python 3.10 or later; the library is tested on 3.10 through 3.14.

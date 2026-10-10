@@ -1,6 +1,6 @@
 # API: vectors
 
-Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../utilities/vectors.md).
+Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../utilities/index.md).
 
 <!-- g:tool -->
 ## `Vectors`

@@ -1,3 +1,13 @@
+# Search
+
+A model knows what it was trained on; a search tells it what is on the web
+today. Six providers sell the same thing, and the choice between them is
+real — what each returns, how well it dates a page, what a call costs.
+
+→ Every parameter: [API: search](../api/tools/search.md)
+
+---
+
 ## One format, six providers
 
 The providers sell the same thing — ranked pages for a query, filtered by

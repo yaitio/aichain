@@ -1,450 +1,154 @@
 # Skill
 
-A **Skill** is the smallest unit that does real work: one model + one prompt
-template + one declared output. Everything else — Chain, Pool, Agent — composes
-Skills.
+A Skill is one call to a model, made reusable: a model, a prompt template and
+the shape of the answer you expect. It is the smallest thing in the library
+that does work, and everything larger — a Chain, a Pool, an Agent — is built
+from Skills or calls models the way a Skill does.
+
+```python
+from yait_aichain import Model, Skill
+
+summarise = Skill(Model("claude-haiku-5-5"), prompt="Summarise in one line: {text}")
+summarise.run(variables={"text": "…"})          # a str
+```
+
+Building a Skill sends nothing. It is a template; only `run()` calls the model,
+and the same Skill runs as many times as you like with different variables.
+
+→ Every parameter: [API: Skill](../api/skill.md)
 
 ---
 
-## Quick start
+## One message format for every provider
 
-Bind a model to a prompt with `{placeholders}`, then run it with values:
-
-```python
-import os
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
-
-skill = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    input = {"messages": [{"role": "user", "parts": ["What is {topic} in one sentence?"]}]},
-)
-
-print(skill.run(variables={"topic": "gravity"}))   # -> a string
-```
-
-`run()` returns a **string** for text output (a **dict** for JSON or image —
-see [Output formats](#output-formats)).
-
-▶ Runnable: [`examples/01_skill.py`](../../examples/01_skill.py) ·
-Swap providers: [`examples/02_skill_models.py`](../../examples/02_skill_models.py) ·
-Deep dive ↓
-
----
-
-## Common gotchas
-
-- **A skill is a template, not a result.** Building it makes no network call;
-  only `run()` does. The same skill can be run many times with different
-  variables.
-- **An unknown `{placeholder}` is left in the text verbatim** — it is *not* an
-  error and *not* blanked out. If you see a literal `{topic}` in the output, the
-  variable name didn't match. (This is deliberate — see
-  [Variables & substitution](#variables--substitution).)
-- **`parts` can be a bare string** (`["Hello {name}"]`) as shorthand, or the
-  full `{"type": "text", "text": "…"}` form. Both work; mix freely.
-- **The result type follows `output`**: text → `str`, json/json_schema → `dict`,
-  image → `dict` with a base64 payload. Don't `str()` a JSON result.
-- **Keys never touch YAML.** `save()` stores the model *name*; the key is
-  re-resolved from the environment on `load()`.
-
----
-
-## The short form
-
-One user message, one text part — the commonest shape there is:
+A prompt is written once, as messages with a `role` and a list of `parts`:
 
 ```python
-skill = Skill(Model("gpt-4o"), prompt="Summarise: {text}")
-skill.run(variables={"text": "..."})
-```
-
-`input=` stays the only way to say anything else: a system message, several
-turns, an image. That is deliberate — a shortcut that grows options becomes a
-second input format, and two ways to say one thing is how documentation and
-code drift apart. Passing both raises rather than merging, because which one
-the model should see would be a guess.
-
-## A ceiling in money
-
-`max_tokens` bounds one reply; nobody budgets in replies. `max_cost` bounds
-what a run may spend, in the unit that appears on the invoice, and every
-primitive takes it:
-
-```python
-from yait_aichain import Budget, BudgetExceeded
-
-budget = Budget(0.50)                       # or max_cost=0.50 for one of them
-chain  = Chain(steps=[...], max_cost=budget)
-
-try:
-    chain.run()
-except BudgetExceeded:
-    pass                                    # what completed is still there
-print(budget.spent, budget.remaining)
-```
-
-**One object, shared.** A budget handed to a `Chain` covers the `Agent` inside
-it and the `Skill` inside that, because they decrement the same thing. Copies
-would let every level spend the full amount, which is the failure the shape
-exists to avoid — and it is why a `Pool`, whose items run concurrently, needs
-this rather than a number.
-
-**It bounds beginning, not exceeding.** The length of a reply is not known
-before it is paid for, so the first call always runs and the ceiling refuses
-the *next* one. A budget promising "never exceed by a cent" would be lying
-about the one number a caller checks. `cost_budget` in an agent's `stop_when`
-carries the same caveat and composes with this: one ends the loop between
-turns, the other refuses a call.
-
-**Exhaustion raises.** Returning what finished with a flag set is how a
-truncated run gets read as a complete one; catch `BudgetExceeded` and read
-`last_usage` if you want the partial result.
-
-## Streaming
-
-`run()` waits for the whole answer; `stream()` yields it as it arrives. Same
-request, same cost — a second way to spend it, not a replacement.
-
-```python
-skill = Skill(model=Model("gpt-4o"), input={"messages": [...]})
-
-for piece in skill.stream():
-    print(piece, end="", flush=True)
-
-skill.last_result   # the whole answer, parsed when the format asks for JSON
-skill.last_usage    # what the provider reported, or None if it reported nothing
-```
-
-Four things differ from `run()`, and all four are deliberate.
-
-**Retries stop at the first piece; there is no fallback chain.** Both work by
-discarding the attempt and starting over, which is impossible once the caller
-has seen something. A transient failure (429, 5xx, network) therefore retries
-while the attempt is still discardable — exactly as `run()` does — and is
-raised once it is not. *Before the first piece* is not a "sometimes": it is a
-state you can see, because nothing has been yielded. The fallback chain stays
-out on purpose: a second model is a different answer, not a retry of this one,
-and swapping models mid-sentence is not a thing to do quietly.
-
-> **Changed in 2.8.0.** 2.5.0 refused to retry a stream at all, on the
-> reasoning that such a rule "holds sometimes". That was wrong, and the agent
-> needed it: its loop retries every model call because a loop that does not
-> pays for each transient blip with a lost decision.
-
-**Usage may be `None`.** It is asked for explicitly and reported by most
-providers; where one does not, nothing is invented. A token count derived
-from the text we happened to see is a number with no provider behind it.
-
-**JSON is parsed at the end, not on the way.** Pieces arrive as text, and
-`last_result` holds the parsed value once the stream completes. An answer
-that does not parse keeps its text rather than becoming `None`: the caller has
-already seen it and can say what arrived better than a swallowed exception.
-
-**Tool calls stream too.** A call does not arrive as a call — an id and a
-name land once, then the arguments trickle in as fragments of a JSON string,
-and two calls in one turn interleave. They are reassembled and `last_result`
-holds the `ToolCallRequest`, with any prose the model sent beside them yielded
-as it arrived and kept on `.text`. The call itself is never yielded: the
-pieces are what a caller prints, and a decision is not prose.
-
-**A provider that cannot stream still answers.** Image endpoints have nothing
-to deliver progressively, and two of OpenAI's own paths speak a different
-event vocabulary. Rather than raise — a library that raises on a provider gap
-is one you cannot swap a provider under — the whole answer arrives as one
-piece and a `declined` is recorded:
-
-```python
-skill.last_adaptations   # [Adaptation(kind="declined", option="stream", …)]
-```
-
-That matters because one chunk at the end *looks* like a working stream. A
-caller who needs the real thing says so once, at the model:
-
-```python
-Model("gpt-5.5", on_unsupported="requirements")   # raises instead
-```
-
-## Reference
-
-### How a Skill runs
-
-When you call `skill.run(variables=...)`, four things happen, in order:
-
-1. **Substitute.** Every `{placeholder}` in the input template's text parts is
-   replaced from the merged variables ([details](#variables--substitution)).
-2. **Translate.** The model converts the now-filled universal template into the
-   provider's native request shape — OpenAI `messages`, Anthropic `messages`,
-   Google `contents`, an image-generation body, etc. This is why the *same*
-   `input` works on every provider: you write it once, the model layer adapts
-   it. You never write provider-specific payloads.
-3. **Send.** The request goes out through the model's client. Transient failures
-   are retried and, if you gave a model list, fall back to the next model
-   ([Fallback chains](#fallback-chains)).
-4. **Parse.** The raw response is turned into the declared `output` type — a
-   string, a parsed/validated dict, or an image dict — and token usage is
-   recorded on `skill.last_usage` ([Token usage & cost](#token-usage--cost)).
-
-Holding this four-step model in mind explains every parameter below.
-
-### Constructor
-
-```python
-Skill(model, input, output=None, variables=None, options=None,
-      name=None, description=None, max_retries=0, retry_delay=2.0)
-```
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `model` | `Model` \| `list[Model]` | — | The model that runs the skill. A **list** is a [fallback chain](#fallback-chains). |
-| `input` | `dict` | — | Provider-agnostic message template. See [The input template](#the-input-template). |
-| `output` | `dict` \| `None` | `None` | Declares the response format. `None`/`{}` = plain text. See [Output formats](#output-formats). |
-| `variables` | `dict` \| `None` | `None` | Default placeholder values, merged with (and overridden by) `run()`'s `variables`. |
-| `options` | `dict` \| `None` | `None` | Per-call model setting overrides (e.g. `{"temperature": 0.2}`) layered on top of the model's own configuration for this skill. |
-| `name` | `str` \| `None` | `None` | Identifier used in `Chain.history` and YAML persistence. |
-| `description` | `str` \| `None` | `None` | Free-text note; surfaced to an Agent when the skill is used as a tool. |
-| `max_retries` | `int` | `0` | Retries on the **same** model for transient errors, with exponential backoff. |
-| `retry_delay` | `float` | `2.0` | Base backoff seconds (doubled each attempt). |
-
-### The input template
-
-The input is a list of messages; each message has a `role`
-(`system` / `user` / `assistant`) and a list of `parts`. A part is either a
-plain string (shorthand for a text part) or an explicit
-`{"type": "text", "text": "…"}` object.
-
-```python
-input = {
-    "messages": [
-        {"role": "system", "parts": ["You are a translator."]},
-        {"role": "user",   "parts": ["Translate {text} into {language}."]},
-    ]
-}
-```
-
-This is the library's **one universal format**. You never write OpenAI's
-`messages`, Anthropic's `system`+`messages` split, or Google's `contents` by
-hand — the model layer translates this shape into each provider's native
-request (step 2 above). Swapping `Model("gpt-4o")` for
-`Model("claude-sonnet-4-6")` changes nothing about your `input`.
-
-**Multimodal input.** Image and audio parts carry a `source`, either a URL or
-inline base64:
-
-```python
-{"role": "user", "parts": [
-    "Describe this image.",
-    {"type": "image", "source": {"kind": "url", "url": "https://example.com/photo.jpg"}},
-    # inline alternative:
-    # {"type": "image", "source": {"kind": "base64", "mime": "image/png", "data": "<b64>"}},
+input = {"messages": [
+    {"role": "system", "parts": ["You are a translator."]},
+    {"role": "user",   "parts": ["Translate {text} into {language}."]},
 ]}
 ```
 
-Whether a given model accepts image input depends on its capabilities — see
-[Models](../models/models.md) for the per-provider vision support.
+That is the only format you write. OpenAI's `messages`, Anthropic's split
+between `system` and `messages`, Google's `contents` are the model layer's job,
+which is why changing `Model("claude-haiku-5-5")` to `Model("gpt-6-luna")`
+changes nothing about the prompt. An image goes in the same list, as a part
+with a `source` — a URL or base64.
 
-### Multi-turn (directed reasoning)
+`prompt="…"` is a shortcut for the commonest case: one user message, one text
+part. Anything more — a system message, several turns, an image — is `input=`.
+The shortcut stays that small on purpose. A shortcut that grows options becomes
+a second input format, and two ways to say one thing is how code and
+documentation drift apart. Giving both raises, because which one the model
+should see would be a guess.
 
-*Since 1.5.0.* When the template has several `user` turns separated by **"generate
-here" markers** — an `assistant` turn with **no** `parts` — the Skill runs them as
-a sequence: each marker is one model call, and its reply is appended to the
-running context so later turns see it. This is *directed* reasoning — you author
-the steps (unlike an [Agent](../agents/overview.md), which decides them).
+## Placeholders are replaced safely, not formatted
 
-```python
-Skill(model=Model("claude-sonnet-4-6"), input={"messages": [
-    {"role": "system",    "parts": ["Be concise."]},
-    {"role": "user",      "parts": ["Write 10 quotes about {topic}."]},
-    {"role": "assistant"},                                  # ← generate, keep in context
-    {"role": "user",      "parts": ["Drop the 5 most clichéd, write 5 fresh."]},
-    {"role": "assistant"},                                  # ← generate, keep in context
-    {"role": "user",      "parts": ["Translate the result into {language}."]},
-]}).run(variables={"topic": "perseverance", "language": "French"})
-```
+`{name}` is filled from the variables — the Skill's own defaults, overridden by
+the ones passed to `run()`. Only a bare `{identifier}` that has a value is
+replaced. Everything else passes through untouched:
 
-Rules:
+- an unknown `{topic}` stays in the text as `{topic}`, so a typo shows up in
+  the output instead of vanishing into an empty string;
+- literal braces — a JSON example in the prompt, LaTeX, code — need no escaping,
+  and braces a model writes are never mangled.
 
-- `assistant` **with** `parts` → a fixed/seed turn (few-shot example or a default
-  answer): used as-is, **no model call**.
-- `assistant` **without** `parts` → the generate marker (one model call).
-- A trailing `user` turn triggers an implicit final call — its reply is the
-  return value, and it uses the skill's `output` format. Intermediate calls are
-  plain text (they only feed the context).
-- `skill.history` lists each generated turn (`history[-1]` is the return);
-  `skill.last_usage` sums across turns.
-- **Backward compatible:** with no markers, the messages are sent in one call,
-  exactly as before.
+This is not Python's `str.format`, deliberately: a prompt is full of braces
+that are not placeholders.
 
-Validated at construction (`ValueError`): the messages must contain at least one
-`user` turn, must not start with an `assistant`, and must not have two `assistant`
-turns in a row. Valid shape: `[system?] user (assistant user)*`.
+## The answer has the shape you declared
 
-### Variables & substitution
+`output` says what comes back, and the library both steers the provider and
+shapes the return value:
 
-Variables come from two places and are merged, **call-time wins**:
+| `output` | `run()` returns |
+|---|---|
+| nothing, or `{"format": {"type": "text"}}` | a `str` |
+| `{"format": {"type": "json"}}` | a `dict` — the provider is asked for JSON, and the reply is parsed |
+| `{"format": {"type": "json_schema", "schema": {…}}}` | a `dict` matching your schema — sent to the provider as a constraint, checked again on return |
 
-1. `Skill(variables=...)` — defaults baked into the skill.
-2. `skill.run(variables=...)` — overrides for this one call.
+Use `json` when you want valid JSON and will read it loosely. Use
+`json_schema` when code depends on the keys and types: correctness then comes
+from the schema rather than from prompt wording. A reply cut off at the token
+ceiling raises `TruncatedResponseError`, and one that arrived whole but does
+not match raises `InvalidStructuredOutputError` naming where — two different
+problems, told apart.
 
-```python
-skill = Skill(model=model, input=..., variables={"language": "English"})
-skill.run()                                  # language = English
-skill.run(variables={"language": "French"})  # language = French
-skill.run(variables={"text": "Hello"})       # text set; language still English
-```
+Images are not a Skill's job any more: an image model is a tool,
+`image(service, model=…)`. → [Images](../tools/media.md)
 
-Substitution is intentionally **safe and minimal**, not Python's `str.format`:
+## Several turns you direct
 
-- Only a bare `{identifier}` whose key exists in the variables is replaced.
-- An **unknown placeholder is left untouched** — `{topic}` with no `topic`
-  variable stays the literal text `{topic}`. A typo surfaces visibly in the
-  output instead of vanishing or raising.
-- **Literal braces pass through unchanged**, so your prompt can contain JSON
-  examples (`{"role": "user"}`), LaTeX, or code without escaping anything, and
-  model-generated braces never get mangled.
-
-That trade — visible-on-typo plus brace-safe — is why missing variables are not
-turned into empty strings.
-
-### Output formats
-
-`output` declares what you expect back, and the library both *steers the
-provider* and *shapes the return value* accordingly.
-
-| `output` | Returns | What the library does |
-|---|---|---|
-| `None` / `{}` / `{"format": {"type": "text"}}` | `str` | Plain completion, returned verbatim. |
-| `{"format": {"type": "json"}}` | `dict` | Tells the provider to emit JSON, then parses it. Raises `ValueError` if the reply isn't valid JSON. |
-| `{"format": {"type": "json_schema", "schema": {…}}}` | `dict` | As above, plus the response is constrained to (and validated against) your JSON Schema. |
-| `{"modalities": ["image"], "format": {"type": "image", "size": "1536x1024"}}` | `dict` | Routes to the provider's image endpoint; returns `{"base64", "mime_type", …}`. |
-
-**JSON vs JSON Schema.** Use `json` when you just want "valid JSON back" and
-will read it loosely. Use `json_schema` when you need *predictable keys and
-types* — the schema is sent to the provider as a constraint and re-checked on
-return, so you don't prompt-engineer correctness by hand:
+An `assistant` turn with no `parts` means "generate here, and keep it":
 
 ```python
-output = {"format": {
-    "type": "json_schema", "name": "cities", "strict": True,
-    "schema": {
-        "type": "object",
-        "properties": {"cities": {"type": "array", "items": {
-            "type": "object",
-            "properties": {"name": {"type": "string"}, "population": {"type": "integer"}},
-            "required": ["name", "population"],
-        }}},
-        "required": ["cities"],
-    },
-}}
+Skill(Model("claude-haiku-5-5"), input={"messages": [
+    {"role": "user", "parts": ["Write ten quotes about {topic}."]},
+    {"role": "assistant"},
+    {"role": "user", "parts": ["Drop the five most clichéd and write five fresh ones."]},
+    {"role": "assistant"},
+    {"role": "user", "parts": ["Translate the result into {language}."]},
+]})
 ```
 
-**Transparent images.** For `gpt-image-*` / `chatgpt-image-*`, add
-`"background": "transparent"` and `"output_format": "png"` to get a real PNG
-alpha channel (other image providers bake an opaque background regardless of the
-prompt):
+Each marker is one model call whose reply joins the context, and the last
+turn's reply, in the declared `output` format, is what `run()` returns. This is
+reasoning in steps you wrote, not steps the model chose — when the steps are
+known, it is cheaper and more predictable than an
+[Agent](../agents/overview.md). An `assistant` turn *with* parts is a fixed
+turn, a few-shot example, and costs nothing.
 
-```python
-output = {"modalities": ["image"], "format": {
-    "type": "image", "size": "1536x1024",
-    "background": "transparent", "output_format": "png",
-}}
-```
+## When a call fails
 
-### `run()`
+Two mechanisms, along two different axes:
 
-```python
-skill.run(variables=None, max_retries=None, retry_delay=None) -> str | dict
-```
+- **`max_retries`** retries the same model after a transient failure — 429,
+  5xx, a network error — waiting `retry_delay`, then twice that, then four
+  times. The provider was briefly busy.
+- **A list of models** — `Skill([Model("gpt-6-luna"), Model("claude-haiku-5-5")], …)`
+  — moves to the next one when a model keeps failing. The provider is down.
 
-`variables` are merged over the constructor's (later wins). `max_retries` /
-`retry_delay` override the constructor values for this call only. The return
-type is whatever the `output` format implies.
+A request first spends its retries on one model, then falls back. Nothing else
+is retried: a 400, a 401 or a 404 will not be fixed by another attempt or
+another model, and a reply that does not parse means the prompt or the schema
+needs work, so it raises at once instead of burning tokens.
 
-### Token usage & cost
+## Streaming
 
-After every `run()`, `skill.last_usage` holds a `Usage` for *that* call. Token
-counts are normalised across providers (each provider reports usage
-differently), and the cost is computed from the prices in the model registry:
+`stream()` yields the answer as it arrives — the same request at the same
+price, a second way to spend it. Four things differ from `run()`, each on
+purpose:
 
-```python
-skill.run(variables={"topic": "gravity"})
-u = skill.last_usage
-print(u.input_tokens, u.output_tokens, u.total_tokens)
-print(u.cost)          # USD, derived from the model's registry price
-```
+- **Retries stop at the first piece, and there is no fallback.** Both throw the
+  attempt away and start again, which cannot be done once you have shown
+  someone half a sentence. Before the first piece nothing has been seen, so a
+  transient failure there is still retried.
+- **Usage may be `None`.** Most providers report it; where one does not,
+  nothing is invented from the text that happened to arrive.
+- **JSON is parsed at the end.** Pieces are text; `last_result` holds the
+  parsed value once the stream is done, and an answer that does not parse keeps
+  its text.
+- **A provider that cannot stream still answers**, in one piece, and records a
+  `declined` adaptation — one chunk at the end looks like a working stream, so
+  it is said rather than left to look like one.
 
-`last_usage` reflects the most recent run only; read it right after the call (or
-accumulate it yourself across calls).
+## What a Skill reports
 
-### Fallback chains
+After each call, `skill.last_usage` has the tokens and the cost, and
+`skill.last_adaptations` has everything the library changed to fit the
+provider — an option dropped, a value translated, a model swapped. A ceiling in
+dollars is `max_cost=`. → [Cost and budget](../control/cost-and-budget.md)
 
-Pass a **list of models** instead of one. On a *transient* failure — HTTP 429
-(rate limit), 5xx (server), or a network error — the skill advances to the next
-model in the list and tries again. The successful result is identical to a
-single-model run; only resilience changes.
+## A portable unit
 
-```python
-skill = Skill(
-    model = [Model("gpt-5.4"), Model("claude-sonnet-4-6"), Model("gemini-2.5-flash")],
-    input = {"messages": [{"role": "user", "parts": ["Summarise: {text}"]}]},
-)
-```
-
-`max_retries` and the fallback chain compose along different axes:
-`max_retries` retries *within* one model (the same model might just be briefly
-overloaded); the chain advances *between* models (this provider is down, try
-another). A request first exhausts retries on a model, then falls back.
-
-A **non-transient** error (400 bad request, 401 auth, 404 model-not-found) is
-*not* retried or fallen back from — a different model won't fix a malformed
-request — so it raises immediately.
-
-### Retries
-
-When `max_retries > 0`, transient errors are retried with exponential backoff:
-`retry_delay`, then `retry_delay × 2`, then `× 4`, … (so `2s, 4s, 8s` by
-default). Parsing errors (malformed JSON from the model) are **never** retried —
-they signal a prompt or schema problem, not a server fault, so retrying would
-just burn tokens.
-
-```python
-skill = Skill(model=model, input=..., output=..., max_retries=3, retry_delay=2.0)
-skill.run(max_retries=5)   # per-call override
-```
-
-### Save and load
-
-A skill is the smallest portable unit in the library. `save()` writes the
-template and the model *name* to YAML; `load()` re-creates the model and
-re-resolves the API key from the environment — keys are **never** written to
-disk.
-
-```python
-skill.save("skills/explainer.yaml")
-loaded = Skill.load("skills/explainer.yaml")
-# loaded = Skill.load("skills/explainer.yaml", api_key="sk-...")  # explicit override
-```
-
-Saved: `model_name`, `input`, `output`, `variables`, `options`, `name`,
-`description`. Not saved: API keys.
-
-### Using a Skill in a Chain
-
-A Skill is already a valid `Chain` step. In a chain it receives the accumulated
-variable dict, and its output is stored back under a named key for later steps:
-
-```python
-from yait_aichain.chain import Chain
-
-chain = Chain(steps=[(summariser, "summary"), (translator, "final")])
-```
-
-See [Chain](chain.md) for the full step syntax and variable flow.
+`skill.save("explain.yaml")` writes the template and the model's *name*;
+`Skill.load()` rebuilds it and reads the key from the environment. A key is
+never written. A saved Skill is how a prompt moves between projects, or from a
+notebook into a pipeline, without being copied by hand.
 
 ---
 
-## See also
-
-- [Model](../models/models.md) — the providers and models a Skill can bind to.
-- [Chain](chain.md) — wire Skills in sequence with automatic variable flow.
-- [Tools](../tools/index.md) — add real-world actions (search, convert, embeddings).
+▶ [`examples/01_skill.py`](../../examples/01_skill.py) ·
+[`examples/02_skill_models.py`](../../examples/02_skill_models.py) ·
+[`examples/21_multi_turn.py`](../../examples/21_multi_turn.py)

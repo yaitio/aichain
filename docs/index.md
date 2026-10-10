@@ -76,7 +76,7 @@ for a person to decide; an [event for every step](control/observability.md);
 **Models.** <!-- g:provider-list -->**10 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), DeepSeek, Google AI, Kimi (Moonshot AI), OpenAI, Perplexity, Qwen (DashScope), Recraft, xAI<!-- /g:provider-list -->, and any [private OpenAI-compatible server](models/private-models.md)
 you run yourself (vLLM, Ollama, LM Studio, …), where nothing leaves your
 perimeter. Text and vision are [models](models/models.md); image generation
-is a [tool](tools/image.md).
+is a [tool](tools/media.md).
 
 <!-- g:modalities -->
 | Modality | Providers |
@@ -90,20 +90,18 @@ is a [tool](tools/image.md).
 
 ---
 
-## Requirements
+## How these pages are organised
 
-- Python 3.10+
-- A provider's API key — or none, for a model on your own server
-- `pip install pyyaml` for YAML save/load
+| | |
+|---|---|
+| **Start** | [Installation](start/installation.md) · [Quickstart](start/quickstart.md) — five minutes, four steps · [Concepts](start/concepts.md) — six ideas, one screen each |
+| **Guides** — what each part is for, why it is built the way it is, how to use it well | [Pipelines](pipelines/skills.md) · [Agents](agents/overview.md) · [Tools](tools/index.md) · [Utilities](utilities/index.md) · [Cost](control/cost-and-budget.md) · [Permissions](control/permissions.md) · [Observability](control/observability.md) · [Eval](control/eval.md) · [Models](models/models.md) |
+| **The three promises** | [Build with your coding agent](with-your-agent.md) · [From laptop to production](production.md) · [Never in silence](models/models.md#never-in-silence) |
+| **[API](api/index.md)** | every class, function and parameter — generated from the code, so it cannot drift from it |
+| **[Reference](reference/index.md)** | data: the model registry, what each provider does with each option, environment variables, the YAML schema |
 
-See [Installation](start/installation.md) for optional dependencies and setup.
-
----
-
-## Where to go next
-
-- **Set up and verify** → [Installation](start/installation.md)
-- **First working example** → [Quickstart](start/quickstart.md)
-- **Understand the design** → [Concepts](start/concepts.md)
-- **All model options** → [Models](models/models.md)
-- **Why it is built this way** → design notes: [the default agent](../design/default-agent.md) · [streaming to a UI](../design/streaming-to-a-ui.md) · [image editing](../design/image-edit.md) · [the 2026-09-13 audit](../design/audit-2026-09-13.md) and its [cleanup plan](../design/cleanup-plan-2026-09-13.md)
+Why it is built this way, in the design notes:
+[the default agent](../design/default-agent.md) ·
+[the tool convention](../design/tool-convention.md) ·
+[streaming to a UI](../design/streaming-to-a-ui.md) ·
+[image editing](../design/image-edit.md).

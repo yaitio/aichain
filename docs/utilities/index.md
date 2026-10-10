@@ -55,7 +55,7 @@ kb = Vectors("chroma", collection="tickets", description="last year's support ti
 
 Backends: `chroma`, `pinecone`, `qdrant`. `description` is required — it is how
 the search tool tells a model what it searches, and an agent with two
-knowledge bases cannot tell them apart without it. → [Vectors](vectors.md)
+knowledge bases cannot tell them apart without it. → [API: Vectors](../api/utilities/vectors.md)
 
 ### Shell — a folder
 
@@ -69,7 +69,7 @@ Agent(model, tools=[sh.browse, sh.read])               # read-only
 |---|
 | `browse`, `read`, `write`, `run` — each confined to the folder, each given to an agent on its own |
 
-→ [Shell](shell.md)
+→ [API: Shell](../api/utilities/shell.md)
 
 ### REST — an API
 
@@ -84,7 +84,7 @@ get_order.run(id=42)
 The base URL, the auth and the headers are set once, for every endpoint, and
 never passed with a call. Each endpoint is a tool, and the API's description
 and the endpoint's are both required — a model has nothing else to go on.
-→ [REST](rest.md)
+→ [API: REST](../api/utilities/rest.md)
 
 ### MCP — a server
 
@@ -98,7 +98,7 @@ Agent(model, tools=deepwiki.tools)                     # or deepwiki.tool("ask_w
 The server is asked for its tools on first use, not when the utility is made.
 Each tool keeps the name, description and schema the server gives it.
 `connect_timeout` bounds reaching the server, `call_timeout` one call.
-→ [MCP](mcp.md)
+→ [API: MCP](../api/utilities/mcp.md)
 
 ---
 

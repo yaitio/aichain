@@ -1,6 +1,6 @@
 # API: wait-gate
 
-Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../tools/wait-gate.md).
+Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../pipelines/pause-and-resume.md).
 
 <!-- g:tool -->
 ## `wait()`

@@ -1,6 +1,6 @@
 # API: shell
 
-Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../utilities/shell.md).
+Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../utilities/index.md).
 
 <!-- g:tool -->
 ## `Shell`

@@ -68,4 +68,4 @@ Chains and Agents identically.
 
 - **Tool contract & custom tools** → [Tools](../tools/index.md)
 - **Using tools in Chains** → [Chain](../pipelines/chain.md)
-- **Using tools in Agents** → [agents/configuration.md](../agents/configuration.md)
+- **Using tools in Agents** → [agents/configuration.md](../agents/overview.md)

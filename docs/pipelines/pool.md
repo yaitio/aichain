@@ -1,101 +1,41 @@
 # Pool
 
-A **Pool** runs the same runner — a [Skill](skills.md) or a [Chain](chain.md) —
-across many inputs **in parallel**. Total wall-clock time is the slowest item,
-not the sum. Results come back in the same order as the inputs.
+A Pool runs one Skill or Chain over many inputs at once. Fifty documents to
+summarise, a thousand rows to classify, twenty pages to translate: the work is
+the same, only the input changes, and running it one after another wastes the
+time each call spends waiting for the network.
+
+```python
+pool = Pool(summarise, items=[{"text": t} for t in documents], max_flows=10)
+results = pool.run()
+results[0], results.success, results.cost
+```
+
+Total time is the slowest item, not the sum. Results come back in the order
+of the inputs, whatever order they finished in.
+
+→ Every parameter: [API: Pool](../api/pool.md)
 
 ---
 
-## Quick start
+## An item is a set of variables
 
-```python
-import os
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
-from yait_aichain.pool   import Pool
+Each item is a dict, given to the runner as its variables — `{"text": …}` fills
+`{text}` in the Skill's prompt. Variables passed to `pool.run(variables=…)` go
+to every item, for what they share: a language, a tone, a date.
 
-summarise = Skill(
-    model = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    input = {"messages": [{"role": "user", "parts": ["Summarise {topic} in one line."]}]},
-)
+The runner can be a whole Chain, so each item runs its own pipeline — fetch,
+then summarise — independently of the others. A Chain or an Agent runner
+contributes its `.output` to the results.
 
-pool = Pool(summarise, items=[{"topic": t} for t in ["gravity", "entropy", "AI"]], max_flows=10)
-results = pool.run()          # a PoolResult: one output per item, same order
+## Concurrency is a cap, not a count
 
-print(list(results), results.success)
-print(pool.status)            # {0: 0, 1: 0, 2: 3, 3: 0}  → 3 DONE
-```
+`max_flows` is how many items are in flight at once, not how many there are:
+a thousand items with `max_flows=10` run ten at a time. The right number is
+set by the provider's rate limit, not by the machine — past it, calls start
+coming back 429 and the retries cost more time than the parallelism saved.
 
-Each item is a **variable dict** fed to the runner. The pool runs up to
-`max_flows` of them concurrently.
-
-▶ Skill across items: [`examples/11_pool.py`](../../examples/11_pool.py) ·
-Chain as the runner: [`examples/12_pool_chain.py`](../../examples/12_pool_chain.py) ·
-Deep dive ↓
-
----
-
-## Common gotchas
-
-- **`items` are variable dicts**, not positional args — each is merged into the
-  runner's variables for that flow.
-- **Results preserve input order** even though execution is concurrent.
-  `results[i]` corresponds to `items[i]`.
-- **A failed item is `None`** in the results (with `on_error="collect"`/`"skip"`);
-  use the results list — not live `status` — as the source of truth after the run.
-- **`max_flows` is the concurrency cap**, not the item count. 1000 items with
-  `max_flows=10` run ten at a time.
-
----
-
-## Reference
-
-### Constructor
-
-<!-- g:pool-signature -->
-```python
-Pool(
-    runner,
-    items: list[dict],
-    max_flows: int = 10,
-    on_error: str = 'collect',
-    name: str | None = None,
-    description: str | None = None,
-    max_cost = None,
-)
-```
-<!-- /g:pool-signature -->
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `runner` | `Skill` \| `Chain` | — | What to run for each item. |
-| `items` | `list[dict]` | — | One variable dict per parallel flow. |
-| `max_flows` | `int` | `10` | Max concurrent flows (worker threads). |
-| `on_error` | `str` | `"collect"` | How a failing item is handled (below). |
-| `name`, `description` | `str` \| `None` | `None` | Labels. |
-
-### `run()`
-
-```python
-results = pool.run(variables=None) -> PoolResult
-```
-
-Returns a `PoolResult` the same length and order as `items`: iterate it, index
-it, take its length. Entry `i` is the runner's output for `items[i]` — a Chain
-or Agent runner contributes its `.output` — or `None` if that item failed or
-was never started. Beside the outputs it carries `.output` (the list),
-`.success`, `.error`, `.errors`, `.history`, `.usage`, `.tokens_used` and
-`.cost`, and `bool(results)` is `.success`.
-
-> **Changed in 3.0.0.** `run()` returned a bare `list`. Iteration and indexing
-> are unchanged; compare with `results.output`. The optional `variables` dict is **merged into every item** —
-handy for values shared across all flows.
-
-```python
-results = pool.run(variables={"language": "English"})   # every item gets language=English
-```
-
-### `on_error` modes
+## When an item fails
 
 <!-- g:policy -->
 | Mode | Behaviour |
@@ -106,35 +46,28 @@ results = pool.run(variables={"language": "English"})   # every item gets langua
 | `"collect"` (default) | That item's result is `None` and its error is in `history`; the others continue, silently. |
 <!-- /g:policy -->
 
-### Monitoring: `status` and `history`
+The default differs from a Chain's, and for a reason: in a chain a later step
+depends on an earlier one, so one failure invalidates the run; in a pool the
+items are independent, and one bad document should not cost you the other
+forty-nine. A failed item is `None` in the results and its error is in
+`results.history`.
 
-Both are safe to read from another thread while the pool runs.
+## Watching it run
 
-```python
-pool.status   # {PENDING: N, RUNNING: N, DONE: N, FAILED: N} — live counts
-pool.history  # one record per item: its status, result, and error (if any)
-```
+`pool.status` counts the items pending, running, done and failed, and is safe
+to read from another thread while the pool works — enough for a progress bar.
+After the run, read the results, not the status.
 
-Status codes: `PENDING=0`, `RUNNING=1`, `DONE=2`, `FAILED=3` (importable from
-`yait_aichain.pool`). Poll `status` for a live progress bar; read `history` or
-the `run()` results for the outcomes.
+## One budget for all of it
 
-### Any runner works
-
-The runner can be a whole **Chain**, so each item runs its own multi-step
-pipeline independently and in parallel:
-
-```python
-from yait_aichain.chain import Chain
-
-pipeline = Chain(steps=[(fetch, "page", {"source": "url"}), (summarise, "summary")])
-pool = Pool(pipeline, items=[{"url": u} for u in urls], max_flows=5)
-results = pool.run()
-```
+`max_cost=` is one ceiling in dollars shared by every item. The items run at
+the same time, so a per-item copy would give each the full amount; a shared
+`Budget` is decremented by all of them and is safe under the concurrency. An
+item that would begin past it fails with the budget's reason, handled by
+`on_error`, and the first item always runs.
+→ [Cost and budget](../control/cost-and-budget.md)
 
 ---
 
-## See also
-
-- [Skill](skills.md) / [Chain](chain.md) — the runners a Pool parallelises.
-- [Agent](../agents/overview.md) — for tasks that need planning rather than fan-out.
+▶ [`examples/11_pool.py`](../../examples/11_pool.py) ·
+[`examples/12_pool_chain.py`](../../examples/12_pool_chain.py)

@@ -1,3 +1,12 @@
+# Fetch
+
+A search finds a link; a fetch reads the page behind it — its text as
+Markdown, its title, its date, its author.
+
+→ Every parameter: [API: fetch](../api/tools/fetch.md)
+
+---
+
 ## One record, five ways to get it
 
 A search finds the link; a fetch brings back the page. Four providers sell

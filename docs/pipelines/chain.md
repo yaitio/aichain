@@ -1,164 +1,94 @@
 # Chain
 
-A **Chain** is an ordered sequence of steps — Skills, Tools, and Agents. All
-steps share one **accumulated variable dict**: each step's output flows forward
-as a named variable the next step can read. No glue code.
-
----
-
-## Quick start
+A Chain is a pipeline whose steps you can list: summarise, then translate,
+then count the words, then publish. The steps run in order and share one set
+of variables, so a step reads what the earlier ones wrote without any code to
+pass it along.
 
 ```python
-import os
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
-from yait_aichain.chain  import Chain
-
-summarise = Skill(model=Model("gpt-4o"), name="summary",
-                  input={"messages": [{"role": "user", "parts": ["Summarise: {article}"]}]})
-translate = Skill(model=Model("claude-sonnet-4-6"), name="final",
-                  input={"messages": [{"role": "user", "parts": ["Translate to {language}: {summary}"]}]})
-
-chain = Chain(steps=[(summarise, "summary"), (translate, "final")])
-result = chain.run(variables={"article": "...", "language": "French"})
-print(result.output)       # the last step's output
-print(result["summary"])   # any step's output, by its key
-```
-
-The summariser writes `summary`; the translator reads `{summary}` automatically.
-
-▶ Runnable: [`examples/08_chain.py`](../../examples/08_chain.py) ·
-Tool + Skill: [`examples/09_chain_tool_skill.py`](../../examples/09_chain_tool_skill.py) ·
-Deep dive ↓
-
----
-
-## Common gotchas
-
-- **Outputs are named, not positional.** `(skill, "summary")` stores the result
-  under `summary`; later steps reference `{summary}`. A bare step stores under
-  `"result"`.
-- **A Tool reads only its declared parameters** from the accumulated dict; a
-  Skill reads the whole dict as its variable namespace.
-- **A `dict` step output is merged** into the accumulated dict (many keys at
-  once); a `str` output is stored under the one `output_key`.
-- **A chain can pause.** If a step suspends (a `Wait`/`Gate` tool), `run()`
-  returns a `SuspendedResult` instead of the final value — resume it later with
-  `chain.resume(run_id, signal)`. See [Suspend & resume](#suspend--resume).
-
----
-
-## Reference
-
-### Step syntax
-
-Each element of `steps` takes one of four shapes, simplest to most explicit:
-
-**1. Bare runner** — output stored under `"result"`:
-
-```python
-Chain(steps=[summariser, translator])
-```
-
-**2. `(runner, output_key)`** — name the output so later steps can read it:
-
-```python
-Chain(steps=[(summariser, "summary"), (translator, "final")])
-```
-
-**3. `(runner, output_key, input_map)`** — fill the step from accumulated
-variables. `input_map` is `{dst: src}`:
-
-```python
-Chain(steps=[
-    (fetch("firecrawl"), "page",    {"url": "link"}),                       # a variable's name
-    (search("exa"),      "found",   {"input": "news about {topic} this week"}),  # a template
-    (rerank_tool,        "top",     {"input": "{candidates}",               # the value itself
-                                     "options": {"query": "{question}", "top_n": 5}}),  # a dict
-    (summariser,         "summary", {"article": "page"}),                   # Skill: alias page → {article}
+chain = Chain(steps=[
+    (summarise, "summary"),
+    (translate, "french"),
 ])
+result = chain.run(variables={"text": "…", "language": "French"})
+result["french"], result.output, result.cost
 ```
 
-- **Tool** — `dst` is the tool's parameter name, and `src` is one of: a
-  variable's **name** (`"link"`); a **template** with `{variables}`, filled as a
-  Skill fills its prompt; **one placeholder alone** (`"{candidates}"`), which
-  passes the value itself so a list stays a list; or a **dict**, resolved key by
-  key, where templates are filled and anything else — a number, a plain
-  string — is a literal. A parameter not mapped takes the variable of the same
-  name when there is one. A name or a template naming a variable the chain does
-  not have, and a `dst` the tool does not take, are errors that say which.
-- **Skill** — `dst` is the template variable name; `src` is the accumulated key to copy in (non-destructive).
+→ Every parameter: [API: Chain](../api/chain.md)
 
-**4. `(runner, output_key, input_map, options)`** — currently for **Agent** steps:
+---
 
-| Option | Default | Meaning |
+## When a Chain, and when an Agent
+
+When you can write the steps down, write them down. A Chain does exactly what
+it lists: no turn spent deciding what to do next, the same path every run, and
+a cost you can predict from the steps. An Agent earns its price only where the
+next step depends on what the last one returned. The two compose: an Agent can
+be one step of a Chain, and the Chain hands it its task.
+→ [An agent as a chain step](../agents/agent-as-chain-step.md)
+
+## Variables are the spine
+
+A run starts with the Chain's default variables, overridden by the ones given
+to `run()`. Each step adds its output under its key, so by the last step the
+variables hold everything the run computed. That is also what the result
+reads: `result["summary"]` is any step's output by its key, `result.output` the
+last step's.
+
+Each kind of step reads them differently, because each needs something
+different:
+
+| Step | Reads | Writes |
 |---|---|---|
-| `task_key` | `"task"` | Accumulated variable the agent reads its task from. |
-| `output_field` | `"output"` | Which `AgentResult` field to store as the step output. |
+| a `Skill` | every variable, as `{placeholders}` in its prompt | its answer under its key |
+| a tool | only the arguments its schema names | its result under its key |
+| a function, or a utility's method | the parameters its signature names | what it returns under its key |
+| an `Agent` | its task from the `task` variable, everything else as context | its answer under its key |
 
-### Variable flow
+A plain `dict` a step returns is merged into the variables instead — a REST
+reply's fields become variables of their own. A tool's `Record` is not merged:
+it is one result, so two search steps do not overwrite each other's
+`results`, and a Skill reading `{found}` gets its text.
 
-The accumulated dict is the spine of the pipeline:
+## Filling a tool's arguments
 
-```
-initial: {"article": "...", "language": "French"}
-              │
-        ┌─────▼──────┐
-        │ summariser │  reads {article} → writes accumulated["summary"]
-        └─────┬──────┘
-              │  {article, language, summary}
-        ┌─────▼──────┐
-        │ translator │  reads {summary}, {language} → writes accumulated["final"]
-        └─────┬──────┘
-        final output: accumulated["final"]
-```
-
-| Runner | Reads | Writes |
-|---|---|---|
-| **Skill** | The whole accumulated dict as its variable namespace. | Output under `output_key`. |
-| **Tool** | Only its `parameters`, filled by `input_map` as above. | A `Record` (search, fetch, decide) or any non-dict → `output_key`; a plain `dict` → **merged** into accumulated (many keys). |
-| **Agent** | Task from `accumulated[task_key]`; full dict passed as variables. | The `output_field` attribute under `output_key`. |
-
-After each step: a plain `dict` output → `accumulated.update(output)` — a REST
-reply's fields become variables; anything else, a `Record` included →
-`accumulated[output_key] = output`. A `Record` is one result, so two search
-steps do not overwrite each other's `results`, and a Skill that reads
-`{found}` gets its text.
-
-### Initial variables
-
-Merge order, later wins: `Chain(variables=...)` (defaults) then
-`chain.run(variables=...)` (per-call).
+A tool takes its arguments by name, and the step's third element says where
+each comes from:
 
 ```python
-chain = Chain(steps=[...], variables={"language": "English"})
-chain.run()                                   # English
-chain.run(variables={"language": "Spanish"})  # Spanish
+(fetch("local"),  "page",  {"url": "link"})                        # the variable `link`
+(search("exa"),   "found", {"input": "news about {topic} this week"})   # a template
+(rerank_tool,     "top",   {"input": "{candidates}",               # the value itself, a list stays a list
+                            "options": {"query": "{question}", "top_n": 5}})
 ```
 
-### Inspecting a run
+A template assembles the input by substitution, which is free and gives the
+same text every time. When the input needs judgement — a good search query, an
+image prompt — put a Skill before the tool and let a model write it: one call
+more, a better input. Choosing between the two is choosing where you want the
+model's judgement and where you do not.
+
+A name or a template naming a variable the chain does not have is an error
+with its name, and so is an argument the tool does not take: a pipeline that
+silently passes nothing fails later, somewhere less obvious.
+
+## Plain code is a step
+
+A function is a step as it is; its parameters are filled from the variables by
+name:
 
 ```python
-result = chain.run(variables={...})     # a ChainResult
-result.output       # the last successful step's output
-result["summary"]   # any step's output (or initial variable), by key
-result.success      # every step completed; False after a skipped failure
-result.error        # "step N (name): message", or None
-result.history      # one record per step: step, kind, name, input, output, output_key, options
-result.variables    # every variable at the end — what result["key"] reads
-result.usage, result.tokens_used, result.cost
+def shout(slogan: str) -> str:
+    return slogan.upper()
+
+Chain(steps=[(write_slogan, "slogan"), (shout, "loud")])
 ```
 
-`bool(result)` is `result.success`, as it is on `PoolResult` and `AgentResult`.
-A chain used as a step inside another chain, or as a `Pool` runner, contributes
-its `.output`; if it did not complete, that step or item fails.
+So is a utility's method — `kb.upsert` writing what a chunking step produced.
+Not every step needs a model, and a pipeline that wraps plain code in a prompt
+to get it into a chain pays for every run of it.
 
-> **Changed in 3.0.0.** `run()` returned the last step's output as a bare
-> value. Read it as `result.output`.
-
-### Error handling
-
-By default a step exception propagates and stops the run. The same four words mean the same thing on `Pool`:
+## When a step fails
 
 <!-- g:policy -->
 | Mode | Behaviour |
@@ -169,86 +99,25 @@ By default a step exception propagates and stops the run. The same four words me
 | `"collect"` | As `skip`, without the warning — for a long generated chain that expects a few steps to fail. |
 <!-- /g:policy -->
 
-```python
-chain = Chain(steps=[...], on_step_error="stop")
-chain.run(..., on_step_error="raise")   # per-call override
-```
+The same four words mean the same thing on a `Pool`. `raise` is the default
+because a failure you did not plan for should be loud; `skip` warns because a
+later step may read a value that is now stale.
 
-### Suspend & resume
+## Money, pauses, saving
 
-A chain can **pause** mid-pipeline until an external signal arrives — a human
-approval, a webhook, a cron tick — and **resume** later, even in a different
-process. This is the durable-run mechanism (see [State](pause-and-resume.md) for the full
-model).
-
-You pause by putting a `Wait` or `Gate` tool in the chain, and you make the run
-survivable by giving the chain a persistent `store`:
-
-```python
-from yait_aichain.chain import Chain
-from yait_aichain.tools import Wait
-from yait_aichain.state import FileStore, SuspendedResult
-
-chain = Chain(
-    steps = [(draft, "draft"),
-             Wait(reason="A human must approve the draft", resume_with={"reply": "str"}),
-             (send, "confirmation")],
-    store = FileStore("runs/"),     # survives a restart; omit for in-memory
-)
-
-result = chain.run(variables={"complaint": "..."})
-if isinstance(result, SuspendedResult):
-    # ...later, possibly another process sharing the same store...
-    final = chain.resume(result.run_id, signal={"reply": "approved text"})
-```
-
-| Method / arg | Purpose |
-|---|---|
-| `Chain(store=...)` | Where suspended runs are parked. Default `InMemoryStore` (process-local); `FileStore(dir)` survives restart; subclass `StateStore` for S3/DB. |
-| `chain.run(..., context=RunContext(...))` | Per-request tenant + metadata threaded through the run (not secrets). |
-| `result` from `run()` | A `ChainResult`, **or** a falsy `SuspendedResult` (`run_id`, `awaiting`, `document`) if a step paused. `resume()` returns the same. |
-| `chain.resume(run_id, signal)` | Continue from the paused step; completed steps are **not** re-run. Idempotent — a duplicate resume of a finished run raises `KeyError`. |
-
-### Mixing Skills, Tools, and Agents
-
-All three compose as steps:
-
-```python
-from yait_aichain.chain  import Chain
-from yait_aichain.agent  import Agent
-from yait_aichain.tools  import fetch
-
-chain = Chain(steps=[
-    (fetch("local"),          "article", {"url": "url"}),                # Tool
-    (summariser,              "summary"),                                 # Skill
-    (Agent(model=...), "analysis", {}, {"task_key": "summary"}),   # Agent
-    (report_skill,            "report"),                                  # Skill
-])
-```
-
-An Agent inside a Chain is just another step — its final `output` becomes the
-next variable.
-
-### Save and load
-
-A Chain serialises to YAML; every step is recreated at load time with keys
-resolved from the environment (never written to disk).
-
-```python
-chain.save("chains/pipeline.yaml")
-loaded = Chain.load("chains/pipeline.yaml")
-# loaded = Chain.load("chains/pipeline.yaml", api_key="sk-...")
-```
-
-Stored: chain-level `name`/`description`/`variables`/`on_step_error`; per step
-`kind`/`output_key`/`input_map`/`options`; and each runner's own definition
-(Skill → model name + template; Tool → class path + init args; Agent →
-orchestrator + tools). **Not** stored: API keys.
+- **`max_cost=`** is one ceiling for the whole chain, shared by every step:
+  nobody knows in advance which step will be the expensive one, so it is not
+  divided between them. → [Cost and budget](../control/cost-and-budget.md)
+- **A step can pause the run** — `wait()` for a signal, `gate(tool)` for an
+  approval — and `resume()` carries on later, in another process, from the
+  first step not yet done. → [Pause and resume](pause-and-resume.md)
+- **`chain.save()`** writes the steps to YAML, keys never included. A chain
+  holding a `@tool` function or a plain function cannot be saved — a function
+  is code, not data — and `save()` says so instead of writing a file that
+  cannot be loaded.
 
 ---
 
-## See also
-
-- [Skill](skills.md), [Tool](../tools/index.md), [Agent](../agents/overview.md) — the step runners.
-- [State](pause-and-resume.md) — suspend/resume, stores, `Wait`/`Gate`, `RunContext`.
-- [Agent as a Chain step](../agents/agent-as-chain-step.md).
+▶ [`examples/08_chain.py`](../../examples/08_chain.py) ·
+[`examples/09_chain_tool_skill.py`](../../examples/09_chain_tool_skill.py) ·
+[`examples/10_chain_save_load.py`](../../examples/10_chain_save_load.py)

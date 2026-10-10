@@ -3,6 +3,8 @@
 Run the same cases through several arms, several times, and be able to believe
 the result.
 
+→ Every parameter: [API: Eval](../api/eval.md)
+
 ```python
 from yait_aichain.eval import Eval, Case, contains
 

@@ -66,12 +66,12 @@ you to find out from the output.
 
 | | |
 |---|---|
-| **Deterministic pipelines** | `Skill` — one model call with a template and an output format. `Chain` — steps in order, each output passed on by name. `Pool` — one Skill or Chain over many inputs at once. |
-| **Agents, by how hard the task is** | `mode="agile"` decides at every turn. `mode="waterfall"` writes a plan first — from a stronger `planner_model` if you like — and holds to it. `team=` lets it delegate to workers with conversations of their own. On τ²-bench a plain loop did best with a weak model and a planned run with a strong one. |
-| **Tools** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
-| **Utilities** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
-| **Control and measurement** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class, and `approve=` for a person to decide. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
-| **Models** | **<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
+| **[Deterministic pipelines](docs/pipelines/chain.md)** | `Skill` — one model call with a template and an output format. `Chain` — steps in order, each output passed on by name. `Pool` — one Skill or Chain over many inputs at once. |
+| **[Agents, by how hard the task is](docs/agents/overview.md)** | `mode="agile"` decides at every turn. `mode="waterfall"` writes a plan first — from a stronger `planner_model` if you like — and holds to it. `team=` lets it delegate to workers with conversations of their own. On τ²-bench a plain loop did best with a weak model and a planned run with a strong one. |
+| **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
+| **[Utilities](docs/utilities/index.md)** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
+| **[Control and measurement](docs/control/cost-and-budget.md)** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class, and `approve=` for a person to decide. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
+| **[Models](docs/models/models.md)** | **<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 
@@ -81,15 +81,10 @@ you to find out from the output.
 pip install yait-aichain
 ```
 
-Optional extras:
-
-```bash
-pip install markitdown   # file/URL → Markdown
-pip install pyyaml       # save & load Skills and Chains
-pip install fastmcp      # MCP server integration
-```
-
-API keys — only for the providers you use:
+One required dependency, `urllib3`. Extras when you use what needs them:
+`[yaml]` to save and load, `[mcp]` for MCP servers, `[fetch]` to read pages
+locally — [Installation](docs/start/installation.md). Keys, only for the
+providers you use:
 
 <!-- g:exports -->
 ```bash
@@ -103,7 +98,6 @@ export PERPLEXITY_API_KEY="…"
 export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
 export XAI_API_KEY="…"
-export ="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export EXA_API_KEY="…"
@@ -145,207 +139,19 @@ The skill alone works too: copy `plugin/skills/yait-aichain/` into
 `~/.agents/skills/`, which Codex and Cursor both read, or into
 `~/.claude/skills/` for Claude Code.
 
-## Every provider, one syntax
+## Learn more
 
-```python
-from yait_aichain.models import Model
-
-Model("claude-sonnet-4-6")   # Anthropic
-Model("gpt-4o")              # OpenAI
-Model("gemini-2.5-flash")    # Google
-Model("grok-3")              # xAI
-Model("sonar-pro")           # Perplexity
-Model("kimi-k2.6")           # Kimi
-Model("deepseek-chat")       # DeepSeek
-Model("qwen-max")            # Qwen
-Model("private/llama3.3")    # your own server — vLLM, Ollama, LM Studio, …
-```
-
-Full list: [model registry →](docs/reference/model-registry.md).
-The `private` provider needs no key and accepts whatever your server serves —
-the prompts and the answers stay inside your perimeter
-([private models →](docs/models/private-models.md)).
-
----
-
-## Core concepts
-
-### Skill — one prompt, any model
-
-```python
-skill  = Skill(model=Model("gpt-4o-mini"), input={...})
-result = skill.run(variables={"topic": "neural networks"})
-```
-
-### Chain — sequential steps, automatic variable flow
-
-```python
-chain = Chain(steps=[
-    (fetch_tool,    "page"),
-    (summarise,     "summary"),
-    (translate,     "result"),
-])
-result = chain.run(variables={"url": "https://…", "language": "French"})
-print(result.output, result["summary"])   # the last step, and any step by key
-```
-
-### Pool — parallel execution
-
-```python
-pool    = Pool(summarise_skill, items=[{"text": t} for t in documents], max_flows=10)
-results = pool.run()                    # all documents processed simultaneously
-print(results[0], results.success, results.cost)
-
-print(pool.status)   # {PENDING: 0, RUNNING: 0, DONE: 50, FAILED: 0}
-print(pool.history)  # per-item: status, output, error, duration
-```
-
-### Agent — autonomous reasoning
-
-```python
-from yait_aichain.agent import Agent, step_count
-
-agent  = Agent(
-    model        = Model("claude-opus-4-8"),
-    tools        = [search("perplexity"), fetch("local")],
-    mode         = "agile",
-    stop_when    = [step_count(10)],
-)
-result = agent.run("Compare the top 3 vector databases.")
-print(result.output)
-print(f"steps={result.steps_taken}  tokens={result.tokens_used:,}")
-```
-
-### Full RAG pipeline
-
-```python
-from yait_aichain.tools          import chunk, embed, rerank
-from yait_aichain.tools.vectordb import VectorDB, vectorUpsert, vectorQuery
-
-store    = VectorDB("chroma", "docs", embedder=embed("cohere", model="embed-v4.0"))
-reranker = rerank("cohere", model="rerank-v3.5")
-
-# Ingest
-chunks = chunk(max_chars=800).run(my_document)
-vectorUpsert(store).run([{"id": f"c{i}", **c} for i, c in enumerate(chunks)])
-
-# Query → rerank → answer
-pipeline = Chain(steps=[
-    (vectorQuery(store),  "candidates", {"input": "{question}", "options": {"n": 20}}),
-    (reranker,            "context",    {"input": "{candidates}",
-                                         "options": {"query": "{question}", "top_n": 5}}),
-    answer_skill,
-])
-answer = pipeline.run(variables={"question": "How does KV caching work?"})
-```
-
-Vector DB providers: **Chroma · Qdrant · Pinecone**
-Reranking providers: **Cohere · Voyage · Qwen**
-
----
-
-## Cost, routing & resilience
-
-These are all **opt-in** — the minimal program above is unchanged.
-
-**Token usage & cost** — every result carries normalised usage:
-
-```python
-skill.run()
-skill.last_usage.input_tokens   # 1240
-skill.last_usage.total_tokens   # 1310
-skill.last_usage.cost           # 0.0032  (USD, None if the model has no price)
-
-chain.run()
-chain.last_usage.cost           # summed across all Skill steps
-```
-
-**Explicit provider routing** — pick the provider with a `provider/model`
-prefix; it also unlocks custom / fine-tuned names the auto-detector can't
-recognise:
-
-```python
-Model("openai/gpt-4o")                 # same as Model("gpt-4o")
-Model("openai/ft:gpt-4o:acme:42")      # custom name, explicit provider
-```
-
-**Fallback chain** — pass a list; a transient failure (rate limit / server /
-network) advances to the next model. A real error (bad key, bad request)
-still raises immediately:
-
-```python
-skill = Skill(
-    model = [Model("claude-sonnet-4-6"), Model("gpt-4o")],  # primary, then backup
-    input = {"messages": [{"role": "user", "parts": ["..."]}]},
-)
-```
-
-**Typed errors** — catch a specific failure mode, or `APIError` for all:
-
-```python
-from yait_aichain import (RateLimitError, AuthenticationError,
-                          InsufficientCreditsError, APIError)
-
-try:
-    skill.run()
-except RateLimitError as e:
-    wait(e.retry_after)        # honours the Retry-After header
-except InsufficientCreditsError:
-    ...                        # out of credits/quota — top up (not a key problem)
-except AuthenticationError:
-    ...
-```
-
-**Keep the model list fresh** — diff the registry against a provider's live
-roster:
-
-```python
-from yait_aichain.models import registry
-registry.refresh("openai")     # → {"new": [...], "removed": [...], ...}
-```
-
----
-
-## Built-in tools
-
-### Search
-`search(service)` — `perplexity` · `brave` · `exa` · `firecrawl` · `tavily` · `parallel`
-
-### Fetch
-`fetch(service)` — `firecrawl` · `tavily` · `exa` · `parallel` · `local` (free; `pip install "yait-aichain[fetch]"`)
-
-### Decide
-`decide(service, questions=…)` — `openai` · `typesafe`
-
-```python
-from yait_aichain.tools import search, fetch
-
-found = search("exa").run("AI and leadership", {"domains": ["hbr.org"]})
-pages = fetch("firecrawl").run([r["url"] for r in found["results"]])
-Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
-```
-
-### Speech
-`speech(service)` — `openai` · `google` · `xai` · `qwen` (text → audio) ·
-`transcribe(service)` — the same four (audio → text)
-
-### Embeddings, reranking, chunking
-`embed(service, model=…)` — `openai` · `cohere` · `voyage` · `google` · `qwen` ·
-`rerank(service, model=…)` — `cohere` · `voyage` · `qwen` · `chunk(max_chars=…)`
-
-### Images
-`image(service, model=…)` — `openai` · `google` · `bfl` · `xai` · `qwen` · `recraft`;
-`.run(prompt, images=[…], options={"aspect_ratio": "16:9"})` generates, or edits the images given
-
-### Pause
-`wait(reason=…)` · `gate(tool, reason=…)`
-
-### Utilities — `from yait_aichain.utilities import …`
-`Vectors` (a vector database; `kb.query` its tool) · `MCP` (a server's tools) ·
-`REST` (an API; each endpoint a tool) · `Shell` (a folder; browse, read, write, run)
-
-
----
+| | |
+|---|---|
+| **Start** | [Quickstart](docs/start/quickstart.md) — five minutes, four steps · [Concepts](docs/start/concepts.md) — six ideas, one screen each |
+| **Pipelines** | [Skill](docs/pipelines/skills.md) · [Chain](docs/pipelines/chain.md) · [Pool](docs/pipelines/pool.md) · [Pause and resume](docs/pipelines/pause-and-resume.md) |
+| **Agents** | [The loop and its modes](docs/agents/overview.md) · [Driving the loop](docs/agents/driving-the-loop.md) · [An agent as a chain step](docs/agents/agent-as-chain-step.md) |
+| **Tools** | [How tools work](docs/tools/index.md) · [Search](docs/tools/search.md) · [Fetch](docs/tools/fetch.md) · [Decide](docs/tools/decide.md) · [Chunk, embed, rerank](docs/tools/retrieval.md) · [Speech and images](docs/tools/media.md) |
+| **Utilities** | [Vectors, Shell, REST, MCP](docs/utilities/index.md) |
+| **Control** | [Cost and budget](docs/control/cost-and-budget.md) · [Permissions](docs/control/permissions.md) · [Observability](docs/control/observability.md) · [Eval](docs/control/eval.md) |
+| **Models** | [Models and options](docs/models/models.md) · [Private models](docs/models/private-models.md) · [the registry](docs/reference/model-registry.md) |
+| **Production** | [From laptop to production](docs/production.md) · [Build with your coding agent](docs/with-your-agent.md) |
+| **[API](docs/api/index.md)** | every class, function and parameter, generated from the code |
 
 ## Examples
 
@@ -379,42 +185,6 @@ Agent(model, tools=[search("perplexity"), fetch("firecrawl")])
 | 23 | [`23_private_model.py`](examples/23_private_model.py) | Run a model on hardware you control. |
 | 24 | [`24_scaffold.py`](examples/24_scaffold.py) | Scaffold — the model designs the team, then runs it |
 <!-- examples:end -->
-
----
-
-
-## Persist and reload
-
-```python
-skill.save("skills/translator.yaml")
-skill = Skill.load("skills/translator.yaml")   # API key from env, not file
-
-chain.save("chains/research.yaml")
-chain = Chain.load("chains/research.yaml")
-```
-
----
-
-## Supported providers
-
-| Provider | Text | Vision | Image gen | Env var |
-|---|---|---|---|---|
-| **Anthropic** | Claude Fable 5.1, Opus / Sonnet / Haiku 5.5 | ✓ | — | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-6.1, GPT-6, GPT-5.6, GPT-5.5 | ✓ | GPT-Image-2.5, GPT-Image-2 | `OPENAI_API_KEY` |
-| **Google** | Gemini 3.8 / 3.6 Flash, 3.1 Pro, 3.1 Flash-Lite | ✓ | Gemini image models | `GOOGLE_AI_API_KEY` |
-| **xAI** | Grok 4.7, 4.3, Grok Build | ✓ | Grok-Imagine | `XAI_API_KEY` |
-| **Perplexity** | Sonar Pro, Sonar, Deep Research | — | — | `PERPLEXITY_API_KEY` |
-| **Kimi** | K3, K2.7 Code, K2.6 | ✓ | — | `MOONSHOT_API_KEY` |
-| **DeepSeek** | DeepSeek Flash, V4 Pro | — | — | `DEEPSEEK_API_KEY` |
-| **Qwen** | Qwen 3.8 Max / Flash, 3.7 Plus | ✓ | Wan 2.2, Qwen-Image-Edit | `DASHSCOPE_API_KEY` |
-| **Recraft** | — | — | Recraft V4.1, V3 (raster + vector) | `RECRAFT_API_TOKEN` |
-| **BFL (FLUX)** | — | — | FLUX.3, FLUX.2, FLUX Kontext | `BFL_API_KEY` |
-
-**Image editing — instruction edit, preserves the subject:** OpenAI · Google · xAI · Qwen · FLUX Kontext (place / restyle / recompose while keeping the original object)  
-**Image-to-image — whole-image variation (restyle, not subject-preserving):** Recraft (`imageToImage`, `strength`-controlled)  
-**Embedding:** OpenAI · Cohere · Voyage · Google · Qwen  
-**Reranking:** Cohere · Voyage · Qwen  
-**Vector DB:** Chroma · Qdrant · Pinecone
 
 ---
 

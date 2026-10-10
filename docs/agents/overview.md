@@ -1,319 +1,147 @@
 # Agent
 
-An **Agent** is a conversation that can act. You give it a task; it is asked
-what to do, the world answers, the answer is appended, and the loop goes round
-until it replies without asking for anything more. Use it when the *sequence*
-of steps is not known upfront. For a fixed pipeline, use a
-[Chain](../pipelines/chain.md) — it spends no model call deciding an order you
-already know.
-
----
-
-## Quick start
+An Agent is a conversation that can act. It is given a task and tools; each
+turn the model either calls tools or answers. Tool results go back into the
+conversation, and the loop asks again. Use it when the next step depends on
+what the last one returned — when you could not have written the steps down in
+advance. When you could, a [Chain](../pipelines/chain.md) does the same work
+without paying a model to rediscover the order.
 
 ```python
-import os
-from yait_aichain.models import Model
-from yait_aichain.agent  import Agent, step_count, cost_budget
-from yait_aichain.tools  import PerplexitySearchTool
-
-agent = Agent(
-    Model("claude-opus-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    tools     = [PerplexitySearchTool()],
-    stop_when = [step_count(8), cost_budget(0.50)],
-)
-
-result = agent.run("Compare the top 3 managed vector databases and return a Markdown table.")
-print(result.output)
-print(result.stopped_by,                       # "answered" — or the ceiling that fired
-      result.steps_taken, "steps",
-      f"{result.tokens_used:,} tokens", f"${result.cost or 0:.4f}")
+agent = Agent(Model("gpt-6-luna"), tools=[search("exa"), fetch("local")],
+              stop_when=[step_count(10), cost_budget(0.50)])
+result = agent.run("Compare the three largest managed vector databases.")
+result.output, result.stopped_by, result.cost
 ```
 
-▶ One tool: [`examples/13_agent.py`](../../examples/13_agent.py) ·
-Multiple tools: [`examples/14_agent_tools.py`](../../examples/14_agent_tools.py) ·
-Delegation: [`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
-A verified stop condition: [`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)
+→ Every parameter: [API: Agent](../api/agent.md)
 
 ---
 
-## Common gotchas
+## One loop, and the reply decides
 
-- **`run()` never raises.** It returns an `AgentResult`; check `result.success`
-  (and `bool(result)` *is* `success`). On failure, read `result.error`.
-- **Answering is the absence of an action.** The ordinary exit is the model
-  replying without asking for a tool. There is no separate "finish" action.
-- **A ceiling reached is not success.** `stop_when` holds everything else that
-  can end a run, and `result.stopped_by` says which fired — `"answered"`,
-  `"check:<name>"`, `"step_count"`, `"cost_budget"`. Without that field a run
-  that finished and a run that ran out look identical from the outside.
-- **`check()` is the strong one.** A callable the harness evaluates itself, so
-  the run ends on a fact rather than on the model's word for it.
-- **Repeating work over a list needs `pool`.** Every other action is exactly one
-  call, so "read every document" without it reads one — silently.
-
----
-
-## Reference
-
-### Constructor
-
-```python
-Agent(model, tools=None, instructions="", mode="agile", team=None,
-      stop_when=None, hooks=None, permissions=None,
-      name=None, description=None, verbose=0)
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `model` | — | The `Model` that drives the loop. |
-| `tools` | `None` | Tools it may call. |
-| `instructions` | `""` | The standing brief. Goes in the stable prefix, so it is cached from the second call onward. |
-| `mode` | `"agile"` | `"agile"` decides at every step; `"waterfall"` writes a plan at step 0 and holds to it. |
-| `team` | `None` | `None` — nobody else. `[agents]` — delegate only to these. `"auto"` — describe and spawn workers as needed. |
-| `stop_when` | `[step_count(30)]` | Everything that can end a run other than answering. |
-| `hooks` | `None` | Observability sinks ([Observability](../control/observability.md)). |
-| `permissions` | `None` | Tool governance. |
-| `verbose` | `0` | `0` silent · `1` per-action status · `2` token breakdowns. |
-
-`agent.run(task, variables=None)` executes and returns an `AgentResult`.
-`variables` seeds the conversation with data the caller already holds — this is
-how a `Chain` or `Pool` step hands its accumulated values down.
-
-### The loop
-
-```
-messages = [system, task]
+```text
+messages = [instructions, task]
 loop:
-    reply = ask the model
-    if the reply has no action  → done, the reply is the answer
-    result = execute(reply.action)
-    messages += [reply, result]
-    if a stop condition fires   → stop
+    reply = the model
+    no tool calls in it?   → done; the reply is the answer
+    run each call, append the reply and every result
+    a stop condition fires? → stop
 ```
 
-That is all of it. The conversation is held with **the world**, not with
-itself: every second turn is a fact the model did not have, which is why the
-loop converges instead of circling.
+That is the whole of it. Control flow is a pure function of the reply: tool
+calls continue, prose ends. The model chooses what to say and what to call,
+never whether the loop goes on, which is why a run cannot wander off into a
+state the code does not know about.
 
-The conversation only ever **appends** — nothing is rebuilt — so the cacheable
-prefix grows and prompt caching works without being configured.
+The conversation only grows. Nothing is rebuilt between turns, so the prefix a
+provider can cache grows with it, and every second message is something the
+world said rather than the model — which is what makes the loop converge
+instead of circling.
 
-### Actions
+## The agent's state is its conversation
 
-The model either replies in plain text, which ends the run, or asks for exactly
-one action:
+There is no memory store beside it, no plan object to keep in step, no
+snapshot to save. Everything the agent knows is in the message list: every
+attempt, with what came back. A message list is data, so a run can park and
+resume in another process, a driver can run it one turn per serverless call,
+and a reader can see exactly what the model was told and when.
 
-| Action | What it does |
-|---|---|
-| `tool` | Call one tool with arguments. |
-| `pool` | Repeat one runner over a list, in parallel. The only action that is more than one call. |
-| `agent` | Delegate a scoped sub-task. Offered only when `team` is set. |
+## Tools, and three it may be given
 
-### Externally driven
+The agent offers each tool's name, description and schema, and checks every
+call against the schema before it runs: a missing argument or an unknown key
+comes back to the model as a message it can correct, not as a crash. Beside
+your tools it may get three of its own:
 
-`run()` owns the loop. When something else needs to — a serverless invocation
-that must be one step, or a harness that executes the tools itself — the same
-machinery is exposed:
-
-```python
-from yait_aichain.models._calls import ToolCallRequest, tool_result_turn
-
-messages = agent.opening(task)
-state    = agent.new_state()
-
-while True:
-    decision = agent.step(messages, state)          # decide, do not execute
-    if not isinstance(decision, ToolCallRequest):
-        answer = decision                           # a string is the answer
-        break
-    messages.append(decision.as_turn())
-    for call in decision.calls:
-        result, error = agent.execute(call, state)
-        messages.append(tool_result_turn(call.id, error or result))
-```
-
-**Append a result for every call, failed ones included** — the error *is* the
-result. `step()` checks this before it asks anything and raises locally,
-naming the unanswered ids, because a history holding a call nobody answered is
-malformed and the providers disagree about it in the worst way: three reject
-the request, Google is looser, and a self-hosted OpenAI-compatible server
-validates nothing and templates it through, so the model meets its own
-unanswered call and improvises — differently each time. `run()` owns this for
-you; a driver that owns the loop owns it too.
-
-> **Corrected 2026-09-12.** This example read
-> `agent.execute(decision["action"], state)`. `step()` returns a
-> `ToolCallRequest` or a string, never a dict, so the line raised `TypeError`
-> — and the paragraph that followed described reflection assigning a
-> `store_as` key into memory, which the agent has not had since `2.0.0`.
-
-### Modes
-
-| Mode | What it does | Use when |
+| Tool | When it is offered | What it does |
 |---|---|---|
-| `agile` (default) | Decides every step from what the previous one returned; nothing is written in advance. | The path is exploratory; later steps depend on what early ones reveal. |
-| `waterfall` | Writes a plan at step 0 and holds to it. `planner_model` applies to this mode only. | The path is predictable, or a stronger model should design it once. |
+| `pool` | whenever it has tools | repeats one of them, or a prompt, over a list in parallel — "read every document" in one turn instead of one turn each |
+| `write_plan` | `mode="waterfall"` | records the plan the run then holds to |
+| `delegate` | `team=` is set | hands a scoped sub-task to a worker with a conversation of its own |
 
-There is no `goal` mode: what it did — deciding one action at a time with
-nothing written in advance — is what `agile` is.
+## How hard the task is picks the mode
 
-#### Goal mode
+| | `agile` (default) | `waterfall` | `team=` |
+|---|---|---|---|
+| Decides | at every turn, from what the last one returned | once, up front, in a written plan | which worker does which part |
+| Suits | exploration: step four is unknowable until step three answers | a path that can be designed once — and a stronger `planner_model` can design it | work that splits into independent parts |
+| Costs | the cheapest loop | one planning turn, possibly on a dearer model | a conversation per worker |
 
-*Since 1.6.0.* A plan is a bet that you know the steps up front. When you don't
-— when step 4 is unknowable until step 3 answers — **that is what `"agile"`
-already is**: it decides one action at a time from what it has learned, with
-nothing written in advance.
+`planner_model` is where the money goes in `waterfall`: the plan is the
+highest-leverage tokens of the run, everything after merely executes it. Think
+while planning, act without deliberating.
 
-```python
-from yait_aichain.agent import Agent, step_count, check
+Which mode wins depends on the model, and the difference is large. In a
+τ²-bench study of five harnesses on the same 184 tasks, with the same models
+and the same system prompt, a plain loop scored best with open-weight models
+(0.560) and this library's `waterfall` scored best with proprietary ones
+(0.745), where the plain loop fell to fourth. A harness is a tax on a weak
+model and an asset on a strong one; measure on yours before settling.
+→ [Eval](../control/eval.md)
 
-agent = Agent(
-    model     = Model("claude-sonnet-4-6"),
-    tools     = [Probe(), RecordAnswer()],
-    mode      = "agile",
-    stop_when = [check(lambda state: answer_recorded()), step_count(50)],
-)
-result = agent.run("Find the combination and record it.")
-```
+`team=[historian, chemist]` delegates only to the agents named; `team="auto"`
+lets the model describe new workers as it needs them. A worker's report comes
+back as the model's word, not as a checked fact, and the result says so.
 
-Each iteration the model sees the objective and the conversation so far —
-every attempt *with what came back* — then picks one action. The
-[journal](../control/observability.md#the-attempt-journal) is not a side-effect here, it
-is the record of that.
+## How a run ends
 
-**Stopping.** An open-ended loop needs stop rules a plan gives for free, and
-they all live in `stop_when`:
+The ordinary end is an answer — a reply with no tool calls. Everything else
+that can end a run is in `stop_when`, and there are three kinds, kept apart
+because they mean different things:
 
-| Rule | Meaning |
-|---|---|
-| `check(fn)` | Success — the harness verified a condition. |
-| `step_count(n)` | Iteration ceiling. `success=False`: a ceiling reached is not an answer. |
-| `token_budget(n)` / `cost_budget(x)` | Spending ceilings, same verdict. |
+- **A ceiling** — `step_count(n)`, `token_budget(n)`, `cost_budget(usd)` — ends
+  the run as a **failure**. Reaching the limit is not an answer.
+- **A check** — `check(fn)` — ends it as a **success** on a fact your code
+  verified. It is the only completion the harness can confirm itself;
+  everything else is the model's word for it.
+- **A nudge** — `stalled(k)`, `repeating(k)` — ends nothing. When the last *k*
+  attempts moved nothing, or were the same move, the model is told so in an
+  ordinary, logged message, and the loop goes on.
 
-> The loop is only as good as the model driving it. On
-> [`examples/22_goal_mode.py`](../../examples/22_goal_mode.py) (find a number in
-> 1–1000, 15 iterations): `claude-sonnet-4-6` ran a clean binary search and
-> finished in 9 probes; `gpt-4o-mini` bisected for a while, then degenerated
-> into +1 scanning and hit the cap. Same harness both times — which is exactly
-> why the stop rules exist.
+The default is `[step_count(30)]`: a backstop, not a plan. `result.stopped_by`
+says which ended the run — `"answered"`, `"check:<name>"`, `"step_count"`, … —
+because a run that finished and a run that ran out of budget otherwise look
+identical from outside.
 
-> **Corrected 2026-09-11.** This section documented a third mode, `"goal"`,
-> with a required `done_when` and its own defaults for `max_steps` /
-> `max_tokens`; the modes are `"agile"` and `"waterfall"`, and the ceilings
-> are entries in `stop_when`. It also listed two automatic stop rules — "no
-> progress" over a 5-attempt window, and repetition — that **no library code
-> fires**: `Journal.has_progress()` and `Journal.is_repeating()` exist and are
-> called from nowhere, so a run that stalls today spins until a ceiling stops
-> it. Making them fire is the `nudge` work in the plan, not a thing the
-> library does now.
+The loop is only as good as the model driving it. Asked to find a number
+between 1 and 1000 in fifteen probes
+([`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)), one model ran a
+clean binary search and finished in nine; a smaller one bisected for a while,
+then fell into counting up by one and hit the ceiling. Same harness both
+times — which is what the stop conditions are for.
 
-### `AgentResult`
+## What the result says
 
-`run()` never raises — inspect the result:
+`run()` does not raise. It returns an `AgentResult`: `bool(result)` is
+`.success`, `.error` says why it failed, `.cost` and `.usage` what it spent,
+`.adaptations` what the library changed to fit the provider. `.journal` is
+what was attempted, each entry marked `check` when code verified it and
+`model_claim` when only the model said so, and `.acceptance` sums that up:
+`checked`, `claimed` or `unsupported`. An unsupported answer is still returned
+— the point is that you can see it is one.
 
-| Field | Description |
-|---|---|
-| `success: bool` | `True` on completion; `bool(result)` mirrors it. |
-| `output` | The final answer (`None` on failure). |
-| `steps_taken: int` | Plan steps executed. |
-| `tokens_used: int` | Total tokens across all LLM calls. |
-| `cost: float \| None` | Estimated USD for those calls, priced per model. `None` when nothing is priceable — a self-hosted model has no price per token, and this says so rather than reporting `0.0`. Not derivable from `tokens_used`, which sums input and output while output costs several times more. Covers this invocation; a `resume()` reports only the resumed leg. |
-| `plan: list[dict]` | The final plan (may differ from the first in agile mode). |
-| `history: list[dict]` | Per-attempt trace: action, output, reflection, tokens. |
-| `memory: dict` | Memory snapshot at the end. |
-| `error: str \| None` | Failure reason. |
+## Around the loop
 
-```python
-for rec in result.history:
-    print(f"step {rec['step']+1} [{rec['action_type']}] {rec['step_goal']}"
-          f" → {rec['reflection']['assessment']} ({rec['tokens']:,} tok)")
-```
-
-### Suspend & resume
-
-**A run parks only where a tool asked it to.** In a `Chain` that tool is a
-`Wait`/`Gate` step the author placed; in an agent it is the same tool in the
-model's own hands, offered like any other:
-
-```python
-agent = Agent(Model("gpt-4o"), tools=[Gate(IssueRefund(), reason="Approve this refund?")],
-              store=FileStore("runs/"))
-parked = agent.run("refund order 4417 if the policy allows it")
-parked.run_id, parked.awaiting          # {"reason": ..., "resume_with": {"approved": "bool"}}
-done = agent.resume(parked.run_id, signal={"approved": True})   # an AgentResult
-```
-
-`Agent(store=...)` is **required** when a tool can park — an agent given one
-without a store is refused at construction, because a pause nobody can resume
-is otherwise discovered after the model has asked for it. The signal completes
-the tool that asked: an approved `Gate` runs the guarded tool, a refused one
-skips it, and either result goes back to the model as that call's tool result.
-Parking again keeps the same `run_id`; a `run_id` the store no longer holds
-raises `KeyError`, so an at-least-once trigger cannot run the tail twice.
-
-What `2.0.0` removed is still removed, and the distinction is the whole of it:
-there is **no snapshot mechanism**. Nothing stops a run from outside it, there
-is no `agent.save()` and no `agent.context`. The agent's state **is** the
-conversation — a message list, serialisable by construction — and that is
-exactly what the store holds while an answer is owed, and deletes when the run
-ends.
-
-For a human in the loop inside one invocation, `approve=` remains cheaper: it
-decides **before** the tool runs, without parking anything. Park when the
-waiting cannot be held — a serverless invocation cannot sit in front of a
-person:
-
-```python
-agent = Agent(Model("gpt-4o"), tools=[IssueRefund()],
-              permissions=PermissionPolicy({"financial": "approve"}),
-              approve=lambda req: ask_the_manager(req.tool, req.arguments))
-```
-
-See [Observability](../control/observability.md#permission-matrix) for the request an
-approver is handed and what happens when there is none.
-
-> **Corrected in 2.6.0.** This section previously showed `Agent(store=...)`,
-> `agent.resume(...)` and a `SuspendedResult` from `agent.run()` — none of
-> which have existed since `2.0.0`. A `Gate` tool handed to an agent does not
-> pause it either: the `Suspend` it raises is caught like any other tool
-> failure and reported to the model as an error.
-
-### Sub-agents
-
-With `team="auto"`, the orchestrator gets a `delegate` tool and can hand a
-sub-task to a fresh agent (its own tools/model), then use the result. Pass a
-list of agents instead to delegate to named workers. Good for fan-out research
-— one worker per topic.
-
-A worker inherits the parent's permissions **and its approver**: rules without
-an answerer would refuse every gated call, which reads as the policy being
-stricter for children than for their parent.
-
-> **Corrected in 2.6.0.** `allow_spawn=True` and `spawn_agent` are the older
-> names; the parameter is `team=` and the tool is `delegate`. See
-> [design/default-agent.md](../../design/default-agent.md), which recorded the
-> rename while this page kept the old spelling.
-
-### When to reach for an Agent
-
-| Situation | Use |
-|---|---|
-| One model call, known prompt | [Skill](../pipelines/skills.md) |
-| Fixed sequence with known data flow | [Chain](../pipelines/chain.md) |
-| Search → read → cross-reference → reason | **Agent** |
-| Exploratory; next step depends on what you learned | **Agent (agile)** |
-| No plan is possible; only a finish line | **Agent (goal)** |
-
-An agent can also be one step *inside* a Chain — it handles the open-ended
-phase, the Chain handles the rest. See [Agent as a Chain step](agent-as-chain-step.md).
+- **Permissions** — a tool's `risk` and the agent's `permissions=` decide, before
+  a call runs, whether it runs, asks `approve=` or never runs.
+  → [Permissions](../control/permissions.md)
+- **Money** — `max_cost=` ends the run before a call that would pass it.
+  → [Cost and budget](../control/cost-and-budget.md)
+- **Pausing** — a `wait()` or `gate()` among the tools lets the model park the
+  run until the world answers; `store=` keeps it.
+  → [Pause and resume](../pipelines/pause-and-resume.md)
+- **Watching** — every turn, call and approval is an event, and `stream()`
+  yields them as they happen. → [Observability](../control/observability.md)
+- **Driving it yourself** — `step()` decides without executing, for a harness
+  or a serverless function that owns the loop.
+  → [Driving the loop](driving-the-loop.md)
+- **Inside a pipeline** — an agent is a Chain step, and reads its task from the
+  chain's variables. → [An agent as a chain step](agent-as-chain-step.md)
 
 ---
 
-## See also
-
-- [Configuration](configuration.md) — tools, executors, persona, modes in depth.
-- [Memory](memory.md) — shared step state and persistent cross-run memory.
-- [Observability & control](../control/observability.md) — hooks, events, the permission matrix, tool-call repair.
-- [State](../pipelines/pause-and-resume.md) — suspend/resume, stores, `Wait`/`Gate`.
-- [Agent as a Chain step](agent-as-chain-step.md).
+▶ [`examples/13_agent.py`](../../examples/13_agent.py) ·
+[`examples/14_agent_tools.py`](../../examples/14_agent_tools.py) ·
+[`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
+[`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)

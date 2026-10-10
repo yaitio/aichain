@@ -1,6 +1,6 @@
 # API: speech
 
-Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../tools/speech.md).
+Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../tools/media.md).
 
 <!-- g:tool -->
 ## `speech()`

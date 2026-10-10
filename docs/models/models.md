@@ -1,98 +1,36 @@
-# Model
+# Models
 
-A **Model** is the provider gateway. You ask for a model by name; the library
-resolves the provider, attaches a configured HTTP client, and gives you back one
-object that every other primitive (Skill, Chain, Agent, embeddings) can use.
-Swapping providers is a one-word change.
+A Model is a name. `Model("claude-haiku-5-5")` is Anthropic, `Model("gpt-6-luna")`
+is OpenAI, `Model("private/llama3.3")` is a server you run; the rest of your
+code does not change when the name does. That is the promise this whole
+library rests on, and this page is about what it takes to keep it honestly.
+
+```python
+Model("claude-haiku-5-5")                              # the key from ANTHROPIC_API_KEY
+Model("gpt-6-luna", options={"reasoning": "high"})     # one vocabulary of options
+Model("openai/my-fine-tune")                           # an explicit provider for a name it cannot guess
+```
+
+→ Every parameter: [API: Model](../api/model.md) · the catalogue: [model registry](../reference/model-registry.md)
 
 ---
 
-## Quick start
+## A provider is data, not a class
 
-```python
-import os
-from yait_aichain.models import Model
+There is one `Model` class. What differs between providers — the URL, the auth
+header, the request and response shapes, what each option is called — lives in
+data, `models/providers/*.toml`, read by seven family clients — one per
+wire dialect — that cover every provider. A model's capabilities and its price are in the same files. Adding a
+provider that speaks an existing dialect is a data file, not code.
 
-m = Model("claude-sonnet-4-6", api_key=os.getenv("ANTHROPIC_API_KEY"))
-```
+A Model does two things: turn the universal messages into the provider's
+request, and turn the response back into a clean value. It knows nothing about
+prompts, retries or pipelines — those are the [Skill](../pipelines/skills.md)'s
+— and that separation is why changing the name changes nothing around it.
 
-The same `Model` drops into any primitive — change the name to change provider,
-nothing else:
+## One vocabulary of options
 
-```python
-Model("gpt-4o")              # OpenAI
-Model("gemini-2.5-flash")    # Google
-Model("grok-3")              # xAI
-Model("qwen-max")            # Qwen
-```
-
-▶ One prompt, three providers: [`examples/02_skill_models.py`](../../examples/02_skill_models.py) ·
-Full catalogue: [model registry](../reference/model-registry.md) · Deep dive ↓
-
----
-
-## Common gotchas
-
-- **The name picks the provider.** `Model("gpt-4o")` is OpenAI because `gpt-`
-  maps to OpenAI. There are *no* per-provider classes — one `Model`, resolved
-  from data.
-- **The API key comes from the environment** by default — each provider has its
-  own variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …). Pass `api_key=` to
-  override. Missing both → `ValueError` at construction.
-- **A name that matches no prefix raises.** For a custom or fine-tuned name, give
-  an explicit `provider/` prefix: `Model("openai/my-ft-name")`.
-- **The registry is reference data, not a gatekeeper.** Asking a text model for
-  an image won't be blocked locally — it fails when the provider rejects it. Use
-  the registry to *discover* what works, not to validate.
-
----
-
-## Reference
-
-### How a model is resolved
-
-`Model("name")` does three lookups, all data-driven:
-
-1. **Provider** — from a well-known name prefix (table below), or an explicit
-   `provider/` prefix. Exposed afterwards as `model._provider`.
-2. **Settings & price** — from that provider's data file
-   `yait_aichain/models/providers/<provider>.toml` (defaults, endpoints,
-   capabilities, prices).
-3. **Wire format** — handled by the provider's *family client*. Five clients
-   cover all eight providers; you never see them directly.
-
-There is a single `Model` class. Everything provider-specific (URL, auth header,
-request/response shape, the reasoning knob) lives in data + the family client —
-which is exactly why swapping models is one line.
-
-| Prefix / pattern | Provider |
-|---|---|
-| `claude-` | Anthropic |
-| `gemini-` | Google AI |
-| `grok-` | xAI |
-| `sonar`, `r1-1776` | Perplexity |
-| `kimi-` | Kimi (Moonshot) |
-| `deepseek-` | DeepSeek |
-| `qwen`, `qwq`, `wanx`, `wan<digit>` | Qwen (DashScope) |
-| `gpt-`, `dall-e-`, `chatgpt-image-`, `text-embedding-`, `whisper-`, `tts-`, `o<digit>` | OpenAI |
-
-### Constructor
-
-```python
-Model(name, options=None, client_options=None, api_key=None)
-```
-
-| Parameter | Type | Description |
-|---|---|---|
-| `name` | `str` | Model name; the prefix selects the provider. `provider/name` forces a provider for an unlisted name. |
-| `options` | `dict` \| `None` | Generation parameters (see below). Missing keys fall back to the provider's data defaults. |
-| `client_options` | `dict` \| `None` | HTTP client tuning (see below). |
-| `api_key` | `str` \| `None` | Overrides the provider's environment variable. |
-
-### `options` — generation parameters
-
-One vocabulary for every provider. Where a provider has no control for an
-option, the library declines it and says so — it is never dropped silently.
+You ask for `temperature`, `max_tokens`, `reasoning` the same way everywhere:
 
 <!-- g:model-options -->
 | Key | What it asks for | Providers with a control for it |
@@ -119,148 +57,68 @@ option, the library declines it and says so — it is never dropped silently.
 | `fidelity` | how much of the original survives an edit: 0 to 1, or 'low'/'high'. One axis, and providers run it both ways — OpenAI asks how much to preserve, Recraft how much to change, so the number is inverted for the latter | ✓ | OpenAI, Recraft |
 <!-- /g:model-options -->
 
-An option this library has no word for **raises at construction**, naming the
-ones that exist — a misspelt `temperatur` used to be accepted, ignored, and
-cost a whole run to notice. What each option actually does on each provider,
-built by making the requests rather than by writing prose, is in
-[Parameters, per provider](../reference/parameters.md).
+`reasoning` is the clearest case of what one word has to do: it becomes a
+thinking budget of 10 000 tokens on Anthropic, 8 192 on Google, the word
+`medium` on OpenAI, a flag on Qwen, and a different model on DeepSeek. You
+write it once.
 
-Whatever the library has to change to fit a provider, it says: a warning once
-per (model, option), and a record on `Skill.last_adaptations` and
-`AgentResult.adaptations` that a run can keep.
+## Never in silence
 
-### Universal reasoning
+A provider cannot always do what was asked: OpenAI has no `top_k`, a
+reasoning model refuses `temperature`, an image model ignores a `seed`. Each
+option meets one of four fates, and vanishing is not one of them:
 
-`reasoning` is one knob mapped to each provider's native thinking controls — so
-you raise "reasoning depth" the same way everywhere:
-
-| Provider | Translated to |
+| | What happens |
 |---|---|
-| Anthropic | `{"type": "enabled", "budget_tokens": N}` — low=4k, medium=10k, high=20k. Temperature forced to 1.0 when active. |
-| Google AI | `thinkingConfig.thinkingBudget` — low=2 048, medium=8 192, high=24 576. |
-| OpenAI | `reasoning_effort` on o-series / GPT-5.x reasoners. Plain GPT models ignore it. |
-| xAI | `reasoning_effort` for `grok-3-mini` / `-fast`. Other grok models think natively and ignore it. |
-| Kimi | `{"thinking": {"type": "enabled"}}` — all levels enable it (no budget knob). Temperature forced to 1.0. |
-| DeepSeek | Name switch — `"high"` routes to `deepseek-reasoner`; `"low"`/`"medium"` stay on `deepseek-chat`. |
-| Perplexity | Not used. |
+| **translated** | sent in the provider's own word — `aspect_ratio` as pixels |
+| **adapted** | changed to fit, and said so — a level becomes a budget |
+| **declined** | not sent, because the provider has nothing for it, and said so with what to use instead |
+| **refused** | a name the library has no word for — `temperatur` — raises when the Model is made, naming the options that exist |
 
-```python
-Model("claude-opus-4-8", options={"reasoning": "high"})    # 20k thinking tokens
-Model("gemini-2.5-pro",  options={"reasoning": "high"})    # Gemini thinking budget
-Model("deepseek-chat",   options={"reasoning": "high"})    # routes to deepseek-reasoner
-```
+"Said so" is two things: a warning, once per model and option, and a record on
+the result — `skill.last_adaptations`, `result.adaptations` — that a run keeps.
+The second matters more: a warning is lost in a log, a line in a run record is
+not, and a comparison that cannot say what its arms actually sent is not a
+comparison.
 
-### `client_options` — HTTP / transport
+Who decides whether a lost option is fatal is the caller, because the cost
+depends on the use: a thumbnail does not care about its shape, a fixed layout
+slot does, and a measurement is invalidated outright. `on_unsupported="warn"`,
+the default, adapts and reports; `"requirements"` raises for the losses that
+leave a result looking right and silently wrong — a seed, a size, a background;
+`"raise"` raises for any. What each option does on each provider, built by
+making the requests: [Parameters, per provider](../reference/parameters.md).
 
-| Key | Type | Notes |
-|---|---|---|
-| `url` | `str` | Override the base URL (proxies, gateways, Azure-style endpoints). |
-| `timeout` | `urllib3.Timeout` | Custom connect / read timeout. |
-| `retries` | `urllib3.Retry` | Transport-level retry policy. |
-| `proxy` | `dict` | `{"url": "http://proxy:3128", "username": …, "password": …}`. Or set `HTTPS_PROXY` / `HTTP_PROXY` in the environment — that applies to tool traffic too, not just model calls. |
-| `region` | `str` | **Qwen only** — DashScope region (`ap` default, `us`, `cn`, `hk`); also via `DASHSCOPE_REGION`. |
+## Defaults are not a baseline
 
-```python
-Model("gpt-4o", client_options={"proxy": {"url": "http://corp-proxy:3128"}})
-Model("qwen-max", client_options={"region": "us"})
-```
+A model run with no options set is not "the model with nothing chosen".
+`temperature` starts at 0.0 on DeepSeek, 0.2 on Perplexity, 0.7 on Qwen and
+1.0 on the rest; `max_tokens` spans 2 048 to 32 768. They are sent on every
+call whether anybody chose them or not, so **two models compared with no
+options set are not one variable apart**.
 
-### The registry — discovering models
+They were not converged, on purpose: a library-wide default would override a
+number each provider picked for its own models and change every existing
+caller's output. What is owed instead is the fact — `model.effective_options`
+says what goes on the wire, and each default's author is written down beside
+it: the vendor's own documented default, the vendor's advice adopted, or a
+choice this library made. When you compare models, set the options yourself.
 
-The registry is **reference data**. Query it to discover what the library ships
-and is tested with (<!-- g:count-models -->130 models from 10 cloud providers<!-- /g:count-models --> — the `private` provider
-deliberately lists none, because its catalogue belongs to your server):
+## Finding a model
+
+The registry is reference data, not a gatekeeper. It lists what the library
+ships and has tested, with capabilities and prices, and answers questions:
 
 ```python
 from yait_aichain.models import registry
-
-registry.models(task="text-to-image")
-# ['chatgpt-image-latest', 'gemini-3.1-flash-image', 'gpt-image-2',
-#  'gpt-image-1.5', 'grok-imagine-image-pro', 'wan2.2-t2i-flash', ...]
-
-registry.providers(task="text-to-image")   # ['openai', 'google', 'xai', 'qwen']
-registry.tasks("gpt-4o")                    # ['image-to-text', 'text-to-text']
-registry.is_supported("gpt-image-2", "text-to-image")   # True
+registry.models(task="image-to-text")        # every model that reads images
+registry.providers(task="text-to-image")
 ```
 
-Tasks: `text-to-text`, `text-to-image`, `image-to-text`, `image-to-image`. To
-diff the registry against a provider's live roster (new/removed models), call
-`registry.refresh("openai")`.
+It does not block a name it does not list — a new model works the day the
+provider ships it, by its prefix or `provider/` — and it is no guarantee your
+account can reach every model it lists. Text and vision are models; image
+generation is a tool, `image(service, model=…)`. → [Images](../tools/media.md)
 
-### Image editing (image-to-image)
-
-Editing an image is just **an input image part plus an image output** — the same
-`Skill` you use for generation, with the model named accordingly. The provider is
-a one-word swap.
-
-Two flavours, depending on the model:
-
-- **Instruction edit — preserves the subject** (OpenAI `gpt-image-*`, Google
-  Gemini image, xAI `grok-imagine-*`, Qwen `qwen-image-edit`, BFL `flux-kontext-*`):
-  follows the prompt while keeping the original object — e.g. "place *this*
-  product on a marble counter" keeps your product. This is what you want for
-  product photography and scene composition.
-- **Whole-image variation — not subject-preserving** (Recraft `imageToImage`):
-  a `strength`-controlled img2img transform of the *entire* image; great for
-  restyling a picture, but it will not lift your object into a new scene
-  (low `strength` stays near the original, high `strength` invents a new one).
-
-```python
-from yait_aichain import Model, Skill
-
-Skill(
-    model  = Model("gpt-image-1.5"),   # → gemini-3.1-flash-image / grok-imagine-image / qwen-image-edit
-    input  = {"messages": [{"role": "user", "parts": [
-        {"type": "image", "source": {"kind": "file", "path": "product.png"}},
-        "Place this product on a marble kitchen counter, soft morning light",
-    ]}]},
-    output = {"modalities": ["image"], "format": {"type": "image"}},
-).run()      # → {"base64": ..., "mime_type": ..., "url": ..., "revised_prompt": ...}
-```
-
-A media source of `{"kind": "file", "path": "..."}` is read and base64-encoded for
-you (MIME inferred); `{"kind": "base64", "data": ..., "mime": ...}` and
-`{"kind": "url", "url": ...}` work too. Discover edit-capable models with
-`registry.models(task="image-to-image")`.
-
-### Provider reference
-
-All providers expose the same interface; the table is for discovery. Full,
-current lists live in `models/providers/*.toml` and the
-[model registry](../reference/model-registry.md).
-
-| Provider | Env var | Representative models |
-|---|---|---|
-| OpenAI | `OPENAI_API_KEY` | `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.5` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` |
-| Google AI | `GOOGLE_AI_API_KEY` | `gemini-3.1-pro-preview`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-3-flash-preview` |
-| xAI | `XAI_API_KEY` | `grok-4.7`, `grok-4.3`, `grok-build-0.1` |
-| Perplexity | `PERPLEXITY_API_KEY` | `sonar-pro`, `sonar`, `sonar-reasoning-pro`, `sonar-deep-research` |
-| Kimi | `MOONSHOT_API_KEY` | `kimi-k3`, `kimi-k2.7-code`, `kimi-k2.6` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-flash`, `deepseek-v4-pro` |
-| Qwen | `DASHSCOPE_API_KEY` | `qwen3.8-max`, `qwen3.7-plus`, `qwen3.8-flash`, `qwen3-vl-plus` |
-| Recraft | `RECRAFT_API_TOKEN` | `recraftv4_1`, `recraftv3`, `recraftv3_vector` *(image only)* |
-| BFL (FLUX) | `BFL_API_KEY` | `flux-2-pro`, `flux-pro-1.1`, `flux-kontext-pro`, `flux-kontext-max` *(image only)* |
-| Private (your own server) | *(none — key optional)* | any name your server serves, via the `private/` prefix — see [Private models](private-models.md) |
-
-### What a Model does (and doesn't)
-
-A Model does exactly two things:
-
-- **`to_request(messages, output) → (path, body)`** — universal template →
-  provider-native request.
-- **`from_response(response, output) → str | dict`** — raw response → clean value.
-
-It knows nothing about prompts, variables, retries, or pipelines — those belong
-to [Skill](../pipelines/skills.md) and [Chain](../pipelines/chain.md). That isolation is the whole point.
-
----
-
-## See also
-
-- [Private models](private-models.md) — the same interface against a server you
-  control (vLLM, Ollama, LM Studio), with the data staying in your perimeter.
-- [Skill](../pipelines/skills.md) — bind a Model to a prompt and run it.
-- [Chain](../pipelines/chain.md) — sequence model calls with automatic variable flow.
-- [Agent](../agents/overview.md) — let a model plan and call tools.
-- [Model registry](../reference/model-registry.md) — the full model catalogue.
+A model on your own hardware is a `private/` name, needs no key, and sends
+nothing outside your network. → [Private models](private-models.md)

@@ -1,3 +1,12 @@
+# Decide
+
+Some questions need a number, not a paragraph: is this ticket urgent, how
+sure, which of five teams. A decision tool answers them directly.
+
+→ Every parameter: [API: decide](../api/tools/decide.md)
+
+---
+
 ## What a decision tool is
 
 A decision model writes no prose. It is given evidence — a text, a record, an

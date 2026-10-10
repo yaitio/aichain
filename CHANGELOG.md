@@ -50,6 +50,21 @@ a cost, 35 of 35; six new image models drew a picture.
   `agent.resume()` does not run, which is false since 3.1
   (`evals/agent_builds/HOLDOUT-RESULTS-3.md`).
 
+- **The documentation in two layers.** Guides — `start/`, `pipelines/`,
+  `agents/`, `tools/`, `utilities/`, `control/`, `models/`, and
+  `with-your-agent.md` and `production.md` — say what each part is for, why
+  it is built the way it is and how to use it well, with little code. The
+  API — `docs/api/`, one page per area — is rendered from the code's
+  signatures and docstrings, so it cannot drift from it; a public name with no
+  page fails a test, and the number of parameters no docstring describes is
+  held by a ratchet (361 when it was written, 140 now). Writing those
+  docstrings found them describing 1.x and 2.x in `AgentResult`, `Chain`,
+  `AgentMemory`, `Budget` and `Shell`, and two examples that could not run:
+  `Vectors` upserted `chunk()` pieces, which have no `id`, and `Budget`
+  passed a `budget=` no primitive takes. The README is the promises, a map of
+  the guides and the examples; `design/` moved to the root; the six cookbook
+  skeletons were deleted; `tests/test_doc_links.py` holds every relative link.
+
 ### Changed
 
 - **Prices.** `claude-sonnet-5` 3.0/15.0 → 2.0/10.0: the introductory rate

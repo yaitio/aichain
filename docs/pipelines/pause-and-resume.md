@@ -1,281 +1,118 @@
-# State — suspend & resume
+# Pause and resume
 
-A run can **pause** until an external signal arrives — a human approval, a
-webhook, a cron tick, a queue message — and **resume** later, even in a
-*different process*. The paused run is parked in a **store**; `resume(run_id,
-signal)` continues from exactly where it stopped, without re-running completed
-steps. This is the serverless core of the library.
-
-It applies to both [Chain](chain.md) and [Agent](../agents/overview.md), and is
-entirely additive: a run with no pause tool behaves exactly as before.
-
----
-
-## Quick start
-
-Put a `Wait` tool where the run should pause; resume it with the awaited data:
+Some runs have to wait: for a manager to approve a refund, for a customer to
+reply, for a webhook to say the payment cleared, for tomorrow morning. A
+process cannot sit there for a day, and a serverless function cannot sit there
+for more than a few minutes. So a run that waits does not wait — it **parks**:
+it writes down where it is, returns, and is picked up later by whatever
+receives the answer, in another process if need be.
 
 ```python
-from yait_aichain.chain import Chain
-from yait_aichain.tools import Wait
-from yait_aichain.state import SuspendedResult
-
 chain = Chain(steps=[
-    (draft, "draft"),
-    Wait(reason="A human must approve the reply", resume_with={"reply": "str"}),
-    (send, "confirmation"),
-])
+    (draft, "reply"),
+    (wait(reason="A person approves the reply", resume_with={"approved": "bool"}), "decision"),
+    (send, "sent"),
+], store=FileStore("runs/"))
 
-result = chain.run(variables={"complaint": "My order arrived late."})
+paused = chain.run(variables={"complaint": "My order arrived late."})
+paused.run_id, paused.awaiting["reason"]
 
-if isinstance(result, SuspendedResult):
-    print(result.awaiting["reason"])          # why it paused
-    print(result.document["variables"]["draft"])  # work done so far
-    # ...a human reviews, then:
-    final = chain.resume(result.run_id, signal={"reply": "Approved text"})
+# later, anywhere that shares the store:
+chain.resume(paused.run_id, signal={"approved": True})
 ```
 
-▶ Human-in-the-loop: [`examples/17_chain_human_input.py`](../../examples/17_chain_human_input.py) ·
-External trigger (cross-process): [`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py) ·
-Deep dive ↓
+→ Every parameter: [API: State](../api/state.md) · [API: wait and gate](../api/tools/wait-gate.md)
 
 ---
 
-## Common gotchas
+## Two ways to pause
 
-- **`run()` returns a `SuspendedResult` when it pauses** — and it's *falsy*. So
-  `if result:` is false on a pause; check `isinstance(result, SuspendedResult)`
-  (or inspect `result.run_id`).
-- **Default store is in-memory** — fine within one process, but a restart loses
-  the run. For a webhook/cron in another process, give a persistent store
-  (`FileStore`, or your own).
-- **Resume is idempotent by construction.** The store holds only *suspended*
-  runs; a completed run is deleted. Resuming a `run_id` that already finished
-  raises `KeyError` — a duplicate trigger can't double-execute.
-- **Completed steps are never re-run.** Their outputs are already in the saved
-  run document; resume re-enters only the paused step with your `signal`.
+**`wait()`** is a step that parks the run until a signal arrives. On resume
+its output is the signal, so the steps after it read what the person or the
+webhook sent.
 
----
+**`gate(tool)`** wraps any tool behind a decision. The run parks before the
+tool; on resume the tool runs only if the signal approves — `{"approved":
+True}` by default — and is skipped otherwise. A gate takes the wrapped tool's
+schema, so it drops into a chain or an agent's tools in its place.
 
-## Reference
+Both are ordinary tools. In a chain they are steps you put where the run must
+wait. In an agent's tools they are something the **model** may call, when it
+decides the world has to answer before it can go on.
 
-### How it works
+## The store is the run
 
-A run carries a self-contained **document**: the variables produced so far, each
-step's status, and enough definition to continue. When a step raises the
-internal `Suspend`, the engine saves that document to the store and returns a
-`SuspendedResult`. `resume(run_id, signal)` loads the document, feeds `signal`
-into the suspended step, and runs forward to completion (or the next pause),
-deleting the document from the store when the run finishes.
+A paused run is a document: the variables computed so far, each step's
+status, and enough of the definition to continue. Parking writes it to the
+store; resuming reads it, hands the signal to the waiting step, and continues
+from the first step not yet done. Finished steps are never run again — their
+outputs are already in the document — and nothing is replayed from the top.
 
-Because step outputs are *named* and stored, there is no replay: resume picks up
-at the cursor, not from the top.
-
-### `Wait` — a pause point
-
-A leaf tool that pauses the run on first reach and, on resume, returns the
-signal as its output.
-
-```python
-Wait(reason="...", resume_with={"reply": "str"})
-```
-
-| Argument | Purpose |
+| Store | When |
 |---|---|
-| `reason` | Human-readable why-paused, surfaced in `SuspendedResult.awaiting`. |
-| `resume_with` | A `{field: type}` hint describing the signal you'll send back. Documentation only — not enforced. |
-| `name` | Optional step/tool name. |
-| `hint` | Optional free-form hint for whatever will resume the run (e.g. a cron expression). The library records it; it never schedules anything itself. |
+| `InMemoryStore()` | the default: the answer comes back within this process |
+| `FileStore("runs/")` | the answer comes in another process on the same disk, or after a restart |
+| your own `StateStore` | S3, DynamoDB, Redis — anything with save, load and delete |
 
-On resume, `Wait`'s output is the `signal` dict — so a later step can read what
-the human/webhook provided.
+The default is in memory, and that is the mistake to avoid: a chain with a
+`wait()` and no store warns when it is built, and an agent given a pausing
+tool with no store refuses to be built, because a pause nobody can resume is
+otherwise discovered at the worst moment — after someone answered.
 
-### `Gate` — approval around any tool
+## Across processes
 
-Wraps **any** tool behind an external decision. On first reach the run pauses;
-on resume, if the signal grants approval the wrapped tool runs with its normal
-arguments, otherwise it's skipped.
-
-```python
-from yait_aichain.tools import Gate
-
-Gate(IssueRefund(), reason="A manager must approve the refund",
-     resume_with={"approved": "bool"})
-# resume with: signal={"approved": True}
-```
-
-| Argument | Default | Purpose |
-|---|---|---|
-| `tool` | — | The tool to run only after approval. |
-| `reason` | `""` | Why approval is needed. |
-| `resume_with` | `{}` | Shape of the expected signal. |
-| `decision_key` | `"approved"` | Which signal key is read as the approve/skip boolean. |
-| `name`, `hint` | — | As for `Wait`. |
-
-`Gate` mirrors the wrapped tool's `parameters`, so it drops into a Chain or an
-Agent's toolset transparently.
-
-### Stores
-
-A store is where suspended runs live. Every Chain/Agent always has one (default
-in-memory), so the engine has a single uniform path.
-
-| Store | Use |
-|---|---|
-| `InMemoryStore()` | Default. Process-local; lost on restart. Fine for same-process human-in-the-loop. |
-| `FileStore(dir)` | Persists each run to `<dir>/<run_id>.json` (atomic writes). Survives restart; shareable between processes on the same disk. |
-| Subclass `StateStore` | Implement `save` / `load` / `delete` over S3, DynamoDB, Redis, any KV — for real serverless / multi-host. |
+The point of all this is that the two halves share nothing but the store and
+the run's id:
 
 ```python
-from yait_aichain.state import InMemoryStore, FileStore
-
-Chain(steps=[...], store=FileStore("runs/"))         # a Wait/Gate step
-Agent(model, tools=[Gate(publish)], store=FileStore("runs/"))   # a tool the model may call
-```
-
-### `SuspendedResult`
-
-Returned by `run()` (and `resume()`) when the run pauses.
-
-| Attribute | Meaning |
-|---|---|
-| `run_id` | Pass to `resume(run_id, signal=...)` to continue. |
-| `awaiting` | Dict describing the pause (`reason`, and the `resume_with` hint). |
-| `document` | The run snapshot — `variables` done so far, step `status`, definition. |
-
-It is **falsy**, so an accidental `if result:` treats a pause as "not done".
-
-### `resume()`
-
-```python
-final = chain.resume(run_id, signal={...})        # Chain → a ChainResult
-```
-
-Loads the parked document, injects `signal` into the suspended step, and runs to
-completion — returning the final value (or another `SuspendedResult` if it
-pauses again). The document is deleted from the store on completion. A fresh
-Chain/Agent built in another process resumes fine as long as it shares the same
-store.
-
-### `RunContext` — per-request context
-
-Pass tenant + metadata (tracing ids, request info — **not** secrets; API keys
-stay on `Model`/`Tool`) into a run:
-
-```python
-from yait_aichain.state import RunContext
-
-chain.run(variables={...}, context=RunContext(tenant="acme", metadata={"req": "r-42"}))
-chain.context.tenant          # "acme" — available for the duration of the run
-chain.context.get("req")      # "r-42"
-```
-
-`RunContext(tenant=None, metadata={})` is a frozen value object with a
-convenience `.get(key, default)` reader. It is exposed as `chain.context`
-while the run is in flight and is **persisted in the run document**, so
-`resume()` restores it (even in another process — pass it again to override).
-
-**`Chain` only.** `Agent.run()` takes `task` and `variables`; there is no
-`agent.context` and no `context=`. Put an agent inside a chain step when a run
-needs per-request context.
-
-### Per-request secrets, for multi-tenant
-
-`RunContext` carries a tenant's **name**, never its credentials — it is
-serialised into the run document and `FileStore` writes that to disk, so a key
-placed in it would be persisted in plaintext. The secret is resolved *from* it
-instead:
-
-```python
-from yait_aichain.state import RunContext, using
-
-model = Model("gpt-4o", api_key=lambda ctx: vault.key_for(ctx.tenant))
-
-chain.run(variables={...}, context=RunContext(tenant="acme"))   # Chain
-with using(RunContext(tenant="acme")):                          # anything else
-    skill.run()
-```
-
-The callable is asked **once per request** and handed whatever run is in
-flight, so one `Model` serves every tenant. Resolving at construction would
-bind the first tenant's credential to every later request.
-
-**A resolver that returns nothing raises.** There is no fall-back to the
-process-wide key, deliberately: a fall-back would send one tenant's request
-under another's credential and the provider would answer normally.
-
-**No `context=` on `Skill`, `Pool` or `Tool`.** The context is ambient for the
-duration of a run — a parameter on every primitive would be the environment
-leaking into the scenario, which [VISION](../../VISION.md) names as the signal
-that a design has gone wrong. `Pool` copies it into each worker thread
-explicitly, because `contextvars` do not cross a thread boundary on their own.
-
-### The cross-process pattern
-
-The whole point: the two halves can be separate serverless invocations that
-share nothing but the store.
-
-```python
-# Invocation 1 — start; it parks at the gate
-def start():
+# invocation 1 — starts the run; it parks
+def start(order):
     chain = build_chain(store=FileStore("/srv/runs"))
-    res = chain.run(variables={"order": "#123"})
-    return res.run_id                      # persist this id somewhere
+    return chain.run(variables={"order": order}).run_id      # keep this id
 
-# Invocation 2 — a webhook delivers the decision later
-def approval_webhook(run_id, approved):
-    chain = build_chain(store=FileStore("/srv/runs"))   # fresh chain, same store
+# invocation 2 — a webhook, hours later
+def on_approval(run_id, approved):
+    chain = build_chain(store=FileStore("/srv/runs"))         # a new object, same store
     return chain.resume(run_id, signal={"approved": approved})
 ```
 
-The trigger needs only the `run_id`, the shared store, and the signal — no
-reference to the original object.
+**Resuming is idempotent.** The store holds only parked runs; a run that
+finished is deleted. A `run_id` that is no longer there raises `KeyError`, so a
+trigger that delivers twice — and webhooks do — can read that as "already
+handled" instead of running the tail twice.
 
-### A run that has not started — `arm()`
+## A run that has not started
 
-A subscription is a parked run that has taken no step. `arm()` creates one:
+`arm()` creates a run parked before its first step: an id, a document in the
+store, and the shape of the signal that will start it. That is a
+subscription — what a trigger waits on, and what a person is shown a form for.
 
 ```python
 armed = chain.arm(reason="waiting for an order", resume_with={"topic": "str"},
                   hint={"on": "order.created"})
-armed.run_id                       # store this; it *is* the subscription
-armed.awaiting                     # what a person is shown a form for
-
-# whatever wakes it — a webhook, a cron tick, a human pressing start:
-chain.resume(armed.run_id, signal={"topic": "solar power"})
+chain.resume(armed.run_id, signal={"topic": "solar power"})    # the order arrived
 ```
 
-The signal seeds the variables, because nothing has run and there is no
-suspended tool to hand it to. `Agent.arm()` is the same, except that the signal
-is the **task** — a bare string, or `{"task": ..., ...}` whose other keys seed
-the conversation as `variables=` does.
+The signal seeds the variables, since nothing has run yet. For an agent, the
+signal is the task. `hint` is recorded for whatever does the waking and never
+acted on: the library parks runs and schedules nothing. What it buys is one
+shape for three things usually built apart — a run waiting to start, waiting at
+a gate, and waiting for an answer the model asked for all end in
+`resume(run_id, signal)`.
 
-`hint` is recorded and never acted upon: the library parks runs and does not
-schedule them. What this buys is one shape for two things that are usually
-built separately — the trigger and the human form are both
-`resume(run_id, signal)` against a `SuspendedResult`, whether the run is
-waiting to start, waiting at a gate, or waiting for an answer the model asked
-for.
+## What it is not
 
-> **An agent parks the same way — since 2026-09-18.** `Agent(store=...)` and
-> `agent.resume(run_id, signal=...)` exist, and a `Wait` or `Gate` in the tool
-> list is a tool the **model** may call when it decides the world has to
-> answer. Before that date the `Suspend` such a tool raises was caught like
-> any other tool failure and reported to the model as an error, so the run
-> never parked. What `2.0.0` removed is still removed: there is no snapshot
-> mechanism, no `agent.save()` and no `agent.context`, and nothing stops a run
-> from outside it — the agent's state **is** the conversation, and that is
-> precisely what the store keeps while an answer is owed.
->
-> For a human deciding **inside** an invocation that can afford to wait, the
-> cheaper mechanism is still `approve=` — see
-> [Permissions](../control/observability.md#permission-matrix). Park when the
-> waiting cannot be held: a Lambda cannot sit in front of a person.
+A pause is not a snapshot of an object. An agent's state is its conversation —
+a message list — so an agent parks the same way a chain does, through a
+`wait()` or `gate()` in its tools and a `store=`, and there is no
+`agent.save()`. Nothing stops a run from outside it either: a run parks only
+where one of its own steps asked the world for something.
+
+A person deciding within the same call needs none of this: `approve=` on the
+agent asks them before the tool runs, and returns. Parking is for answers that
+outlive the process. → [Permissions](../control/permissions.md)
 
 ---
 
-## See also
-
-- [Chain](chain.md) — `store=`, `run()` pausing, `resume()`.
-- [Agent](../agents/overview.md) — the same suspend/resume on autonomous runs.
-- [Tools](../tools/index.md) — `Wait` and `Gate` alongside the other built-in tools.
+▶ [`examples/17_chain_human_input.py`](../../examples/17_chain_human_input.py) ·
+[`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py)
