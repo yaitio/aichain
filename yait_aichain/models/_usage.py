@@ -139,7 +139,12 @@ def extract_usage(response: dict) -> Usage:
             img_in = idet.get("image_tokens") or 0
             inp    = max(0, inp - img_in)
         total = u.get("total_tokens") or (inp + out + write + read + img_in)
+        # Some providers bill in the response itself — OpenRouter puts the
+        # call's price in `usage.cost`. That is the bill, not an estimate, so
+        # it is kept and wins over the registry's arithmetic.
+        reported = u.get("cost")
         return Usage(input_tokens=inp, output_tokens=out, total_tokens=total,
+                     cost=float(reported) if isinstance(reported, (int, float)) else None,
                      cache_write_tokens=write, cache_read_tokens=read,
                      image_input_tokens=img_in)
 
@@ -263,5 +268,8 @@ def price_per_image(model_name: str) -> "float | None":
 
 
 def attach_cost(usage: Usage, model_name: str, cache_ttl: str = "5m") -> Usage:
-    """Return *usage* with its ``cost`` field filled in (``None`` if unknown)."""
+    """Return *usage* with its ``cost`` filled in: what the provider reported
+    when it reported one, else the registry's estimate, else ``None``."""
+    if usage.cost is not None:
+        return usage
     return replace(usage, cost=estimate_cost(usage, model_name, cache_ttl))

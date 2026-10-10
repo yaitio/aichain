@@ -115,5 +115,31 @@ class TestRatesAModelCarriesItself(unittest.TestCase):
         self.assertIsNone(price_per_image("claude-haiku-5-5"))
 
 
+class TestACostTheProviderReports(unittest.TestCase):
+    """OpenRouter bills in the response: `usage.cost`, verbatim from a live
+    call on 2026-10-11. The bill wins over the registry's arithmetic, and a
+    model the registry does not price is no longer `None`."""
+
+    OPENROUTER = {"usage": {"prompt_tokens": 10, "completion_tokens": 13, "total_tokens": 23,
+                            "cost": 5.04e-06, "is_byok": False,
+                            "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0}}}
+
+    def test_it_is_read(self):
+        from yait_aichain.models._usage import attach_cost
+        u = attach_cost(extract_usage(self.OPENROUTER), "xiaomi/mimo-v2.6-flash")
+        self.assertEqual(u.cost, 5.04e-06)
+
+    def test_it_wins_over_the_registry(self):
+        from yait_aichain.models._usage import attach_cost
+        u = attach_cost(extract_usage(self.OPENROUTER), "claude-haiku-5-5")
+        self.assertEqual(u.cost, 5.04e-06)
+
+    def test_without_it_the_registry_prices(self):
+        from yait_aichain.models._usage import attach_cost
+        u = attach_cost(extract_usage({"usage": {"prompt_tokens": 10_000, "completion_tokens": 0}}),
+                        "claude-haiku-5-5")
+        self.assertAlmostEqual(u.cost, 0.001)
+
+
 if __name__ == "__main__":
     unittest.main()
