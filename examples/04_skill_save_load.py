@@ -19,7 +19,7 @@ YAML_PATH = os.path.join(os.path.dirname(__file__), "validator.yaml")
 
 # ── Define and save ───────────────────────────────────────────────────────────
 skill = Skill(
-    model       = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model       = Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input       = {"messages": [{"role": "user", "parts": ["Check whether this text was written by a human or a modern LLM and rate the probability from 0 to 10. The higher the score, the more likely it is that the text was written by LLM: {text}"]}]},
     name        = "validator",
     description = "Checks the AI-ship of the text.",

@@ -25,7 +25,7 @@ writer = Skill(
 )
 
 reviewer = Skill(
-    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": [
         "Review this paragraph and suggest one concrete improvement:\n\n{result}"
     ]}]},

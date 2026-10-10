@@ -44,7 +44,7 @@ Required env vars:
 
 import random
 
-MODEL = "claude-haiku-4-5-20251001"      # any orchestrator model you have a key for
+MODEL = "claude-haiku-5-5"      # any orchestrator model you have a key for
 
 from yait_aichain import Agent, Model
 from yait_aichain.agent import check, step_count, token_budget

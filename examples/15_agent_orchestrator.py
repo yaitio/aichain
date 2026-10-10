@@ -26,7 +26,7 @@ from yait_aichain.tools import search
 # topic in its own conversation and hands back a conclusion, so the coordinator
 # gains one turn per topic instead of a whole search history.
 orchestrator = Agent(
-    Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
     tools     = [search("perplexity", api_key=os.getenv("PERPLEXITY_API_KEY"))],
     team      = "auto",
     stop_when = [step_count(15)],

@@ -1,7 +1,7 @@
 """
 03_skill_multimodal.py — Text → Image → Text, three providers.
 
-  1. text  → text   Claude  (claude-haiku-4-5-20251001)   a model
+  1. text  → text   Claude  (claude-haiku-5-5)   a model
   2. text  → image  Grok    (grok-imagine-image)  a tool — an image model cannot be an agent's mind
   3. image → text   Qwen    (qwen3-vl-plus)       a model that sees
 
@@ -23,7 +23,7 @@ HERE = pathlib.Path(__file__).parent
 
 # ── 1. Text → Text (Claude) ───────────────────────────────────────────────────
 text_skill = Skill(
-    model = Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    model = Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
     input = {"messages": [{"role": "user", "parts": ["Describe a sunset in one sentence."]}]},
 )
 

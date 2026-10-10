@@ -19,7 +19,7 @@ from yait_aichain.agent  import Agent, step_count
 from yait_aichain.tools import fetch, search
 
 agent = Agent(
-    Model("claude-haiku-4-5-20251001", api_key=os.getenv("ANTHROPIC_API_KEY")),
+    Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
     tools     = [
         search("perplexity", api_key=os.getenv("PERPLEXITY_API_KEY")),
         fetch("local"),

@@ -37,12 +37,12 @@ def _hr(label): print(f"\n{'─' * 60}\n  {label}\n{'─' * 60}")
 _hr("CHAIN · chain.history")
 
 writer = Skill(
-    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-5-5", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Write one sentence about {topic}."]}]},
     name  = "writer",
 )
 reviewer = Skill(
-    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-5-5", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Improve this: {result}"]}]},
     name  = "reviewer",
 )
@@ -63,7 +63,7 @@ for record in chain.history:
 _hr("POOL · pool.status (live) + pool.history")
 
 skill = Skill(
-    model = Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
+    model = Model("claude-haiku-5-5", api_key=ANTHROPIC_KEY),
     input = {"messages": [{"role": "user", "parts": ["Explain {topic} in one sentence."]}]},
 )
 
@@ -108,7 +108,7 @@ for r in pool.history:
 _hr("AGENT · verbose=1 + result.journal")
 
 agent = Agent(
-    Model("claude-haiku-4-5-20251001", api_key=ANTHROPIC_KEY),
+    Model("claude-haiku-5-5", api_key=ANTHROPIC_KEY),
     tools     = [search("perplexity", api_key=PERPLEXITY_KEY)],
     stop_when = [step_count(5)],   # a ceiling; reaching it is a failure, and it says so
     verbose   = 1,                 # ← one line per tool call

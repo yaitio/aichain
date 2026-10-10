@@ -119,7 +119,7 @@ from yait_aichain.state import FileStore, SuspendedResult
 from yait_aichain.tools import wait
 
 # Skill — one prompt, one model
-skill = Skill(model=Model("claude-haiku-4-5-20251001"), prompt="Summarise: {text}")
+skill = Skill(model=Model("claude-haiku-5-5"), prompt="Summarise: {text}")
 result = skill.run(variables={"text": "..."})
 
 # Chain — sequential steps
@@ -133,7 +133,7 @@ results = pool.run()          # outputs in item order
 print(results[0], results.success, results.cost)
 
 # Agent — one loop, tools or an answer each turn
-agent = Agent(Model("claude-haiku-4-5-20251001"), tools=[...], stop_when=[step_count(10)])
+agent = Agent(Model("claude-haiku-5-5"), tools=[...], stop_when=[step_count(10)])
 result = agent.run("Research the top 3 vector databases.")
 print(result.output, result.stopped_by, result.tokens_used)
 
