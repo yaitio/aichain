@@ -302,6 +302,13 @@ class Model:
         Provider API key.  When omitted it is read from the provider's
         environment variable (e.g. ``OPENAI_API_KEY``), named in the provider
         data.  Raises ``ValueError`` if neither is found.
+    on_unsupported : str, optional
+        What happens when a provider cannot do an option it was asked:
+        ``"warn"`` (the default) adapts or drops it and says so in
+        ``last_adaptations``; ``"requirements"`` raises for the losses that
+        leave a result looking right and silently wrong — ``seed``, ``size``,
+        ``aspect_ratio``, ``background``, ``fidelity``, ``output_format``,
+        ``compression``; ``"raise"`` raises for any.
 
     Attributes
     ----------
@@ -580,6 +587,16 @@ class Model:
         implemented the tool wire format refuse loudly here — silently sending
         a request without the declared tools would produce a model that simply
         never calls anything, with no error anywhere.
+
+        Parameters
+        ----------
+        messages : list
+            Universal messages, placeholders already filled: ``{"role", "parts"}``
+            with typed parts.
+        output : dict
+            The output spec: ``{"modalities": [...], "format": {"type": …}}``.
+        tools : list | None, optional
+            Function-calling schemas, as ``Tool.schema()`` returns them.
         """
         if tools:
             if not getattr(self.client, "supports_tools", False):
@@ -723,6 +740,16 @@ class Model:
         exists to raise on.
 
         Usage lands on ``last_stream_usage`` when the provider reports it.
+
+        Parameters
+        ----------
+        messages : list
+            Universal messages, placeholders already filled: ``{"role", "parts"}``
+            with typed parts.
+        output : dict
+            The output spec: ``{"modalities": [...], "format": {"type": …}}``.
+        tools : list | None, optional
+            Function-calling schemas, as ``Tool.schema()`` returns them.
         """
         from ._adaptation import (Adaptation, DECLINED, announce, collect,
                                   enforce, note_absent)
@@ -814,6 +841,13 @@ class Model:
         """
         Extract the clean result (str for text, dict for json / image) from a
         raw provider response, by delegating to the family client.
+
+        Parameters
+        ----------
+        response : dict
+            The provider's raw response body.
+        output : dict
+            The output spec the request was built with.
         """
         return self.client.parse_response(response, output)
 

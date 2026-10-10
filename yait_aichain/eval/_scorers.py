@@ -47,7 +47,13 @@ def _norm(s: str, fold: bool) -> str:
 # ── Rule-based ───────────────────────────────────────────────────────────────
 
 def exact(*, fold: bool = True) -> Scorer:
-    """The answer equals ``case.expect``, whitespace collapsed."""
+    """The answer equals ``case.expect``, whitespace collapsed.
+
+    Parameters
+    ----------
+    fold : bool, optional
+        Ignore case.
+    """
     def _score(case, output):
         return _norm(_text(output), fold) == _norm(_text(case.expect), fold)
     return _score
@@ -61,6 +67,13 @@ def contains(*, fold: bool = True, all_of: bool = True) -> Scorer:
     hit passes, and the partial score is the fraction found — the difference
     between three of four and none of four is the whole reason a benchmark
     discriminates, and an all-or-nothing verdict throws it away.
+
+    Parameters
+    ----------
+    fold : bool, optional
+        Ignore case.
+    all_of : bool, optional
+        Every expected string must appear; ``False`` — any one.
     """
     def _score(case, output):
         want = case.expect if isinstance(case.expect, (list, tuple)) else [case.expect]
@@ -72,14 +85,26 @@ def contains(*, fold: bool = True, all_of: bool = True) -> Scorer:
 
 
 def regex(*, flags: int = 0) -> Scorer:
-    """``case.expect`` is a pattern the answer must match somewhere."""
+    """``case.expect`` is a pattern the answer must match somewhere.
+
+    Parameters
+    ----------
+    flags : int, optional
+        ``re`` flags.
+    """
     def _score(case, output):
         return bool(_re.search(_text(case.expect), _text(output), flags))
     return _score
 
 
 def numeric(*, tolerance: float = 0.0) -> Scorer:
-    """The first number in the answer equals ``case.expect``, within tolerance."""
+    """The first number in the answer equals ``case.expect``, within tolerance.
+
+    Parameters
+    ----------
+    tolerance : float, optional
+        The largest difference still counted equal.
+    """
     def _score(case, output):
         found = _re.search(r"-?\d+(?:[.,]\d+)?", _text(output))
         if not found:
@@ -122,6 +147,15 @@ def judge(model, *, rubric: str = "The answer is correct if it states the same "
     An unparseable verdict raises. That is deliberate: the alternative is to
     guess, and guessing "pass" raises every arm at once, which reads as a good
     result rather than as a broken judge.
+
+    Parameters
+    ----------
+    model : Model
+        The judge.
+    rubric : str, optional
+        What correct means here.
+    prompt : str, optional
+        The whole judging prompt, with ``{rubric}``, ``{question}``, ``{expect}`` and ``{answer}``.
     """
     from ..models import Model
     from ..skills import Skill
@@ -166,6 +200,11 @@ def abstain(why: str) -> dict:
     reads, and it removes the row from the denominator rather than counting it
     as a failure. Those two are different claims and the difference is the
     whole point: a judge that cannot read an answer has said nothing about it.
+
+    Parameters
+    ----------
+    why : str
+        Why no verdict was possible; counted in ``Report.abstentions()``.
     """
     return {"ok": False, "score": 0.0, "abstained": True, "why": why}
 
@@ -192,6 +231,15 @@ def pairwise(model, *, rubric: str = "Which answer better fulfils the "
     they disagreed. That number is the judge's own reliability, measured for
     free while grading, and a pair of orderings that disagree half the time
     means the comparison is a coin toss wearing a rubric.
+
+    Parameters
+    ----------
+    model : Model
+        The judge.
+    rubric : str, optional
+        What better means here.
+    champion : str, optional
+        What the candidate is compared with, as named to the judge.
     """
     from ..models import Model
     from ..skills import Skill

@@ -2,43 +2,31 @@
 agent._memory
 =============
 
-``AgentMemory`` — shared key-value store accessible from every agent step.
+``AgentMemory`` — a key-value store with a pluggable backend.
 
-The memory persists for the lifetime of a single ``agent.run()`` call.
-Every step can read from it, write to it, and update it.  The full memory
-state is included in every orchestrator prompt so the agent always has
-complete context.
-
-The memory is also exposed in :class:`~agent.AgentResult` as a plain dict
-snapshot, giving callers a full audit trail of what the agent retained.
+**The Agent does not use it.** Since 2.0.0 an agent's state is its
+conversation; nothing in the loop reads or writes this store, and
+``AgentResult.memory`` survives as a field that is never written. What remains
+is yours to use — from inside your own tools, across runs, or as scratch space
+in a ``Chain``.
 
 .. warning::
-    Memory is **not** encrypted or redacted: its full contents are embedded
-    verbatim into every orchestrator prompt (sent to the model provider) and,
-    with ``FileBackend``, written to disk as plain JSON. Do not store secrets
-    (API keys, tokens, PII) in agent memory or seed them as ``initial``
-    values — they would leak to the provider and to the state file.
+    Memory is **not** encrypted or redacted, and with ``FileBackend`` it is
+    written to disk as plain JSON. Do not store secrets in it.
 
 Pluggable backends
 ------------------
-By default ``AgentMemory`` uses an in-process ``InMemoryBackend``: each
-``run()`` starts from the construction-time baseline (any ``initial`` seed),
-discarding scratch values from previous runs.
-
-For durable state across separate ``run()`` calls, supply a ``FileBackend``::
+By default ``AgentMemory`` uses an in-process ``InMemoryBackend``. For state
+that survives the process, supply a ``FileBackend``::
 
     from yait_aichain.agent import AgentMemory, FileBackend
 
-    memory = AgentMemory(backend=FileBackend("~/.agent_state.json"))
-    agent  = Agent(..., memory=memory)
-    result = agent.run(task="...")   # sees the state loaded from the file
+    memory = AgentMemory(backend=FileBackend("~/.my_state.json"))
+    memory.set("last_seen", "2026-10-10")
+    memory.flush()                       # write it
 
-    # Persist the final state so the next run can load it
-    memory.flush()
-
-``run()`` calls :meth:`AgentMemory.reset` (not :meth:`~AgentMemory.clear`),
-which restores the loaded-plus-initial baseline without touching the backend
-— so persisted state survives and is visible to every run.
+:meth:`AgentMemory.reset` (not :meth:`~AgentMemory.clear`) restores the
+loaded-plus-initial baseline without touching the backend.
 """
 
 from __future__ import annotations
@@ -215,10 +203,9 @@ class AgentMemory:
 
         from yait_aichain.agent import AgentMemory, FileBackend
 
-        memory = AgentMemory(backend=FileBackend("~/.my_agent.json"))
-        agent  = Agent(..., memory=memory)
-        result = agent.run(task="...")
-        memory.flush()   # checkpoint the final state
+        memory = AgentMemory(backend=FileBackend("~/.my_state.json"))
+        memory.set("topic", "fusion energy")
+        memory.flush()   # write it to the file
     """
 
     def __init__(

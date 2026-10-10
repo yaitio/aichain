@@ -237,7 +237,15 @@ def note_absent(made: list, asked: dict, body, model_name: str,
 
 class UnsupportedOption(ValueError):
     """An option the caller set could not be honoured, and they asked to be
-    stopped rather than warned. Carries the adaptations that caused it."""
+    stopped rather than warned. Carries the adaptations that caused it.
+
+    Parameters
+    ----------
+    message : str
+        What could not be honoured.
+    adaptations : list
+        The ``Adaptation`` records behind it, also on ``last_adaptations``.
+    """
 
     def __init__(self, message: str, adaptations: list) -> None:
         super().__init__(message)

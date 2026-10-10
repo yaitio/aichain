@@ -15,83 +15,62 @@ from .. import _hints
 @dataclass
 class AgentResult:
     """
-    Structured return value from :meth:`Agent.run`.
+    What :meth:`Agent.run` returns: the answer, how the run ended, and what it
+    cost. ``bool(result)`` is ``result.success``.
 
     Attributes
     ----------
     success : bool
-        ``True`` when the agent produced a final answer.
-        ``False`` when it stopped due to a fatal error, budget exhaustion,
-        or an unrecoverable step failure.
-
+        ``True`` when the agent answered, or a ``check()`` passed.
     output : str | dict | None
-        The final answer produced by the agent.  ``None`` when
-        *success* is ``False``.
-
+        The answer. ``None`` when *success* is ``False``.
     mode : str
-        The mode the agent ran in — ``"waterfall"`` or ``"agile"``.
-
+        ``"agile"`` or ``"waterfall"``.
     steps_taken : int
-        Number of plan steps that were executed (including retries).
-
+        Model turns taken.
     tokens_used : int
-        Total tokens consumed across *all* LLM calls: planning,
-        action determination, skill execution, and reflection.
-
+        Tokens across every model call of the run, input and output together.
     cost : float | None
-        Estimated USD spent on those calls, priced per model from the provider
-        registry.  ``None`` when nothing could be priced — a self-hosted model
-        has no price per token, and this reports that rather than inventing a
-        zero.
-
-        Not derivable from ``tokens_used``: that field sums input and output
-        together, and output costs five to six times input at frontier rates.
-
-        Covers the calls made by *this* invocation.  A run picked up with
-        :meth:`~Agent.resume` therefore reports only the resumed leg, because
-        cost is not written to the checkpoint the way ``tokens_used`` is.
-
+        Dollars, priced per model from the registry; ``None`` when nothing
+        could be priced, never an invented zero. A run picked up with
+        ``resume()`` reports the resumed part only.
+    stopped_by : str | None
+        What ended the run: ``"answered"``, ``"check:<name>"``,
+        ``"step_count"``, ``"token_budget"``, ``"cost_budget"``, or the name
+        of an error.
     plan : list[dict]
-        The final plan the agent executed.  In agile mode this may
-        differ from the original plan if replanning occurred.
-
+        In ``waterfall`` mode, the plan it wrote — ``{"goal": …}`` per step.
+    adaptations : list
+        What the library changed in this run's requests to fit the provider,
+        each an ``Adaptation``; empty when nothing was.
     history : list[dict]
-        Full step-by-step execution trace.  Each record contains:
-
-        * ``step``       — 0-based step index in the plan
-        * ``attempt``    — 1-based attempt counter for this step
-        * ``step_goal``  — what the step was trying to achieve
-        * ``action_type``— ``"tool"`` or ``"skill"``
-        * ``action``     — the action dict produced by the orchestrator
-        * ``output``     — raw output from the step
-        * ``exec_error`` — exception message if execution failed, else ``None``
-        * ``stored_as``  — memory key where output was stored, else ``None``
-        * ``reflection`` — the orchestrator's assessment dict
-        * ``tokens``     — tokens used for this step's LLM calls
-
+        Empty for an agent, kept so every result has the same fields; an
+        agent's record is ``journal``.
     memory : dict
-        Final snapshot of the agent's memory after all steps completed.
-
+        Empty; the agent has had no memory store since 2.0.
     error : str | None
-        Human-readable reason for failure.  ``None`` when *success* is
-        ``True``.
+        Why it failed, when it did.
+    journal : list[dict]
+        What was attempted, in order, each entry with its outcome and the
+        evidence behind it — ``check`` for a fact the code verified,
+        ``model_claim`` for the model's word.
+    acceptance : Acceptance | None
+        What the answer rests on: ``checked``, ``claimed`` or ``unsupported``,
+        with a fingerprint of the evidence, so ``still_holds()`` can tell when
+        it has changed.
+    beacons : list
+        Beacons raised during the run, including by delegated workers — a
+        blocker, a question, a contract that changed.
 
     Examples
     --------
     ::
 
-        result = agent.run("Research fusion energy and write a summary in French")
-
+        result = agent.run("Research fusion energy and summarise it in French")
         if result:
-            print(result.output)
-            print(f"Used {result.tokens_used} tokens in {result.steps_taken} steps")
+            print(result.output, result.cost, result.stopped_by)
         else:
-            print("Failed:", result.error)
-
-        # Inspect the full trace
-        for rec in result.history:
-            print(f"Step {rec['step']+1} [{rec['action_type']}] {rec['step_goal']}")
-            print(f"  Assessment: {rec['reflection'].get('assessment')}")
+            print("failed:", result.error)
     """
 
     success:     bool

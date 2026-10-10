@@ -125,6 +125,19 @@ class Skill:
 
     description : str | None, optional
         Short description of what the skill does.
+    prompt : str | None, optional
+        A shortcut for one user message: ``Skill(model, prompt="Summarise:
+        {text}")``. Give ``prompt`` or ``input``, not both.
+    max_retries : int, optional
+        Retries after a transient failure (429, 5xx, a network error), on top
+        of the transport's own. ``0``, the default, is one attempt.
+    retry_delay : float, optional
+        Seconds before the first retry; each later one waits twice as long.
+    hooks : list | None, optional
+        Callables given an ``Event`` for each model call.
+    max_cost : float | Budget | None, optional
+        A ceiling in dollars; a call that would begin past it raises
+        ``BudgetExceeded``.
 
     Examples
     --------
@@ -380,6 +393,11 @@ class Skill:
 
         A provider that cannot stream yields the whole answer as one piece
         and says so through the adaptation channel — see ``Model.stream``.
+
+        Parameters
+        ----------
+        variables : dict | None, optional
+            Variables for this call, merged over the Skill's own.
         """
         import json as _json
         import time as _time

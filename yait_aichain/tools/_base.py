@@ -75,6 +75,13 @@ class Record(dict):
 
     The rendering is not stored: a record written to a state store and read
     back is a plain dict.
+
+    Parameters
+    ----------
+    data : dict
+        The fields, for code.
+    render : callable
+        Turns them into the text a model is shown; ``str(record)`` calls it.
     """
 
     __slots__ = ("_render",)
@@ -397,6 +404,11 @@ class Tool:
         only authority over what it actually describes. A nested object with
         no `properties` of its own is a free-form dict by declaration, and is
         left alone.
+
+        Parameters
+        ----------
+        kwargs : dict
+            The arguments of a call.
         """
         declared = self.parameters.get("properties", {})
         unknown  = [k for k in kwargs if k not in declared]
@@ -426,6 +438,11 @@ class Tool:
         type enforcement (which would need an extra dependency). An Agent feeds
         the returned message back to the model as a structured observation so it
         can correct the call within the step's attempt budget.
+
+        Parameters
+        ----------
+        kwargs : dict
+            The arguments of a call.
         """
         required   = self.parameters.get("required", [])
         properties = self.parameters.get("properties", {})
@@ -508,6 +525,17 @@ class FunctionTool(Tool):
     its ``name: text`` line in the docstring. ``run(**arguments)`` calls the
     function and returns what it returns; the function itself is
     ``.__wrapped__``.
+
+    Parameters
+    ----------
+    fn : callable
+        The function to wrap.
+    name : str | None, optional
+        The tool's name; the function's by default.
+    description : str | None, optional
+        What a model reads; the docstring's first line by default.
+    risk : str, optional
+        The risk class; ``"write"`` by default.
     """
 
     def __init__(self, fn, *, name: "str | None" = None, description: "str | None" = None,
@@ -583,6 +611,18 @@ def tool(fn=None, *, name: "str | None" = None, description: "str | None" = None
     does, and assuming it only reads would let a permission policy pass it
     unasked — saying ``risk="read"`` is the author's claim to make. Usable as
     ``@tool``, ``@tool(...)`` or ``tool(fn, ...)``.
+
+    Parameters
+    ----------
+    fn : callable, optional
+        The function; omitted when used as ``@tool(...)``.
+    name : str | None, optional
+        The tool's name; the function's by default.
+    description : str | None, optional
+        What a model reads; the docstring's first line by default.
+    risk : str, optional
+        The risk class a permission policy reads; ``"write"`` by default,
+        because the library cannot tell what a function does.
     """
     if fn is None:
         return lambda f: FunctionTool(f, name=name, description=description, risk=risk)

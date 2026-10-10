@@ -49,6 +49,34 @@ from ._scorers import Scorer, normalise
 
 
 class Eval:
+    """
+    The same cases through several arms, several times each, into a ledger.
+
+    Results are written as they happen to a durable JSON-lines file, a
+    finished ``(arm, case, trial)`` is never run twice, and ``smoke()`` tries
+    a couple of cases first. ``run()`` returns a :class:`Report`.
+
+    Parameters
+    ----------
+    cases : iterable of Case
+        The work, each with a unique, stable ``id``.
+    arms : dict
+        Name → a callable taking a ``Case``. It returns the answer, or
+        ``{"output": …, "cost": …, "tokens": …}`` when it knows what it spent.
+        A Skill, a Chain, an Agent or someone else's code all fit.
+    score : callable
+        A scorer — ``exact()``, ``contains()``, ``judge(model)``, … — or any
+        function of ``(case, output)`` returning a bool, a number or a dict.
+    trials : int, optional
+        Attempts per arm and case; ``Pass^k`` needs more than one.
+    out : str | Path | None, optional
+        The ledger; ``./eval-runs/<name>.jsonl`` by default, never a scratch
+        directory.
+    name : str, optional
+        The run's name, and the ledger's.
+    verbose : bool, optional
+        Print each attempt as it finishes.
+    """
 
     def __init__(
         self,
@@ -88,6 +116,11 @@ class Eval:
         Nothing is written to the main ledger — a smoke run is a check on the
         wiring, not data, and mixing the two means the real run resumes over
         results taken under different conditions.
+
+        Parameters
+        ----------
+        n : int, optional
+            How many cases, from the start.
         """
         probe = Eval(self.cases[:n], self.arms, self.score, trials=1,
                      out=self.out.with_suffix(".smoke.jsonl"),
@@ -111,6 +144,11 @@ class Eval:
         produces empty results under concurrency and reports no error at all —
         that failure cost a whole benchmark cell before it was understood. The
         default is 1 for that reason.
+
+        Parameters
+        ----------
+        concurrency : int, optional
+            Attempts in flight at once.
         """
         done = {(r.arm, r.case, r.trial) for r in self._existing()}
         todo = [(arm, case, t)

@@ -33,7 +33,15 @@ class RunContext:
     metadata: dict          = field(default_factory=dict)
 
     def get(self, key: str, default=None):
-        """Convenience read from ``metadata``."""
+        """Convenience read from ``metadata``.
+
+        Parameters
+        ----------
+        key : str
+            A key of ``metadata``.
+        default : any, optional
+            Returned when it is absent.
+        """
         return self.metadata.get(key, default)
 
     def to_dict(self) -> dict:

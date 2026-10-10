@@ -59,6 +59,11 @@ class FileStore(StateStore):
     Store each run as ``<dir>/<run_id>.json`` (atomic write). Survives a
     process restart, so it is the simplest persistent backend for serverless
     when the directory is on shared storage (EFS, a mounted volume, …).
+
+    Parameters
+    ----------
+    directory : str
+        Where the files go; created if it does not exist.
     """
 
     def __init__(self, directory: str) -> None:

@@ -35,6 +35,19 @@ class Case:
     contested, and the interesting result lived entirely in how the groups
     behaved differently. A benchmark reported only in aggregate cannot show
     that.
+
+    Attributes
+    ----------
+    id : str
+        The join key across arms and trials; stable from run to run.
+    input : any
+        What an arm is given.
+    expect : any
+        What a correct answer looks like, for the scorer.
+    group : str
+        A stratum to report apart — ``by_group()`` reads it.
+    meta : dict
+        Anything else an arm or a scorer needs.
     """
 
     id: str
@@ -57,6 +70,33 @@ class Record:
     ``error`` being set does not mean ``ok`` is False by definition — a
     scenario may recover — but it is what the validity guards count, and a
     cell with too many of them is rejected rather than reported.
+
+    Attributes
+    ----------
+    arm : str
+        The arm that made the attempt.
+    case : str
+        The case's id.
+    trial : int
+        Which attempt, from 1.
+    ok : bool
+        The scorer's verdict.
+    score : float
+        Its magnitude, 0 to 1.
+    output : any
+        What the arm returned.
+    error : str
+        The exception, if the arm raised.
+    group : str
+        The case's group.
+    seconds : float
+        How long the attempt took.
+    tokens : int
+        Tokens it reported.
+    cost : float
+        Dollars it reported.
+    meta : dict
+        The scorer's reasons and anything else recorded with it.
     """
 
     arm: str

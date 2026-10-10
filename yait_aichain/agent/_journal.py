@@ -56,7 +56,16 @@ EVIDENCE_KINDS = frozenset({CHECK, MODEL_CLAIM})
 
 
 def evidence(kind: str, detail: str = "") -> dict:
-    """Build an evidence record, validating *kind*."""
+    """Build an evidence record, validating *kind*.
+
+    Parameters
+    ----------
+    kind : str
+        ``check`` for a fact code verified, or ``model_claim`` for the
+        model's word that nothing verified.
+    detail : str, optional
+        What the evidence is.
+    """
     if kind not in EVIDENCE_KINDS:
         raise ValueError(
             f"evidence kind must be one of {sorted(EVIDENCE_KINDS)}; got {kind!r}"

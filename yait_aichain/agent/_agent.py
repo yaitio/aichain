@@ -66,7 +66,13 @@ _logger = logging.getLogger("yait_aichain.agent")
 # with harness-verified evidence, a *ceiling* that is reached is a failure.
 
 def step_count(n: int):
-    """Stop after *n* decisions. A ceiling: reaching it is not success."""
+    """Stop after *n* decisions. A ceiling: reaching it is not success.
+
+    Parameters
+    ----------
+    n : int
+        Model turns allowed.
+    """
     def _c(state):
         return "step_count" if state["steps"] >= n else None
     _c.kind, _c.name = "ceiling", "step_count"
@@ -79,7 +85,13 @@ def step_count(n: int):
 
 
 def token_budget(n: int):
-    """Stop once *n* tokens have been spent. A ceiling."""
+    """Stop once *n* tokens have been spent. A ceiling.
+
+    Parameters
+    ----------
+    n : int
+        Tokens allowed, input and output together.
+    """
     def _c(state):
         return "token_budget" if state["tokens"] >= n else None
     _c.kind, _c.name = "ceiling", "token_budget"
@@ -93,6 +105,11 @@ def cost_budget(usd: float):
 
     Bounds "do not begin another step", not "never exceed by a cent": the
     length of a reply is not known before it is paid for.
+
+    Parameters
+    ----------
+    usd : float
+        Dollars allowed.
     """
     def _c(state):
         return "cost_budget" if (state["cost"] or 0.0) >= usd else None
@@ -120,6 +137,15 @@ def nudge(predicate, message, name: str = "nudge"):
     It fires **once per streak**: while the predicate stays true it stays
     quiet, and it re-arms when the predicate clears. A reminder repeated
     every turn is how a reminder stops being read.
+
+    Parameters
+    ----------
+    predicate : callable
+        Given the run's state; true when the model should be told something.
+    message : str | callable
+        What it is told — a string, or a function of the state.
+    name : str, optional
+        How the nudge is named in events.
     """
     def _c(state):
         return f"nudge:{name}" if predicate(state) else None
@@ -134,6 +160,11 @@ def stalled(last_k: int = 5):
     from no library code at all — available only to someone writing their
     own loop. It reads the journal, not the task metric, so it has nothing to
     overfit to and applies to every task, verifiable or not.
+
+    Parameters
+    ----------
+    last_k : int, optional
+        Attempts that must all have moved nothing.
     """
     def _stalled(state):
         journal = state.get("journal")
@@ -156,6 +187,11 @@ def repeating(last_k: int = 5):
     this catches one that is succeeding pointlessly — clean results that
     carry no new information. Like `stalled`, it existed in the journal and
     nothing called it.
+
+    Parameters
+    ----------
+    last_k : int, optional
+        Attempts that must all have been the same move.
     """
     def _repeating(state):
         journal = state.get("journal")
@@ -174,6 +210,13 @@ def check(fn, name: str = "check"):
 
     The only completion the harness can verify itself. Everything else the
     agent reports about its own progress is the model's word for it.
+
+    Parameters
+    ----------
+    fn : callable
+        Given the run's state; returns true when the objective is met.
+    name : str, optional
+        How the stop is reported: ``stopped_by="check:<name>"``.
     """
     def _c(state):
         try:
@@ -348,6 +391,31 @@ class Agent:
     stop_when : list, optional
         Conditions from this module. Defaults to ``[step_count(30)]`` —
         a backstop, not a plan.
+    hooks : list | None, optional
+        Callables given an ``Event`` at every step boundary; ``stream()`` yields
+        the same events.
+    permissions : PermissionPolicy | None, optional
+        Maps a tool's ``risk`` class to ``allow``, ``approve`` or ``deny``,
+        checked before the tool runs. With none, every tool runs.
+    approve : callable, optional
+        Asked when the policy says ``approve``: given an ``ApprovalRequest``,
+        returns ``True``, ``False`` or ``ApprovalDecision(False, reason)``.
+        With ``approve`` in the policy and none attached, the call is refused.
+    store : StateStore, optional
+        Where a run parked by a ``wait()`` or ``gate()`` in the agent's tools
+        is kept until ``resume()``. Required when such a tool is given.
+    max_cost : float | Budget | None, optional
+        A ceiling in dollars for the whole run; a model call that would begin
+        past it ends the run with ``success=False`` and the reason in
+        ``.error``.
+    name : str | None, optional
+        How this agent is named as a worker in another agent's ``team`` and in
+        events.
+    description : str | None, optional
+        What it does — what a lead agent reads when choosing a worker.
+    verbose : int, optional
+        ``0`` is silent, ``1`` logs each step, ``2`` logs everything, through the
+        ``yait_aichain`` logger.
     """
 
     MODES = ("agile", "waterfall")
@@ -469,6 +537,13 @@ class Agent:
         *variables* seeds the conversation with data the caller already holds —
         this is how a ``Chain`` or ``Pool`` step hands its accumulated values
         down. There is one place state lives, and it is the conversation.
+
+        Parameters
+        ----------
+        task : str
+            What to do, in words.
+        variables : dict | None, optional
+            Data the caller already holds, given to the model with the task.
         """
         journal  = Journal()
         messages = self.opening(task, variables, ground_rules=True)
@@ -503,6 +578,13 @@ class Agent:
           loop leaves the agent mid-turn; the temporary hook is still removed
           (that much is guaranteed), but no result is produced and no
           `run.finished` is emitted. Exhaust it, or accept that.
+
+        Parameters
+        ----------
+        task : str
+            What to do, in words.
+        variables : dict | None, optional
+            Data the caller already holds, given to the model with the task.
         """
         journal  = Journal()
         messages = self.opening(task, variables, ground_rules=True)
@@ -563,6 +645,17 @@ class Agent:
         The signal carries the task: a string is the task, a dict gives it
         under ``"task"`` and every other key seeds the conversation the way
         ``run(task, variables=...)`` does.
+
+        Parameters
+        ----------
+        reason : str, optional
+            What the run waits for, shown to whoever starts it.
+        resume_with : dict | None, optional
+            The shape of the signal that starts it.
+        hint : dict | None, optional
+            Recorded for whatever does the waking; the engine schedules nothing.
+        variables : dict | None, optional
+            Data the run starts with, beside what the signal brings.
         """
         from ..state import RunDocument, StepStatus
 
@@ -606,6 +699,15 @@ class Agent:
         :class:`~..state.SuspendedResult` when it parks again — under the same
         ``run_id``, so a caller tracks one identifier for the whole
         conversation however many times it waits.
+
+        Parameters
+        ----------
+        run_id : str
+            The parked run, as the ``SuspendedResult`` named it.
+        signal : any, optional
+            The answer the run waited for — the result of the tool call that
+            parked it. For a run made by ``arm()``, a string is the task, or a dict
+            gives it under ``"task"``.
         """
         from ..state import RunDocument
 
@@ -701,6 +803,16 @@ class Agent:
         ``opening()``/``step()`` owns its own loop — there a plain reply is an
         ordinary turn, so the default is clean instructions and the driver
         states its own framing.
+
+        Parameters
+        ----------
+        task : str
+            What to do, in words.
+        variables : dict | None, optional
+            Data the caller already holds, given with the task.
+        ground_rules : bool, optional
+            Add the rule that a plain-text reply ends the run. ``run()`` sets it;
+            a driver that owns its own loop usually does not.
         """
         opening = task
         if variables:
@@ -738,6 +850,15 @@ class Agent:
         wording. What it does not buy is a better score — on a benchmark a
         crash can rank below a model muddling through. This is an instrument
         for reliability, not for accuracy.
+
+        Parameters
+        ----------
+        messages : list
+            The conversation so far — ``opening()``'s two messages, then each
+            reply and each tool result in turn.
+        state : dict | None, optional
+            The run's working state between calls, kept by the caller; the plan in
+            ``waterfall`` mode lives here.
         """
         if unanswered := dangling_calls(messages):
             raise ValueError(
@@ -750,7 +871,15 @@ class Agent:
         return self._ask(messages, state if state is not None else self.new_state())
 
     def execute(self, call, state: "dict | None" = None):
-        """Run one :class:`ToolCall`. Returns ``(result, error)`` — never raises."""
+        """Run one :class:`ToolCall`. Returns ``(result, error)`` — never raises.
+
+        Parameters
+        ----------
+        call : ToolCall
+            One call from a ``ToolCallRequest`` that ``step()`` returned.
+        state : dict | None, optional
+            The same working state passed to ``step()``.
+        """
         return self._execute(call, state if state is not None else self.new_state())
 
     # ── The loop ─────────────────────────────────────────────────────────

@@ -34,6 +34,12 @@ class Usage:
     output_tokens : completion / output tokens billed.
     total_tokens  : provider-reported total, or input+output when absent.
     cost          : estimated cost in USD (filled in 1.2-C; ``None`` until then).
+    cache_write_tokens : int
+        Prompt prefix stored for reuse this call, billed above fresh input.
+    cache_read_tokens : int
+        Prompt prefix reused from an earlier call, billed well below it.
+    image_input_tokens : int
+        Images sent in, kept apart because they are billed at their own rate.
     """
 
     input_tokens:  int = 0

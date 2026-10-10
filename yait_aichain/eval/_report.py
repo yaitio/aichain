@@ -36,7 +36,13 @@ from ._records import Record
 
 
 class Report:
-    """Read-only view over a set of records, grouped by arm and case."""
+    """Read-only view over a set of records, grouped by arm and case.
+
+    Parameters
+    ----------
+    records : iterable of Record
+        The attempts, usually read back from a ledger.
+    """
 
     def __init__(self, records: "Iterable[Record]") -> None:
         self.records = [r for r in records]
@@ -52,6 +58,13 @@ class Report:
         case="task_id", ok="success")`` adapts a foreign shape — which is how
         a τ²-bench run or a retrieval bench gets reported here without being
         run here.
+
+        Parameters
+        ----------
+        source : str | Path | list
+            A ledger path, a list of ``Record``, or a list of foreign dicts.
+        **keys : str
+            For foreign dicts, which of their keys mean ``arm``, ``case``, ``ok``, …
         """
         from ._records import read, adapt
         if isinstance(source, (str, bytes)) or hasattr(source, "__fspath__"):
@@ -72,6 +85,16 @@ class Report:
         defect that produced empty dialogues under concurrency. A guard that
         never fires is not evidence of clean data; these fired, and each time
         the alternative was publishing a number that meant nothing.
+
+        Parameters
+        ----------
+        max_empty : int, optional
+            Attempts with no output a cell may have.
+        max_errors : int, optional
+            Attempts that raised a cell may have.
+        max_abstained : float, optional
+            The share of attempts a judge could not read; past it the cell is
+            rejected rather than reported on a shrunken denominator.
         """
         for arm, rows in self._by_arm().items():
             empty  = sum(1 for r in rows if not r.error and _is_empty(r.output))
@@ -123,7 +146,15 @@ class Report:
         return bool((record.meta or {}).get("abstained"))
 
     def abstentions(self, arm: str, group: str = "") -> int:
-        """How many rows the judge declined to score for *arm*."""
+        """How many rows the judge declined to score for *arm*.
+
+        Parameters
+        ----------
+        arm : str
+            The arm.
+        group : str, optional
+            Only this group.
+        """
         return sum(1 for r in self._live()
                    if r.arm == arm and (not group or r.group == group)
                    and self._abstained(r))
@@ -137,7 +168,15 @@ class Report:
         return dict(out)
 
     def mean(self, arm: str, group: str = "") -> float:
-        """Share of *attempts* that passed — pooled over cases, not averaged."""
+        """Share of *attempts* that passed — pooled over cases, not averaged.
+
+        Parameters
+        ----------
+        arm : str
+            The arm.
+        group : str, optional
+            Only this group.
+        """
         rows = [r for c in self._cases(arm, group).values() for r in c]
         return sum(1 for r in rows if r.ok) / len(rows) if rows else 0.0
 
@@ -149,6 +188,15 @@ class Report:
         fewer than k trials is skipped rather than counted as a failure —
         being under-sampled is not the same as being wrong, and folding the
         two together makes an interrupted run look like a bad one.
+
+        Parameters
+        ----------
+        arm : str
+            The arm.
+        k : int | None, optional
+            Trials that must all pass; the number of trials by default.
+        group : str, optional
+            Only this group.
         """
         cases = self._cases(arm, group)
         if k is None:
@@ -171,6 +219,13 @@ class Report:
 
         Zero means perfectly reproducible — including reproducibly wrong,
         which is why it is read next to the mean and never on its own.
+
+        Parameters
+        ----------
+        arm : str
+            The arm.
+        group : str, optional
+            Only this group.
         """
         cases = [rows for rows in self._cases(arm, group).values() if len(rows) > 1]
         if not cases:
@@ -203,6 +258,15 @@ class Report:
         equal, so ``p`` is an exact two-sided binomial test on them; with fewer
         than ~6 discordant pairs no honest test can reject anything, and the
         function says so in ``enough``.
+
+        Parameters
+        ----------
+        a : str
+            One arm.
+        b : str
+            The other.
+        group : str, optional
+            Only this group.
         """
         wins_a = wins_b = same = 0
         for case, rows_a in self._cases(a, group).items():
@@ -235,6 +299,19 @@ class Report:
 
         Half an hour to run, and it is the only check here that can tell you
         the numbers themselves are worthless.
+
+        Parameters
+        ----------
+        oracle : Report
+            The harness fed known-correct answers.
+        noise : Report
+            The harness fed answers that do nothing.
+        arm : str, optional
+            Which arm of each to read; the only one by default.
+        floor : float, optional
+            The least the oracle must score.
+        ceiling : float, optional
+            The most the noise may score.
         """
         a = arm or (oracle.arms() or [""])[0]
         b = arm or (noise.arms()  or [""])[0]
@@ -247,7 +324,15 @@ class Report:
 
     # ── output ───────────────────────────────────────────────────────────
     def table(self, group: str = "", k: "int | None" = None) -> str:
-        """One row per arm: accuracy, reliability, and what it cost."""
+        """One row per arm: accuracy, reliability, and what it cost.
+
+        Parameters
+        ----------
+        group : str, optional
+            Only this group.
+        k : int | None, optional
+            The ``k`` of ``Pass^k``; the number of trials by default.
+        """
         head = (f"{'arm':<22}{'mean':>8}{'pass^k':>9}{'flips':>8}"
                 f"{'cases':>7}{'err':>5}{'n/j':>5}{'$':>10}")
         lines = [head, "─" * len(head)]
@@ -270,7 +355,13 @@ class Report:
         return "\n".join(lines)
 
     def by_group(self, k: "int | None" = None) -> str:
-        """The same table, once per group. Aggregate hides stratified effects."""
+        """The same table, once per group. Aggregate hides stratified effects.
+
+        Parameters
+        ----------
+        k : int | None, optional
+            The ``k`` of ``Pass^k``.
+        """
         out = []
         for g in self.groups() or [""]:
             out.append(f"[{g or 'all'}]")

@@ -32,26 +32,19 @@ Examples
 --------
 Give an agent full local filesystem access in the current directory::
 
-    from yait_aichain.tools.local import LocalTools
-    from yait_aichain.agent import Agent
-    from yait_aichain.models import Model
+    from yait_aichain import Agent, Model
+    from yait_aichain.agent import step_count
+    from yait_aichain.utilities import Shell
 
-    agent = Agent(
-        orchestrator = Model("claude-sonnet-4-6"),
-        tools        = LocalTools(),          # all 4 tools, sandboxed to cwd
-        max_steps    = 20,
-    )
+    agent = Agent(Model("claude-haiku-5-5"), tools=Shell().tools,    # all four, confined to cwd
+                  stop_when=[step_count(20)])
     result = agent.run("Write a Python script that prints the Fibonacci sequence, save it as fib.py, and run it.")
 
 Pin to a specific directory::
 
-    tools = LocalTools("/Users/me/projects/myapp")
-
-    agent = Agent(
-        orchestrator = Model("claude-sonnet-4-6"),
-        tools        = tools,
-        max_steps    = 20,
-    )
+    sh = Shell("/Users/me/projects/myapp")
+    agent = Agent(Model("claude-haiku-5-5"), tools=[sh.browse, sh.read],   # read-only
+                  stop_when=[step_count(20)])
     result = agent.run("Find all TODO comments in the codebase and summarise them.")
 
 Use tools individually::
@@ -104,15 +97,11 @@ def LocalTools(root_dir: str | None = None) -> list:
     -------
     ::
 
-        from yait_aichain.tools.local import LocalTools
-        from yait_aichain.agent import Agent
-        from yait_aichain.models import Model
+        from yait_aichain import Agent, Model
+        from yait_aichain.tools import LocalTools
 
-        agent = Agent(
-            orchestrator = Model("claude-sonnet-4-6"),
-            tools        = LocalTools("/my/project"),
-            max_steps    = 20,
-        )
+        agent = Agent(Model("claude-haiku-5-5"), tools=LocalTools("/my/project"))
+        # the same as tools=Shell("/my/project").tools, which new code uses
     """
     return [
         localBrowse(root_dir),

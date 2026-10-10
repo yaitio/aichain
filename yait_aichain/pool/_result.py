@@ -35,6 +35,19 @@ class PoolResult(Sequence):
         Summed across the items that reported usage.
     beacons : list
         Beacons raised by any item.
+
+    Parameters
+    ----------
+    outputs : list
+        One output per item, in the items' order.
+    success : bool
+        Whether every item succeeded.
+    history : list
+        One record per item: its status, output, error and duration.
+    usage : Usage, optional
+        Tokens and cost across the items.
+    beacons : list | None, optional
+        Beacons the items raised.
     """
 
     def __init__(self, outputs: list, *, success: bool, history: list,

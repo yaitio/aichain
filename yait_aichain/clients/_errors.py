@@ -112,6 +112,15 @@ class TruncatedResponseError(APIError, ValueError):
     output_tokens  : how many output tokens were produced, when the response
                      reported it. That number *is* the ceiling that was hit,
                      so it is what ``max_tokens`` has to be raised above.
+
+    Parameters
+    ----------
+    message : str
+        What happened.
+    finish_reason : str, optional
+        The provider's own word for why it stopped.
+    output_tokens : int | None, optional
+        How many tokens it wrote before the ceiling.
     """
 
     def __init__(self, message: str, finish_reason: str = "",
@@ -136,6 +145,15 @@ class InvalidStructuredOutputError(APIError, ValueError):
     problems : one string per violation found, in the order they were found.
     value    : what the provider actually returned, so the caller can log it
                without re-parsing.
+
+    Parameters
+    ----------
+    message : str
+        What happened.
+    problems : list[str] | None, optional
+        Where the value departs from the schema, one path each.
+    value : any, optional
+        What came back.
     """
 
     def __init__(self, message: str, problems: "list[str] | None" = None,

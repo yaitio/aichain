@@ -268,83 +268,63 @@ def _resolve(value, accumulated: dict, where: str, top: bool = False):
 
 class Chain:
     """
-    Sequential pipeline of :class:`~skills.Skill` and
-    :class:`~tools.Tool` instances.
+    Steps in a fixed order, sharing one set of variables.
 
-    Both kinds of runner are accepted in any order and can be freely mixed.
-    Skills receive the full accumulated variable dict for template
-    substitution; Tools receive only the kwargs that match their declared
-    parameters (with optional renaming via *input_map*).
+    A step is a ``Skill``, a tool, an ``Agent``, or a plain function or a
+    utility's method, in any order. A Skill reads any variable in its prompt;
+    a tool or a function gets the arguments its schema or signature names,
+    filled from the variables or from the step's mapping. Each step's output
+    is stored under its key; a plain dict a step returns is merged into the
+    variables, so one step can write several.
+
+    ::
+
+        chain = Chain(steps=[
+            (summarise,          "summary"),
+            (translate,          "french"),
+            (count_words,        "length", {"text": "Title: {french}"}),
+            (shout,              "loud"),
+        ], max_cost=0.05)
+        result = chain.run(variables={"text": "…"})
+        result["french"], result.output, result.cost
 
     Parameters
     ----------
     steps : list
-        Ordered list of runners.  Each element may be:
-
-        * A bare ``Skill``, ``Tool``, or ``Agent``.
-        * A ``(runner, output_key)`` tuple.
-        * A ``(runner, output_key, input_map)`` tuple — *input_map* is a
-          ``dict`` that renames accumulated variables before they are passed
-          to a Tool (e.g. ``{"source": "url"}`` passes ``accumulated["url"]``
-          as the tool's ``source`` argument).
-        * A ``(runner, output_key, input_map, options)`` tuple — *options*
-          is a ``dict`` of step-level settings.  For Agent steps the
-          recognised keys are:
-
-          ``task_key`` (str, default ``"task"``)
-              Name of the accumulated variable that holds the agent's task
-              string.
-
-          ``output_field`` (str, default ``"output"``)
-              Which ``AgentResult`` attribute to extract as the step output.
-              Typically ``"output"`` (the final answer) or ``"memory"``.
-
+        The steps, in order. Each is a runner on its own, or a tuple:
+        ``(runner, output_key)``; ``(runner, output_key, input_map)``, where
+        *input_map* maps an argument name to a variable's name or to a
+        ``"{template}"`` the chain fills in; or ``(runner, output_key,
+        input_map, options)``. For an Agent step, *options* takes
+        ``task_key`` (the variable holding its task, default ``"task"``) and
+        ``output_field`` (the ``AgentResult`` attribute stored, default
+        ``"output"``). A bare runner is stored under ``"result"``.
     variables : dict | None, optional
-        Default variable values applied to every ``run()`` call.
-        Call-time variables take precedence.
-
+        Default variables for every ``run()``; call-time values win.
     name : str | None, optional
-        Human-readable label for this chain.
-
+        A label, shown in events and when the chain is a step elsewhere.
     description : str | None, optional
-        Short description of what the chain does.
+        What the chain does.
+    on_step_error : str, optional
+        What a failed step does to the run: ``"raise"`` (the default)
+        propagates it, ``"stop"`` ends the run without raising, ``"skip"``
+        records it, warns and goes on, ``"collect"`` does the same without
+        the warning.
+    store : StateStore, optional
+        Where a paused run is kept. The default is process-local, so a run
+        that waits for a person or a webhook needs ``FileStore(...)`` or
+        another persistent store to be resumed from another process.
+    hooks : list | None, optional
+        Callables given an ``Event`` at every step boundary.
+    max_cost : float | Budget | None, optional
+        A ceiling in dollars for the whole chain, shared by every step; a
+        step that would begin past it is refused with ``BudgetExceeded``.
 
     Raises
     ------
     ValueError
-        If *steps* is empty or any tuple element has an unsupported shape.
-
-    Examples
-    --------
-    Mixed Skill + Tool pipeline — fetch a URL, clean it, translate it::
-
-        from yait_aichain.models import Model
-        from yait_aichain.skills import Skill
-        from yait_aichain.tools  import MarkItDownTool
-        from yait_aichain.chain  import Chain
-
-        fetch      = MarkItDownTool()
-        cleaner    = Skill(model=Model("gpt-4o"), ...)
-        translator = Skill(model=Model("gpt-4o"), ...)
-
-        chain = Chain(
-            steps=[
-                (fetch,      "raw_markdown", {"source": "url"}),
-                (cleaner,    "article"),
-                (translator, "translation"),
-            ],
-        )
-
-        result = chain.run(variables={
-            "url":      "https://example.com/article",
-            "language": "French",
-        })
-
-    Two-step Skill-only pipeline::
-
-        chain = Chain([analyst, translator])
-        output = chain.run(variables={"topic": "quantum computing",
-                                      "language": "Spanish"})
+        If *steps* is empty, a tuple has an unsupported shape, or
+        *on_step_error* is not one of the four.
     """
 
     @_hints.refuse("Chain")
@@ -439,6 +419,9 @@ class Chain:
         on_step_error : str | None, optional
             Override the instance-level ``on_step_error`` for this call only.
             Must be ``"raise"``, ``"stop"``, or ``"skip"`` when provided.
+        context : RunContext, optional
+            The tenant and metadata of this request, ambient for every step; a
+            ``Model(api_key=callable)`` resolves its key from it.
 
         Returns
         -------
@@ -493,6 +476,20 @@ class Chain:
         On resume the signal **seeds the variables** rather than being handed
         to a step, because nothing has run yet and there is no suspended tool
         to complete.
+
+        Parameters
+        ----------
+        reason : str, optional
+            What the run waits for, shown to whoever starts it.
+        resume_with : dict | None, optional
+            The shape of the signal that starts it — a JSON-Schema-like description.
+        hint : dict | None, optional
+            Recorded for whatever does the waking: ``{"on": "order.created"}``,
+            ``{"wake_at": "…"}``. The engine schedules nothing.
+        variables : dict | None, optional
+            Variables the run is seeded with before the signal adds its own.
+        context : RunContext, optional
+            The request's tenant and metadata, kept with the run.
         """
         from ..state import RunDocument, StepStatus, SuspendedResult
 
@@ -533,6 +530,18 @@ class Chain:
         Idempotent: a ``run_id`` no longer in the store (already resumed to
         completion, or unknown) raises ``KeyError`` so an at-least-once trigger
         can treat that as "already handled".
+
+        Parameters
+        ----------
+        run_id : str
+            The parked run, as the ``SuspendedResult`` named it.
+        signal : any, optional
+            The answer the run waited for. A dict is merged into the variables.
+        on_step_error : str | None, optional
+            Overrides the chain's policy for the rest of this run.
+        context : RunContext, optional
+            The tenant and metadata for the resumed part; the stored one when
+            omitted.
         """
         _on_error = self.on_step_error if on_step_error is None else on_step_error
         if _on_error not in _VALID_ON_STEP_ERROR:
@@ -1087,6 +1096,15 @@ class Chain:
             Override the API key used for **all** Skill models in this chain.
             When omitted, each model's key is read from its provider's
             environment variable.
+        path : str
+            The YAML file ``save()`` wrote.
+        api_key : str | None, optional
+            A key for every Skill step's model; each reads its own provider's from
+            the environment otherwise.
+        trusted : bool, optional
+            Allow tool classes outside ``yait_aichain`` to be imported. Loading a
+            chain file runs the code it names; pass ``True`` only for files you
+            wrote or control.
 
         Returns
         -------

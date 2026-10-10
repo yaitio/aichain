@@ -43,6 +43,11 @@ class using:
 
         with using(RunContext(tenant="acme")):
             chain.run()
+
+    Parameters
+    ----------
+    context : RunContext
+        The context every call inside the block sees.
     """
 
     def __init__(self, context) -> None:

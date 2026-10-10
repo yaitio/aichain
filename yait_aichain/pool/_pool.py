@@ -153,6 +153,9 @@ class Pool:
         ``"skip"``     — same as ``"collect"`` but emits a ``RuntimeWarning``.
     name : str | None, optional
     description : str | None, optional
+    max_cost : float | Budget | None, optional
+        One ceiling in dollars for every item; an item that would begin past
+        it fails with the budget's reason, handled by ``on_error``.
 
     Examples
     --------

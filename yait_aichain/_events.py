@@ -157,7 +157,15 @@ class Tracer(Hook):
 
 
 class LoggingTracer(Hook):
-    """A hook that logs every event to a ``logging`` logger (default INFO)."""
+    """A hook that logs every event to a ``logging`` logger (default INFO).
+
+    Parameters
+    ----------
+    logger : logging.Logger | None, optional
+        Where to log; ``yait_aichain.trace`` by default.
+    level : int, optional
+        The level each event is logged at; ``INFO`` by default.
+    """
 
     def __init__(self, logger: "logging.Logger | None" = None,
                  level: int = logging.INFO) -> None:

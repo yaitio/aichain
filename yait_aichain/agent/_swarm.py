@@ -125,6 +125,17 @@ def beacon(kind: str, message: str, *, source: str = "") -> Beacon:
     Callable from anywhere inside a run — a tool, a nested agent, a pool item
     — without a parameter, because the board is ambient for the duration of
     the run, exactly as `RunContext` is.
+
+    Parameters
+    ----------
+    kind : str
+        ``blocker``, ``question`` and ``contract_change`` demand attention and
+        end a parent's wait early; ``contract``, ``decision`` and ``fact`` are
+        coordination records.
+    message : str
+        What it says.
+    source : str, optional
+        Who raised it.
     """
     if kind not in KINDS:
         raise ValueError(
@@ -156,7 +167,21 @@ UNSUPPORTED = "unsupported"
 
 @dataclass(frozen=True)
 class Acceptance:
-    """What a finished result rests on, and whether that still holds."""
+    """What a finished result rests on, and whether that still holds.
+
+    Attributes
+    ----------
+    kind : str
+        ``checked``, ``claimed`` or ``unsupported``.
+    fingerprint : str
+        A hash of the checked evidence, so a later look can tell it changed.
+    checks : tuple
+        The checks it rests on.
+    claims : tuple
+        The model's claims it rests on.
+    superseded : str
+        Why it no longer holds; empty while it does.
+    """
 
     kind:        str
     fingerprint: str
@@ -174,13 +199,24 @@ class Acceptance:
         *journal* is evidence obtained **again** — the same actions re-run,
         the same files re-read. If what the checks observed has changed, the
         result was accepted on facts that are no longer true.
+
+        Parameters
+        ----------
+        journal : list | Journal
+            Evidence gathered again, after the run.
         """
         if self.superseded:
             return False
         return acceptance_from(journal).fingerprint == self.fingerprint
 
     def supersede(self, reason: str) -> "Acceptance":
-        """The caller intervened; the acceptance must be re-earned."""
+        """The caller intervened; the acceptance must be re-earned.
+
+        Parameters
+        ----------
+        reason : str
+            Why it must be re-earned.
+        """
         return replace(self, superseded=reason or "superseded")
 
 
@@ -191,6 +227,11 @@ def acceptance_from(journal) -> Acceptance:
     category. The fingerprint covers the **checked** evidence alone: a claim
     changing does not change what was verified, and folding claims in would
     let a model re-wording its report look like the facts moving.
+
+    Parameters
+    ----------
+    journal : list | Journal
+        A run's journal.
     """
     checks: list = []
     claims: list = []

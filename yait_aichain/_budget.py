@@ -37,6 +37,15 @@ class BudgetExceeded(RuntimeError):
     silent-success shape this library has spent its 2.x line removing — and a
     caller who wants the partial output can catch this and read
     ``last_usage``.
+
+    Parameters
+    ----------
+    spent : float
+        Dollars spent when the call was refused.
+    limit : float
+        The ceiling.
+    what : str, optional
+        What was refused.
     """
 
     def __init__(self, spent: float, limit: float, what: str = "") -> None:
@@ -60,6 +69,11 @@ class Budget:
         Chain(steps=[...], max_cost=budget).run()
         budget.spent        # what it cost
         budget.remaining    # what is left
+
+    Parameters
+    ----------
+    limit : float
+        The ceiling, in dollars; must be positive.
     """
 
     def __init__(self, limit: float) -> None:
@@ -82,14 +96,26 @@ class Budget:
         return self._spent >= self.limit
 
     def check(self, what: str = "") -> None:
-        """Refuse to begin another call when there is nothing left."""
+        """Refuse to begin another call when there is nothing left.
+
+        Parameters
+        ----------
+        what : str, optional
+            What was about to begin, for the error's message.
+        """
         if self.exhausted:
             raise BudgetExceeded(self._spent, self.limit, what)
 
     def charge(self, amount: "float | None") -> None:
         """Record what a call cost. ``None`` is free — a provider that does
         not price its answers cannot be billed against a ceiling, and
-        inventing a number would be worse than admitting it."""
+        inventing a number would be worse than admitting it.
+
+        Parameters
+        ----------
+        amount : float | None
+            What the call cost; ``None`` when it could not be priced.
+        """
         if not amount:
             return
         with self._lock:

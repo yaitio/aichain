@@ -34,7 +34,17 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class ToolCall:
-    """One requested call: which tool, with which arguments."""
+    """One requested call: which tool, with which arguments.
+
+    Attributes
+    ----------
+    id : str
+        The provider's id for this call; a tool result answers it by this id.
+    name : str
+        The tool's name.
+    arguments : dict
+        The arguments, parsed from the provider's JSON.
+    """
 
     id:        str
     name:      str
@@ -53,6 +63,13 @@ class ToolCallRequest:
     Providers may request **several** calls in one turn. Honouring all of them
     is deliberate: it is free parallelism, and executing only the first would
     silently narrow the channel this feature exists to widen.
+
+    Attributes
+    ----------
+    calls : tuple[ToolCall, ...]
+        Every call the model asked for in this turn, in order.
+    text : str
+        Prose the model sent beside them, if any.
     """
 
     calls: "tuple[ToolCall, ...]"
@@ -147,6 +164,11 @@ def dangling_calls(messages: list) -> list:
     they met it — and that seam is precisely what a benchmark harness and a
     serverless driver use, which is where a result crosses a process boundary
     and can be lost.
+
+    Parameters
+    ----------
+    messages : list
+        A conversation, as ``Agent.step()`` takes it.
     """
     answered = {m.get("call_id") for m in messages
                 if isinstance(m, dict) and m.get("role") == "tool"}
@@ -176,6 +198,13 @@ def tool_result_turn(call_id: str, result) -> dict:
     parts are carried here and each family decides on the wire: Anthropic puts
     them inside the tool result, the others send them as a following user
     message.
+
+    Parameters
+    ----------
+    call_id : str
+        The ``ToolCall.id`` this result answers.
+    result : any
+        What the tool returned; a non-string is rendered as text.
     """
     if _is_part(result):
         return {"role": "tool", "call_id": call_id, "parts": [result]}

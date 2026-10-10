@@ -161,11 +161,23 @@ class PermissionPolicy:
         self.default = default
 
     def decide_risk(self, risk: str) -> str:
-        """Return the decision for a bare *risk* class string."""
+        """Return the decision for a bare *risk* class string.
+
+        Parameters
+        ----------
+        risk : str
+            A risk class.
+        """
         return self.rules.get(risk, self.default)
 
     def decide(self, tool) -> str:
-        """Return the decision for *tool* based on its ``risk`` attribute."""
+        """Return the decision for *tool* based on its ``risk`` attribute.
+
+        Parameters
+        ----------
+        tool : Tool
+            The tool about to run; its ``risk`` is read.
+        """
         return self.decide_risk(getattr(tool, "risk", WRITE))
 
     def __repr__(self) -> str:
