@@ -1,5 +1,6 @@
 """
-The Claude Code plugin is what the repository tests, generated and nothing else.
+The plugin — for Claude Code, Codex and Cursor — is what the repository tests,
+generated and nothing else.
 """
 
 import importlib.util
@@ -30,6 +31,19 @@ class TestThePlugin(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["version"], yait_aichain.__version__)
         self.assertEqual(market["plugins"][0]["name"], manifest["name"])
         self.assertTrue((ROOT / market["plugins"][0]["source"]).is_dir())
+
+    def test_codex_and_cursor_find_the_same_plugin(self):
+        for manifest_path in (skill.PLUGIN / "plugin.json", skill.PLUGIN / ".cursor-plugin" / "plugin.json"):
+            with self.subTest(manifest=manifest_path.relative_to(ROOT).as_posix()):
+                manifest = json.loads(manifest_path.read_text())
+                self.assertEqual((manifest["name"], manifest["version"]),
+                                 ("yait-aichain", yait_aichain.__version__))
+        codex = json.loads(skill.CODEX_MARKETPLACE.read_text())["plugins"][0]
+        cursor = json.loads(skill.CURSOR_MARKETPLACE.read_text())["plugins"][0]
+        self.assertTrue((ROOT / codex["source"]["path"]).is_dir())
+        self.assertTrue((ROOT / cursor["source"]).is_dir())
+        # Each Codex entry must carry these, or the marketplace is refused.
+        self.assertLessEqual({"policy", "category"}, set(codex))
 
     def test_the_skill_has_a_name_and_a_description_that_fits(self):
         text = (skill.SKILL_DIR / "SKILL.md").read_text()
