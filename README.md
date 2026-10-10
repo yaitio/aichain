@@ -28,7 +28,9 @@ Change `"claude-haiku-5-5"` to `"gpt-6-luna"`, `"gemini-3-flash-preview"` or
 carries it with twenty worked recipes. Measured on twenty tasks the docs were
 not written against: a small model with the docs passed 15 of them in all three
 tries, Claude Code passed 19, and the same small model without the docs passed
-none ([`evals/agent_builds/`](evals/agent_builds/HOLDOUT-RESULTS-2.md)).
+none ([`evals/agent_builds/`](evals/agent_builds/HOLDOUT-RESULTS-2.md)). On eleven more
+for what 3.x added — `@tool`, tools by name, utilities, templated chains — both
+passed all eleven ([measurement 3](evals/agent_builds/HOLDOUT-RESULTS-3.md)).
 
 **The code you tested is the code you ship.** Only what you inject changes
 between a laptop and production: where state is stored, whose keys are used,

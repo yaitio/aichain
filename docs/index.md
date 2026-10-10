@@ -24,7 +24,8 @@ result = skill.run(variables={"text": "Your content here..."})
 `llms.txt`, and the Claude Code plugin carries it with twenty worked recipes.
 On twenty tasks the docs were not written against, a small model with the docs
 passed 15 in all three tries, Claude Code passed 19, and the same small model
-without the docs passed none.
+without the docs passed none. On eleven more for what 3.x added, both passed
+all eleven.
 
 **The code you tested is the code you ship.** Only what you inject changes
 between a laptop and production: where state is stored, whose keys are used,
