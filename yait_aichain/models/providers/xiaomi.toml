@@ -1,0 +1,46 @@
+# xiaomi — Xiaomi MiMo: provider settings + its models (data tier)
+#
+# Read 2026-10-11 from mimo.mi.com's quick start (the first API call): an
+# OpenAI-compatible API at api.xiaomimimo.com/v1, key MIMO_API_KEY. The curl
+# example sends the key as `api-key:`, the OpenAI SDK examples as a Bearer
+# token; Bearer is what this sends, and the first live call settles it. The
+# model and price pages render in the browser only, so the prices below are
+# the overseas rate card as third-party pages quote it (eesel.ai, litellm),
+# to be checked against the console. Not yet called live.
+#
+# MiMo-V2.5 and V2.5-Pro forward to V2.6 from 2026-10-14 and go offline on
+# 2026-10-21, so they are not listed. In thinking mode a reply carries
+# `reasoning_content`, which the quick start asks to keep in the history for
+# multi-turn tool calls.
+
+[provider]
+key      = "xiaomi"
+client   = "openai"
+base_url = "https://api.xiaomimimo.com"
+env_key  = "MIMO_API_KEY"
+label    = "Xiaomi (MiMo)"
+keys_url = "https://platform.xiaomimimo.com"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+# No reasoning control is documented in the quick start; it is not claimed.
+accepts = ["temperature", "top_p", "max_tokens"]
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+
+[provider.default_notes]
+temperature = "ours · the OpenAI-compatible default; Xiaomi's own is not documented in what could be read"
+max_tokens  = "ours · a ceiling that leaves room for the thinking a reply carries"
+
+[models."mimo-v2.6-pro"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.435, output = 0.87, cache_read = 0.0036 }
+
+[models."mimo-v2.6-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.14, output = 0.28, cache_read = 0.0028 }

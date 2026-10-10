@@ -20,13 +20,16 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `google` | `1.0` | `0.95` | `40` | `8192`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
 | `meta` | `1.0` | — | — | `16384`\* |
+| `minimax` | `1.0` | `0.95` | — | `16384`\* |
 | `mistral` | `0.7`\* | `1.0` | — | `16384`\* |
 | `openai` | `1.0` | `1.0` | — | `16384`\* |
 | `perplexity` | `0.2`\* | `0.9` | — | `8192`\* |
 | `private` | `1.0`\* | — | — | `4096`\* |
 | `qwen` | `0.7` | `0.8` | — | `8192`\* |
 | `recraft` | `1.0`\* | — | — | `4096`\* |
+| `stepfun` | `1.0`\* | `1.0`\* | — | `16384`\* |
 | `xai` | `1.0` | `1.0` | — | `16384`\* |
+| `xiaomi` | `1.0`\* | — | — | `16384`\* |
 | `zai` | `1.0` | `0.95` | — | `16384`\* |
 
 `temperature` alone takes `0.2`, `0.7`, `1.0` depending on where the request goes; `max_tokens` spans `4096`–`32768`.
@@ -74,6 +77,12 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — vendor · Meta's default, and the value Muse Spark is tuned for
 - `max_tokens` — ours · the API defaults per model; reasoning shares this budget with the answer, so it is set generously
 
+**`minimax`**
+
+- `temperature` — vendor · MiniMax's default, and the value it recommends
+- `top_p` — vendor · MiniMax's default for M3
+- `max_tokens` — ours · thinking counts toward it, and a small value ends in finish_reason length with nothing said
+
 **`mistral`**
 
 - `temperature` — ours · Mistral's default differs by model and is read from /models; 0.7 is the top of the range its docs recommend
@@ -108,11 +117,22 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — unused · this provider renders images and reads neither of these
 - `max_tokens` — unused · this provider renders images and reads neither of these
 
+**`stepfun`**
+
+- `temperature` — ours · the OpenAI-compatible default; StepFun's own is not confirmed
+- `top_p` — ours · the OpenAI-compatible default; StepFun's own is not confirmed
+- `max_tokens` — ours · the model takes up to 64K out by third-party report; a ceiling is ours to pick
+
 **`xai`**
 
 - `temperature` — vendor · the OpenAI-compatible default
 - `top_p` — vendor · the OpenAI-compatible default
 - `max_tokens` — ours · practical; grok-3 carries 131072 of context and grok-4 256000
+
+**`xiaomi`**
+
+- `temperature` — ours · the OpenAI-compatible default; Xiaomi's own is not documented in what could be read
+- `max_tokens` — ours · a ceiling that leaves room for the thinking a reply carries
 
 **`zai`**
 
@@ -130,11 +150,11 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 
 | option | what it does | values | who takes it |
 |---|---|---|---|
-| `temperature` | how much randomness the model is allowed | `0.0`–`1.0` (glm-5.3); `0.0`–`2.0` (muse-spark-1.3) | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `perplexity`, `qwen`, `xai`, `zai` |
-| `top_p` | nucleus sampling: the probability mass to sample from | `0.01`–`1.0` | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `perplexity`, `qwen`, `xai`, `zai` |
+| `temperature` | how much randomness the model is allowed | `0.0`–`1.0` (glm-5.3); `0.0`–`2.0` (MiniMax-M3, muse-spark-1.3) | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
+| `top_p` | nucleus sampling: the probability mass to sample from | `0.01`–`1.0` (glm-5.3); `0.0`–`1.0` (MiniMax-M3) | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
 | `top_k` | sample only from the k most likely tokens | any | `anthropic`, `google` |
-| `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `perplexity`, `qwen`, `xai`, `zai` |
-| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `qwen`, `xai`, `zai` |
+| `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
+| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `qwen`, `stepfun`, `xai`, `zai` |
 | `cache_control` | cache the stable prefix so a repeated one is not re-billed: True, an int, or 'last' for an agent loop | any | `anthropic` |
 | `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | any | `anthropic` |
 
@@ -163,12 +183,15 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `meta` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
+| `minimax` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `mistral` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `openai` | `aspect_ratio`, `background`, `compression`, `fidelity`, `max_tokens`, `output_format`, `quality`, `reasoning`, `size`, `temperature`, `top_p` |
 | `perplexity` | `max_tokens`, `temperature`, `top_p` |
 | `qwen` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
 | `recraft` | `aspect_ratio`, `fidelity`, `size` |
+| `stepfun` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `xai` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_p` |
+| `xiaomi` | `max_tokens`, `temperature`, `top_p` |
 | `zai` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 
 ### The same level on each provider's own scale
@@ -182,9 +205,11 @@ A universal name is only half the promise. These are the tables the value is put
 | `google` | `reasoning` | `low`→`2048`, `medium`→`8192`, `high`→`24576` |
 | `kimi` | `reasoning` | `low`→`enabled`, `medium`→`enabled`, `high`→`enabled` |
 | `meta` | `reasoning` | `low`→`low`, `medium`→`medium`, `high`→`high` |
+| `minimax` | `reasoning` | `low`→`adaptive`, `medium`→`adaptive`, `high`→`adaptive` |
 | `mistral` | `reasoning` | `none`→`none`, `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `openai` | `reasoning` | `none`→`none`, `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `qwen` | `reasoning` | `low`→`True`, `medium`→`True`, `high`→`True` |
+| `stepfun` | `reasoning` | `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `xai` | `reasoning` | `low`→`low`, `medium`→`high`, `high`→`high` |
 | `zai` | `reasoning` | `low`→`low`, `medium`→`medium`, `high`→`high` |
 
@@ -223,6 +248,9 @@ without saying so. It may adapt; it may not do it quietly.
 | `glm-5.3` | ✓ | ✓ | — | ✓ | → `reasoning_effort, type` | — |
 | `muse-spark-1.3` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `mistral-small-2603` | ✓ | ✓ | — | ✓ | → `reasoning_effort` | — |
+| `mimo-v2.6-pro` | ✓ | ✓ | — | ✓ | ⊘ <sub>reasoning for the 'xiaomi' provider must be None or one of: </sub> | — |
+| `MiniMax-M3` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `type` | — |
+| `step-5-preview` | ✓ | ✓ | — | ✓ | → `reasoning_effort` | — |
 
 ### Output format (image)
 

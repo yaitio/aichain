@@ -1,0 +1,61 @@
+# minimax — MiniMax: provider settings + its models (data tier)
+#
+# Read 2026-10-11 from platform.minimax.io's OpenAI API reference: chat
+# completions at api.minimax.io/v1 (China: api.minimaxi.com/v1). Not yet
+# called live. Prices are not on that page; those below are the ones OpenRouter
+# and Novita list, which agree with each other ($0.30 / $1.20, cache reads
+# $0.06) and are to be checked against MiniMax's own rate card.
+#
+# From the reference: thinking is `{"type": "adaptive"}` or
+# `{"type": "disabled"}`; `reasoning_split = true` puts the thinking in
+# `reasoning_content` instead of `<think>` tags inside the answer, so it is sent
+# on every request; `reasoning_effort` exists on M3.1-Flash-Preview only;
+# penalties and logit_bias are ignored; `n` is 1.
+
+[provider]
+key      = "minimax"
+client   = "openai"
+base_url = "https://api.minimax.io"
+env_key  = "MINIMAX_API_KEY"
+label    = "MiniMax"
+keys_url = "https://platform.minimax.io"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
+[provider.options.values]
+temperature = [0.0, 2.0]
+top_p       = [0.0, 1.0]
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p       = 0.95
+
+[provider.default_notes]
+temperature = "vendor · MiniMax's default, and the value it recommends"
+top_p       = "vendor · MiniMax's default for M3"
+max_tokens  = "ours · thinking counts toward it, and a small value ends in finish_reason length with nothing said"
+
+[provider.request]
+always = { reasoning_split = true }
+
+# A level keeps adaptive thinking on — M3 takes no depth; `none` turns it off.
+[provider.reasoning_map]
+low    = "adaptive"
+medium = "adaptive"
+high   = "adaptive"
+
+[provider.reasoning]
+field = ""
+on    = { thinking = { type = "adaptive" } }
+off   = { thinking = { type = "disabled" } }
+why   = "M3 thinks adaptively and takes no level; any level keeps thinking on"
+
+[models."MiniMax-M3"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.30, output = 1.20, cache_read = 0.06 }

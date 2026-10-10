@@ -1,0 +1,46 @@
+# stepfun — StepFun: provider settings + its models (data tier)
+#
+# Read 2026-10-11. StepFun's own documentation could not be fetched (the
+# platform's docs answered 404 to the paths tried); what is below is what
+# third-party guides agree on — an OpenAI-compatible API at
+# api.stepfun.ai/v1 (China: api.stepfun.com/v1), `step-5-preview` with
+# low/medium/high reasoning effort, JSON Schema output and tool calling, at
+# $1.00 / $2.70 per 1M tokens and $0.05 for cache reads. Every line is to be
+# checked against platform.stepfun.ai and a live call before it ships.
+
+[provider]
+key      = "stepfun"
+client   = "openai"
+base_url = "https://api.stepfun.ai"
+env_key  = "STEPFUN_API_KEY"
+label    = "StepFun"
+keys_url = "https://platform.stepfun.ai"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p       = 1.0
+
+[provider.default_notes]
+temperature = "ours · the OpenAI-compatible default; StepFun's own is not confirmed"
+top_p       = "ours · the OpenAI-compatible default; StepFun's own is not confirmed"
+max_tokens  = "ours · the model takes up to 64K out by third-party report; a ceiling is ours to pick"
+
+[provider.reasoning_map]
+low    = "low"
+medium = "medium"
+high   = "high"
+
+[provider.reasoning]
+field = "reasoning_effort"
+
+[models."step-5-preview"]
+caps  = ["text-to-text"]
+price = { input = 1.00, output = 2.70, cache_read = 0.05 }

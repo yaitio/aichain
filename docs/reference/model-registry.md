@@ -28,7 +28,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `meta`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `xai`, `zai`.
+`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -40,12 +40,15 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Google AI | 9 | 5 | 9 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
 | Meta (Muse) | 5 | — | 5 | — |
+| MiniMax | 1 | — | 1 | — |
 | Mistral AI | 5 | — | 3 | — |
 | OpenAI | 20 | 7 | 20 | 7 |
 | Perplexity | 4 | — | — | — |
 | Qwen (DashScope) | 18 | 2 | 3 | 3 |
 | Recraft | — | 9 | — | 3 |
+| StepFun | 1 | — | — | — |
 | xAI | 14 | 3 | 13 | 3 |
+| Xiaomi (MiMo) | 2 | — | 2 | — |
 | Z.ai (GLM) | 7 | — | 2 | — |
 
 ---
@@ -235,6 +238,24 @@ muse-spark-1.2              # $1.25 in / $4.25 out per 1M tokens
 muse-spark-1.2-contributor  # $0.1 in / $0.2 out per 1M tokens
 muse-spark-1.3              # $1.25 in / $4.25 out per 1M tokens
 muse-spark-1.3-contributor  # $0.1 in / $0.2 out per 1M tokens
+```
+
+---
+
+## MiniMax
+
+`provider = "minimax"` · key `MINIMAX_API_KEY`
+
+### `text-to-text`
+
+```
+MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
 ```
 
 ---
@@ -438,6 +459,18 @@ recraftv3_vector   # per_image $0.08
 
 ---
 
+## StepFun
+
+`provider = "stepfun"` · key `STEPFUN_API_KEY`
+
+### `text-to-text`
+
+```
+step-5-preview  # $1 in / $2.7 out per 1M tokens
+```
+
+---
+
 ## xAI
 
 `provider = "xai"` · key `XAI_API_KEY`
@@ -493,6 +526,26 @@ grok-4.7                      # $2 in / $6 out per 1M tokens
 grok-imagine-image          # per_image $0.02
 grok-imagine-image-2.0      # per_image $0.04
 grok-imagine-image-quality  # per_image $0.05
+```
+
+---
+
+## Xiaomi (MiMo)
+
+`provider = "xiaomi"` · key `MIMO_API_KEY`
+
+### `text-to-text`
+
+```
+mimo-v2.6-flash  # $0.14 in / $0.28 out per 1M tokens
+mimo-v2.6-pro    # $0.435 in / $0.87 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+mimo-v2.6-flash  # $0.14 in / $0.28 out per 1M tokens
+mimo-v2.6-pro    # $0.435 in / $0.87 out per 1M tokens
 ```
 
 ---
@@ -590,7 +643,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'meta', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'xai', 'zai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

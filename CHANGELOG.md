@@ -22,9 +22,22 @@ ships when its live calls pass.
   `mistral-small-2603`, `ministral-14b-2512`, `codestral-2508`;
   `MISTRAL_API_KEY`. The ids of Large 4 and Medium 3.5 are read from version
   numbers and are the first thing to check live.
+- **Xiaomi (MiMo)** — `mimo-v2.6-pro`, `mimo-v2.6-flash`; `MIMO_API_KEY`. No
+  reasoning control is documented, so none is claimed. Prices from the
+  overseas rate card as third parties quote it.
+- **MiniMax** — `MiniMax-M3`; `MINIMAX_API_KEY`. `reasoning_split` is sent on
+  every request so thinking stays out of the answer; a level keeps adaptive
+  thinking on, `"none"` turns it off.
+- **StepFun** — `step-5-preview`; `STEPFUN_API_KEY`. StepFun's own
+  documentation could not be fetched; the file is third-party documentation
+  until a live call confirms it.
+- **NVIDIA is not a provider here**: its hosted catalogue's model ids and
+  prices could not be confirmed; Nemotron 3 Ultra is reached through
+  OpenRouter or a server of your own, by `private/`.
 - **A provider the OpenAI family has no branch for is built from its data**:
-  `[provider.reasoning]` names the reasoning field and what to merge to switch
-  thinking on or off, and `[provider.options] json_schema = false` says a
+  `[provider.reasoning]` names the reasoning field — or none, for a provider
+  with a switch and no level — and what to merge to switch thinking on or off,
+  `[provider.request] always` names fields sent on every request, and `[provider.options] json_schema = false` says a
   provider takes JSON but not a schema. A new provider in this dialect is a
   TOML file.
 - **A cost the provider reports is the cost.** OpenRouter returns the call's

@@ -101,6 +101,9 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^flux"),                                             "bfl"),
     (re.compile(r"^glm-"),                                             "zai"),
     (re.compile(r"^muse-"),                                            "meta"),
+    (re.compile(r"^mimo-"),                                            "xiaomi"),
+    (re.compile(r"^minimax-"),                                         "minimax"),
+    (re.compile(r"^step-"),                                            "stepfun"),
     (re.compile(r"^(mistral-|ministral-|codestral-|magistral-|devstral-)"), "mistral"),
     (re.compile(r"^(gpt-|dall-e-|chatgpt-image-|text-embedding-|whisper-|tts-|o\d)"), "openai"),
 ]
@@ -110,7 +113,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 _PROVIDER_KEYS = frozenset({
     "openai", "anthropic", "google", "xai",
     "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "zai", "meta", "mistral", "private",
+    "recraft", "bfl", "zai", "meta", "mistral", "xiaomi", "minimax", "stepfun", "private",
 })
 
 
@@ -144,7 +147,7 @@ def _resolve_provider(name: str) -> str:
     raise ValueError(
         f"Cannot detect provider for model {name!r}.\n"
         "Supported prefixes: claude-, gemini-, grok-, sonar, kimi-, deepseek-, "
-        "qwen, glm-, muse-, mistral-, ministral-, codestral-, gpt-, o<digit>, "
+        "qwen, glm-, muse-, mimo-, minimax-, step-, mistral-, ministral-, codestral-, gpt-, o<digit>, "
         "flux, recraft.\n"
         "Use an explicit \"provider/model\" prefix (e.g. \"openai/my-custom\", "
         "\"private/llama3.3\") for a name the prefixes do not cover."

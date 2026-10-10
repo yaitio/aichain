@@ -38,12 +38,15 @@ on your own server needs no key and sends nothing outside your network.
 | Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
 | Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |
 | Meta (Muse) | `META_API_KEY` | <https://dev.meta.ai> |
+| MiniMax | `MINIMAX_API_KEY` | <https://platform.minimax.io> |
 | Mistral AI | `MISTRAL_API_KEY` | <https://console.mistral.ai/api-keys> |
 | OpenAI | `OPENAI_API_KEY` | <https://platform.openai.com/api-keys> |
 | Perplexity | `PERPLEXITY_API_KEY` | <https://www.perplexity.ai/settings/api> |
 | Qwen (DashScope) | `DASHSCOPE_API_KEY` | <https://dashscope.aliyuncs.com> |
 | Recraft | `RECRAFT_API_TOKEN` | — |
+| StepFun | `STEPFUN_API_KEY` | <https://platform.stepfun.ai> |
 | xAI | `XAI_API_KEY` | <https://console.x.ai/> |
+| Xiaomi (MiMo) | `MIMO_API_KEY` | <https://platform.xiaomimimo.com> |
 | Z.ai (GLM) | `ZAI_API_KEY` | <https://z.ai/manage-apikey/apikey-list> |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |

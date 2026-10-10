@@ -406,6 +406,10 @@ class OpenAIClient(BaseClient):
     def _described_request(self, m, messages, output, tools):
         prov = self._data["provider"]
         path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        # Fields a provider needs on every request — MiniMax's
+        # reasoning_split, which keeps its thinking out of the answer's text.
+        for key, val in ((prov.get("request") or {}).get("always") or {}).items():
+            body.setdefault(key, val)
         how = prov.get("reasoning") or {}
         if m.reasoning is not None:
             level = m.reasoning
@@ -416,14 +420,17 @@ class OpenAIClient(BaseClient):
                     kind=DECLINED, option="reasoning", asked=level, sent=None, model=m.name,
                     why=how.get("declined", "this provider has no setting for this level")))
             else:
+                # An empty field is a provider with a switch and no level —
+                # only `on` / `off` are sent.
                 field = how.get("field", "reasoning_effort")
-                if value is not None:
+                levelled = bool(field) and value is not None
+                if levelled:
                     body[field] = value
                 for key, val in (extra or {}).items():
                     body[key] = val
                 record(Adaptation(
                     kind=ADAPTED, option="reasoning", asked=level,
-                    sent=", ".join([f"{field}={value}"] * (value is not None) + list(extra or {})),
+                    sent=", ".join([f"{field}={value}"] * levelled + list(extra or {})),
                     model=m.name, why=how.get("why", "sent as this provider's reasoning setting")))
         fmt = output.get("format", {})
         if fmt.get("type") == "json_schema" and not (prov.get("options") or {}).get("json_schema", True):

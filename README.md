@@ -71,7 +71,7 @@ you to find out from the output.
 | **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
 | **[Utilities](docs/utilities/index.md)** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
 | **[Control and measurement](docs/control/cost-and-budget.md)** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class, and `approve=` for a person to decide. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
-| **[Models](docs/models/models.md)** | **<!-- g:count-models -->147 models from 13 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
+| **[Models](docs/models/models.md)** | **<!-- g:count-models -->151 models from 16 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 
@@ -94,12 +94,15 @@ export DEEPSEEK_API_KEY="…"
 export GOOGLE_AI_API_KEY="…"
 export MOONSHOT_API_KEY="…"
 export META_API_KEY="…"
+export MINIMAX_API_KEY="…"
 export MISTRAL_API_KEY="…"
 export OPENAI_API_KEY="…"
 export PERPLEXITY_API_KEY="…"
 export DASHSCOPE_API_KEY="…"
 export RECRAFT_API_TOKEN="…"
+export STEPFUN_API_KEY="…"
 export XAI_API_KEY="…"
+export MIMO_API_KEY="…"
 export ZAI_API_KEY="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"

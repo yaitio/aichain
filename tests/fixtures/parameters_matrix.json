@@ -607,6 +607,118 @@
    ]
   }
  },
+ "mimo-v2.6-pro": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "refused",
+   "detail": "reasoning for the 'xiaomi' provider must be None or one of: (none for this provider); got 'high'",
+   "warned": false
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "MiniMax-M3": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "converted",
+   "detail": "type",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "step-5-preview": {
+  "temperature": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_p": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
  "gpt-image-2.5-flare": {
   "size": {
    "outcome": "passed",
