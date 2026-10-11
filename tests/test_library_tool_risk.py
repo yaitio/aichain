@@ -10,8 +10,9 @@ it wrote ``Shell.run``, and it can read what an MCP server says about its own.
 
 Pinned: what each Shell tool is and what the policy then decides; how an MCP
 tool's annotations become a class, in either spelling the MCP SDK has used;
-that a tool the server says nothing about goes to a person; and that the
-caller's ``risk=`` outranks the server's word.
+that a tool the server says nothing about goes to a person; that the
+caller's ``risk=`` outranks the server's word; and that a REST endpoint's
+class follows its HTTP method unless the caller says otherwise.
 """
 
 import tempfile
@@ -120,6 +121,29 @@ class TestTheMCPUtility(unittest.TestCase):
         with patch("yait_aichain.utilities.mcp.MCPTools", return_value=_discovered(("ask", "read"))):
             with self.assertRaisesRegex(KeyError, r"risk= names \['asc'\], which the server does not have"):
                 MCP("https://example.com/mcp", risk={"asc": "read"}).tools
+
+
+class TestREST(unittest.TestCase):
+
+    def test_the_method_decides(self):
+        from yait_aichain.utilities import REST
+        api = REST("https://api.example.com", description="Shop API.")
+        cases = (("GET", "read", ALLOW), ("head", "read", ALLOW), ("OPTIONS", "read", ALLOW),
+                 ("POST", "external", APPROVE), ("PUT", "external", APPROVE),
+                 ("PATCH", "external", APPROVE), ("DELETE", "destructive", DENY))
+        for i, (method, risk, decision) in enumerate(cases):
+            with self.subTest(method):
+                t = api.endpoint(f"e{i}", method, "/x", description="x.")
+                self.assertEqual((t.risk, POLICY.decide(t)), (risk, decision))
+
+    def test_the_callers_word_wins(self):
+        from yait_aichain.utilities import REST
+        from yait_aichain.utilities.rest import RestApiTool
+        api = REST("https://api.example.com", description="Shop API.")
+        self.assertEqual(api.endpoint("search", "POST", "/s", description="s.", risk="read").risk, "read")
+        self.assertEqual(RestApiTool("x", "d", "GET", "https://api.example.com/x", risk="write").risk, "write")
+        with self.assertRaisesRegex(ValueError, "risk 'safe' is not one of"):
+            RestApiTool("x", "d", "GET", "https://api.example.com/x", risk="safe")
 
 
 if __name__ == "__main__":

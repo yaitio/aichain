@@ -91,6 +91,10 @@ get_order.run(id=42)
 The base URL, the auth and the headers are set once, for every endpoint, and
 never passed with a call. Each endpoint is a tool, and the API's description
 and the endpoint's are both required — a model has nothing else to go on.
+An endpoint's risk class follows its method: `GET` is `read`, `DELETE` is
+`destructive`, `POST`, `PUT` and `PATCH` are `external` — they change
+something on a service the library does not own. `risk="read"` on a `POST`
+that only searches says otherwise.
 → [API: REST](../api/utilities/rest.md)
 
 ### MCP — a server

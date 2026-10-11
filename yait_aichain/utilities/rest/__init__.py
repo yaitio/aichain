@@ -17,7 +17,9 @@ endpoint is a tool.
     Agent(model, tools=api.tools)                    # every endpoint made so far
 
 Each endpoint is a ``RestApiTool``, which can also be built on its own when
-an API has a single endpoint.
+an API has a single endpoint. Its risk class follows the method — ``GET`` is
+``read``, ``DELETE`` is ``destructive``, a write is ``external`` — unless
+``risk=`` says otherwise.
 """
 
 from __future__ import annotations
@@ -52,11 +54,16 @@ class REST(Utility):
 
     def endpoint(self, name: str, method: str, path: str, *, description: str,
                  path_params=(), query_params=(), body_params=(), required_params=(),
-                 content_type: str = "application/json", response_field: "str | None" = None) -> RestApiTool:
+                 content_type: str = "application/json", response_field: "str | None" = None,
+                 risk: "str | None" = None) -> RestApiTool:
         """
         A tool for one endpoint: *method* on the base URL plus *path* —
         ``"/booking/{id}"`` with ``path_params=["id"]``. Its fields are its
         arguments; the API's auth and headers are the utility's.
+
+        *risk* is what a permission policy reads; omitted, it follows the
+        method — ``GET`` is ``read``, ``DELETE`` is ``destructive``,
+        ``POST``/``PUT``/``PATCH`` are ``external``.
         """
         if name in self._endpoints:
             raise ValueError(f"this API already has an endpoint named {name!r}")
@@ -67,7 +74,7 @@ class REST(Utility):
                            path_params=path_params, query_params=query_params, body_params=body_params,
                            required_params=required_params, headers=self.headers, auth=self.auth,
                            content_type=content_type, response_field=response_field,
-                           timeout=self.timeout)
+                           timeout=self.timeout, risk=risk)
         self._endpoints[name] = tool
         return tool
 

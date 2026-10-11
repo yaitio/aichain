@@ -100,6 +100,7 @@ from yait_aichain.clients._base import make_http
 from yait_aichain.clients._constants import Retry
 
 from ...tools._base import Tool
+from ...tools._permissions import RISK_CLASSES
 from ...tools._security import assert_safe_url
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,17 @@ from ...tools._security import assert_safe_url
 _DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=30.0)
 _DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5,
                          status_forcelist={429, 502, 503, 504})
+
+
+# What a method does, as a risk class. HTTP calls GET, HEAD and OPTIONS safe —
+# they change nothing — and DELETE removes; the rest change state on a service
+# the library does not own, which the risk table calls `external`.
+_METHOD_RISK = {"GET": "read", "HEAD": "read", "OPTIONS": "read", "DELETE": "destructive"}
+
+
+def risk_for_method(method: str) -> str:
+    """The risk class an endpoint has when nobody says: from its HTTP method."""
+    return _METHOD_RISK.get(method.upper(), "external")
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +172,13 @@ class RestApiTool(Tool):
         When set, ``run()`` returns ``response[response_field]`` instead of
         the full response dict.  Useful for extracting a single key from a
         wrapper object (e.g. ``response_field="token"`` for ``{"token": …}``).
+    risk : str | None, optional
+        The risk class a permission policy reads. Omitted, it follows the
+        method: ``GET``, ``HEAD`` and ``OPTIONS`` change nothing and are
+        ``read``; ``DELETE`` is ``destructive``; ``POST``, ``PUT`` and
+        ``PATCH`` change something on another service and are ``external``.
+        Say otherwise when you know better — a ``POST`` that only searches is
+        ``read``.
 
     Examples
     --------
@@ -229,10 +248,14 @@ class RestApiTool(Tool):
         content_type:    str         = "application/json",
         response_field:  str | None  = None,
         timeout:         "float | None" = None,
+        risk:            "str | None"  = None,
     ) -> None:
         # ── Public identity (Tool class attributes) ────────────────────
         self.name        = name
         self.description = description
+        self.risk        = risk_for_method(method) if risk is None else risk
+        if self.risk not in RISK_CLASSES:
+            raise ValueError(f"RestApiTool {name!r}: risk {risk!r} is not one of {sorted(RISK_CLASSES)}")
 
         # ── Endpoint configuration ─────────────────────────────────────
         self._method         = method.upper()

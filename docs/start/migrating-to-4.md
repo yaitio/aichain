@@ -88,23 +88,26 @@ needs an `id`; `chunk()` pieces have none, so number them:
 An old image option is now an unknown key: it is reported as one, and the
 request goes without it.
 
-## Shell and MCP tools ask before they act
+## Shell, MCP and REST tools ask before they act
 
-Every `Shell` and MCP tool used to inherit the default risk class, `write`,
-which a policy allows — so with `permissions=PermissionPolicy()` on, an agent
-could still run any shell command, or any tool a server declared, unasked.
+Every `Shell`, MCP and REST tool used to inherit the default risk class,
+`write`, which a policy allows — so with `permissions=PermissionPolicy()` on,
+an agent could still run any shell command, call any tool a server declared,
+or `DELETE` through an API, unasked.
 
 | 3.x | 4.0 |
 |---|---|
 | `Shell(...).run` is `write`: allowed | `privileged`: needs approval |
 | `Shell(...).browse`, `.read` are `write` | `read` |
 | every MCP tool is `write` | from the server's annotations; `privileged` when there are none |
+| every REST endpoint is `write` | by method: `GET` `read`, `POST`/`PUT`/`PATCH` `external` (approval), `DELETE` `destructive` (denied) |
 
 An agent with no `permissions=` is unchanged — it runs every tool, as before.
 With a policy, a `run` or an unannotated MCP tool is now refused unless
 `approve=` is attached. To keep the old behaviour on purpose, say so:
 `PermissionPolicy({"privileged": "allow"})`, or
-`MCP(server, risk={"tool_name": "write"})` for one tool.
+`MCP(server, risk={"tool_name": "write"})` or `api.endpoint(..., risk="write")`
+for one tool.
 → [Permissions](../control/permissions.md)
 
 ## Saved chains

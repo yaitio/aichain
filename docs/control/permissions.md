@@ -50,7 +50,9 @@ search, fetch, embeddings and reranking are `read`, images are `draft`.
 `Shell`'s `browse` and `read` are `read`, `write` is `write`, and `run` is
 `privileged` — it runs any command with your process's rights. An MCP tool
 takes its class from the server's annotations and is `privileged` when the
-server says nothing; `MCP(server, risk={...})` overrides it.
+server says nothing; `MCP(server, risk={...})` overrides it. A REST endpoint
+follows its method — `GET` is `read`, `DELETE` is `destructive`, a write is
+`external` — and `endpoint(..., risk=…)` overrides it.
 
 ## The policy decides
 

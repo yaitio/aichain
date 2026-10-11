@@ -38,12 +38,17 @@ REST.endpoint(
     required_params=(),
     content_type: str = 'application/json',
     response_field: 'str | None' = None,
+    risk: 'str | None' = None,
 ) -> RestApiTool
 ```
 
 A tool for one endpoint: *method* on the base URL plus *path* —
 `"/booking/{id}"` with `path_params=["id"]`. Its fields are its
 arguments; the API's auth and headers are the utility's.
+
+*risk* is what a permission policy reads; omitted, it follows the
+method — `GET` is `read`, `DELETE` is `destructive`,
+`POST`/`PUT`/`PATCH` are `external`.
 
 ### `REST.TOOLS`
 
@@ -89,6 +94,7 @@ RestApiTool(
     content_type: str = 'application/json',
     response_field: str | None = None,
     timeout: float | None = None,
+    risk: str | None = None,
 )
 ```
 
