@@ -1,11 +1,12 @@
 """
 Z.ai, Meta, Mistral, Xiaomi, MiniMax and StepFun (4.1): providers described by data, on the OpenAI family.
 
-None has been called live yet — the keys are still to come — so what is pinned
-here is what each provider's documentation says the request must be, read
-2026-10-11: the URL, the token field, how reasoning is asked for, and what
-happens to a JSON Schema where the provider takes none. The live calls belong
-beside these once there are keys.
+What is pinned here is what each provider's documentation says the request
+must be, read 2026-10-11: the URL, the token field, how reasoning is asked
+for, and what happens to a JSON Schema where the provider takes none. Mistral
+and Xiaomi were called live the same day, and what that found is pinned too:
+Mistral's reasoning models answer with a list of parts, thinking among them,
+and two of its models refuse a reasoning setting outright.
 """
 
 import os
@@ -97,6 +98,26 @@ class TestMistral(unittest.TestCase):
     def test_the_token_field(self):
         _, _, body = _request("mistral-small-2603")
         self.assertIn("max_tokens", body)
+
+    def test_a_model_that_does_not_reason_is_not_asked_to(self):
+        from yait_aichain.models._adaptation import DECLINED
+        for name in ("codestral-2508", "ministral-14b-2512"):
+            with self.subTest(name):
+                m, _, body = _request(name, {"reasoning": "high"})
+                self.assertNotIn("reasoning_effort", body)
+                notes = [a for a in m.last_adaptations if a.option == "reasoning"]
+                self.assertEqual([a.kind for a in notes], [DECLINED])
+
+    def test_thinking_parts_stay_out_of_the_answer(self):
+        m = Model("mistral-large-4-0")
+        reply = {"choices": [{"message": {"role": "assistant", "content": [
+            {"type": "thinking", "thinking": [{"type": "text", "text": "Paris, surely."}]},
+            {"type": "text", "text": '{"a": "Paris"}'}]}, "finish_reason": "stop"}]}
+        self.assertEqual(m.client.parse_response(reply, {"format": {"type": "text"}}), '{"a": "Paris"}')
+        self.assertEqual(m.client.parse_response(reply, {"format": SCHEMA}), {"a": "Paris"})
+        event = {"choices": [{"delta": {"content": [{"type": "thinking", "thinking": []},
+                                                    {"type": "text", "text": "Par"}]}}]}
+        self.assertEqual(m.client.parse_stream_event(event, {}), "Par")
 
 
 @patch.dict(os.environ, KEYS)

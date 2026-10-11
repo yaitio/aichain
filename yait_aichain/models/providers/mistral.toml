@@ -1,9 +1,10 @@
 # mistral — Mistral AI: provider settings + its models (data tier)
 #
 # Read 2026-10-11 from docs.mistral.ai: the API reference and the model pages.
-# OpenAI-compatible chat completions at api.mistral.ai/v1. Not yet called
-# live — the key is still to come. The one European provider here, which is
-# its own reason to exist for data that has to stay in the EU.
+# OpenAI-compatible chat completions at api.mistral.ai/v1. Called live
+# 2026-10-11: text, JSON schema, tools, stream and reasoning on every model.
+# The one European provider here, which is its own reason to exist for data
+# that has to stay in the EU.
 #
 # Differences from OpenAI's wire, from the reference: the seed is
 # `random_seed`; `tool_choice` adds "any"; `safe_prompt` injects a safety
@@ -11,7 +12,7 @@
 # `prompt_mode = "reasoning"`. Model ids: the model pages render them with a
 # "+1" beside them; Large 4 and Medium 3.5 carry the ids OpenRouter lists
 # (2026-10-11), whose Small, Ministral and Codestral ids are Mistral's own.
-# A Mistral key's model list settles it.
+# Every id was in the model list of a Mistral key, 2026-10-11.
 
 [provider]
 key      = "mistral"
@@ -65,7 +66,9 @@ price = { input = 0.15, output = 0.6 }
 [models."ministral-14b-2512"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.2, output = 0.2 }
+rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11
 
 [models."codestral-2508"]
 caps  = ["text-to-text"]
 price = { input = 0.3, output = 0.9 }
+rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11

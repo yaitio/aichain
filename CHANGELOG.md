@@ -3,9 +3,11 @@
 ## [Unreleased] — 4.1.0
 
 **More providers, described by data.** Each is a provider file on the OpenAI
-family, written from the provider's own documentation read 2026-10-11, and
-none has been called live yet: the keys are still to come, and a provider
-ships when its live calls pass.
+family, written from the provider's own documentation read 2026-10-11. A
+provider ships when its live calls pass — text, a JSON Schema, a tool call, a
+stream and each reasoning level. Mistral and Xiaomi have passed; Z.ai,
+MiniMax and StepFun answered with an empty balance, and Meta has no key yet.
+All of them answered through OpenRouter.
 
 ### Added
 
@@ -20,11 +22,12 @@ ships when its live calls pass.
   refused before the network, as the API refuses it.
 - **Mistral** — `mistral-large-4-0`, `mistral-medium-3-5`,
   `mistral-small-2603`, `ministral-14b-2512`, `codestral-2508`;
-  `MISTRAL_API_KEY`. The ids of Large 4 and Medium 3.5 are OpenRouter's; the
-  other three match Mistral's own.
+  `MISTRAL_API_KEY`. Every id is in the model list a Mistral key returns.
+  Called live: all five pass. Codestral and Ministral refuse a reasoning
+  setting with HTTP 400, so it is declined for them, and said so.
 - **Xiaomi (MiMo)** — `mimo-v2.6-pro`, `mimo-v2.6-flash`; `MIMO_API_KEY`. No
   reasoning control is documented, so none is claimed. Prices from the
-  overseas rate card as third parties quote it.
+  overseas rate card as third parties quote it. Called live: both pass.
 - **MiniMax** — `MiniMax-M3`; `MINIMAX_API_KEY`. `reasoning_split` is sent on
   every request so thinking stays out of the answer; a level keeps adaptive
   thinking on, `"none"` turns it off.
@@ -40,6 +43,11 @@ ships when its live calls pass.
   `[provider.request] always` names fields sent on every request, and `[provider.options] json_schema = false` says a
   provider takes JSON but not a schema. A new provider in this dialect is a
   TOML file.
+- **A reply whose content is a list of parts is read.** Mistral's reasoning
+  models — Large 4 — answer with `[{"type": "thinking", …}, {"type": "text",
+  …}]` instead of a string. The JSON mode failed on it with `AttributeError`
+  and an agent's next turn with `ValueError`; only the text parts are the
+  answer now, in a reply and in a stream, and the thinking is kept out of it.
 - **A cost the provider reports is the cost.** OpenRouter returns the call's
   price in `usage.cost`; it is read now and wins over the registry's estimate,
   so a model reached through `private/` with OpenRouter's URL reports what it

@@ -38,6 +38,7 @@ def _ratio_of(size: str) -> "str | None":
 from .._base import BaseClient
 from ._openai_compat import (
     _part_to_openai,                       # noqa: F401  (kept for parity)
+    content_text,
     _build_openai_compat_request,
     _parse_openai_compat_response,
     _build_responses_api_request,
@@ -185,10 +186,11 @@ class OpenAIClient(BaseClient):
         if not choices:
             return None
         delta = choices[0].get("delta") or {}
-        text = delta.get("content")
-        # A tool-call delta carries no content and must not be mistaken for
-        # the end of the answer; it is simply not text.
-        return text if isinstance(text, str) and text else None
+        # A list is Mistral's parts, thinking among them; only text is the
+        # answer. A tool-call delta carries no content and must not be
+        # mistaken for the end of the answer; it is simply not text.
+        text = content_text(delta.get("content"))
+        return text or None
 
     def stream_tool_fragments(self, event: dict) -> "list | None":
         choices = event.get("choices") or []
@@ -411,7 +413,11 @@ class OpenAIClient(BaseClient):
         for key, val in ((prov.get("request") or {}).get("always") or {}).items():
             body.setdefault(key, val)
         how = prov.get("reasoning") or {}
-        if m.reasoning is not None:
+        if m.reasoning is not None and "reasoning" in m._REJECTS:
+            record(Adaptation(
+                kind=DECLINED, option="reasoning", asked=m.reasoning, sent=None, model=m.name,
+                why="this model does not reason; the API refuses the setting"))
+        elif m.reasoning is not None:
             level = m.reasoning
             value = m._REASONING_MAP.get(level)
             extra = how.get("off") if level == "none" else how.get("on")

@@ -532,10 +532,10 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
               c.get("function", {}).get("arguments"),
               c.get("id", ""))
              for c in message["tool_calls"]),
-            text=message.get("content") or "",
+            text=content_text(message.get("content")),
         )
 
-    text  = message.get("content") or ""
+    text  = content_text(message.get("content"))
 
     # A server that does not implement harmony passes it through as prose.
     # Parsing it here is what turns a lost tool call into a real one — and
@@ -556,6 +556,23 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
             output_tokens=usage.get("completion_tokens"),
         )
     return text
+
+
+def content_text(content) -> str:
+    """The answer's text from a message's ``content``.
+
+    Most servers send a string. Mistral's reasoning models send a list of
+    parts — ``{"type": "thinking", ...}`` then ``{"type": "text", "text": ...}``
+    — and only the text parts are the answer: the thinking is the model's
+    notes, kept out of what the caller reads, as harmony's are.
+    """
+    if isinstance(content, str):
+        return content
+    if not content:
+        return ""
+    return "".join(part.get("text", "") for part in content
+                   if isinstance(part, dict) and part.get("type", "text") == "text"
+                   and isinstance(part.get("text"), str))
 
 
 # ---------------------------------------------------------------------------
