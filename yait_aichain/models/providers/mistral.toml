@@ -9,8 +9,9 @@
 # `random_seed`; `tool_choice` adds "any"; `safe_prompt` injects a safety
 # prompt; reasoning is `reasoning_effort` (none..xhigh) and, on some models,
 # `prompt_mode = "reasoning"`. Model ids: the model pages render them with a
-# "+1" beside them, so the ids of Large 4 and Medium 3.5 below are taken from
-# the pages' version numbers and are the first thing to check live.
+# "+1" beside them; Large 4 and Medium 3.5 carry the ids OpenRouter lists
+# (2026-10-11), whose Small, Ministral and Codestral ids are Mistral's own.
+# A Mistral key's model list settles it.
 
 [provider]
 key      = "mistral"
@@ -49,11 +50,11 @@ field = "reasoning_effort"
 # Prices: the model pages on docs.mistral.ai, read 2026-10-11, USD per 1M
 # tokens. Large 4 was on sale at half its list price that day; the list price
 # is kept, as for every introductory price in this registry.
-[models."mistral-large-2610"]
+[models."mistral-large-4-0"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.36, output = 4.18, cache_read = 0.14 }
 
-[models."mistral-medium-2604"]
+[models."mistral-medium-3-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.5, output = 7.5 }
 

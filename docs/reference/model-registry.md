@@ -267,19 +267,19 @@ MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
 ### `text-to-text`
 
 ```
-codestral-2508       # $0.3 in / $0.9 out per 1M tokens
-ministral-14b-2512   # $0.2 in / $0.2 out per 1M tokens
-mistral-large-2610   # $1.36 in / $4.18 out per 1M tokens
-mistral-medium-2604  # $1.5 in / $7.5 out per 1M tokens
-mistral-small-2603   # $0.15 in / $0.6 out per 1M tokens
+codestral-2508      # $0.3 in / $0.9 out per 1M tokens
+ministral-14b-2512  # $0.2 in / $0.2 out per 1M tokens
+mistral-large-4-0   # $1.36 in / $4.18 out per 1M tokens
+mistral-medium-3-5  # $1.5 in / $7.5 out per 1M tokens
+mistral-small-2603  # $0.15 in / $0.6 out per 1M tokens
 ```
 
 ### `image-to-text`
 
 ```
-ministral-14b-2512   # $0.2 in / $0.2 out per 1M tokens
-mistral-large-2610   # $1.36 in / $4.18 out per 1M tokens
-mistral-medium-2604  # $1.5 in / $7.5 out per 1M tokens
+ministral-14b-2512  # $0.2 in / $0.2 out per 1M tokens
+mistral-large-4-0   # $1.36 in / $4.18 out per 1M tokens
+mistral-medium-3-5  # $1.5 in / $7.5 out per 1M tokens
 ```
 
 ---

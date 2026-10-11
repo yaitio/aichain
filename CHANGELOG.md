@@ -18,10 +18,10 @@ ships when its live calls pass.
   `-contributor` models, which Meta trains on; `META_API_KEY`. Sent as
   `max_completion_tokens` and `reasoning_effort`; `reasoning="none"` is
   refused before the network, as the API refuses it.
-- **Mistral** — `mistral-large-2610`, `mistral-medium-2604`,
+- **Mistral** — `mistral-large-4-0`, `mistral-medium-3-5`,
   `mistral-small-2603`, `ministral-14b-2512`, `codestral-2508`;
-  `MISTRAL_API_KEY`. The ids of Large 4 and Medium 3.5 are read from version
-  numbers and are the first thing to check live.
+  `MISTRAL_API_KEY`. The ids of Large 4 and Medium 3.5 are OpenRouter's; the
+  other three match Mistral's own.
 - **Xiaomi (MiMo)** — `mimo-v2.6-pro`, `mimo-v2.6-flash`; `MIMO_API_KEY`. No
   reasoning control is documented, so none is claimed. Prices from the
   overseas rate card as third parties quote it.
