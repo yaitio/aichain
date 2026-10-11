@@ -37,7 +37,7 @@ install `yait-aichain`.
 | File | Size | What it is |
 |---|---|---|
 | `SKILL.md` | 4 KB | when to use the library, which primitive for which task, a checklist before finishing |
-| `llms.txt` | 25 KB | the whole contract: every constructor's signature, one working example per primitive, the rules agents most often get wrong |
+| `llms.txt` | 26 KB | the whole contract: every constructor's signature, one working example per primitive, the rules agents most often get wrong |
 | `recipes.md` | — | twenty worked programs, each passing its task's check in this repository |
 
 The skill fires on the language of the task — "build an agent that…", "a

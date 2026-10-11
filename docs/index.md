@@ -21,7 +21,7 @@ result = skill.run(variables={"text": "Your content here..."})
 
 ## Three promises
 
-**Your coding agent writes the agents.** The whole contract is one 25 KB
+**Your coding agent writes the agents.** The whole contract is one 26 KB
 `llms.txt`, and one plugin for Claude Code, Codex and Cursor carries it with
 twenty worked recipes. On twenty tasks the docs were not written against, a
 small model with the docs passed 15 in all three tries and Claude Code passed
