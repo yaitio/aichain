@@ -114,7 +114,12 @@ later step may read a value that is now stale.
 - **`chain.save()`** writes the steps to YAML, keys never included. A chain
   holding a `@tool` function or a plain function cannot be saved — a function
   is code, not data — and `save()` says so instead of writing a file that
-  cannot be loaded.
+  cannot be loaded. A REST endpoint is saved with its URL, fields and risk
+  class; its credential only by name (`auth={"env": …}`), and a token given
+  as a value refuses to be saved. `Chain.load()` imports only the library's
+  own classes, and an endpoint that carries auth, or a risk class other than
+  its method's, loads only with `trusted=True`: the URL and the variable a
+  token is read from both come from the file.
 
 ---
 

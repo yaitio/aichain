@@ -79,6 +79,19 @@ through OpenRouter.
   so a model reached through `private/` with OpenRouter's URL reports what it
   cost instead of `None`. Verified live on two models.
 
+
+### Fixed
+
+- **A chain with a REST endpoint loads.** It saved, and nothing of the
+  endpoint reached the file, so `Chain.load()` called its constructor with
+  no arguments and raised `TypeError`. The URL, method, fields, headers,
+  auth by name and risk class are written now; a token given as a value, or
+  a header whose name says it carries a secret, makes `save()` refuse with
+  the two sources that can be saved. Loading an endpoint that carries auth,
+  or a risk class other than its method's, needs `trusted=True` — a
+  tampered file could otherwise point a key from your environment at any
+  address, or let a `DELETE` past a permission policy as `read`.
+
 ## [4.0.0] — 2026-10-11
 
 **No compatibility layer.** Every name and path 3.x kept alive for older code

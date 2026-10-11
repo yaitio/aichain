@@ -199,7 +199,57 @@ class TestAChainTakesAMethod(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "'Vectors.upsert' is a function or a utility's method"):
             Chain(steps=[(_vectors().upsert, "n", {"records": "x"})]).save(path)
 
+class TestASavedChainKeepsItsEndpoints(unittest.TestCase):
+    """Until 2026-10-11 a chain with a REST endpoint saved and did not load:
+    nothing of the endpoint reached the file, and load called the constructor
+    with no arguments. It round-trips now, never writes a secret, and will not
+    take an endpoint's credential or risk from a file nobody vouched for."""
 
+    def _api(self, **kw):
+        return REST("https://api.example.com", description="Shop API.",
+                    headers={"Accept": "application/json"}, **kw)
+
+    def _save(self, tool):
+        path = os.path.join(tempfile.mkdtemp(), "c.yaml")
+        Chain(steps=[(tool, "out")]).save(path)
+        return path
+
+    def test_it_round_trips(self):
+        ep = self._api(auth={"type": "bearer", "env": "SHOP_TOKEN"}).endpoint(
+            "update_order", "PUT", "/orders/{id}", path_params=["id"], body_params=["status"],
+            required_params=["id"], query_params=["dry"], description="Change an order.",
+            response_field="order")
+        back = Chain.load(self._save(ep), trusted=True)._steps[0][0]
+        for attr in ("name", "description", "_method", "_url_template", "_path_params",
+                     "_query_params", "_body_params", "_required_params", "_static_headers",
+                     "_auth", "_content_type", "_response_field", "risk", "parameters"):
+            with self.subTest(attr):
+                self.assertEqual(getattr(back, attr), getattr(ep, attr))
+
+    def test_without_auth_it_loads_untrusted(self):
+        ep = self._api().endpoint("get_order", "GET", "/orders/{id}", path_params=["id"],
+                                  description="One order.")
+        self.assertEqual(Chain.load(self._save(ep))._steps[0][0].risk, "read")
+
+    def test_no_secret_is_written(self):
+        token_ep = self._api(auth={"type": "bearer", "token": "s3cret"}).endpoint(
+            "a", "GET", "/a", description="A.")
+        with self.assertRaisesRegex(ValueError, "cannot be saved: its token is a value"):
+            self._save(token_ep)
+        header_ep = REST("https://api.example.com", description="Shop API.",
+                         headers={"Authorization": "Bearer s3cret"}).endpoint("b", "GET", "/b", description="B.")
+        with self.assertRaisesRegex(ValueError, r"header\(s\) \['Authorization'\] would write a secret"):
+            self._save(header_ep)
+
+    def test_an_untrusted_file_cannot_carry_a_credential_or_lower_a_risk(self):
+        ep = self._api(auth={"type": "bearer", "env": "SHOP_TOKEN"}).endpoint(
+            "a", "GET", "/a", description="A.")
+        with self.assertRaisesRegex(ValueError, "carries auth"):
+            Chain.load(self._save(ep))
+        lowered = self._api().endpoint("drop", "DELETE", "/d", description="Drop.", risk="read")
+        with self.assertRaisesRegex(ValueError, "is DELETE with risk 'read', not 'destructive'"):
+            Chain.load(self._save(lowered))
+        self.assertEqual(Chain.load(self._save(lowered), trusted=True)._steps[0][0].risk, "read")
 
 
 if __name__ == "__main__":

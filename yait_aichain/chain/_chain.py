@@ -1222,6 +1222,12 @@ class Chain:
                         f"Module '{module_path}' has no class '{class_name}'"
                     )
 
+                # A class can name what it will not take from an untrusted
+                # file — an endpoint's URL and the variable its token is read
+                # from both come from the file.
+                refusal = getattr(tool_cls, "_untrusted_load_refusal", None)
+                if not trusted and refusal and (why := refusal(init_args)):
+                    raise ValueError(f"Refusing to load {class_path}: {why}")
                 tool  = tool_cls(**init_args)
                 for attr in ("name", "description"):
                     if td.get(attr):

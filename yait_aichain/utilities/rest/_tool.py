@@ -268,6 +268,7 @@ class RestApiTool(Tool):
         self._content_type   = content_type
         self._response_field = response_field
         self._timeout        = timeout
+        self._required_params = list(required_params)
         # The token has one source: a callable, a field the code or a chain
         # fills, or an environment variable. Two of them is an error, so none
         # can win over another in silence.
@@ -514,6 +515,69 @@ class RestApiTool(Tool):
         env_key = auth.get("env")
         if env_key:
             return os.environ.get(env_key)
+        return None
+
+    # ------------------------------------------------------------------
+    # Saving in a chain
+    # ------------------------------------------------------------------
+
+    #: Header names a secret travels in. A saved chain is a file, and a
+    #: value in one of these would be written into it.
+    _SECRET_HEADER = ("authorization", "cookie", "token", "key", "secret", "password")
+
+    def _serialise_init_args(self) -> dict:
+        """What `Chain.save` writes: the endpoint, never a secret.
+
+        A token given as a value or a callable is not written — a file is
+        not a place for it — and saving refuses, naming the two sources that
+        can be saved: ``env`` (the variable's name) and ``token_field`` (a
+        field the chain fills). A static header whose name says it carries a
+        secret is refused for the same reason.
+        """
+        if self._auth.get("token") is not None:
+            raise ValueError(
+                f"RestApiTool {self.name!r} cannot be saved: its token is a value or a "
+                f"callable, and a saved chain is a file. Give it by name — "
+                f"auth={{..., 'env': 'VARIABLE'}} — or as a field the chain fills — "
+                f"auth={{..., 'token_field': 'token'}}.")
+        secret = [h for h in self._static_headers
+                  if any(word in h.lower() for word in self._SECRET_HEADER)]
+        if secret:
+            raise ValueError(
+                f"RestApiTool {self.name!r} cannot be saved: header(s) {secret} would "
+                f"write a secret into the file. Put the credential in auth=, by env name.")
+        args = {
+            "name": self.name, "description": self.description,
+            "method": self._method, "url": self._url_template,
+            "path_params": self._path_params, "query_params": self._query_params,
+            "body_params": self._body_params, "required_params": self._required_params,
+            "headers": self._static_headers or None, "auth": self._auth or None,
+            "content_type": self._content_type, "response_field": self._response_field,
+            "timeout": self._timeout, "risk": self.risk,
+        }
+        return {k: v for k, v in args.items() if v not in (None, [], ())}
+
+    @staticmethod
+    def _untrusted_load_refusal(init_args: dict) -> "str | None":
+        """Why a file nobody vouched for may not make this endpoint, or None.
+
+        The URL and the name of the token's variable both come from the file.
+        A tampered one could send a key from your environment — any key, by
+        name — to any address, so an endpoint with ``auth`` loads only from a
+        file passed with ``trusted=True``. Its risk class comes from the file
+        too, and a ``DELETE`` saved as ``read`` would walk past a permission
+        policy, so a class other than the method's own needs trust as well.
+        """
+        risk = init_args.get("risk")
+        method = init_args.get("method", "")
+        if risk is not None and risk != risk_for_method(method):
+            return (f"endpoint {init_args.get('name')!r} is {method} with risk {risk!r}, not "
+                    f"{risk_for_method(method)!r}; a file you do not control could lower what a "
+                    f"permission policy sees. Pass trusted=True to Chain.load() for a file you wrote.")
+        if init_args.get("auth"):
+            return (f"endpoint {init_args.get('name')!r} carries auth and sends to "
+                    f"{init_args.get('url')!r}; a file you do not control could point your "
+                    f"credential anywhere. Pass trusted=True to Chain.load() for a file you wrote.")
         return None
 
     # ------------------------------------------------------------------
