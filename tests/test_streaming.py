@@ -553,8 +553,7 @@ class TestAStreamRetriesWhileItStillCan(unittest.TestCase):
             def __init__(self):
                 attempts.append(1)
 
-            def read(self):
-                return b'{"error": "bad request"}'
+            data = b'{"error": "bad request"}'
 
             def release_conn(self):
                 pass

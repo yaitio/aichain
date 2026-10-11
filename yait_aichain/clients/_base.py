@@ -332,7 +332,9 @@ class BaseClient:
             raise NetworkError(0, str(exc)) from exc
 
         if not (200 <= response.status < 300):
-            body = response.read().decode("utf-8", errors="replace")
+            # `.data`, not `.read()`: the retry policy may already have read
+            # the body to look for billing, and `.data` is what keeps it.
+            body = response.data.decode("utf-8", errors="replace")
             response.release_conn()
             raise error_from_status(response.status, body, response.headers)
 

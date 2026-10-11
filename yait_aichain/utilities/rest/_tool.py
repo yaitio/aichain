@@ -97,6 +97,7 @@ from typing import Any
 
 import urllib3
 from yait_aichain.clients._base import make_http
+from yait_aichain.clients._constants import Retry
 
 from ...tools._base import Tool
 from ...tools._security import assert_safe_url
@@ -106,8 +107,8 @@ from ...tools._security import assert_safe_url
 # ---------------------------------------------------------------------------
 
 _DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=30.0)
-_DEFAULT_RETRIES = urllib3.Retry(total=2, backoff_factor=0.5,
-                                  status_forcelist={429, 502, 503, 504})
+_DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5,
+                         status_forcelist={429, 502, 503, 504})
 
 
 # ---------------------------------------------------------------------------

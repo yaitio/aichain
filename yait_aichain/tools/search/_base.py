@@ -68,6 +68,7 @@ from datetime import date, datetime, timedelta, timezone
 import urllib3
 
 from ...clients._base import make_http
+from ...clients._constants import Retry
 from .._base import Record, Tool
 
 # ---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ from .._base import Record, Tool
 # search POSTs are read-only queries, so retrying them cannot double-bill a
 # generation the way a retried completion call could.
 SEARCH_TIMEOUT = urllib3.Timeout(connect=10.0, read=120.0)
-SEARCH_RETRIES = urllib3.Retry(
+SEARCH_RETRIES = Retry(
     total=3,
     backoff_factor=1.0,
     status_forcelist={429, 500, 502, 503, 504},

@@ -43,6 +43,14 @@ All of them answered through OpenRouter.
   `[provider.request] always` names fields sent on every request, and `[provider.options] json_schema = false` says a
   provider takes JSON but not a schema. A new provider in this dialect is a
   TOML file.
+- **An empty balance answered with 429 fails at once.** Z.ai answers 429 for
+  a rate limit and for an account with no money alike, and the transport
+  retried both five times with backoff before the body was read — a minute a
+  call, for an answer that could not change. The retry policy reads a 429's
+  body first now: billing raises `InsufficientCreditsError` on the first
+  answer (0.8 s, live), a rate limit is retried as before. The same policy
+  covers model calls, streams, search, embeddings, reranking, vectors and
+  REST endpoints.
 - **A reply whose content is a list of parts is read.** Mistral's reasoning
   models — Large 4 — answer with `[{"type": "thinking", …}, {"type": "text",
   …}]` instead of a string. The JSON mode failed on it with `AttributeError`
