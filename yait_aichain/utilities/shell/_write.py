@@ -39,6 +39,7 @@ class LocalWriteTool(Tool, SandboxedTool):
     """
 
     name        = "local_write"
+    risk        = "write"   # changes files inside the folder
     description = (
         "Write content to a local file. Creates the file (and any parent "
         "directories) if they do not exist. Can overwrite or append."

@@ -45,6 +45,13 @@ agent = Agent(Model("claude-haiku-5-5"), tools=[issue_refund],
 The default is `write` because the library cannot tell what your code does;
 saying `read` is your claim to make.
 
+The library's own tools say what they risk, so a policy holds for them too:
+search, fetch, embeddings and reranking are `read`, images are `draft`.
+`Shell`'s `browse` and `read` are `read`, `write` is `write`, and `run` is
+`privileged` — it runs any command with your process's rights. An MCP tool
+takes its class from the server's annotations and is `privileged` when the
+server says nothing; `MCP(server, risk={...})` overrides it.
+
 ## The policy decides
 
 | Decision | What happens |

@@ -32,7 +32,7 @@ List directory contents as a tree.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.shell import LocalBrowseTool` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 LocalBrowseTool(
@@ -61,7 +61,7 @@ Read a file's contents.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.shell import LocalReadTool` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 LocalReadTool(
@@ -119,7 +119,7 @@ Execute a shell command or Python file.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.shell import LocalRunTool` |
-| Risk class | `write` |
+| Risk class | `privileged` |
 
 ```python
 LocalRunTool(

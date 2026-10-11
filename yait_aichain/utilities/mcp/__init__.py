@@ -15,12 +15,19 @@ declares, each with the name, description and schema the server gives it.
 
 Each tool is an ``MCPTool``. Two settings: ``connect_timeout`` bounds reaching
 the server and listing its tools, ``call_timeout`` one call of a tool.
+
+Each tool's risk class — what a permission policy reads — comes from the
+server's annotations, and is ``privileged`` where the server says nothing:
+another server's tool is unknown here, and the unknown goes to a person.
+``risk={"tool_name": "read"}`` puts your word over the server's::
+
+    MCP("https://mcp.deepwiki.com/mcp", risk={"ask_wiki_question": "read"})
 """
 
 from __future__ import annotations
 
 from .._base import Utility
-from ._tools import DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, MCPTools
+from ._tools import DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, MCPTools, risk_from_annotations
 
 
 class MCP(Utility):
@@ -33,18 +40,30 @@ class MCP(Utility):
     def __init__(self, server, *, filter: "list | None" = None, headers: "dict | None" = None,
                  env: "dict | None" = None, cwd: "str | None" = None, transport: "str | None" = None,
                  connect_timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT,
-                 call_timeout: "float | None" = None) -> None:
+                 call_timeout: "float | None" = None, risk: "dict | None" = None) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool. The discovery function calls the first `timeout`.
         self.server = server
         self._settings = dict(filter=filter, headers=headers, env=env, cwd=cwd, transport=transport,
                               timeout=connect_timeout, call_timeout=call_timeout)
         self._tools: "list | None" = None
+        from ...tools._permissions import RISK_CLASSES
+        bad = {n: r for n, r in (risk or {}).items() if r not in RISK_CLASSES}
+        if bad:
+            raise ValueError(f"MCP risk: {bad} — each must be one of {sorted(RISK_CLASSES)}")
+        self._risk = dict(risk or {})
 
     @property
     def tools(self) -> list:
         if self._tools is None:
-            self._tools = MCPTools(self.server, **self._settings)
+            tools = MCPTools(self.server, **self._settings)
+            missing = sorted(set(self._risk) - {t.name for t in tools})
+            if missing:
+                raise KeyError(f"risk= names {missing}, which the server does not have; "
+                               f"it has {[t.name for t in tools]}")
+            for t in tools:
+                t.risk = self._risk.get(t.name, t.risk)
+            self._tools = tools
         return list(self._tools)
 
     @property
@@ -71,4 +90,4 @@ class MCP(Utility):
         return f"MCP({self.server!r})"
 
 
-__all__ = ["MCP", "MCPTool"]
+__all__ = ["MCP", "MCPTool", "risk_from_annotations"]

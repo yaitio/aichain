@@ -39,6 +39,7 @@ class LocalBrowseTool(Tool, SandboxedTool):
     """
 
     name        = "local_browse"
+    risk        = "read"   # looks, changes nothing
     description = (
         "List the contents of a local directory as a tree. "
         "Use this to explore the filesystem and understand project structure."

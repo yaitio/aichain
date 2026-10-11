@@ -82,6 +82,16 @@ change, with its replacement: `docs/start/migrating-to-4.md`.
 
 ### Changed
 
+- **Shell and MCP tools say what they risk.** Every one of them inherited the
+  default class, `write`, which a policy allows — so with
+  `permissions=PermissionPolicy()` on, an agent could run any shell command,
+  or any tool a server declared, without being asked. `Shell.run` is now
+  `privileged` (approval), `browse` and `read` are `read`. An MCP tool takes
+  its class from the server's annotations — `readOnlyHint`,
+  `destructiveHint`, `openWorldHint` — and is `privileged` where the server
+  says nothing; `MCP(server, risk={...})` puts the caller's word over the
+  server's. An agent with no policy is unchanged. Found reading vercel/ai,
+  whose MCP wrapper defaults an uncovered tool to approval for this reason.
 - **A `Skill` with an image output raises**, naming `image(service, model=…)`.
   It warned since 3.9.0. The image tool makes its request through a `Skill`
   by a seam of its own, `_image=True`, so retries, the budget and the record

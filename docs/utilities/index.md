@@ -65,9 +65,16 @@ sh.read.run("README.md", {"start_line": 1, "end_line": 40})
 Agent(model, tools=[sh.browse, sh.read])               # read-only
 ```
 
-| Tools |
-|---|
-| `browse`, `read`, `write`, `run` — each confined to the folder, each given to an agent on its own |
+| Tool | Risk | What it does |
+|---|---|---|
+| `browse`, `read` | `read` | look inside the folder |
+| `write` | `write` | change a file inside the folder |
+| `run` | `privileged` | run any command — the folder is where it **starts**, not a boundary |
+
+`run` has the host process's rights: a command can use absolute paths, reach
+the network, delete. With a [permission policy](../control/permissions.md) it
+goes to a person before every command; without one, an agent runs whatever it
+writes. Give it only behind a policy, or inside a container.
 
 → [API: Shell](../api/utilities/shell.md)
 
@@ -98,6 +105,12 @@ Agent(model, tools=deepwiki.tools)                     # or deepwiki.tool("ask_w
 The server is asked for its tools on first use, not when the utility is made.
 Each tool keeps the name, description and schema the server gives it.
 `connect_timeout` bounds reaching the server, `call_timeout` one call.
+
+Each tool's risk class comes from the server's annotations — `readOnlyHint`
+makes it `read`, `destructiveHint` makes it `destructive` — and is
+`privileged` where the server says nothing, so a policy sends it to a person.
+The annotations are the server's word; `risk={"ask_wiki_question": "read"}`
+puts yours over it.
 → [API: MCP](../api/utilities/mcp.md)
 
 ---

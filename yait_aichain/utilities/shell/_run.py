@@ -58,6 +58,7 @@ class LocalRunTool(Tool, SandboxedTool):
     """
 
     name        = "local_run"
+    risk        = "privileged"   # runs any command with the host process's rights — the folder is only where it starts
     description = (
         "Execute a shell command or Python file within the sandbox directory. "
         "Returns stdout, stderr, and the return code. "

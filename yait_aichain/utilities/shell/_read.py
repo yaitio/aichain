@@ -36,6 +36,7 @@ class LocalReadTool(Tool, SandboxedTool):
     """
 
     name        = "local_read"
+    risk        = "read"   # looks, changes nothing
     description = (
         "Read the contents of a local file. "
         "Supports reading a specific line range for large files."

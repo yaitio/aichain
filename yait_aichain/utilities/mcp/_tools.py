@@ -343,6 +343,11 @@ class MCPTool(Tool):
     transport : str | None, optional
         Force transport: ``"http"``, ``"sse"``, or ``"stdio"``.
         Auto-detected from *server* when omitted.
+    risk : str, optional
+        The risk class a permission policy reads. ``"privileged"`` when
+        omitted: what another server's tool does is unknown here, and the
+        unknown goes to a person, not through. Discovery sets it from the
+        server's annotations — see :func:`risk_from_annotations`.
 
     Examples
     --------
@@ -386,7 +391,12 @@ class MCPTool(Tool):
         cwd:         "str | None"  = None,
         transport:   "str | None"  = None,
         call_timeout: "float | None" = None,
+        risk:        str           = "privileged",
     ) -> None:
+        from ...tools._permissions import RISK_CLASSES
+        if risk not in RISK_CLASSES:
+            raise ValueError(f"MCPTool {name!r}: risk {risk!r} is not one of {sorted(RISK_CLASSES)}")
+        self.risk        = risk
         self.name        = name
         self._call_timeout = call_timeout
         self.description = description
@@ -681,5 +691,49 @@ async def _discover_tools(
             cwd         = cwd,
             transport   = transport,
             call_timeout = call_timeout,
+            risk        = risk_from_annotations(getattr(t, "annotations", None)),
         ))
     return result
+
+
+def _hint(annotations: Any, snake: str, camel: str) -> "bool | None":
+    """One hint, under its MCP SDK v2 name or the camelCase one before it."""
+    value = getattr(annotations, snake, None)
+    if value is None:
+        value = getattr(annotations, camel, None)
+    if value is None and isinstance(annotations, dict):
+        value = annotations.get(camel, annotations.get(snake))
+    return value if isinstance(value, bool) else None
+
+
+def risk_from_annotations(annotations: Any) -> str:
+    """The risk class an MCP tool's annotations claim.
+
+    MCP lets a server describe each tool: ``readOnlyHint``,
+    ``destructiveHint``, ``openWorldHint``. They are the server's word, which
+    the specification itself calls untrusted — so only an explicit hint lowers
+    the class, and a tool the server says nothing about is ``privileged``:
+    a permission policy sends it to a person. ``MCP(server, risk={...})`` puts
+    the caller's word over the server's.
+
+    ============================================  ===============
+    annotations                                    risk
+    ============================================  ===============
+    ``readOnlyHint: true``                         ``read``
+    ``destructiveHint: true``                      ``destructive``
+    ``destructiveHint: false, openWorldHint: false``  ``write``
+    ``destructiveHint: false``, otherwise          ``external``
+    none, or nothing that settles it               ``privileged``
+    ============================================  ===============
+    """
+    if annotations is None:
+        return "privileged"
+    if _hint(annotations, "read_only_hint", "readOnlyHint") is True:
+        return "read"
+    destructive = _hint(annotations, "destructive_hint", "destructiveHint")
+    if destructive is True:
+        return "destructive"
+    if destructive is False:
+        open_world = _hint(annotations, "open_world_hint", "openWorldHint")
+        return "write" if open_world is False else "external"
+    return "privileged"

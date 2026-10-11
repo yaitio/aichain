@@ -45,10 +45,10 @@ Chains and Agents identically.
 | Speech | [`sttGoogle`](../api/tools/speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
 | Speech | [`sttXAI`](../api/tools/speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `write` |
 | Speech | [`sttQwen`](../api/tools/speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `write` |
-| Local | [`local_browse`](../api/utilities/shell.md#localbrowsetool) | `LocalBrowseTool` | List directory contents as a tree. | — | `write` |
-| Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `write` |
+| Local | [`local_browse`](../api/utilities/shell.md#localbrowsetool) | `LocalBrowseTool` | List directory contents as a tree. | — | `read` |
+| Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `read` |
 | Local | [`local_write`](../api/utilities/shell.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |
-| Local | [`local_run`](../api/utilities/shell.md#localruntool) | `LocalRunTool` | Execute a shell command or Python file. | — | `write` |
+| Local | [`local_run`](../api/utilities/shell.md#localruntool) | `LocalRunTool` | Execute a shell command or Python file. | — | `privileged` |
 | Vector store | [`vector_chunk`](../api/utilities/vectors.md#chunk) | `Chunk` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `write` |
 | Vector store | [`vector_upsert`](../api/utilities/vectors.md#vectorupserttool) | `VectorUpsertTool` | Insert or update records in a `VectorStore`. | — | `write` |
 | Vector store | [`vector_query`](../api/utilities/vectors.md#vectorquerytool) | `VectorQueryTool` | Semantic similarity search over a `VectorStore`. | — | `write` |
