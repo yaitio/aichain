@@ -83,7 +83,7 @@ is a [tool](tools/media.md).
 |---|---|
 | **Text → Text** | Anthropic, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Perplexity, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM), [your own private server](models/private-models.md) |
 | **Text → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
-| **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Qwen (DashScope), xAI, Xiaomi (MiMo), Z.ai (GLM) |
+| **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM) |
 | **Image → Image** | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchTavily` |
 <!-- /g:modalities -->

@@ -44,3 +44,9 @@ price = { input = 0.435, output = 0.87, cache_read = 0.0036 }
 [models."mimo-v2.6-flash"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.14, output = 0.28, cache_read = 0.0028 }
+
+# The fast tier of V2.6 Pro, ten times its price. In the key's model list;
+# the price is OpenRouter's (2026-10-11), like the rest of this file's.
+[models."mimo-v2.6-pro-ultraspeed"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 4.35, output = 8.7, cache_read = 0.036 }

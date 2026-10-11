@@ -34,6 +34,18 @@ All of them answered through OpenRouter.
 - **StepFun** — `step-5-preview`; `STEPFUN_API_KEY`. StepFun's own
   documentation could not be fetched; the file is third-party documentation
   until a live call confirms it.
+- **The models each provider's key lists, registered** — Z.ai `glm-5-turbo`,
+  `glm-4.6`, `glm-4.5`, `glm-4.5-air`; Mistral `mistral-large-2512` (Large 3),
+  `ministral-8b-2512`, `ministral-3b-2512`; Xiaomi `mimo-v2.6-pro-ultraspeed`;
+  MiniMax `MiniMax-M2.7`, `M2.5`, `M2.1`, `M2` and their `-highspeed`
+  variants; StepFun `step-3.7-flash`, `step-3.5-flash`,
+  `step-3.5-flash-2603`. Prices are each provider's own page, read
+  2026-10-11, except `glm-5-turbo` and Xiaomi's, which are OpenRouter's. The
+  new Mistral and Xiaomi models were called live and pass; the three Mistral
+  ones refuse a reasoning setting, like Ministral 14B. Reading the rate cards
+  corrected two existing entries: MiniMax-M3 doubles its price above 512k
+  input tokens, and step-5-preview's cache read is $0.10, not $0.05, and it
+  reads images.
 - **NVIDIA is not a provider here**: its hosted catalogue's model ids and
   prices could not be confirmed; Nemotron 3 Ultra is reached through
   OpenRouter or a server of your own, by `private/`.

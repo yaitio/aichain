@@ -71,7 +71,7 @@ you to find out from the output.
 | **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
 | **[Utilities](docs/utilities/index.md)** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
 | **[Control and measurement](docs/control/cost-and-budget.md)** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class, and `approve=` for a person to decide. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
-| **[Models](docs/models/models.md)** | **<!-- g:count-models -->151 models from 16 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
+| **[Models](docs/models/models.md)** | **<!-- g:count-models -->169 models from 16 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 

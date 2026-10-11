@@ -72,3 +72,21 @@ rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this m
 caps  = ["text-to-text"]
 price = { input = 0.3, output = 0.9 }
 rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11
+
+[models."mistral-large-2512"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.5, output = 1.5 }
+rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11
+
+# Called a tool in 2 runs of 4 on "use the tool", 2026-10-11; answered from
+# its own knowledge in the other two. The request is the same as 3B's, which
+# called it every time.
+[models."ministral-8b-2512"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.15, output = 0.15 }
+rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11
+
+[models."ministral-3b-2512"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.1, output = 0.1 }
+rejects = ["reasoning"]   # HTTP 400 "reasoning_effort is not enabled for this model", 2026-10-11

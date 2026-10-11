@@ -40,16 +40,16 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Google AI | 9 | 5 | 9 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
 | Meta (Muse) | 5 | — | 5 | — |
-| MiniMax | 1 | — | 1 | — |
-| Mistral AI | 5 | — | 3 | — |
+| MiniMax | 8 | — | 1 | — |
+| Mistral AI | 8 | — | 6 | — |
 | OpenAI | 20 | 7 | 20 | 7 |
 | Perplexity | 4 | — | — | — |
 | Qwen (DashScope) | 18 | 2 | 3 | 3 |
 | Recraft | — | 9 | — | 3 |
-| StepFun | 1 | — | — | — |
+| StepFun | 4 | — | 2 | — |
 | xAI | 14 | 3 | 13 | 3 |
-| Xiaomi (MiMo) | 2 | — | 2 | — |
-| Z.ai (GLM) | 7 | — | 2 | — |
+| Xiaomi (MiMo) | 3 | — | 3 | — |
+| Z.ai (GLM) | 11 | — | 2 | — |
 
 ---
 
@@ -249,7 +249,14 @@ muse-spark-1.3-contributor  # $0.1 in / $0.2 out per 1M tokens
 ### `text-to-text`
 
 ```
-MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
+MiniMax-M2              # $0.3 in / $1.2 out per 1M tokens
+MiniMax-M2.1            # $0.3 in / $1.2 out per 1M tokens
+MiniMax-M2.1-highspeed  # $0.6 in / $2.4 out per 1M tokens
+MiniMax-M2.5            # $0.3 in / $1.2 out per 1M tokens
+MiniMax-M2.5-highspeed  # $0.6 in / $2.4 out per 1M tokens
+MiniMax-M2.7            # $0.3 in / $1.2 out per 1M tokens
+MiniMax-M2.7-highspeed  # $0.6 in / $2.4 out per 1M tokens
+MiniMax-M3              # $0.3 in / $1.2 out per 1M tokens
 ```
 
 ### `image-to-text`
@@ -269,6 +276,9 @@ MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
 ```
 codestral-2508      # $0.3 in / $0.9 out per 1M tokens
 ministral-14b-2512  # $0.2 in / $0.2 out per 1M tokens
+ministral-3b-2512   # $0.1 in / $0.1 out per 1M tokens
+ministral-8b-2512   # $0.15 in / $0.15 out per 1M tokens
+mistral-large-2512  # $0.5 in / $1.5 out per 1M tokens
 mistral-large-4-0   # $1.36 in / $4.18 out per 1M tokens
 mistral-medium-3-5  # $1.5 in / $7.5 out per 1M tokens
 mistral-small-2603  # $0.15 in / $0.6 out per 1M tokens
@@ -278,6 +288,9 @@ mistral-small-2603  # $0.15 in / $0.6 out per 1M tokens
 
 ```
 ministral-14b-2512  # $0.2 in / $0.2 out per 1M tokens
+ministral-3b-2512   # $0.1 in / $0.1 out per 1M tokens
+ministral-8b-2512   # $0.15 in / $0.15 out per 1M tokens
+mistral-large-2512  # $0.5 in / $1.5 out per 1M tokens
 mistral-large-4-0   # $1.36 in / $4.18 out per 1M tokens
 mistral-medium-3-5  # $1.5 in / $7.5 out per 1M tokens
 ```
@@ -466,6 +479,16 @@ recraftv3_vector   # per_image $0.08
 ### `text-to-text`
 
 ```
+step-3.5-flash       # $0.1 in / $0.3 out per 1M tokens
+step-3.5-flash-2603  # $0.1 in / $0.3 out per 1M tokens
+step-3.7-flash       # $0.2 in / $1.15 out per 1M tokens
+step-5-preview       # $1 in / $2.7 out per 1M tokens
+```
+
+### `image-to-text`
+
+```
+step-3.7-flash  # $0.2 in / $1.15 out per 1M tokens
 step-5-preview  # $1 in / $2.7 out per 1M tokens
 ```
 
@@ -537,15 +560,17 @@ grok-imagine-image-quality  # per_image $0.05
 ### `text-to-text`
 
 ```
-mimo-v2.6-flash  # $0.14 in / $0.28 out per 1M tokens
-mimo-v2.6-pro    # $0.435 in / $0.87 out per 1M tokens
+mimo-v2.6-flash           # $0.14 in / $0.28 out per 1M tokens
+mimo-v2.6-pro             # $0.435 in / $0.87 out per 1M tokens
+mimo-v2.6-pro-ultraspeed  # $4.35 in / $8.7 out per 1M tokens
 ```
 
 ### `image-to-text`
 
 ```
-mimo-v2.6-flash  # $0.14 in / $0.28 out per 1M tokens
-mimo-v2.6-pro    # $0.435 in / $0.87 out per 1M tokens
+mimo-v2.6-flash           # $0.14 in / $0.28 out per 1M tokens
+mimo-v2.6-pro             # $0.435 in / $0.87 out per 1M tokens
+mimo-v2.6-pro-ultraspeed  # $4.35 in / $8.7 out per 1M tokens
 ```
 
 ---
@@ -557,8 +582,12 @@ mimo-v2.6-pro    # $0.435 in / $0.87 out per 1M tokens
 ### `text-to-text`
 
 ```
+glm-4.5         # $0.6 in / $2.2 out per 1M tokens
+glm-4.5-air     # $0.2 in / $1.1 out per 1M tokens
+glm-4.6         # $0.6 in / $2.2 out per 1M tokens
 glm-4.7         # $0.6 in / $2.2 out per 1M tokens
 glm-5           # $1 in / $3.2 out per 1M tokens
+glm-5-turbo     # $1.2 in / $4 out per 1M tokens
 glm-5.1         # $1.4 in / $4.4 out per 1M tokens
 glm-5.2         # $1.4 in / $4.4 out per 1M tokens
 glm-5.3         # $1.4 in / $4.4 out per 1M tokens

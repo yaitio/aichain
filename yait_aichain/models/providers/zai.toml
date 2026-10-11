@@ -88,3 +88,21 @@ price = { input = 0.15, output = 0.5, cache_read = 0.03 }
 [models."glm-5.3-flashx"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.37, output = 1.25, cache_read = 0.075 }
+
+[models."glm-4.6"]
+caps  = ["text-to-text"]
+price = { input = 0.6, output = 2.2, cache_read = 0.11 }
+
+[models."glm-4.5"]
+caps  = ["text-to-text"]
+price = { input = 0.6, output = 2.2, cache_read = 0.11 }
+
+[models."glm-4.5-air"]
+caps  = ["text-to-text"]
+price = { input = 0.2, output = 1.1, cache_read = 0.03 }
+
+# In the key's model list, not on the pricing page: the price is OpenRouter's
+# (2026-10-11), to be replaced by Z.ai's own when it is published.
+[models."glm-5-turbo"]
+caps  = ["text-to-text"]
+price = { input = 1.2, output = 4.0, cache_read = 0.24 }

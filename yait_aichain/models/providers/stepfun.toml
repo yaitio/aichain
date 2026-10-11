@@ -1,12 +1,13 @@
 # stepfun — StepFun: provider settings + its models (data tier)
 #
-# Read 2026-10-11. StepFun's own documentation could not be fetched (the
-# platform's docs answered 404 to the paths tried); what is below is what
-# third-party guides agree on — an OpenAI-compatible API at
+# Read 2026-10-11. The API itself is from third-party guides — StepFun's
+# reference answered 404 to the paths tried: OpenAI-compatible at
 # api.stepfun.ai/v1 (China: api.stepfun.com/v1), `step-5-preview` with
-# low/medium/high reasoning effort, JSON Schema output and tool calling, at
-# $1.00 / $2.70 per 1M tokens and $0.05 for cache reads. Every line is to be
-# checked against platform.stepfun.ai and a live call before it ships.
+# low/medium/high reasoning effort, JSON Schema output and tool calling. The
+# model ids are the key's model list; the prices are StepFun's own,
+# platform.stepfun.ai/docs/en/pricing/details, USD per 1M tokens — where
+# step-5-preview's cache read is $0.10, not the $0.05 the guides quoted, and
+# step-5-preview and step-3.7-flash are listed as multimodal.
 
 [provider]
 key      = "stepfun"
@@ -42,5 +43,17 @@ high   = "high"
 field = "reasoning_effort"
 
 [models."step-5-preview"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 1.00, output = 2.70, cache_read = 0.10 }
+
+[models."step-3.7-flash"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.20, output = 1.15, cache_read = 0.04 }
+
+[models."step-3.5-flash"]
 caps  = ["text-to-text"]
-price = { input = 1.00, output = 2.70, cache_read = 0.05 }
+price = { input = 0.10, output = 0.30, cache_read = 0.02 }
+
+[models."step-3.5-flash-2603"]
+caps  = ["text-to-text"]
+price = { input = 0.10, output = 0.30, cache_read = 0.02 }
