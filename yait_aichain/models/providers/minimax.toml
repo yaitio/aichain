@@ -28,6 +28,11 @@ chat_path        = "/v1/chat/completions"
 
 [provider.options]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+# Measured 2026-10-11: a json_schema response_format is accepted and not
+# followed — M3, M2.7 and M2.5 answered with fields the closed schema did not
+# declare, and M3 and M2.7 fenced the JSON in ```json. So the schema goes in
+# the prompt, and the answer is checked against it here.
+json_schema = false
 
 [provider.options.values]
 temperature = [0.0, 2.0]

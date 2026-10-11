@@ -62,6 +62,7 @@ why   = "sent as this provider's thinking switch and reasoning_effort"
 [models."glm-5.3"]
 caps  = ["text-to-text"]
 price = { input = 1.4, output = 4.4, cache_read = 0.26 }
+reasoning_off = false   # HTTP 400 "always engages in thinking and cannot be disabled", 2026-10-11
 
 [models."glm-5.2"]
 caps  = ["text-to-text"]
@@ -84,10 +85,12 @@ price = { input = 0.6, output = 2.2, cache_read = 0.11 }
 [models."glm-5.3-flash"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.15, output = 0.5, cache_read = 0.03 }
+reasoning_off = false   # HTTP 400 "always engages in thinking and cannot be disabled", 2026-10-11
 
 [models."glm-5.3-flashx"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.37, output = 1.25, cache_read = 0.075 }
+reasoning_off = false   # HTTP 400 "always engages in thinking and cannot be disabled", 2026-10-11
 
 [models."glm-4.6"]
 caps  = ["text-to-text"]

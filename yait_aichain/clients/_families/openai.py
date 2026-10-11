@@ -142,6 +142,9 @@ class OpenAIClient(BaseClient):
             # because that is all a request builder receives.
             _REJECTS = tuple(self._data.get("models", {})
                              .get(params["name"], {}).get("rejects", ())),
+            # False for a model that always reasons: `none` cannot reach it.
+            _REASONING_OFF = bool(self._data.get("models", {})
+                                  .get(params["name"], {}).get("reasoning_off", True)),
         )
 
     #: Native tool calling is implemented for this family — both wire
@@ -417,6 +420,10 @@ class OpenAIClient(BaseClient):
             record(Adaptation(
                 kind=DECLINED, option="reasoning", asked=m.reasoning, sent=None, model=m.name,
                 why="this model does not reason; the API refuses the setting"))
+        elif m.reasoning == "none" and not m._REASONING_OFF:
+            record(Adaptation(
+                kind=DECLINED, option="reasoning", asked="none", sent=None, model=m.name,
+                why="this model always reasons; its API refuses to switch thinking off"))
         elif m.reasoning is not None:
             level = m.reasoning
             value = m._REASONING_MAP.get(level)
@@ -462,7 +469,11 @@ class OpenAIClient(BaseClient):
             if "choices" in response:
                 return _parse_openai_compat_response(response, output)
             return _parse_responses_api_response(response, output)
-        return _parse_openai_compat_response(response, output)
+        # A provider that takes JSON but not a schema is asked in the prompt,
+        # and answers the way a model writes JSON in prose: often fenced in
+        # ```json. The fence is markup, not content, so it is taken off.
+        loose = not ((self._data.get("provider") or {}).get("options") or {}).get("json_schema", True)
+        return _parse_openai_compat_response(response, output, strip_fences=loose)
 
 
 def _last_user_text(messages: list) -> str:

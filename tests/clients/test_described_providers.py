@@ -56,7 +56,8 @@ class TestZai(unittest.TestCase):
         self.assertEqual((body["thinking"], body["reasoning_effort"]), ({"type": "enabled"}, "high"))
 
     def test_none_turns_thinking_off(self):
-        _, _, body = _request("glm-5.3", {"reasoning": "none"})
+        # glm-5.2: the 5.3 family always thinks — see TestZaiModelsThatAlwaysThink
+        _, _, body = _request("glm-5.2", {"reasoning": "none"})
         self.assertEqual(body["thinking"], {"type": "disabled"})
         self.assertNotIn("reasoning_effort", body)
 
@@ -65,6 +66,30 @@ class TestZai(unittest.TestCase):
         self.assertEqual(body["response_format"], {"type": "json_object"})
         self.assertIn("JSON Schema", body["messages"][0]["content"])
         self.assertIn(("adapted", "format"), [(a.kind, a.option) for a in m.last_adaptations])
+
+
+@patch.dict(os.environ, KEYS)
+class TestZaiModelsThatAlwaysThink(unittest.TestCase):
+    """GLM-5.3 and its Flash models answer 400 to thinking switched off
+    ("always engages in thinking and cannot be disabled", 2026-10-11)."""
+
+    def test_none_is_declined_not_sent(self):
+        from yait_aichain.models._adaptation import DECLINED
+        for name in ("glm-5.3", "glm-5.3-flash", "glm-5.3-flashx"):
+            with self.subTest(name):
+                m, _, body = _request(name, {"reasoning": "none"})
+                self.assertNotIn("thinking", body)
+                self.assertNotIn("reasoning_effort", body)
+                self.assertEqual([a.kind for a in m.last_adaptations if a.option == "reasoning"],
+                                 [DECLINED])
+
+    def test_a_level_still_goes(self):
+        _, _, body = _request("glm-5.3", {"reasoning": "high"})
+        self.assertEqual((body["thinking"], body["reasoning_effort"]), ({"type": "enabled"}, "high"))
+
+    def test_older_models_still_switch_off(self):
+        _, _, body = _request("glm-5.2", {"reasoning": "none"})
+        self.assertEqual(body["thinking"], {"type": "disabled"})
 
 
 @patch.dict(os.environ, KEYS)
@@ -132,6 +157,31 @@ class TestMiniMax(unittest.TestCase):
         _, _, off = _request("MiniMax-M3", {"reasoning": "none"})
         self.assertEqual((on["thinking"], off["thinking"]), ({"type": "adaptive"}, {"type": "disabled"}))
         self.assertNotIn("reasoning_effort", on)
+
+
+@patch.dict(os.environ, KEYS)
+class TestMiniMaxJSON(unittest.TestCase):
+    """MiniMax takes a json_schema response_format and does not follow it â
+    extra fields, and the JSON fenced in ```json (2026-10-11)."""
+
+    def test_the_schema_rides_in_the_prompt(self):
+        m, _, body = _request("MiniMax-M3", fmt=SCHEMA)
+        self.assertEqual(body["response_format"], {"type": "json_object"})
+        self.assertIn("JSON Schema", body["messages"][0]["content"])
+
+    def test_a_fenced_answer_is_read(self):
+        m = Model("MiniMax-M3")
+        reply = {"choices": [{"message": {"content": '```json\n{"a": "Paris"}\n```'},
+                              "finish_reason": "stop"}]}
+        self.assertEqual(m.client.parse_response(reply, {"format": SCHEMA}), {"a": "Paris"})
+
+    def test_a_provider_that_takes_a_schema_is_not_loosened(self):
+        from yait_aichain.clients._errors import InvalidStructuredOutputError
+        m = Model("mistral-small-2603")
+        reply = {"choices": [{"message": {"content": '```json\n{"a": "Paris"}\n```'},
+                              "finish_reason": "stop"}]}
+        with self.assertRaises(InvalidStructuredOutputError):
+            m.client.parse_response(reply, {"format": SCHEMA})
 
 
 @patch.dict(os.environ, KEYS)

@@ -5,17 +5,20 @@
 **More providers, described by data.** Each is a provider file on the OpenAI
 family, written from the provider's own documentation read 2026-10-11. A
 provider ships when its live calls pass — text, a JSON Schema, a tool call, a
-stream and each reasoning level. Mistral and Xiaomi have passed; Z.ai,
-MiniMax and StepFun answered with an empty balance, and Meta has no key yet.
-All of them answered through OpenRouter.
+stream and each reasoning level. Mistral, Xiaomi, Z.ai, MiniMax and StepFun
+have passed on every model they register; Meta has no key, and answered
+through OpenRouter.
 
 ### Added
 
 - **Z.ai (GLM)** — `glm-5.3`, `glm-5.2`, `glm-5.1`, `glm-5`, `glm-4.7`,
   `glm-5.3-flash`, `glm-5.3-flashx`; `ZAI_API_KEY`. Its chat path is
   `/api/paas/v4/chat/completions`; `reasoning` turns its `thinking` switch on
-  and sets `reasoning_effort`, and `"none"` turns thinking off; a JSON Schema
-  is asked for as JSON with the schema in the prompt, and said so.
+  and sets `reasoning_effort`, and `"none"` turns thinking off — except on
+  GLM-5.3, 5.3 Flash and FlashX, which always think and answer 400 to it, so
+  there `"none"` is declined with a notice (`reasoning_off = false` on the
+  model). A JSON Schema is asked for as JSON with the schema in the prompt,
+  and said so. Called live: all eleven models pass.
 - **Meta (Muse)** — `muse-spark-1.3`, `1.2`, `1.1` and the cheaper
   `-contributor` models, which Meta trains on; `META_API_KEY`. Sent as
   `max_completion_tokens` and `reasoning_effort`; `reasoning="none"` is
@@ -30,10 +33,13 @@ All of them answered through OpenRouter.
   overseas rate card as third parties quote it. Called live: both pass.
 - **MiniMax** — `MiniMax-M3`; `MINIMAX_API_KEY`. `reasoning_split` is sent on
   every request so thinking stays out of the answer; a level keeps adaptive
-  thinking on, `"none"` turns it off.
-- **StepFun** — `step-5-preview`; `STEPFUN_API_KEY`. StepFun's own
-  documentation could not be fetched; the file is third-party documentation
-  until a live call confirms it.
+  thinking on, `"none"` turns it off. Its API accepts a JSON Schema and does
+  not follow it — extra fields, and the JSON fenced in ```json — so the
+  schema goes in the prompt and a fenced answer is read, for every provider
+  that takes no schema. Called live: all eight models pass.
+- **StepFun** — `step-5-preview`; `STEPFUN_API_KEY`. The API is from
+  third-party documentation, StepFun's reference could not be fetched; the
+  prices are StepFun's own. Called live: all four models pass.
 - **The models each provider's key lists, registered** — Z.ai `glm-5-turbo`,
   `glm-4.6`, `glm-4.5`, `glm-4.5-air`; Mistral `mistral-large-2512` (Large 3),
   `ministral-8b-2512`, `ministral-3b-2512`; Xiaomi `mimo-v2.6-pro-ultraspeed`;

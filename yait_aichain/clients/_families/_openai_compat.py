@@ -491,7 +491,8 @@ def _parse_harmony(text: str):
     return text_out
 
 
-def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
+def _parse_openai_compat_response(response: dict, output: dict, *,
+                                  strip_fences: bool = False) -> "str | dict":
     """
     Extract the clean result from an OpenAI-compatible chat completion
     response.
@@ -554,6 +555,7 @@ def _parse_openai_compat_response(response: dict, output: dict) -> "str | dict":
             text, output.get("format", {}).get("schema"),
             finish_reason=choice.get("finish_reason") or "",
             output_tokens=usage.get("completion_tokens"),
+            strip_fences=strip_fences,
         )
     return text
 
