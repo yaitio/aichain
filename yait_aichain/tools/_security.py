@@ -24,16 +24,6 @@ def _env_flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def has_url_scheme(value: object) -> bool:
-    """True when *value* is a string carrying any URL scheme (http/file/...)."""
-    if not isinstance(value, str):
-        return False
-    try:
-        return bool(urlparse(value).scheme)
-    except ValueError:
-        return False
-
-
 def assert_url_scheme(url: str) -> None:
     """Raise ``ValueError`` unless *url* uses the http or https scheme."""
     scheme = urlparse(url).scheme

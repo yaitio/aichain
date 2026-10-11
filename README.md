@@ -24,7 +24,7 @@ Change `"claude-haiku-5-5"` to `"gpt-6-luna"`, `"gemini-3-flash-preview"` or
 
 ## Three promises
 
-**Your coding agent writes the agents.** The whole contract is one 25 KB
+**Your coding agent writes the agents.** The whole contract is one 26 KB
 [`llms.txt`](llms.txt), and the [plugin for Claude Code, Codex and Cursor](#use-it-from-claude-code-codex-or-cursor)
 carries it with twenty worked recipes. Measured on tasks the docs were not
 written against: on twenty, a small model with the docs passed 15 in all three
@@ -48,7 +48,7 @@ you to find out from the output.
 
 ## Highlights
 
-- **Small enough to read in one go.** `llms.txt` is 25 KB, the skill 4 KB, the
+- **Small enough to read in one go.** `llms.txt` is 26 KB, the skill 4 KB, the
   whole library about 29,000 lines of Python.
 - **One required dependency**, `urllib3`. YAML, MCP and local page fetching
   are extras you install when you use them.

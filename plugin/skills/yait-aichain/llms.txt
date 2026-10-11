@@ -232,7 +232,13 @@ Chain(steps=[(chunk(max_chars=800), "pieces", {"input": "text"}),
 `Agent(tools=[kb])` or `[kb.upsert]` is refused, naming the utility's tools. A chain
 with a method step cannot be saved. A tool's `risk` is
 one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
-`privileged`. A tool may keep state on its instance and define its own `__init__`.
+`privileged`; a `@tool` is `write` unless it says otherwise. The library's own tools
+say what they risk: `Shell.run` is `privileged`, a REST endpoint follows its method
+(`GET` `read`, `DELETE` `destructive`, other writes `external`), and an MCP tool its
+server's annotations — `privileged` when there are none. With
+`permissions=PermissionPolicy()` the shipped rules allow `read`/`draft`/`write`, ask
+`approve=` for `external`/`financial`/`privileged`, and deny `destructive`; with no
+policy every tool runs. A tool may keep state on its instance and define its own `__init__`.
 
 **Search, fetch and decide — a tool made by its provider's name.** `search("exa")`,
 `fetch("firecrawl")`, `decide("openai", questions=…)`. `run()` returns a `Record`: a
