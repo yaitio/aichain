@@ -86,8 +86,8 @@ class TestEveryBackendAgrees(unittest.TestCase):
         b._metric = metric
         b._index_url = "https://h"
         b._headers = lambda: {}
-        b._ctrl_http = MagicMock()
-        b._ctrl_http.request.return_value = MagicMock(
+        b._http = MagicMock()
+        b._http.request.return_value = MagicMock(
             status=200,
             data=json.dumps({"matches": [
                 {"id": "1", "score": raw, "metadata": {"text": "body"}}]}).encode())

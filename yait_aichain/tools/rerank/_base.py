@@ -55,6 +55,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ...clients._http import request_json
 from .._base import Tool
 
 
@@ -347,24 +348,9 @@ class RerankBase(Tool):
 
     def _post(self, url: str, body: dict, extra_headers: dict | None = None) -> dict:
         """POST *body* as JSON to *url* and return the parsed response."""
-        headers = {
-            "Content-Type":  "application/json",
-            "Accept":        "application/json",
-            "Authorization": f"Bearer {self._api_key}",
-            **(extra_headers or {}),
-        }
-        response = self._http.request(
-            "POST",
-            url,
-            body    = json.dumps(body).encode("utf-8"),
-            headers = headers,
-        )
-        raw = response.data.decode("utf-8", errors="replace")
-        if not (200 <= response.status < 300):
-            raise RuntimeError(
-                f"{self.provider} Rerank API error [{response.status}]: {raw[:500]}"
-            )
-        return json.loads(raw)
+        return request_json(self._http, "POST", url, json=body, what=f"{self.provider} Rerank API",
+                            headers={"Accept": "application/json",
+                                     "Authorization": f"Bearer {self._api_key}", **(extra_headers or {})})
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 

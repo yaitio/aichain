@@ -56,6 +56,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ...clients._http import request_json
 from .._base import Tool
 
 
@@ -443,23 +444,9 @@ class Embedder(Tool):
         RuntimeError
             On any non-2xx HTTP status.
         """
-        headers = {
-            "Content-Type":  "application/json",
-            "Accept":        "application/json",
-            **(extra_headers or {}),
-        }
-        response = self._http.request(
-            "POST",
-            url,
-            body    = json.dumps(body).encode("utf-8"),
-            headers = headers,
-        )
-        raw = response.data.decode("utf-8", errors="replace")
-        if not (200 <= response.status < 300):
-            raise RuntimeError(
-                f"{self.provider} Embeddings API error [{response.status}]: {raw[:500]}"
-            )
-        return json.loads(raw)
+        return request_json(self._http, "POST", url, json=body,
+                            headers={"Accept": "application/json", **(extra_headers or {})},
+                            what=f"{self.provider} Embeddings API")
 
     # ------------------------------------------------------------------
     # Dunder helpers

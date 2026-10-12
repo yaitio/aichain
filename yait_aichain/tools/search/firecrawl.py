@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Search
 from .brave import site_query
 
@@ -141,16 +142,11 @@ class searchFirecrawl(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",
-                     "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Firecrawl API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window, notices),
+                            headers={"Authorization": f"Bearer {self._api_key}", "Accept": "application/json"},
+                            what="Firecrawl API")
         if data.get("success") is False:
-            raise RuntimeError(f"Firecrawl API error: {data.get('error') or raw}")
+            raise RuntimeError(f"Firecrawl API error: {data.get('error') or json.dumps(data)[:500]}")
         if data.get("creditsUsed") is not None:
             # A scraped PDF is billed per page — measured 2026-10-08, calls with one PDF
             # cost 29–47 credits where ten HTML pages cost 12 — so text calls vary.

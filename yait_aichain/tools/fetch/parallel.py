@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Fetch
 
 _ENDPOINT = "https://api.parallel.ai/v1/extract"
@@ -64,13 +65,9 @@ class fetchParallel(Fetch):
         settings: dict = {"full_content": {"max_chars_per_result": opts["max_chars"]}}
         if opts.get("max_age_seconds"):
             settings["fetch_policy"] = {"max_age_seconds": int(opts["max_age_seconds"])}
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps({"urls": urls, "advanced_settings": settings}).encode("utf-8"),
-            headers={"x-api-key": self._api_key, "Content-Type": "application/json", "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Parallel API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json={"urls": urls, "advanced_settings": settings},
+                            headers={"x-api-key": self._api_key, "Accept": "application/json"},
+                            what="Parallel API")
         if data.get("usage"):
             n = {u.get("name"): u.get("count", 0) for u in data["usage"] if isinstance(u, dict)}
             cost.update(usd=sum(v for k, v in n.items() if str(k).startswith("sku_extract")) * 0.001,

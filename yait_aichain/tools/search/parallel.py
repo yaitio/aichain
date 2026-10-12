@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Search
 
 _ENDPOINT = "https://api.parallel.ai/v1/search"
@@ -126,14 +127,9 @@ class searchParallel(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
-            headers={"x-api-key": self._api_key, "Content-Type": "application/json",
-                     "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Parallel API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window, notices),
+                            headers={"x-api-key": self._api_key, "Accept": "application/json"},
+                            what="Parallel API")
         if data.get("usage"):
             n = {u.get("name"): u.get("count", 0) for u in data["usage"] if isinstance(u, dict)}
             per = 0.001 if opts.get("mode") in ("turbo", "fast") else 0.005

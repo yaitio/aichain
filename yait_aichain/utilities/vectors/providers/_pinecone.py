@@ -40,14 +40,10 @@ Data plane     https://{index-host}
 
 from __future__ import annotations
 
-import json
 import os
 from urllib.parse import urlencode
 
-import urllib3
-from yait_aichain.clients._base import make_http
-
-from ....clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ....clients._errors import APIError
 from .._base import VectorBackend, VectorRecord, normalise_score
 
 
@@ -133,12 +129,8 @@ class PineconeBackend(VectorBackend):
         self._cloud     = cloud
         self._region    = region
 
-        # Two separate PoolManagers: one for control plane, one for data plane
-        self._ctrl_http = make_http(
-            timeout = DEFAULT_TIMEOUT,
-            retries = DEFAULT_RETRIES,
-        )
-        # Call super with a placeholder URL; _url is overwritten dynamically
+        # The control plane and the index host are both full URLs, so one pool
+        # — the base class's — serves both. _url is set once the host is known.
         super().__init__(url=url or "", api_key=resolved_key)
 
     # ── Auth headers ───────────────────────────────────────────────────────────
@@ -151,9 +143,6 @@ class PineconeBackend(VectorBackend):
             "Accept":       "application/json",
         }
 
-    def _ctrl_headers(self) -> dict:
-        return self._headers()
-
     # ── Index host resolution ──────────────────────────────────────────────────
 
     def _index_url_resolved(self) -> str:
@@ -164,18 +153,7 @@ class PineconeBackend(VectorBackend):
                 "No Pinecone index name configured.  "
                 "Pass index= to VectorDB() or set the 'PINECONE_INDEX' env var."
             )
-        resp = self._ctrl_http.request(
-            "GET",
-            f"{_CONTROL_URL}/indexes/{self._index}",
-            headers = self._ctrl_headers(),
-        )
-        raw  = resp.data.decode("utf-8", errors="replace")
-        if not (200 <= resp.status < 300):
-            raise RuntimeError(
-                f"Pinecone describe-index error [{resp.status}]: {raw[:400]}"
-            )
-        data = json.loads(raw)
-        host = data.get("host", "")
+        host = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}").get("host", "")
         self._index_url = host if host.startswith("http") else f"https://{host}"
         self._url       = self._index_url   # sync base URL for shared helpers
         return self._index_url
@@ -208,17 +186,11 @@ class PineconeBackend(VectorBackend):
                 }
             },
         }
-        resp = self._ctrl_http.request(
-            "POST",
-            f"{_CONTROL_URL}/indexes",
-            body    = json.dumps(body).encode(),
-            headers = self._ctrl_headers(),
-        )
-        if resp.status not in (200, 201, 409):
-            raw = resp.data.decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"Pinecone create-index error [{resp.status}]: {raw[:400]}"
-            )
+        try:
+            self._call("POST", f"{_CONTROL_URL}/indexes", body)
+        except APIError as exc:
+            if exc.status != 409:                 # 409: it exists already, which is the goal
+                raise
 
     def query(
         self,
@@ -238,13 +210,7 @@ class PineconeBackend(VectorBackend):
         if filter:
             body["filter"] = filter
 
-        resp = self._ctrl_http.request(
-            "POST",
-            f"{host}/query",
-            body    = json.dumps(body).encode(),
-            headers = self._headers(),
-        )
-        data = self._parse(resp)
+        data = self._call("POST", f"{host}/query", body)
 
         records: list[VectorRecord] = []
         for match in data.get("matches", []):
@@ -284,13 +250,7 @@ class PineconeBackend(VectorBackend):
             meta = {**rec.metadata, "text": rec.text}
             payload.append({"id": rec.id, "values": vec, "metadata": meta})
         body = {"vectors": payload, "namespace": collection}
-        resp = self._ctrl_http.request(
-            "POST",
-            f"{host}/vectors/upsert",
-            body    = json.dumps(body).encode(),
-            headers = self._headers(),
-        )
-        self._parse(resp)
+        self._call("POST", f"{host}/vectors/upsert", body)
 
     def fetch(
         self,
@@ -299,12 +259,7 @@ class PineconeBackend(VectorBackend):
     ) -> list[VectorRecord]:
         host   = self._index_url_resolved()
         params = urlencode([("ids", i) for i in ids] + [("namespace", collection)])
-        resp   = self._ctrl_http.request(
-            "GET",
-            f"{host}/vectors/fetch?{params}",
-            headers = self._headers(),
-        )
-        data = self._parse(resp)
+        data = self._call("GET", f"{host}/vectors/fetch?{params}")
 
         records: list[VectorRecord] = []
         for rid, vec_data in (data.get("vectors") or {}).items():
@@ -327,21 +282,10 @@ class PineconeBackend(VectorBackend):
             body["filter"] = filter
         if not ids and not filter:
             body["deleteAll"] = True
-        resp = self._ctrl_http.request(
-            "POST",
-            f"{host}/vectors/delete",
-            body    = json.dumps(body).encode(),
-            headers = self._headers(),
-        )
-        self._parse(resp)
+        self._call("POST", f"{host}/vectors/delete", body)
 
     def count(self, collection: str) -> int:
         host = self._index_url_resolved()
-        resp = self._ctrl_http.request(
-            "GET",
-            f"{host}/describe_index_stats",
-            headers = self._headers(),
-        )
-        data = self._parse(resp)
+        data = self._call("GET", f"{host}/describe_index_stats")
         ns   = (data.get("namespaces") or {}).get(collection, {})
         return int(ns.get("vectorCount", 0))

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Search
 
 _ENDPOINT = "https://api.tavily.com/search"
@@ -172,14 +173,9 @@ class searchTavily(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",
-                     "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Tavily API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window, notices),
+                            headers={"Authorization": f"Bearer {self._api_key}", "Accept": "application/json"},
+                            what="Tavily API")
         credits = (data.get("usage") or {}).get("credits")
         if credits is not None:
             cost.update(usd=credits * self._CREDIT, usage={"credits": credits},

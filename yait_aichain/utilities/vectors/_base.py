@@ -34,6 +34,7 @@ from typing import Any
 import urllib3
 from yait_aichain.clients._base import make_http
 
+from ...clients._http import request
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 
 
@@ -232,49 +233,26 @@ class VectorBackend:
             h["Authorization"] = f"Bearer {self._api_key}"
         return h
 
+    def _call(self, method: str, path: str, body: "dict | None" = None) -> Any:
+        """One request to the backend — *path* under its URL, or a full URL — and
+        its JSON, ``{}`` for an empty body, or a typed `APIError` naming the backend."""
+        url = path if path.startswith(("http://", "https://")) else self._url + path
+        raw = request(self._http, method, url, json=body, headers=self._headers(),
+                      what=f"{self.provider} API").data.decode("utf-8", errors="replace")
+        return json.loads(raw) if raw.strip() else {}
+
     def _get(self, path: str, params: dict | None = None) -> Any:
         from urllib.parse import urlencode
-        url = self._url + path
-        if params:
-            url += "?" + urlencode(params)
-        resp = self._http.request("GET", url, headers=self._headers())
-        return self._parse(resp)
+        return self._call("GET", path + ("?" + urlencode(params) if params else ""))
 
     def _post(self, path: str, body: dict) -> Any:
-        resp = self._http.request(
-            "POST",
-            self._url + path,
-            body    = json.dumps(body).encode(),
-            headers = self._headers(),
-        )
-        return self._parse(resp)
+        return self._call("POST", path, body)
 
     def _put(self, path: str, body: dict) -> Any:
-        resp = self._http.request(
-            "PUT",
-            self._url + path,
-            body    = json.dumps(body).encode(),
-            headers = self._headers(),
-        )
-        return self._parse(resp)
+        return self._call("PUT", path, body)
 
     def _delete_req(self, path: str, body: dict | None = None) -> Any:
-        kw: dict = {"headers": self._headers()}
-        if body is not None:
-            kw["body"] = json.dumps(body).encode()
-        resp = self._http.request("DELETE", self._url + path, **kw)
-        return self._parse(resp)
-
-    def _parse(self, resp: urllib3.BaseHTTPResponse) -> Any:
-        """Decode JSON response; raise RuntimeError on non-2xx status."""
-        raw = resp.data.decode("utf-8", errors="replace")
-        if not (200 <= resp.status < 300):
-            raise RuntimeError(
-                f"{self.provider} API error [{resp.status}]: {raw[:400]}"
-            )
-        if not raw.strip():
-            return {}
-        return json.loads(raw)
+        return self._call("DELETE", path, body)
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 

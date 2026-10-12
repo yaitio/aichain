@@ -43,6 +43,7 @@ import urllib3
 from yait_aichain.clients._base import make_http
 
 from .._base import Tool
+from ...clients._http import request, request_json
 from .._security import assert_safe_url, confine_output_path
 
 
@@ -685,25 +686,9 @@ class ttsQwen(Speech):
             },
         }
 
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type":  "application/json",
-            "X-DashScope-SSE": "disable",
-        }
-
-        # ── POST to DashScope ─────────────────────────────────────────
-        resp = self._http.request(
-            "POST", url,
-            body    = json.dumps(body).encode("utf-8"),
-            headers = headers,
-        )
-        raw = resp.data.decode("utf-8", errors="replace")
-        if not (200 <= resp.status < 300):
-            raise RuntimeError(
-                f"ttsQwen: HTTP {resp.status} from DashScope TTS endpoint: {raw[:500]}"
-            )
-
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", url, json=body, what="DashScope TTS",
+                            headers={"Authorization": f"Bearer {self._api_key}",
+                                     "X-DashScope-SSE": "disable"})
 
         # ── Extract audio URL from response ───────────────────────────
         # Shape: {"output": {"audio": {"url": "https://...", ...}}, ...}
@@ -712,19 +697,14 @@ class ttsQwen(Speech):
         except (KeyError, TypeError) as exc:
             raise RuntimeError(
                 f"ttsQwen: unexpected response shape — could not find "
-                f"output.audio.url: {raw[:300]}"
+                f"output.audio.url: {json.dumps(data)[:300]}"
             ) from exc
 
         # ── Download audio bytes ──────────────────────────────────────
         # The URL comes from the provider response — guard it (SSRF) and do not
         # follow redirects to an unvalidated host.
         assert_safe_url(audio_url)
-        dl = self._http.request("GET", audio_url, redirect=False)
-        if not (200 <= dl.status < 300):
-            raise RuntimeError(
-                f"ttsQwen: failed to download audio from presigned URL "
-                f"(HTTP {dl.status})"
-            )
+        dl = request(self._http, "GET", audio_url, redirect=False, what="DashScope TTS audio download")
 
         output_path = confine_output_path(output_path)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)

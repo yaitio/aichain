@@ -229,10 +229,11 @@ class TestOneAnswerFormat(unittest.TestCase):
             with self.subTest(provider=cls.__name__):
                 with self.assertRaises(RuntimeError) as ctx:
                     _tool(cls, {"error": "bad key"}, status=401).run(state=TICKET)
-                self.assertIn("[401]", str(ctx.exception))
+                self.assertIn("HTTP 401", str(ctx.exception))
+                self.assertEqual(ctx.exception.status, 401)
                 result = _tool(cls, {"error": "x"}, status=422)(state=TICKET)
                 self.assertFalse(result.success)
-                self.assertIn("[422]", result.error)
+                self.assertIn("HTTP 422", result.error)
 
     def test_a_reply_without_answers_is_an_error(self):
         for cls in PROVIDERS:

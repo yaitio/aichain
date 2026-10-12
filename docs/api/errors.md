@@ -13,7 +13,8 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 APIError(status: int, message: str, retry_after: 'float | None' = None)
 ```
 
-Base class for all provider API failures.
+Base class for all provider API failures. A `RuntimeError`, so code that
+caught what a tool raised before tools raised typed errors still does.
 
 Raised when a provider returns a non-2xx HTTP status or a network-level
 error occurs.  Concrete failures use the subclasses below; catching

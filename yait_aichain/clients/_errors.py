@@ -27,9 +27,10 @@ Mapping (HTTP status → class):
 from __future__ import annotations
 
 
-class APIError(Exception):
+class APIError(RuntimeError):
     """
-    Base class for all provider API failures.
+    Base class for all provider API failures. A `RuntimeError`, so code that
+    caught what a tool raised before tools raised typed errors still does.
 
     Raised when a provider returns a non-2xx HTTP status or a network-level
     error occurs.  Concrete failures use the subclasses below; catching

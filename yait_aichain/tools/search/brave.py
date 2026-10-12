@@ -29,6 +29,7 @@ import json
 import re
 from datetime import date
 
+from ...clients._http import request_json
 from ._base import Search
 
 _ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
@@ -104,14 +105,9 @@ class searchBrave(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window, notices)).encode("utf-8"),
-            headers={"x-subscription-token": self._api_key, "Content-Type": "application/json",
-                     "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Brave Search API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window, notices),
+                            headers={"x-subscription-token": self._api_key, "Accept": "application/json"},
+                            what="Brave Search API")
         items = (data.get("web") or {}).get("results") or data.get("results") or []
         out = []
         for it in items:

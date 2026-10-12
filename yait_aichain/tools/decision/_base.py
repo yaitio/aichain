@@ -58,6 +58,7 @@ import os
 
 from ...clients._base import make_http
 from ...clients._constants import DEFAULT_RETRIES, DEFAULT_TIMEOUT
+from ...clients._http import request_json
 from .._base import Record, Tool
 
 QUESTION_TYPES = ("predicate", "choice", "score")
@@ -271,16 +272,11 @@ class Decision(Tool):
         """One request: the answers by question, the model that answered, and
         usage. A provider gives `_ENDPOINT`, `_API_NAME`, `_body(state, images)`,
         `_raw_answers(data)` — by question name, or None — and `_answer(q, a)`."""
-        response = self._http.request(
-            "POST", self._ENDPOINT, body=json.dumps(self._body(state, images)).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"{self._API_NAME} error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", self._ENDPOINT, json=self._body(state, images),
+                            headers={"Authorization": f"Bearer {self._api_key}"}, what=self._API_NAME)
         answers = self._raw_answers(data)
         if answers is None:
-            raise RuntimeError(f"{self._PROVIDER} returned no answers: {raw}")
+            raise RuntimeError(f"{self._PROVIDER} returned no answers: {json.dumps(data)[:500]}")
         usage = data.get("usage") or {}
         return ({n: self._answer(q, answers.get(n) or {}) for n, q in self.questions.items()},
                 data.get("model", self.model),

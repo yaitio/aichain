@@ -6,6 +6,19 @@
 audit: copies merged, dead paths removed, nothing a caller sees changed except
 where a fix is named below.
 
+### Changed
+
+- **A tool's API error is typed.** Search, fetch, embeddings, reranking,
+  decisions, vector stores and Qwen speech raised a bare `RuntimeError`
+  carrying the whole response body, so `except RateLimitError` around a tool
+  caught nothing and an HTML error page could reach a model's context. They go
+  through one `clients/_http.request()` now, as the model clients do: a
+  status raises `RateLimitError`, `InsufficientCreditsError`,
+  `AuthenticationError` and the rest, with the API named and the body cut at
+  2,000 characters. `APIError` is a `RuntimeError`, so code that caught that
+  still does. The message reads `[HTTP 401] Brave Search API: …` where it read
+  `Brave Search API error [401]: …`.
+
 ### Deprecated
 
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes

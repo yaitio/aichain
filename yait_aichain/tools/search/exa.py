@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Search
 
 _ENDPOINT = "https://api.exa.ai/search"
@@ -124,14 +125,9 @@ class searchExa(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(self._body(query, opts, window)).encode("utf-8"),
-            headers={"x-api-key": self._api_key, "Content-Type": "application/json",
-                     "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Exa Search API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window),
+                            headers={"x-api-key": self._api_key, "Accept": "application/json"},
+                            what="Exa Search API")
         spent = (data.get("costDollars") or {}).get("total")
         if spent is not None:
             cost.update(usd=float(spent), basis="reported by Exa", usage=data["costDollars"])

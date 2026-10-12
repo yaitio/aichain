@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 
+from ...clients._http import request_json
 from ._base import Fetch
 
 _ENDPOINT = "https://api.exa.ai/contents"
@@ -59,13 +60,9 @@ class fetchExa(Fetch):
         body: dict = {"urls": urls, "text": {"maxCharacters": opts["max_chars"]}}
         if opts.get("max_age_hours") is not None:
             body["maxAgeHours"] = int(opts["max_age_hours"])
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(body).encode("utf-8"),
-            headers={"x-api-key": self._api_key, "Content-Type": "application/json", "Accept": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Exa API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        data = request_json(self._http, "POST", _ENDPOINT, json=body,
+                            headers={"x-api-key": self._api_key, "Accept": "application/json"},
+                            what="Exa API")
         spent = (data.get("costDollars") or {}).get("total")
         if spent is not None:
             cost.update(usd=float(spent), basis="reported by Exa", usage=data["costDollars"])

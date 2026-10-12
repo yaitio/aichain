@@ -599,8 +599,8 @@ class TestVectordbProviders(unittest.TestCase):
 
         backend = PineconeBackend.__new__(PineconeBackend)
         backend._index_url = "https://h"
-        backend._ctrl_http = MagicMock()
-        backend._ctrl_http.request.return_value = MagicMock(
+        backend._http = MagicMock()
+        backend._http.request.return_value = MagicMock(
             status=200,
             data=json.dumps({"matches": [{
                 "id":       "1",

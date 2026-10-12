@@ -67,6 +67,7 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
 
 # APIError and its subclasses live in ._errors; re-exported here so the
 # long-standing ``from ._base import APIError`` imports keep working.
+from ._http import request
 from ._errors import (  # noqa: F401
     APIError,
     NetworkError,
@@ -414,158 +415,21 @@ class BaseClient:
     # ------------------------------------------------------------------
 
     def _get(self, path: str, headers: dict | None = None) -> bytes:
-        """
-        Send a GET request to ``{base_url}{path}``.
-
-        Parameters
-        ----------
-        path    : URL path appended to base_url.
-        headers : Optional HTTP headers.
-
-        Returns
-        -------
-        bytes
-            Raw response body on a 2xx status code.
-
-        Raises
-        ------
-        APIError
-            On any non-2xx status code or network failure.
-        """
-        try:
-            response = self._http.request(
-                "GET",
-                self._base_url + path,
-                headers=headers,
-                retries=DEFAULT_IDEMPOTENT_RETRIES,
-            )
-        except Exception as exc:
-            raise NetworkError(0, str(exc)) from exc
-
-        if 200 <= response.status < 300:
-            return response.data
-
-        raise error_from_status(
-            response.status,
-            response.data.decode("utf-8", errors="replace"),
-            response.headers,
-        )
+        """GET ``{base_url}{path}``: the body on a 2xx, a typed `APIError` otherwise."""
+        return request(self._http, "GET", self._base_url + path, headers=headers,
+                       retries=DEFAULT_IDEMPOTENT_RETRIES).data
 
     def _post(self, path: str, data: dict, headers: dict) -> bytes:
-        """
-        Send a JSON POST request to ``{base_url}{path}``.
-
-        Parameters
-        ----------
-        path    : URL path appended to base_url.
-        data    : Payload to be JSON-encoded.
-        headers : HTTP headers (must include ``Content-Type: application/json``).
-
-        Returns
-        -------
-        bytes
-            Raw response body on a 2xx status code.
-
-        Raises
-        ------
-        APIError
-            On any non-2xx status code or network failure.
-        """
-        try:
-            response = self._http.request(
-                "POST",
-                self._base_url + path,
-                body=json.dumps(data).encode("utf-8"),
-                headers=headers,
-            )
-        except Exception as exc:
-            raise NetworkError(0, str(exc)) from exc
-
-        if 200 <= response.status < 300:
-            return response.data
-
-        raise error_from_status(
-            response.status,
-            response.data.decode("utf-8", errors="replace"),
-            response.headers,
-        )
+        """POST *data* as JSON to ``{base_url}{path}``: the body, or a typed `APIError`."""
+        return request(self._http, "POST", self._base_url + path, json=data, headers=headers).data
 
     def _post_form(self, path: str, fields: dict, headers: dict) -> bytes:
-        """
-        Send a multipart/form-data POST request to ``{base_url}{path}``.
-
-        urllib3 sets ``Content-Type: multipart/form-data`` automatically
-        when ``fields`` is provided — do **not** include it in ``headers``.
-
-        Parameters
-        ----------
-        path    : URL path appended to base_url.
-        fields  : Form fields (strings or file tuples).
-        headers : HTTP headers (excluding Content-Type).
-
-        Returns
-        -------
-        bytes
-            Raw response body on a 2xx status code.
-
-        Raises
-        ------
-        APIError
-            On any non-2xx status code or network failure.
-        """
-        try:
-            response = self._http.request(
-                "POST",
-                self._base_url + path,
-                fields=fields,
-                headers=headers,
-            )
-        except Exception as exc:
-            raise NetworkError(0, str(exc)) from exc
-
-        if 200 <= response.status < 300:
-            return response.data
-
-        raise error_from_status(
-            response.status,
-            response.data.decode("utf-8", errors="replace"),
-            response.headers,
-        )
+        """POST multipart *fields* to ``{base_url}{path}``. urllib3 sets the
+        content type with its boundary, so *headers* must not carry one."""
+        return request(self._http, "POST", self._base_url + path, fields=fields, headers=headers).data
 
     def _download(self, url: str, headers: dict | None = None) -> dict:
-        """
-        Download binary content from an absolute URL (not base_url-relative).
-
-        Parameters
-        ----------
-        url     : Fully-qualified URL to download.
-        headers : Optional HTTP headers.
-
-        Returns
-        -------
-        dict
-            ``{"data": bytes, "media_type": str}``
-
-        Raises
-        ------
-        APIError
-            On any non-2xx status code or network failure.
-        """
-        try:
-            response = self._http.request("GET", url, headers=headers)
-        except Exception as exc:
-            raise NetworkError(0, str(exc)) from exc
-
-        if 200 <= response.status < 300:
-            return {
-                "data": response.data,
-                "media_type": response.headers.get(
-                    "Content-Type", "application/octet-stream"
-                ),
-            }
-
-        raise error_from_status(
-            response.status,
-            response.data.decode("utf-8", errors="replace"),
-            response.headers,
-        )
+        """GET an absolute URL: ``{"data": bytes, "media_type": str}``."""
+        response = request(self._http, "GET", url, headers=headers)
+        return {"data": response.data,
+                "media_type": response.headers.get("Content-Type", "application/octet-stream")}

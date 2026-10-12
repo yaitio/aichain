@@ -535,10 +535,11 @@ class TestContract(unittest.TestCase):
             with self.subTest(provider=cls.__name__):
                 with self.assertRaises(RuntimeError) as ctx:
                     _tool(cls, {"error": "Invalid API key"}, status=401).run(input=QUERY)
-                self.assertIn("[401]", str(ctx.exception))
+                self.assertIn("HTTP 401", str(ctx.exception))
+                self.assertEqual(ctx.exception.status, 401)
                 result = _tool(cls, {"error": "out of credits"}, status=402)(input=QUERY)
                 self.assertFalse(result.success)
-                self.assertIn("[402]", result.error)
+                self.assertIn("HTTP 402", result.error)
 
     def test_an_empty_query_is_refused(self):
         with self.assertRaises(ValueError):
