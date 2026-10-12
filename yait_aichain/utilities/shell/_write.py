@@ -75,10 +75,6 @@ class LocalWriteTool(Tool, SandboxedTool):
         "required": ["input"],
     }
 
-    def __init__(self, root_dir: str | None = None) -> None:
-        Tool.__init__(self)
-        SandboxedTool.__init__(self, root_dir)
-
     def run(self, input: str, options: dict | None = None) -> dict:
         opts     = options or {}
         rel_path = opts.get("path")

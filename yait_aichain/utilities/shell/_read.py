@@ -70,10 +70,6 @@ class LocalReadTool(Tool, SandboxedTool):
         "required": ["input"],
     }
 
-    def __init__(self, root_dir: str | None = None) -> None:
-        Tool.__init__(self)
-        SandboxedTool.__init__(self, root_dir)
-
     def run(self, input: str, options: dict | None = None) -> str:
         opts       = options or {}
         start_line = int(opts.get("start_line", 1))

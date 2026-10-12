@@ -279,16 +279,9 @@ class RestApiTool(Tool):
         #: Fields a model never sees nor fills: the token. A chain still fills it.
         self._hidden = {self._auth["token_field"]} if self._auth.get("token_field") else set()
 
-        # ── Auto-build parameters schema ───────────────────────────────
-        # All declared field names become schema properties so Agents and
-        # Chains know exactly what to pass.  The auth token field (when
-        # sourced from data) is included too.
-        all_fields: set[str] = (
-            set(path_params) | set(query_params) | set(body_params)
-        )
-        token_field = self._auth.get("token_field")
-        if token_field:
-            all_fields.add(token_field)
+        # Every declared field is a schema property, so agents and chains know
+        # what to pass — the token's field too, which only a chain fills.
+        all_fields = set(path_params) | set(query_params) | set(body_params) | self._hidden
 
         self.parameters = {
             "type": "object",
@@ -368,7 +361,6 @@ class RestApiTool(Tool):
                              + (f"{', '.join(moved)} is a setting of the tool — RestApiTool(…, "
                                 f"{moved[0]}=…) or REST(…, headers=…)" if moved else
                                 f"a call takes the endpoint's fields, not options {sorted(options)}"))
-        opts: dict = {}
 
         # ── 2. Build URL (substitute path params) ─────────────────────
         url = self._url_template

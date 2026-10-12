@@ -68,6 +68,19 @@ def assert_safe_url(url: str, *, allow_private: "bool | None" = None) -> None:
             )
 
 
+def within(root: str, path: str) -> bool:
+    """True when the resolved *path* is *root* or inside it.
+
+    Compared by path components, not by string prefix: a prefix would put
+    ``/tmp/sandbox-evil`` inside ``/tmp/sandbox``, and a root of ``/`` would
+    contain nothing, since every path then had to start with ``//``.
+    """
+    try:
+        return os.path.commonpath([root, path]) == root
+    except ValueError:                 # different drives on Windows
+        return False
+
+
 def confine_output_path(path: str) -> str:
     """
     Return the absolute *path*, confined to ``AICHAIN_OUTPUT_ROOT`` when set.
@@ -82,7 +95,7 @@ def confine_output_path(path: str) -> str:
     if not root:
         return resolved
     root_real = os.path.realpath(root)
-    if resolved != root_real and not resolved.startswith(root_real + os.sep):
+    if not within(root_real, resolved):
         raise PermissionError(
             f"Output path {path!r} resolves to {resolved!r}, outside the "
             f"configured AICHAIN_OUTPUT_ROOT {root_real!r}."

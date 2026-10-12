@@ -73,10 +73,6 @@ class LocalBrowseTool(Tool, SandboxedTool):
         "required": ["input"],
     }
 
-    def __init__(self, root_dir: str | None = None) -> None:
-        Tool.__init__(self)
-        SandboxedTool.__init__(self, root_dir)
-
     def run(self, input: str = ".", options: dict | None = None) -> str:
         opts        = options or {}
         max_depth   = int(opts.get("depth", 2))
@@ -88,49 +84,30 @@ class LocalBrowseTool(Tool, SandboxedTool):
             raise ValueError(f"Not a directory: {input!r}")
 
         lines = [f"📁 {self._rel(target)}/"]
-        self._tree(target, "", max_depth, 0, pattern, show_hidden, lines)
+
+        def walk(path: str, prefix: str, depth: int) -> None:
+            if depth >= max_depth:
+                return
+            try:
+                entries = sorted(os.scandir(path), key=lambda e: (not e.is_dir(), e.name))
+            except PermissionError:
+                lines.append(f"{prefix}  [permission denied]")
+                return
+            visible = [e for e in entries
+                       if (show_hidden or not e.name.startswith("."))
+                       and (e.is_dir() or fnmatch.fnmatch(e.name, pattern))]
+            for i, entry in enumerate(visible):
+                last = i == len(visible) - 1
+                branch = "└── " if last else "├── "
+                if entry.is_dir(follow_symlinks=False):
+                    lines.append(f"{prefix}{branch}📁 {entry.name}/")
+                    walk(entry.path, prefix + ("    " if last else "│   "), depth + 1)
+                else:
+                    lines.append(f"{prefix}{branch}{entry.name}  ({self._fmt_size(entry.stat().st_size)})")
+
+        walk(target, "", 0)
         lines.append(f"\nRoot: {self.root}")
         return "\n".join(lines)
-
-    def _tree(
-        self,
-        path:        str,
-        prefix:      str,
-        max_depth:   int,
-        depth:       int,
-        pattern:     str,
-        show_hidden: bool,
-        lines:       list[str],
-    ) -> None:
-        if depth >= max_depth:
-            return
-
-        try:
-            entries = sorted(os.scandir(path), key=lambda e: (not e.is_dir(), e.name))
-        except PermissionError:
-            lines.append(f"{prefix}  [permission denied]")
-            return
-
-        visible = [
-            e for e in entries
-            if (show_hidden or not e.name.startswith("."))
-            and (e.is_dir() or fnmatch.fnmatch(e.name, pattern))
-        ]
-
-        for i, entry in enumerate(visible):
-            is_last    = (i == len(visible) - 1)
-            connector  = "└── " if is_last else "├── "
-            extension  = "    " if is_last else "│   "
-
-            if entry.is_dir(follow_symlinks=False):
-                lines.append(f"{prefix}{connector}📁 {entry.name}/")
-                self._tree(
-                    entry.path, prefix + extension,
-                    max_depth, depth + 1, pattern, show_hidden, lines,
-                )
-            else:
-                size = self._fmt_size(entry.stat().st_size)
-                lines.append(f"{prefix}{connector}{entry.name}  ({size})")
 
     @staticmethod
     def _fmt_size(n: int) -> str:

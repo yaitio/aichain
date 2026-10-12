@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from yait_aichain.tools._security import assert_safe_url, assert_url_scheme, confine_output_path
+from yait_aichain.tools._security import assert_safe_url, assert_url_scheme, confine_output_path, within
 
 
 class TestURLs(unittest.TestCase):
@@ -38,6 +38,26 @@ class TestURLs(unittest.TestCase):
     def test_a_url_needs_a_host(self):
         with self.assertRaisesRegex(ValueError, "no host"):
             assert_safe_url("http:///path")
+
+
+class TestWithin(unittest.TestCase):
+
+    def test_by_components_not_by_prefix(self):
+        self.assertTrue(within("/tmp/a", "/tmp/a"))
+        self.assertTrue(within("/tmp/a", "/tmp/a/b/c"))
+        self.assertFalse(within("/tmp/a", "/tmp/a-evil"))
+        self.assertFalse(within("/tmp/a", "/tmp"))
+
+    def test_the_filesystem_root_contains_everything(self):
+        # A prefix check made every path need to start with '//'.
+        self.assertTrue(within("/", "/etc/hosts"))
+
+    def test_a_shell_at_the_root_reads(self):
+        from yait_aichain.utilities import Shell
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "f.txt"), "w") as fh:
+            fh.write("hello\n")
+        self.assertIn("hello", Shell("/").read.run(os.path.join(d, "f.txt")))
 
 
 class TestOutputPaths(unittest.TestCase):

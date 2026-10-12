@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import os
 
+from ...tools._security import within
+
 
 class SandboxedTool:
     """
@@ -63,10 +65,7 @@ class SandboxedTool:
         else:
             resolved = os.path.realpath(os.path.join(self.root, path))
 
-        # Compare on path boundaries, not raw string prefix: a plain
-        # ``startswith`` would treat ``/tmp/sandbox-evil`` as inside
-        # ``/tmp/sandbox`` and let a sibling directory escape the sandbox.
-        if resolved != self.root and not resolved.startswith(self.root + os.sep):
+        if not within(self.root, resolved):
             raise PermissionError(
                 f"Path {path!r} resolves to {resolved!r} which is outside "
                 f"the sandbox root {self.root!r}."
