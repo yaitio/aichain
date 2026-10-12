@@ -24,6 +24,7 @@ turns a generation request into an edit. Verified live against the BFL API
 
 from __future__ import annotations
 
+from ._shape import pixels
 import base64
 import json as _json
 import time
@@ -82,9 +83,10 @@ class BFLClient(BaseClient):
         # Size → width/height for generation; Kontext uses aspect_ratio instead.
         size = fmt.get("size")
         if size and "x" in size and "kontext" not in name.lower():
-            w, _, h = size.partition("x")
-            if w.isdigit() and h.isdigit():
-                body["width"], body["height"] = int(w), int(h)
+            wh = pixels(size)
+            if wh:
+                w, h = wh
+                body["width"], body["height"] = w, h
                 from ...models._adaptation import Adaptation, ADAPTED, record
                 record(Adaptation(
                     kind=ADAPTED, option="size", asked=size,

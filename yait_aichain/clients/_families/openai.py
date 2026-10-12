@@ -25,8 +25,8 @@ from ...models._adaptation import (Adaptation, ADAPTED, DECLINED, SWAPPED,
 
 
 from .._base import BaseClient
+from ._shape import ratio_of
 from ._openai_compat import (
-    _ratio_of,
     _last_user_text,
     _part_to_openai,                       # noqa: F401  (kept for parity)
     content_text,
@@ -272,7 +272,7 @@ class OpenAIClient(BaseClient):
                         sent="aspect_ratio", model=m.name,
                         why="passed through"))
                 elif fmt.get("size"):
-                    ratio = _ratio_of(fmt["size"])
+                    ratio = ratio_of(fmt["size"])
                     if ratio:
                         body["aspect_ratio"] = ratio
                         record(Adaptation(

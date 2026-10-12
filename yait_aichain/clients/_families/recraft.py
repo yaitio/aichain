@@ -18,6 +18,7 @@ Verified live against the Recraft API (external.api.recraft.ai).
 
 from __future__ import annotations
 
+from ._shape import size_from_ratio
 import base64
 
 from ._openai_compat import (
@@ -60,19 +61,6 @@ def _strength_from_fidelity(fmt: dict, model: str) -> float:
     return strength
 
 
-def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
-    """'16:9' → '1820x1024'. The short edge is pinned and the long one
-    follows, which is the shape the caller asked for at this provider's
-    working resolution."""
-    a, _, b = ratio.partition(":")
-    if not (a.isdigit() and b.isdigit() and int(a) and int(b)):
-        return None
-    w, h = int(a), int(b)
-    if w >= h:
-        return f"{round(short * w / h)}x{short}"
-    return f"{short}x{round(short * h / w)}"
-
-
 def _build_recraft_generation_request(name, messages, output, path):
     """OpenAI-shaped text-to-image body (Recraft returns ``{"data": [...]}``)."""
     fmt = output.get("format", {})
@@ -90,7 +78,7 @@ def _build_recraft_generation_request(name, messages, output, path):
         # ignored, measured 2026-09-09: "16:9" came back 1024x1024. So the
         # ratio is turned into a size at a 1024 short edge and the provider
         # snaps it to its own nearest (1707x1024 was returned as 1820x1024).
-        size = _size_from_ratio(fmt["aspect_ratio"])
+        size = size_from_ratio(fmt["aspect_ratio"])
         if size:
             body["size"] = size
             record(Adaptation(

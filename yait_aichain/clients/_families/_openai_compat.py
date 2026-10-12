@@ -9,6 +9,7 @@ kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
 
 from __future__ import annotations
 
+from ._shape import ratio_of, size_from_ratio
 import base64
 import json
 import re
@@ -47,31 +48,6 @@ def _drop_rejected(model, fmt: dict) -> dict:
                 "dropped and the request sent; the model applies its own "
                 "handling for the setting"))
     return {k: v for k, v in fmt.items() if k not in dropped}
-
-
-def _ratio_of(size: str) -> "str | None":
-    """'1024x1536' → '2:3'. Reduced, because a provider that honours any
-    ratio exactly has no list to snap to."""
-    from math import gcd
-    w, _, h = size.partition("x")
-    if not (w.isdigit() and h.isdigit() and int(h)):
-        return None
-    w, h = int(w), int(h)
-    g = gcd(w, h) or 1
-    return f"{w // g}:{h // g}"
-
-
-def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
-    """'16:9' → '1824x1024'. Edges are rounded to multiples of 16, which is
-    what this provider requires of a custom size."""
-    a, _, b = str(ratio).partition(":")
-    if not (a.isdigit() and b.isdigit() and int(a) and int(b)):
-        return None
-    w, h = int(a), int(b)
-    def _round16(n): return max(16, int(round(n / 16)) * 16)
-    if w >= h:
-        return f"{_round16(short * w / h)}x{_round16(short)}"
-    return f"{_round16(short)}x{_round16(short * h / w)}"
 
 
 def _part_to_openai(part: dict) -> "dict | None":
@@ -654,7 +630,7 @@ def _build_image_generations_request(
     # are multiples of 16 and whose ratio is between 1:3 and 3:1, which a
     # 1024 short edge satisfies for every shape worth asking for.
     if fmt.get("aspect_ratio") and not fmt.get("size"):
-        fmt = {**fmt, "size": _size_from_ratio(fmt["aspect_ratio"])}
+        fmt = {**fmt, "size": size_from_ratio(fmt["aspect_ratio"], multiple=16)}
         if fmt["size"]:
             from ...models._adaptation import Adaptation, ADAPTED, record
             record(Adaptation(
@@ -883,7 +859,7 @@ def _build_xai_image_edit_request(
     # generation nor the edit branch until now.
     fmt = output.get("format", {})
     _ratio = fmt.get("aspect_ratio") or (
-        _ratio_of(fmt["size"]) if fmt.get("size") else None)
+        ratio_of(fmt["size"]) if fmt.get("size") else None)
     if _ratio:
         from ...models._adaptation import Adaptation, ADAPTED, TRANSLATED, record
         body["aspect_ratio"] = _ratio

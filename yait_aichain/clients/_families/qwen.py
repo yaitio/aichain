@@ -21,6 +21,7 @@ the synchronous image path returns, so ``parse_response`` is reused unchanged.
 
 from __future__ import annotations
 
+from ._shape import size_from_ratio
 import base64
 import json as _json
 import os
@@ -87,11 +88,8 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str
         # 1024 short edge. `seed` is not offered — the same value twice gave
         # two different pictures, measured 2026-09-09.
         ratio = fmt["aspect_ratio"]
-        a, _, b = str(ratio).partition(":")
-        if a.isdigit() and b.isdigit() and int(a) and int(b):
-            w, h = int(a), int(b)
-            size = (f"{round(1024 * w / h)}*1024" if w >= h
-                    else f"1024*{round(1024 * h / w)}")
+        size = size_from_ratio(ratio, sep="*")
+        if size:
             parameters["size"] = size
             record(Adaptation(
                 kind=ADAPTED, option="aspect_ratio", asked=ratio,

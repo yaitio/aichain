@@ -12,6 +12,7 @@ System messages lift into ``system_instruction``; generation params live in
 
 from __future__ import annotations
 
+from ._shape import nearest_ratio
 import json
 
 from .._base import BaseClient
@@ -28,18 +29,6 @@ _WARNED_STRIP = False
 #: while `imageSize` had no effect on gemini-2.5-flash-image.
 _ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
                   "9:16", "16:9", "21:9")
-
-
-def _nearest_ratio(size: str) -> "str | None":
-    """The supported aspect ratio closest to a 'WIDTHxHEIGHT' string."""
-    w, _, h = size.partition("x")
-    if not (w.isdigit() and h.isdigit() and int(h)):
-        return None
-    want = int(w) / int(h)
-    def _of(r):
-        a, _, b = r.partition(":")
-        return int(a) / int(b)
-    return min(_ASPECT_RATIOS, key=lambda r: abs(_of(r) - want))
 
 
 def _sanitize_google_schema(schema: object) -> object:
@@ -343,7 +332,7 @@ class GoogleClient(BaseClient):
                     sent="imageConfig.aspectRatio", model=params["name"],
                     why="this provider's own name for the same thing"))
             elif fmt.get("size"):
-                ratio = _nearest_ratio(fmt["size"])
+                ratio = nearest_ratio(fmt["size"], _ASPECT_RATIOS)
                 if ratio:
                     record(Adaptation(
                         kind=ADAPTED, option="size", asked=fmt["size"],
