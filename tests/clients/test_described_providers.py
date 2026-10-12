@@ -1,5 +1,5 @@
 """
-Z.ai, Meta, Mistral, Xiaomi, MiniMax and StepFun (4.1): providers described by data, on the OpenAI family.
+Z.ai, Meta, Mistral, Xiaomi, MiniMax and StepFun (4.0): providers described by data, on the OpenAI family.
 
 What is pinned here is what each provider's documentation says the request
 must be, read 2026-10-11: the URL, the token field, how reasoning is asked

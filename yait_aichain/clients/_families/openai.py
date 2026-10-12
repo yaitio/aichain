@@ -405,7 +405,7 @@ class OpenAIClient(BaseClient):
         # request is the compatible one, and what differs — how reasoning is
         # asked for, whether a JSON Schema is taken — is read from
         # `[provider.reasoning]` and `[provider.options]`. A new provider that
-        # speaks this dialect is a data file, not a branch here (4.1).
+        # speaks this dialect is a data file, not a branch here (4.0).
         return self._described_request(m, messages, output, tools)
 
     def _described_request(self, m, messages, output, tools):

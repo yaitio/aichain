@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased] — 4.1.0
+## [4.0.0] — 2026-10-12
+
+**No compatibility layer.** Every name and path 3.x kept alive for older code
+is removed, so the library has one way to do each thing. An old name does not
+work quietly: it raises, and the error names what to write instead. Every
+change, with its replacement: `docs/start/migrating-to-4.md`.
 
 **More providers, described by data.** Each is a provider file on the OpenAI
 family, written from the provider's own documentation read 2026-10-11. A
@@ -9,7 +14,61 @@ stream and each reasoning level. Mistral, Xiaomi, Z.ai, MiniMax and StepFun
 have passed on every model they register; Meta has no key, and answered
 through OpenRouter.
 
+The first release on PyPI since 3.1.0: 3.2.0 to 3.10.0 were tagged in this
+file and never published, and everything they record is in 4.0.0.
+
+### Changed
+
+- **Shell, MCP and REST tools say what they risk.** Every one of them inherited the
+  default class, `write`, which a policy allows — so with
+  `permissions=PermissionPolicy()` on, an agent could run any shell command,
+  or any tool a server declared, without being asked. `Shell.run` is now
+  `privileged` (approval), `browse` and `read` are `read`. An MCP tool takes
+  its class from the server's annotations — `readOnlyHint`,
+  `destructiveHint`, `openWorldHint` — and is `privileged` where the server
+  says nothing; `MCP(server, risk={...})` puts the caller's word over the
+  server's. A REST endpoint's class follows its method — `GET` `read`,
+  `POST`/`PUT`/`PATCH` `external`, `DELETE` `destructive` — with
+  `endpoint(..., risk=…)` to override. An agent with no policy is unchanged.
+  Found reading vercel/ai, whose MCP wrapper defaults an uncovered tool to
+  approval for this reason.
+- **A `Skill` with an image output raises**, naming `image(service, model=…)`.
+  It warned since 3.9.0. The image tool makes its request through a `Skill`
+  by a seam of its own, `_image=True`, so retries, the budget and the record
+  of adaptations come with it.
+- **Renamed:** `convertToSpeech` → `Speech`, `convertToText` → `Transcription`,
+  `VectorChunkTool` → `Chunk`.
+- **The tools package exports the tools.** Utilities' classes —
+  `LocalBrowseTool` and the other three, `VectorQueryTool` and its siblings,
+  `RestApiTool`, `MCPTool` — import from `yait_aichain.utilities.shell`,
+  `.vectors`, `.rest` and `.mcp`, where they live.
+
+### Removed
+
+- **Old factories and aliases:** `Embedding(...)`, `Reranker(...)`, `TTS()`,
+  `STT()`, `LocalTools()`, `localBrowse`/`localRead`/`localWrite`/`localRun`,
+  `vectorChunk`/`vectorQuery`/`vectorUpsert`/`vectorFetch`/`vectorDelete`,
+  `MCPTools` as a public name, `PerplexitySearchTool`, `BraveSearchTool`,
+  `OpenAIEmbedder`, `CohereEmbedder`, `VoyageEmbedder`, `GoogleEmbedder`, and
+  a search tool's `.search()`, the 3.2 name of `.run()`.
+- **Old module paths** — `tools.vectordb`, `tools.embedding`,
+  `tools.reranking`, `tools.local`, `tools.mcp`, `tools.rest_api`,
+  `tools.convert` — and the import finder that kept them resolving.
+- **Renamed image options' old names:** `output_compression`,
+  `input_fidelity`, `reference_fidelity` are unknown keys now.
+- **A `Hook`'s `step_started` / `step_ended`** for an agent's tool calls,
+  which fired with a warning since 2.7.0.
+- `ImageSkillWarning`, and the API page of older names.
+
 ### Added
+
+- **An old name says what replaced it.** `from yait_aichain.tools import
+  VectorDB` raises `ImportError` naming `Vectors`, and `import
+  yait_aichain.tools.vectordb` names `yait_aichain.utilities`; the same for
+  every name and path above. Not compatibility — nothing old runs — but the
+  error an agent writing from its weights needs to fix itself in one retry.
+  Held by `tests/test_old_names_say_what_to_write.py`.
+- **`docs/start/migrating-to-4.md`.**
 
 - **Z.ai (GLM)** — `glm-5.3`, `glm-5.2`, `glm-5.1`, `glm-5`, `glm-4.7`,
   `glm-5.3-flash`, `glm-5.3-flashx`; `ZAI_API_KEY`. Its chat path is
@@ -79,7 +138,6 @@ through OpenRouter.
   so a model reached through `private/` with OpenRouter's URL reports what it
   cost instead of `None`. Verified live on two models.
 
-
 ### Fixed
 
 - **A chain with a REST endpoint loads.** It saved, and nothing of the
@@ -91,66 +149,6 @@ through OpenRouter.
   or a risk class other than its method's, needs `trusted=True` — a
   tampered file could otherwise point a key from your environment at any
   address, or let a `DELETE` past a permission policy as `read`.
-
-## [4.0.0] — 2026-10-11
-
-**No compatibility layer.** Every name and path 3.x kept alive for older code
-is removed, so the library has one way to do each thing. An old name does not
-work quietly: it raises, and the error names what to write instead. Every
-change, with its replacement: `docs/start/migrating-to-4.md`.
-
-### Changed
-
-- **Shell, MCP and REST tools say what they risk.** Every one of them inherited the
-  default class, `write`, which a policy allows — so with
-  `permissions=PermissionPolicy()` on, an agent could run any shell command,
-  or any tool a server declared, without being asked. `Shell.run` is now
-  `privileged` (approval), `browse` and `read` are `read`. An MCP tool takes
-  its class from the server's annotations — `readOnlyHint`,
-  `destructiveHint`, `openWorldHint` — and is `privileged` where the server
-  says nothing; `MCP(server, risk={...})` puts the caller's word over the
-  server's. A REST endpoint's class follows its method — `GET` `read`,
-  `POST`/`PUT`/`PATCH` `external`, `DELETE` `destructive` — with
-  `endpoint(..., risk=…)` to override. An agent with no policy is unchanged.
-  Found reading vercel/ai, whose MCP wrapper defaults an uncovered tool to
-  approval for this reason.
-- **A `Skill` with an image output raises**, naming `image(service, model=…)`.
-  It warned since 3.9.0. The image tool makes its request through a `Skill`
-  by a seam of its own, `_image=True`, so retries, the budget and the record
-  of adaptations come with it.
-- **Renamed:** `convertToSpeech` → `Speech`, `convertToText` → `Transcription`,
-  `VectorChunkTool` → `Chunk`.
-- **The tools package exports the tools.** Utilities' classes —
-  `LocalBrowseTool` and the other three, `VectorQueryTool` and its siblings,
-  `RestApiTool`, `MCPTool` — import from `yait_aichain.utilities.shell`,
-  `.vectors`, `.rest` and `.mcp`, where they live.
-
-### Removed
-
-- **Old factories and aliases:** `Embedding(...)`, `Reranker(...)`, `TTS()`,
-  `STT()`, `LocalTools()`, `localBrowse`/`localRead`/`localWrite`/`localRun`,
-  `vectorChunk`/`vectorQuery`/`vectorUpsert`/`vectorFetch`/`vectorDelete`,
-  `MCPTools` as a public name, `PerplexitySearchTool`, `BraveSearchTool`,
-  `OpenAIEmbedder`, `CohereEmbedder`, `VoyageEmbedder`, `GoogleEmbedder`, and
-  a search tool's `.search()`, the 3.2 name of `.run()`.
-- **Old module paths** — `tools.vectordb`, `tools.embedding`,
-  `tools.reranking`, `tools.local`, `tools.mcp`, `tools.rest_api`,
-  `tools.convert` — and the import finder that kept them resolving.
-- **Renamed image options' old names:** `output_compression`,
-  `input_fidelity`, `reference_fidelity` are unknown keys now.
-- **A `Hook`'s `step_started` / `step_ended`** for an agent's tool calls,
-  which fired with a warning since 2.7.0.
-- `ImageSkillWarning`, and the API page of older names.
-
-### Added
-
-- **An old name says what replaced it.** `from yait_aichain.tools import
-  VectorDB` raises `ImportError` naming `Vectors`, and `import
-  yait_aichain.tools.vectordb` names `yait_aichain.utilities`; the same for
-  every name and path above. Not compatibility — nothing old runs — but the
-  error an agent writing from its weights needs to fix itself in one retry.
-  Held by `tests/test_old_names_say_what_to_write.py`.
-- **`docs/start/migrating-to-4.md`.**
 
 ## [3.10.0] — 2026-10-10
 
