@@ -346,6 +346,15 @@ class RerankBase(Tool):
                 originals.append(None)
         return texts, originals
 
+    @staticmethod
+    def _ranked(items: list, documents: list) -> list[dict]:
+        """``{index, text, score}`` by descending score, the text being the one
+        sent — every provider answers with an index and a relevance_score, so
+        none is asked to send the documents back."""
+        out = [{"index": i["index"], "text": documents[i["index"]], "score": i["relevance_score"]}
+               for i in items]
+        return sorted(out, key=lambda x: x["score"], reverse=True)
+
     def _post(self, url: str, body: dict, extra_headers: dict | None = None) -> dict:
         """POST *body* as JSON to *url* and return the parsed response."""
         return request_json(self._http, "POST", url, json=body, what=f"{self.provider} Rerank API",

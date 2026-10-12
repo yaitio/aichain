@@ -41,9 +41,8 @@ DASHSCOPE_REGION  (optional; default: ap)
 
 from __future__ import annotations
 
-import os
 
-from ._base import Embedder
+from ._base import _OpenAIShaped
 
 
 # Models that accept a variable ``dimensions`` parameter
@@ -53,13 +52,9 @@ _SUPPORTS_DIMENSIONS = frozenset({
 })
 
 # Maps universal input_type to DashScope's native values
-_INPUT_TYPE_MAP: dict[str, str] = {
-    "query":    "query",
-    "document": "document",
-}
 
 
-class EmbeddingQwen(Embedder):
+class EmbeddingQwen(_OpenAIShaped):
     """
     Embedder for the Alibaba DashScope Embeddings API.
 
@@ -97,6 +92,7 @@ class EmbeddingQwen(Embedder):
     _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = "DASHSCOPE_API_KEY"
     _MAX_BATCH = 25
+    _INPUT_TYPE = True
 
     def __init__(
         self,
@@ -109,53 +105,6 @@ class EmbeddingQwen(Embedder):
         self._region = region
         super().__init__(model, api_key=api_key, **defaults)
 
-    def _embed_chunk(
-        self,
-        texts:      list[str],
-        *,
-        input_type: "str | None",
-        dimensions: "int | None",
-        **options,
-    ) -> "tuple[list[list[float]], int | None, dict]":
-        """
-        Send one ``/compatible-mode/v1/embeddings`` request to DashScope.
-
-        Returns
-        -------
-        (embeddings, total_tokens, metadata)
-        """
+    def _url(self) -> str:
         from ...clients._families.qwen import resolve_qwen_base_url
-
-        base_url = resolve_qwen_base_url(self._region)
-        url      = base_url + "/compatible-mode/v1/embeddings"
-
-        body: dict = {
-            "model":           self.model,
-            "input":           texts,
-            "encoding_format": "float",
-        }
-
-        # Optional: variable dimensions (v3 and v4 only)
-        if dimensions is not None and self.model in _SUPPORTS_DIMENSIONS:
-            body["dimensions"] = dimensions
-
-        # Optional: input_type hint
-        native_type = _INPUT_TYPE_MAP.get(input_type or "")
-        if native_type:
-            body["input_type"] = native_type
-
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type":  "application/json",
-        }
-
-        data = self._request(url, body, headers)
-
-        # Response: {"data": [{"embedding": [...], "index": i}, ...], "usage": {...}}
-        items      = sorted(data["data"], key=lambda x: x["index"])
-        embeddings = [item["embedding"] for item in items]
-
-        usage        = data.get("usage", {})
-        total_tokens = usage.get("total_tokens")
-
-        return embeddings, total_tokens, {}
+        return resolve_qwen_base_url(self._region) + "/compatible-mode/v1/embeddings"

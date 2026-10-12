@@ -24,7 +24,7 @@ Environment variable
 OPENAI_API_KEY
 """
 
-from ._base import Embedder
+from ._base import _OpenAIShaped
 
 _BASE_URL = "https://api.openai.com"
 
@@ -35,7 +35,7 @@ _SUPPORTS_DIMENSIONS = frozenset({
 })
 
 
-class EmbeddingOpenAI(Embedder):
+class EmbeddingOpenAI(_OpenAIShaped):
     """
     Embedder for the OpenAI Embeddings API.
 
@@ -63,41 +63,4 @@ class EmbeddingOpenAI(Embedder):
     _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = "OPENAI_API_KEY"
     _MAX_BATCH = 2048
-
-    def _embed_chunk(
-        self,
-        texts:      list[str],
-        *,
-        input_type: "str | None",
-        dimensions: "int | None",
-        **options,
-    ) -> "tuple[list[list[float]], int | None, dict]":
-        """
-        Send one ``/v1/embeddings`` request and return
-        ``(embeddings, total_tokens, metadata)``.
-
-        ``input_type`` is accepted, as every embedder takes it, but ignored
-        (OpenAI does not distinguish query vs document).
-        ``dimensions`` is forwarded only for models that support it.
-        """
-        body: dict = {
-            "model":           self.model,
-            "input":           texts,
-            "encoding_format": "float",
-        }
-        if dimensions is not None and self.model in _SUPPORTS_DIMENSIONS:
-            body["dimensions"] = dimensions
-
-        headers = {"Authorization": f"Bearer {self._api_key}"}
-        data    = self._request(f"{_BASE_URL}/v1/embeddings", body, headers)
-
-        # Response: {"data": [{"embedding": [...], "index": i}, ...], "usage": {...}}
-        items = sorted(data["data"], key=lambda x: x["index"])
-        embeddings = [item["embedding"] for item in items]
-
-        usage        = data.get("usage", {})
-        total_tokens = usage.get("total_tokens")
-
-        return embeddings, total_tokens, {}
-
-
+    _URL       = f"{_BASE_URL}/v1/embeddings"

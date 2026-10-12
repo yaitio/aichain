@@ -18,12 +18,10 @@ Request body
   query            : str
   documents        : list[str]
   top_k            : int | None    (Voyage uses top_k, not top_n)
-  return_documents : true
 
 Response
   data[].index           — original document index
   data[].relevance_score — float, higher = more relevant
-  data[].document        — document text string (when return_documents=true)
   usage.total_tokens     — token count
 
 Environment variable
@@ -77,27 +75,13 @@ class RerankVoyage(RerankBase):
             "model":            self.model,
             "query":            query,
             "documents":        documents,
-            "return_documents": True,
         }
         if top_n is not None:
             body["top_k"] = top_n   # Voyage uses top_k
 
         data = self._post(_BASE_URL, body)
 
-        results: list[dict] = []
-        for item in data.get("data", []):
-            # Voyage returns document as a plain string when return_documents=True
-            doc_text = item.get("document", documents[item["index"]])
-            if isinstance(doc_text, dict):
-                doc_text = doc_text.get("text", documents[item["index"]])
-            results.append({
-                "index": item["index"],
-                "text":  doc_text,
-                "score": item["relevance_score"],
-            })
-        # Sort descending by score (Voyage already sorts but be safe)
-        results.sort(key=lambda x: x["score"], reverse=True)
-
+        results = self._ranked(data.get("data", []), documents)
         usage        = data.get("usage", {})
         total_tokens = usage.get("total_tokens")
 

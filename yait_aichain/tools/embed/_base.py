@@ -457,3 +457,34 @@ class Embedder(Tool):
             f"{type(self).__name__}(model={self.model!r}, "
             f"provider={self.provider!r})"
         )
+
+
+class _OpenAIShaped(Embedder):
+    """The OpenAI embeddings wire, which Voyage and DashScope speak too: model
+    and input in; ``data[].embedding`` by index and ``usage.total_tokens`` out.
+
+    A provider on it is data: its ``_URL``, the name of its dimension field,
+    whether it asks for floats, and whether it forwards ``input_type``.
+    ``dimensions`` is already refused for a fixed-length model when the
+    embedder is made, so it is sent whenever it is set.
+    """
+
+    _URL: str = ""
+    _DIMS_FIELD: str = "dimensions"
+    _FLOAT: bool = True
+    _INPUT_TYPE: bool = False
+
+    def _url(self) -> str:
+        return self._URL
+
+    def _embed_chunk(self, texts, *, input_type, dimensions, **options):
+        body: dict = {"model": self.model, "input": texts}
+        if self._FLOAT:
+            body["encoding_format"] = "float"
+        if dimensions is not None:
+            body[self._DIMS_FIELD] = dimensions
+        if self._INPUT_TYPE and input_type in ("query", "document"):
+            body["input_type"] = input_type
+        data = self._request(self._url(), body, {"Authorization": f"Bearer {self._api_key}"})
+        items = sorted(data["data"], key=lambda x: x["index"])
+        return [i["embedding"] for i in items], (data.get("usage") or {}).get("total_tokens"), {}

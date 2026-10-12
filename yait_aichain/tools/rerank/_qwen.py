@@ -20,12 +20,10 @@ Request body
     documents : list[str]
   parameters
     top_n            : int | None
-    return_documents : true
-
+  
 Response
   output.results[].index           — original document index
   output.results[].relevance_score — float, higher = more relevant
-  output.results[].document.text   — document text
   usage.total_tokens               — token count
 
 Region / base URL
@@ -105,7 +103,7 @@ class RerankQwen(RerankBase):
         base_url = resolve_qwen_base_url(self._region)
         url      = base_url + _RERANK_PATH
 
-        params: dict = {"return_documents": True}
+        params: dict = {}
         if top_n is not None:
             params["top_n"] = top_n
 
@@ -121,18 +119,7 @@ class RerankQwen(RerankBase):
         data = self._post(url, body)
 
         output  = data.get("output", {})
-        results: list[dict] = []
-        for item in output.get("results", []):
-            doc  = item.get("document") or {}
-            text = doc.get("text", documents[item["index"]])
-            results.append({
-                "index": item["index"],
-                "text":  text,
-                "score": item["relevance_score"],
-            })
-        # Sort descending by score
-        results.sort(key=lambda x: x["score"], reverse=True)
-
+        results = self._ranked(output.get("results", []), documents)
         usage        = data.get("usage", {})
         total_tokens = usage.get("total_tokens")
 

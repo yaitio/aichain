@@ -19,12 +19,10 @@ Request body
   query            : str
   documents        : list[str]
   top_n            : int | None
-  return_documents : true
 
 Response
   results[].index            — original document index
   results[].relevance_score  — float, higher = more relevant
-  results[].document.text    — document text (when return_documents=true)
   meta.billed_units.search_units — billing
 
 Environment variable
@@ -79,22 +77,13 @@ class RerankCohere(RerankBase):
             "model":            self.model,
             "query":            query,
             "documents":        documents,
-            "return_documents": True,
         }
         if top_n is not None:
             body["top_n"] = top_n
 
         data = self._post(_BASE_URL, body)
 
-        results: list[dict] = []
-        for item in data.get("results", []):
-            results.append({
-                "index": item["index"],
-                "text":  (item.get("document") or {}).get("text", documents[item["index"]]),
-                "score": item["relevance_score"],
-            })
-        # Already sorted by Cohere (descending score)
-
+        results = self._ranked(data.get("results", []), documents)
         meta         = data.get("meta", {})
         billed       = meta.get("billed_units", {})
         total_tokens = billed.get("search_units")   # Cohere bills in search_units
