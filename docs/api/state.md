@@ -140,6 +140,10 @@ This default loads then deletes, which is **not** atomic. A store
 shared between processes overrides it with the backend's own claim:
 a conditional delete in DynamoDB, `GETDEL` in Redis.
 
+**Parameters**
+
+- `run_id` (*str*) — The run to claim.
+
 ---
 
 ## `InMemoryStore`
@@ -158,15 +162,11 @@ process** only; for cross-process / serverless use a shared store
 InMemoryStore.take(run_id: str) -> dict | None
 ```
 
-Remove the document and return it, as one step: the claim a resume
-makes before it acts, so that two deliveries of one signal — an SQS
-message seen twice, a webhook retried — cannot both run the approved
-action. `None` when there is nothing to take, which a second
-delivery reads as "already handled".
+Claimed under a lock: of two threads taking one run, one gets it.
 
-This default loads then deletes, which is **not** atomic. A store
-shared between processes overrides it with the backend's own claim:
-a conditional delete in DynamoDB, `GETDEL` in Redis.
+**Parameters**
+
+- `run_id` (*str*) — The run to claim.
 
 ### `InMemoryStore.load()`
 
@@ -209,6 +209,10 @@ FileStore.take(run_id: str) -> dict | None
 Claimed by a rename, which the filesystem makes atomic: of two
 processes taking one run, one rename succeeds and the other finds no
 file.
+
+**Parameters**
+
+- `run_id` (*str*) — The run to claim.
 
 ---
 

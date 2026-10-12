@@ -44,6 +44,11 @@ class StateStore:
         This default loads then deletes, which is **not** atomic. A store
         shared between processes overrides it with the backend's own claim:
         a conditional delete in DynamoDB, ``GETDEL`` in Redis.
+
+        Parameters
+        ----------
+        run_id : str
+            The run to claim.
         """
         document = self.load(run_id)
         if document is not None:
@@ -66,6 +71,13 @@ class InMemoryStore(StateStore):
         self._runs[run_id] = copy.deepcopy(document)
 
     def take(self, run_id: str) -> dict | None:
+        """Claimed under a lock: of two threads taking one run, one gets it.
+
+        Parameters
+        ----------
+        run_id : str
+            The run to claim.
+        """
         with self._lock:
             return self._runs.pop(run_id, None)
 
@@ -149,7 +161,13 @@ class FileStore(StateStore):
     def take(self, run_id: str) -> dict | None:
         """Claimed by a rename, which the filesystem makes atomic: of two
         processes taking one run, one rename succeeds and the other finds no
-        file."""
+        file.
+
+        Parameters
+        ----------
+        run_id : str
+            The run to claim.
+        """
         claimed = f"{self._path(run_id)}.{uuid.uuid4().hex}.taken"
         try:
             os.rename(self._path(run_id), claimed)
