@@ -11,6 +11,7 @@ a forced ``tool_use``; extended thinking maps to ``budget_tokens``.
 
 from __future__ import annotations
 
+from ...models._schema import check_structure
 import json
 
 from .._base import BaseClient
@@ -448,10 +449,29 @@ class AnthropicClient(BaseClient):
         ftype   = output.get("format", {}).get("type", "text")
         content = response.get("content", [])
         if ftype == "json_schema":
-            for block in content:
-                if block.get("type") == "tool_use":
-                    return block.get("input", {})
-            return {}
+            # Answered through a forced tool call. No call is no answer — cut
+            # off, or refused — and was returned as `{}`, a valid-looking
+            # result; the other families raise there, and so does this one.
+            schema = (output.get("format") or {}).get("schema")
+            block = next((b for b in content if b.get("type") == "tool_use"), None)
+            if block is None:
+                from .._errors import InvalidStructuredOutputError, TruncatedResponseError
+                spent = (response.get("usage") or {}).get("output_tokens")
+                if response.get("stop_reason") == "max_tokens":
+                    raise TruncatedResponseError(
+                        f"Response was cut off at {spent} output tokens before the structured "
+                        f"answer was written — raise max_tokens above {spent}.",
+                        finish_reason="max_tokens", output_tokens=spent)
+                raise InvalidStructuredOutputError(
+                    "the model gave no structured answer (stop_reason="
+                    f"{response.get('stop_reason')!r})", value=None)
+            value = block.get("input") or {}
+            if isinstance(schema, dict) and (problems := check_structure(value, schema)):
+                from .._errors import InvalidStructuredOutputError
+                raise InvalidStructuredOutputError(
+                    "the structured answer does not match the schema: " + "; ".join(problems),
+                    problems=problems, value=value)
+            return value
         text = ""
         for block in content:
             if block.get("type") == "text":

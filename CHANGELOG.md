@@ -118,6 +118,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **Claude's structured answers are checked like every other family's.**
+  With `json_schema`, a reply with no tool call — cut off or refused — came
+  back as `{}`, and a partial object went out unchecked. It raises
+  `TruncatedResponseError` at the token ceiling and
+  `InvalidStructuredOutputError` otherwise, and an answer that does not match
+  the schema raises with the problems named.
 - **An approved action runs once, however often its signal arrives.** A
   resume loaded the parked run, ran the rest and deleted it at the end, so
   two deliveries of one signal — an SQS message seen twice, a webhook
