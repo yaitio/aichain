@@ -103,12 +103,14 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 
+#: The prefixes above as a person reads them, for the error that lists them.
+_PREFIXES = ", ".join(
+    alt.replace("\\d", "<digit>")
+    for pattern, _ in _PROVIDER_PATTERNS
+    for alt in pattern.pattern.lstrip("^").strip("()").split("|"))
+
 # Provider keys accepted as an explicit ``"provider/model"`` prefix.
-_PROVIDER_KEYS = frozenset({
-    "openai", "anthropic", "google", "xai",
-    "perplexity", "kimi", "deepseek", "qwen",
-    "recraft", "bfl", "zai", "meta", "mistral", "xiaomi", "minimax", "stepfun", "private",
-})
+_PROVIDER_KEYS = frozenset(PROVIDERS)
 
 
 def _split_provider_prefix(name: str) -> "tuple[str | None, str]":
@@ -140,9 +142,7 @@ def _resolve_provider(name: str) -> str:
             return provider
     raise ValueError(
         f"Cannot detect provider for model {name!r}.\n"
-        "Supported prefixes: claude-, gemini-, grok-, sonar, kimi-, deepseek-, "
-        "qwen, glm-, muse-, mimo-, minimax-, step-, mistral-, ministral-, codestral-, gpt-, o<digit>, "
-        "flux, recraft.\n"
+        f"Supported prefixes: {_PREFIXES}.\n"
         "Use an explicit \"provider/model\" prefix (e.g. \"openai/my-custom\", "
         "\"private/llama3.3\") for a name the prefixes do not cover."
     )
@@ -909,8 +909,9 @@ def refresh(provider: str, api_key: "str | None" = None, client=None) -> dict:
         raise ValueError("provider is required")
     if client is None:
         env_key = PROVIDERS[provider]["provider"]["env_key"]
-        key = api_key or os.getenv(env_key)
-        if not key:
+        key = api_key or os.getenv(env_key) or ""
+        # A keyless provider (a local server) is asked without one.
+        if not key and PROVIDERS[provider]["provider"].get("auth") != "none":
             raise ValueError(
                 f"No API key for provider {provider!r}. "
                 f"Set {env_key} or pass api_key=/client=."

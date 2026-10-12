@@ -20,7 +20,7 @@ steps into one total.  Cost is attached separately in block 1.2-C.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 
 
 @dataclass(frozen=True)
@@ -62,18 +62,11 @@ class Usage:
     def __add__(self, other: Usage) -> Usage:
         if not isinstance(other, Usage):
             return NotImplemented
-        a = self.cost
-        b = other.cost
-        merged_cost = None if (a is None and b is None) else (a or 0.0) + (b or 0.0)
-        return Usage(
-            input_tokens  = self.input_tokens  + other.input_tokens,
-            output_tokens = self.output_tokens + other.output_tokens,
-            total_tokens  = self.total_tokens  + other.total_tokens,
-            cost          = merged_cost,
-            cache_write_tokens = self.cache_write_tokens + other.cache_write_tokens,
-            cache_read_tokens  = self.cache_read_tokens  + other.cache_read_tokens,
-            image_input_tokens = self.image_input_tokens + other.image_input_tokens,
-        )
+        # Every count adds; a cost stays None only when neither side knew it.
+        summed = {f.name: getattr(self, f.name) + getattr(other, f.name)
+                  for f in fields(self) if f.name != "cost"}
+        known = self.cost is not None or other.cost is not None
+        return Usage(**summed, cost=(self.cost or 0.0) + (other.cost or 0.0) if known else None)
 
     def __radd__(self, other):
         # Enables sum([...]) which starts from int 0.
@@ -82,15 +75,16 @@ class Usage:
         return self.__add__(other)
 
     def __bool__(self) -> bool:
-        return bool(self.input_tokens or self.output_tokens or self.total_tokens)
+        """True when anything was counted — a token of any kind, or a cost a
+        provider reported for a call that has no tokens (a picture)."""
+        return any(getattr(self, f.name) for f in fields(self))
 
 
 class Spend:
     """`tokens_used` and `cost` for a result that carries a `usage`.
 
-    Read through `is not None`, not truthiness: a `Usage` with no tokens is
-    falsy, and a cost the provider reported — or a price per picture — would
-    otherwise read as unknown.
+    Read through `is not None`, not truthiness: "no usage recorded" and "a
+    usage of nothing" are different answers, and only the first is unknown.
     """
 
     @property

@@ -48,7 +48,9 @@ class ToolCall:
 
     id:        str
     name:      str
-    arguments: dict = field(default_factory=dict)
+    # Out of the hash: a dict has none, and a frozen call whose hash raised
+    # could not be put in a set or used as a key.
+    arguments: dict = field(default_factory=dict, hash=False)
 
 
 @dataclass(frozen=True)

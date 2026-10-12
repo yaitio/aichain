@@ -75,6 +75,11 @@ where a fix is named below.
   and `[all]` is the three extras rather than a copy of their lists. The sdist
   no longer carries the test suite, which cannot run outside the repository.
 
+- **A `Usage` is truthy when anything was counted**, a cost included: a
+  provider's price for a picture with no tokens beside it read as falsy.
+  `Usage + Usage` sums every count, so a counter added later cannot be
+  dropped by the sum.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -87,6 +92,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **The model layer reads its provider list from the data.** The keys
+  accepted as a `provider/model` prefix and the prefixes named in the error
+  for an unknown model were typed by hand, and the error's list had fallen
+  behind (no `magistral-`, `devstral-`, `qwq`, `wan2`, `chatgpt-image-`).
+  `ToolCall` hashes — its dict of arguments is left out of the hash — and
+  `refresh("private")` asks a keyless server without demanding a key.
 - **The library's exceptions pickle and copy.** `BudgetExceeded`, every
   `APIError`, `UnsupportedOption` and `Suspend` take their fields in
   `__init__`, so Python's way of rebuilding them — calling the class with the

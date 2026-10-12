@@ -164,20 +164,32 @@ class TestEvalRecordsTheOutputNotTheObject(unittest.TestCase):
         self.assertTrue(record.meta["success"])
 
 
+class TestUsageAddsEveryCount(unittest.TestCase):
+
+    def test_every_field_is_summed_and_cost_stays_unknown_only_when_both_were(self):
+        from dataclasses import fields
+        from yait_aichain.models._usage import Usage
+        counts = [f.name for f in fields(Usage) if f.name != "cost"]
+        one = Usage(**{n: 1 for n in counts})
+        self.assertEqual({n: getattr(one + one, n) for n in counts}, {n: 2 for n in counts})
+        self.assertIsNone((Usage(input_tokens=1) + Usage(input_tokens=1)).cost)
+        self.assertEqual((Usage(cost=0.5) + Usage(input_tokens=1)).cost, 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()
 
 
 class TestACostWithNoTokensIsACost(unittest.TestCase):
-    """A Usage with no tokens is falsy, and a cost the provider reported or a
-    price per picture used to read as unknown on Chain and Pool results."""
+    """A cost the provider reported, or a price per picture, with no tokens
+    beside it: the Usage is truthy and both results read the cost."""
 
     def test_both_results_read_it(self):
         from yait_aichain.chain._result import ChainResult
         from yait_aichain.models._usage import Usage
         from yait_aichain.pool._result import PoolResult
         u = Usage(cost=0.5)
-        self.assertFalse(u)
+        self.assertTrue(u)
         self.assertEqual(ChainResult(output=1, success=True, usage=u).cost, 0.5)
         self.assertEqual(PoolResult([1], success=True, history=[], usage=u).cost, 0.5)
         self.assertEqual((ChainResult(output=1, success=True).cost,
