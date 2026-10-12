@@ -34,7 +34,7 @@ from ..._require import require
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
-from .._security import assert_safe_url
+from .._security import assert_safe_url, safe_get
 from ._page import DEFAULT_TIMEOUT, _session, page_metadata
 from ._base import Fetch
 
@@ -104,7 +104,7 @@ class fetchLocal(Fetch):
                 refused = self._refused_by_robots(u)
                 if refused:
                     return {u: self.page(u, error=refused)}
-            response = self._session.get(u, stream=True)
+            response = safe_get(self._session, u, stream=True)
             if response.status_code >= 400:
                 return {u: self.page(u, final_url=response.url, error=f"HTTP {response.status_code}")}
             ctype = response.headers.get("content-type", "").lower()
@@ -125,7 +125,7 @@ class fetchLocal(Fetch):
         if root not in self._robots:
             parser = RobotFileParser()
             try:
-                r = self._session.get(root + "/robots.txt")
+                r = safe_get(self._session, root + "/robots.txt")
                 if 400 <= r.status_code < 500:
                     parser.allow_all = True
                 elif r.status_code >= 500:

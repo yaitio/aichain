@@ -115,6 +115,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: SSRF through a redirect, a parser disagreement or a shared
+  address.** The URL check read the first URL and the HTTP library then
+  followed redirects unchecked, so a public page answering `302` to
+  `169.254.169.254` reached the metadata service — from `fetchLocal`, its
+  `robots.txt` request and REST. Redirects are followed by the library now,
+  at most five, each target checked first. A URL carrying credentials or a
+  backslash is refused, the two shapes where this parser and the connecting
+  one read different hosts. An address must be public by `is_global`, which
+  covers the shared `100.64.0.0/10` range (Alibaba's metadata is
+  `100.100.100.200`), and IPv4 inside IPv6 (`::ffff:`, NAT64) is checked as
+  the address it is. Not covered: a DNS answer that changes between the check
+  and the connection.
 - **Security: quoted text became an executed tool call.** The harmony parser
   ran on any OpenAI-compatible reply containing `<|channel|>`, so a model —
   DeepSeek, Qwen, Grok, gpt-4o — quoting an example from a file or a page it

@@ -101,7 +101,7 @@ from yait_aichain.clients._constants import Retry
 
 from ...tools._base import Tool
 from ...tools._permissions import RISK_CLASSES
-from ...tools._security import assert_safe_url
+from ...tools._security import safe_request
 
 # ---------------------------------------------------------------------------
 # Internal constants
@@ -422,8 +422,7 @@ class RestApiTool(Tool):
         # Only ever speak http(s), and block SSRF targets (private / loopback /
         # metadata IPs) unless AICHAIN_ALLOW_PRIVATE_URLS is set — needed when a
         # REST endpoint is on an internal network.
-        assert_safe_url(url)
-        response = self._http.request(self._method, url, **req_kwargs)
+        response = safe_request(self._http, self._method, url, **req_kwargs)
         raw = response.data.decode("utf-8", errors="replace")
 
         if not (200 <= response.status < 300):

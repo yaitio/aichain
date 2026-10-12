@@ -334,6 +334,7 @@ def _local(robots=None, robots_status=200, page_status=200, robots_raises=False,
 
 
 @patch("yait_aichain.tools.fetch.local.assert_safe_url", lambda u: None)
+@patch("yait_aichain.tools._security.assert_safe_url", lambda u: None)
 class TestLocal(unittest.TestCase):
 
     def test_a_page_with_its_head(self):
