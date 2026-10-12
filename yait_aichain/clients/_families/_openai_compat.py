@@ -412,18 +412,8 @@ def _tool_call_request(triples, text: str = "") -> ToolCallRequest:
 #: lost, which is the exact silent failure the native channel exists to remove.
 _HARMONY_MARK = "<|channel|>"
 
-#: One harmony segment: a channel name, an optional ``to=`` recipient, then the
-#: body up to the next control token.
-_HARMONY_SEGMENT = re.compile(
-    r"<\|channel\|>(?P<channel>\w+)"
-    # The header holds the recipient and may carry further control tokens of
-    # its own — ``<|constrain|>json`` is routine on a call. Stopping at the
-    # first "<" would end the segment inside its own header and drop the call.
-    r"(?P<header>(?:(?!<\|message\|>).)*?)"
-    r"<\|message\|>(?P<body>.*?)"
-    r"(?=<\|end\|>|<\|call\|>|<\|return\|>|<\|start\|>|<\|channel\|>|\Z)",
-    re.DOTALL,
-)
+#: Where a harmony segment's body ends.
+_HARMONY_STOPS = ("<|end|>", "<|call|>", "<|return|>", "<|start|>")
 
 #: The recipient of a tool call inside a commentary channel:
 #: ``to=functions.get_weather``.
@@ -434,7 +424,15 @@ def _is_harmony(text: str) -> bool:
     return isinstance(text, str) and _HARMONY_MARK in text
 
 
-def _parse_harmony(text: str):
+def speaks_harmony(model_name: str) -> bool:
+    """Whether a model writes harmony: the gpt-oss family, by name — the one
+    family that does, and the only one whose replies are parsed for it. Any
+    other model that quotes a channel marker it read in a file or a page is
+    quoting, and its text stays text."""
+    return "gpt-oss" in (model_name or "").lower()
+
+
+def _parse_harmony(text: str, *, calls_allowed: bool = True):
     """
     Split a harmony reply into its channels and return either a
     :class:`ToolCallRequest` (when it asks to act) or the user-facing text.
@@ -445,25 +443,36 @@ def _parse_harmony(text: str):
     segment, addressed with ``to=functions.NAME``. ``final`` is what the user
     should see.
 
+    *calls_allowed* is False when no tools were sent: a call then is text the
+    model wrote, never a request to act, and the reply is its final text.
+
     A truncated reply (max_tokens cut mid-call) yields a segment whose body is
     not valid JSON; those become empty arguments rather than an exception, so
-    the executor can complain by name instead of the turn dying here.
+    the executor can complain by name instead of the turn dying here. One pass
+    over the text: each segment is cut at its first stop token, where a
+    backtracking pattern took seconds on a long reply.
     """
     calls, final_parts = [], []
-    for m in _HARMONY_SEGMENT.finditer(text):
-        channel = m.group("channel")
-        body    = m.group("body").strip()
+    for segment in text.split(_HARMONY_MARK)[1:]:
+        head, sep, rest = segment.partition("<|message|>")
+        if not sep:
+            continue
+        channel = re.match(r"\w*", head).group(0)
+        cut = min((i for i in (rest.find(t) for t in _HARMONY_STOPS) if i >= 0), default=len(rest))
+        body = rest[:cut].strip()
         if channel == "analysis":
             continue                       # deliberation, not an answer
         if channel == "commentary":
-            recipient = _HARMONY_RECIPIENT.search(m.group("header") or "")
+            recipient = _HARMONY_RECIPIENT.search(head)
             if recipient:
-                try:
-                    args = json.loads(body) if body else {}
-                except json.JSONDecodeError:
-                    args = {}
-                calls.append((recipient.group("name"),
-                              args if isinstance(args, dict) else {}, ""))
+                if calls_allowed:
+                    try:
+                        args = json.loads(body) if body else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    calls.append((recipient.group("name"),
+                                  args if isinstance(args, dict) else {},
+                                  f"call_{len(calls)}"))
             elif body:
                 final_parts.append(body)   # commentary addressed to nobody
         elif channel == "final":
@@ -471,13 +480,14 @@ def _parse_harmony(text: str):
 
     text_out = "\n".join(p for p in final_parts if p)
     if calls:
-        # ids are absent on this wire — the executor falls back to the name
+        # this wire carries no ids; one per call keeps two calls to one tool apart
         return _tool_call_request(iter(calls), text=text_out)
     return text_out
 
 
 def _parse_openai_compat_response(response: dict, output: dict, *,
-                                  strip_fences: bool = False) -> str | dict:
+                                  strip_fences: bool = False,
+                                  harmony: str | None = None) -> str | dict:
     """
     Extract the clean result from an OpenAI-compatible chat completion
     response.
@@ -526,8 +536,11 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
     # A server that does not implement harmony passes it through as prose.
     # Parsing it here is what turns a lost tool call into a real one — and
     # what keeps a reasoning model's notes out of the user-facing answer.
-    if _is_harmony(text):
-        parsed = _parse_harmony(text)
+    # Only for a model that writes it (*harmony* is "calls" when tools were
+    # sent, "text" when not): any other model's text that quotes a channel
+    # marker — read from a file, a page — was being executed as a tool call.
+    if harmony and _is_harmony(text):
+        parsed = _parse_harmony(text, calls_allowed=harmony == "calls")
         if not isinstance(parsed, str):
             return parsed
         text = parsed

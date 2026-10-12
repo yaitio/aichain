@@ -485,6 +485,7 @@ class Model:
         #: What the last :meth:`to_request` had to change to fit the provider.
         #: Empty when the request went out as asked.
         self.last_adaptations: list = []
+        self._sent_tools = False
 
         #: Token counts from the last :meth:`stream`, when the provider sent
         #: them. None rather than a guess: counting the text we happened to
@@ -580,6 +581,9 @@ class Model:
         tools : list | None, optional
             Function-calling schemas, as ``Tool.schema()`` returns them.
         """
+        # Read by `from_response`: a reply can be a request to act only when
+        # tools were offered, whatever its text looks like.
+        self._sent_tools = bool(tools)
         if tools:
             if not self.client.supports_tools:
                 raise ValueError(
@@ -800,6 +804,10 @@ class Model:
         output : dict
             The output spec the request was built with.
         """
+        from ..clients._families._openai_compat import speaks_harmony
+        if speaks_harmony(self.name):
+            mode = "calls" if self._sent_tools else "text"
+            return self.client.parse_response(response, output, harmony=mode)
         return self.client.parse_response(response, output)
 
     # ------------------------------------------------------------------

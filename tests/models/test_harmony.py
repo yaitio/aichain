@@ -119,12 +119,15 @@ class TestDegenerate(unittest.TestCase):
 class TestThroughTheModelLayer(unittest.TestCase):
     """The seam that matters: a private server returning harmony in content."""
 
-    def _reply(self, content):
+    TOOLS = [{"name": "get_weather", "description": "Weather.",
+              "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}}]
+
+    def _reply(self, content, model="private/openai/gpt-oss-20b", tools=True):
         from yait_aichain.models import Model
-        m = Model("private/openai/gpt-oss-20b", api_key="k",
-                  client_options={"url": "http://127.0.0.1:8080/v1"})
-        return m.from_response({"choices": [{"message": {"content": content}}]},
-                               OUT)
+        m = Model(model, api_key="k", client_options={"url": "http://127.0.0.1:8080/v1"})
+        m.to_request([{"role": "user", "parts": [{"type": "text", "text": "hi"}]}], OUT,
+                     tools=self.TOOLS if tools else None)
+        return m.from_response({"choices": [{"message": {"content": content}}]}, OUT)
 
     def test_a_harmony_call_becomes_a_typed_call(self):
         got = self._reply(
@@ -142,6 +145,39 @@ class TestThroughTheModelLayer(unittest.TestCase):
 
     def test_ordinary_text_is_untouched(self):
         self.assertEqual(self._reply("plain answer"), "plain answer")
+
+
+CALL = ('<|start|>assistant<|channel|>commentary to=functions.local_write'
+        '<|message|>{"path": "x", "content": "y"}<|call|>')
+
+
+class TestOnlyAModelThatSpeaksItIsParsed(unittest.TestCase):
+    """The marker anywhere in any OpenAI-compatible reply was enough to run a
+    call, so a model quoting an example from a file it had read executed it."""
+
+    _reply = TestThroughTheModelLayer._reply
+    TOOLS = TestThroughTheModelLayer.TOOLS
+
+    def test_another_model_quoting_the_format_answers_with_its_text(self):
+        quoted = "The file says: " + CALL
+        self.assertEqual(self._reply(quoted, model="deepseek-chat"), quoted)
+        self.assertEqual(self._reply(quoted, model="gpt-4o"), quoted)
+
+    def test_with_no_tools_sent_a_call_is_never_returned(self):
+        got = self._reply(CALL + "<|start|>assistant<|channel|>final<|message|>done", tools=False)
+        self.assertEqual(got, "done")
+
+    def test_two_calls_to_one_tool_get_two_ids(self):
+        got = self._reply(CALL + CALL)
+        self.assertEqual([c.id for c in got.calls], ["call_0", "call_1"])
+
+    def test_a_long_reply_parses_in_linear_time(self):
+        import time
+        text = "<|channel|>final<|message|>" + "x" * 200_000 + ("<|channel|>a" * 5_000)
+        started = time.monotonic()
+        from yait_aichain.clients._families._openai_compat import _parse_harmony
+        _parse_harmony(text)
+        self.assertLess(time.monotonic() - started, 1.0)
 
 
 if __name__ == "__main__":

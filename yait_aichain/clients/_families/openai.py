@@ -406,19 +406,20 @@ class OpenAIClient(BaseClient):
         return path, body
 
     # ── format: provider response → our result ───────────────────────
-    def parse_response(self, response, output) -> str | dict:
+    def parse_response(self, response, output, *, harmony: str | None = None) -> str | dict:
         p = self._provider
         if "data" in response:
             return _parse_image_generations_response(response)
         if p == "openai":
             if "choices" in response:
-                return _parse_openai_compat_response(response, output)
+                return _parse_openai_compat_response(response, output, harmony=harmony)
             return _parse_responses_api_response(response, output)
         # A provider that takes JSON but not a schema is asked in the prompt,
         # and answers the way a model writes JSON in prose: often fenced in
         # ```json. The fence is markup, not content, so it is taken off.
         loose = not ((self._data.get("provider") or {}).get("options") or {}).get("json_schema", True)
-        return _parse_openai_compat_response(response, output, strip_fences=loose)
+        return _parse_openai_compat_response(response, output, strip_fences=loose,
+                                             harmony=harmony)
 
 
 def _decline_sampling(m, body: dict) -> None:

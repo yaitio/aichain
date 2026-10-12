@@ -115,6 +115,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: quoted text became an executed tool call.** The harmony parser
+  ran on any OpenAI-compatible reply containing `<|channel|>`, so a model —
+  DeepSeek, Qwen, Grok, gpt-4o — quoting an example from a file or a page it
+  had read had `to=functions.local_write …` executed. Harmony is parsed now
+  only for the gpt-oss family, and only becomes a tool call when tools were
+  sent; without tools the reply is its final text. A Skill without tools no
+  longer returns a `ToolCallRequest` this way. The parser is one pass over
+  the text, where its pattern took seconds on a long reply, and two calls to
+  one tool get two ids.
 - **Security: `Chain.load()` of an untrusted file could run shell commands.**
   The guard checked only that a class lived under `yait_aichain.`, and the
   package ships tools whose arguments say what they reach: `LocalRunTool`
