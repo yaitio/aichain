@@ -285,6 +285,9 @@ class GoogleClient(BaseClient):
                 continue
             release()
             # The model's request to act: functionCall parts on a model turn.
+            if msg["role"] == "assistant" and (msg.get("opaque") or {}).get("google"):
+                contents.append({"role": "model", "parts": list(msg["opaque"]["google"])})
+                continue
             if msg["role"] == "assistant" and msg.get("tool_calls"):
                 gparts = [_part_to_google(p) for p in msg.get("parts") or []]
                 gparts = [g for g in gparts if g is not None]
@@ -419,12 +422,17 @@ class GoogleClient(BaseClient):
             raise ValueError(f"Google stopped the answer before any text (finishReason={finish})")
         if calls:
             from ...models._calls import ToolCall, ToolCallRequest
+            # Gemini 3 signs its function calls (`thoughtSignature` on the
+            # part) and wants the parts back as they came; a call rebuilt from
+            # name and args is a call without its signature, and a 400.
+            signed = any("thoughtSignature" in p for p in parts)
             return ToolCallRequest(
                 calls=tuple(ToolCall(id=c.get("name", ""),
                                      name=c.get("name", ""),
                                      arguments=c.get("args") or {})
                             for c in calls),
                 text=text,
+                opaque={"google": [dict(p) for p in parts]} if signed else {},
             )
         if ftype in ("json", "json_schema"):
             # A response cut off at the token ceiling arrives as HTTP 200 with

@@ -124,6 +124,9 @@ class OpenAIClient(BaseClient):
             # False for a model that always reasons: `none` cannot reach it.
             _REASONING_OFF = bool(self._data.get("models", {})
                                   .get(params["name"], {}).get("reasoning_off", True)),
+            # The provider wants a turn's `reasoning_content` back with its
+            # tool calls; without it a multi-turn tool loop loses the thread.
+            _KEEP_REASONING = bool(prov.get("keep_reasoning", False)),
         )
 
     #: Native tool calling is implemented for this family — both wire

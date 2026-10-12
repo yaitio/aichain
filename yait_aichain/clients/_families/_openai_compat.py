@@ -238,6 +238,9 @@ def _build_openai_compat_request(
                     for c in msg["tool_calls"]
                 ],
             }
+            kept = (msg.get("opaque") or {}).get("reasoning_content")
+            if kept and getattr(model, "_KEEP_REASONING", False):
+                entry["reasoning_content"] = kept
             openai_messages.append(entry)
             continue
 
@@ -393,7 +396,7 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
     return result
 
 
-def _tool_call_request(triples, text: str = "") -> ToolCallRequest:
+def _tool_call_request(triples, text: str = "", opaque: dict | None = None) -> ToolCallRequest:
     """
     Build a :class:`ToolCallRequest` from ``(name, arguments, id)`` triples.
 
@@ -412,7 +415,7 @@ def _tool_call_request(triples, text: str = "") -> ToolCallRequest:
                 args = {}
         calls.append(ToolCall(id=call_id or "", name=name,
                               arguments=args if isinstance(args, dict) else {}))
-    return ToolCallRequest(calls=tuple(calls), text=text)
+    return ToolCallRequest(calls=tuple(calls), text=text, opaque=opaque or {})
 
 
 #: Marker that a reply is written in OpenAI's *harmony* format rather than
@@ -538,12 +541,14 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
     refuse_cut_off(finish, spent, calls=bool(message.get("tool_calls")),
                    text=content_text(message.get("content")))
     if message.get("tool_calls"):
+        thought = message.get("reasoning_content")
         return _tool_call_request(
             ((c.get("function", {}).get("name", ""),
               c.get("function", {}).get("arguments"),
               c.get("id", ""))
              for c in message["tool_calls"]),
             text=content_text(message.get("content")),
+            opaque={"reasoning_content": thought} if thought else None,
         )
 
     text  = content_text(message.get("content"))

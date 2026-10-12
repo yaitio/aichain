@@ -24,6 +24,9 @@ auth     = "bearer"
 max_tokens_field = "max_tokens"
 models_path      = "/v1/models"
 chat_path        = "/v1/chat/completions"
+# The quick start asks for a turn's `reasoning_content` to be sent back with
+# its tool calls in a multi-turn loop.
+keep_reasoning   = true
 
 [provider.options]
 # No reasoning control is documented in the quick start; it is not claimed.

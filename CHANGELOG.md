@@ -118,6 +118,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **What a provider attaches to a tool-calling turn comes back with it.**
+  Gemini 3 signs each function call with a `thoughtSignature` and answers 400
+  when the call returns without it; the library rebuilt calls from name and
+  arguments and dropped it. A signed turn now goes back as its original
+  parts. A turn's `reasoning_content` is kept with its tool calls for
+  providers whose data sets `keep_reasoning = true` — MiMo, whose quick start
+  asks for it, verified live 2026-10-13 on `mimo-v2.6-flash`. Kimi and
+  DeepSeek's thinking modes are not flagged: not yet verified live.
 - **Claude's structured answers are checked like every other family's.**
   With `json_schema`, a reply with no tool call — cut off or refused — came
   back as `{}`, and a partial object went out unchecked. It raises
