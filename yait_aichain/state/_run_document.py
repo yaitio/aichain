@@ -71,7 +71,7 @@ class RunDocument:
             return StepStatus.FAILED
         if StepStatus.SUSPENDED in states:
             return StepStatus.SUSPENDED
-        if states and states <= {StepStatus.DONE}:
+        if states and states <= {StepStatus.DONE, StepStatus.SKIPPED}:
             return StepStatus.DONE
         return StepStatus.RUNNING
 
@@ -87,9 +87,6 @@ class RunDocument:
             if s["status"] not in StepStatus.TERMINAL:
                 return s["id"]
         return None
-
-    def step(self, idx: int) -> dict:
-        return self.steps[idx]
 
     def suspended_step(self) -> dict | None:
         return next((s for s in self.steps
@@ -110,6 +107,9 @@ class RunDocument:
 
     @classmethod
     def from_dict(cls, data: dict) -> RunDocument:
+        if not isinstance(data, dict) or "run_id" not in data:
+            raise ValueError("not a run document: no run_id — "
+                             f"got {type(data).__name__} with keys {sorted(data)[:8] if isinstance(data, dict) else '-'}")
         return cls(
             run_id     = data["run_id"],
             kind       = data.get("kind", "chain"),

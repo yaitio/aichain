@@ -38,6 +38,7 @@ prefix stable.
 from __future__ import annotations
 
 import json
+import contextlib
 import logging
 import time
 import uuid
@@ -46,6 +47,8 @@ from typing import Any
 
 from .._budget import Budget
 from ..models import Model
+from ..skills import Skill
+from ..utilities._base import Utility
 from ..state import StateStore
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
@@ -330,7 +333,7 @@ _AWAITING = object()
 
 
 def _is_utility(obj) -> bool:
-    return any(c.__name__ == "Utility" for c in type(obj).__mro__)
+    return isinstance(obj, Utility)
 
 
 def _utility_tools(u) -> str:
@@ -360,7 +363,7 @@ def _check_tools(tools: list) -> None:
                 and callable(getattr(t, "run", None))):
             kind = type(t).__name__
             hint = (" A Skill is one call to a model — a step for a Chain, not a tool for an Agent."
-                    if any(c.__name__ == "Skill" for c in type(t).__mro__) else "")
+                    if isinstance(t, Skill) else "")
             raise TypeError(f"{kind} is not a tool: an Agent needs a name, schema() and run() — "
                             f"a Tool subclass, or a tool from a factory such as search('exa').{hint}")
         if t.name in seen:
@@ -610,10 +613,8 @@ class Agent:
             self.last_result = result
         finally:
             self._streaming = False
-            try:
+            with contextlib.suppress(ValueError):    # already gone; fine
                 self.hooks.remove(collect)
-            except ValueError:                       # already gone; fine
-                pass
 
     def arm(self, reason: str = "", resume_with: dict | None = None, *,
             hint: dict | None = None,
@@ -1073,7 +1074,6 @@ class Agent:
         caching and native tool calling arrive at all: they were added to the
         primitive and would never reach a private copy of it.
         """
-        from ..skills import Skill
         _t0 = time.monotonic()
         # The planning phase, when it exists and has its own model, deserves
         # deliberation; execution turns do not. The phase boundary is the
@@ -1143,7 +1143,8 @@ class Agent:
         # a second one would put the question to a person twice.
         if (problem := tool.check_args(kwargs)) is not None:
             raise ValueError(problem)
-        self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
+        if _logger.isEnabledFor(logging.INFO):     # the arguments are serialised only to be shown
+            self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
 
     def _ask_permission(self, call, state: dict | None = None):
@@ -1221,6 +1222,8 @@ class Agent:
 
     def _do_plan(self, args: dict, state: dict) -> str:
         items = args.get("items") or []
+        if not isinstance(items, list):
+            items = [items]                  # one item, not a string split into characters
         if state["plan"] is not None:
             # "You may not rewrite it" — and a rewrite would also invalidate
             # the prefix the freeze exists to keep cacheable.
@@ -1548,7 +1551,6 @@ class _MappedSkill(Tool):
         self._prompt = prompt
 
     def run(self, item=None, options=None):
-        from ..skills import Skill
         text  = (self._prompt or "{item}").replace("{item}", str(item))
         skill = Skill(model=self._agent.model,
                       input={"messages": [{"role": "user", "parts": [text]}]})

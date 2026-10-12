@@ -30,7 +30,7 @@ anyone builds behaviour on it.
 from __future__ import annotations
 
 import contextvars
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 import hashlib
 import json
 import threading
@@ -108,14 +108,12 @@ def collecting_beacons():
     try:
         yield board
     finally:
-        try:
+        # A streaming run is a generator, and a generator may be resumed in a
+        # different context from the one it started in. The board is already
+        # detached from the run by then; failing the run over it would turn
+        # bookkeeping into a crash.
+        with suppress(ValueError):
             _BOARD.reset(token)
-        except ValueError:
-            # A streaming run is a generator, and a generator may be resumed
-            # in a different context from the one it started in. The board is
-            # already detached from the run by then; failing the run over it
-            # would turn bookkeeping into a crash.
-            pass
 
 
 def beacon(kind: str, message: str, *, source: str = "") -> Beacon:

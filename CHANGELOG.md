@@ -106,6 +106,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **Small contracts in the agent and the run document.** An `Agent` told a
+  user's own class named `Utility` or `Skill` it was the library's, because
+  it compared class names; it checks types now. A plan given as one string
+  was recorded one character per item. A run whose steps were all done or
+  skipped reported `running`. `RunDocument.from_dict` on something else
+  raised a bare `KeyError`; it raises `ValueError` saying so. A tool call's
+  arguments are serialised for the log only when the log is on.
+  `RunDocument.step()`, which nothing called, is gone.
 - **A search result's date is a real day or none.** `2026-13-45` and
   `Feb 30, 2026` came back as dates; they are `""` now.
 - **Google transcription no longer pays twice for the end of a file.** The
