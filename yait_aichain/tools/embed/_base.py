@@ -47,7 +47,7 @@ To cap the slice size for rate-limiting purposes:
 
 from __future__ import annotations
 
-import math
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -339,50 +339,31 @@ class Embedder(Tool):
             raise ValueError("texts must not be empty")
 
         _refuse_settings(type(self).__name__, refused)
-        eff_input_type = input_type
-        eff_dimensions = self.dimensions
-
-        # ── Determine chunk size ──────────────────────────────────────
-        limit = self._MAX_BATCH
-        if self.batch_size is not None:
-            limit = max(1, min(self.batch_size, self._MAX_BATCH))
-
-        # ── Fan-out across batches ────────────────────────────────────
-        all_embeddings: list[list[float]] = []
-        total_tokens_sum: int = 0
-        has_tokens = False
-        last_metadata: dict = {}
-
-        n_chunks = math.ceil(len(texts) / limit)
-        for i in range(n_chunks):
-            chunk = texts[i * limit : (i + 1) * limit]
-            vecs, tok, meta = self._embed_chunk(
-                chunk,
-                input_type = eff_input_type,
-                dimensions = eff_dimensions,
-            )
-            all_embeddings.extend(vecs)
+        limit = max(1, min(self.batch_size or self._MAX_BATCH, self._MAX_BATCH))
+        vectors: list[list[float]] = []
+        tokens: "list[int]" = []
+        metadata: dict = {}
+        for i in range(0, len(texts), limit):
+            vecs, tok, metadata = self._embed_chunk(
+                texts[i:i + limit], input_type=input_type, dimensions=self.dimensions)
+            vectors.extend(vecs)
             if tok is not None:
-                total_tokens_sum += tok
-                has_tokens = True
-            last_metadata = meta
-
-        dims = len(all_embeddings[0]) if all_embeddings else 0
+                tokens.append(tok)
         return EmbeddingResult(
-            embeddings   = all_embeddings,
+            embeddings   = vectors,
             model        = self.model,
             provider     = self.provider,
-            dimensions   = dims,
-            total_tokens = total_tokens_sum if has_tokens else None,
-            metadata     = last_metadata,
+            dimensions   = len(vectors[0]) if vectors else 0,
+            total_tokens = sum(tokens) if tokens else None,
+            metadata     = metadata,
         )
 
     def run(self, input: "str | list[str]", options: "dict | None" = None) -> "EmbeddingResult":
         """
         Embed one text (or a short list) and return an EmbeddingResult.
 
-        This is the standard tool interface. For large batches, prefer
-        :meth:`batch`, which makes the intent explicit.
+        This is the standard tool interface; a long list is split into
+        requests of at most the provider's batch size.
 
         Parameters
         ----------
@@ -403,28 +384,10 @@ class Embedder(Tool):
         return self.embed(input, input_type=input_type)
 
     def batch(self, input: "list[str]", options: "dict | None" = None) -> "EmbeddingResult":
-        """
-        Embed a list of texts explicitly as a batch.
-
-        Identical to :meth:`run` but communicates intent clearly when the
-        caller knows the input is always a list.
-
-        Parameters
-        ----------
-        input : list[str]
-            Texts to embed.
-        options : dict | None, optional
-            Same keys as :meth:`run`.
-
-        Returns
-        -------
-        EmbeddingResult
-        """
-        if not isinstance(input, list):
-            raise TypeError(
-                f"batch() expects a list[str]; got {type(input).__name__}.  "
-                f"Use run() for a single string."
-            )
+        """Deprecated: the same as :meth:`run`, which takes a list. Removed in 5.0."""
+        import warnings
+        warnings.warn("Embedder.batch() is run() — call run(); batch() goes in 5.0",
+                      DeprecationWarning, stacklevel=2)
         return self.run(input, options)
 
     # ------------------------------------------------------------------
@@ -480,7 +443,6 @@ class Embedder(Tool):
         RuntimeError
             On any non-2xx HTTP status.
         """
-        import json
         headers = {
             "Content-Type":  "application/json",
             "Accept":        "application/json",
@@ -497,8 +459,7 @@ class Embedder(Tool):
             raise RuntimeError(
                 f"{self.provider} Embeddings API error [{response.status}]: {raw[:500]}"
             )
-        import json as _json
-        return _json.loads(raw)
+        return json.loads(raw)
 
     # ------------------------------------------------------------------
     # Dunder helpers

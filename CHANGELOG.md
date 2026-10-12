@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+**Less code, the same behaviour.** The simplification half of the 4.0.0
+audit: copies merged, dead paths removed, nothing a caller sees changed except
+where a fix is named below.
+
+### Deprecated
+
+- **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
+  a list. It warns now and goes in 5.0.
+
+### Fixed
+
+- **`Shell("/")` reads.** The containment check compared string prefixes, so
+  with the filesystem root as the folder every path had to start with `//`
+  and nothing was inside. It compares path components now, in one `within()`
+  that `Shell` and output-path confinement share.
+- **The chunker keeps a space it used to drop** when a single token longer
+  than `max_chars` was cut.
+
 ## [4.0.0] — 2026-10-12
 
 **No compatibility layer.** Every name and path 3.x kept alive for older code
