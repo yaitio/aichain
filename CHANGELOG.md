@@ -92,6 +92,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **`@tool` reads what a function says about itself.** A NumPy-style
+  docstring — the form this library writes — gave each parameter the
+  description `float`, the type after the colon; it now gives the indented
+  text under it. A `functools.partial` was named `partial` and described by
+  functools' docstring; it takes its function's. An unannotated `count=3`
+  was a string in the schema; a default of a JSON type gives the type. An
+  annotation naming something undefined raised a bare `NameError`; it raises
+  `TypeError` naming the function. A name with a trailing newline passed the
+  check.
 - **The model layer reads its provider list from the data.** The keys
   accepted as a `provider/model` prefix and the prefixes named in the error
   for an unknown model were typed by hand, and the error's list had fallen

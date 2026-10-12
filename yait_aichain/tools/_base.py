@@ -473,15 +473,44 @@ class Tool:
 # @tool — any function as a tool
 # ---------------------------------------------------------------------------
 
+import functools
 import inspect as _inspect
 import re as _re
 import types as _types
 import typing as _typing
 
 #: What providers accept as a function name.
-_TOOL_NAME = _re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_TOOL_NAME = _re.compile(r"[A-Za-z0-9_-]{1,64}")
 #: ``text: the text to count.`` or ``text (str): …`` — a parameter's line in a docstring.
 _PARAM_LINE = _re.compile(r"^\s*\*{0,2}([A-Za-z_][A-Za-z0-9_]*)\*{0,2}\s*(?:\([^)]*\))?\s*:\s*(.+?)\s*$")
+#: ``text : str`` — a NumPy-style parameter header; its description is the
+#: indented lines under it, not the type after the colon.
+_NUMPY_HEAD = _re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s+:\s*\S.*$")
+
+_PRIMITIVE = {bool: "boolean", int: "integer", float: "number", str: "string"}
+
+
+def _param_docs(doc: str) -> dict:
+    """Each parameter's description, from a ``name: text`` line or from the
+    NumPy form this library itself writes (``name : type`` over an indented
+    description)."""
+    lines = doc.splitlines()[1:]
+    if any(_re.match(r"^\s*-{3,}\s*$", line) for line in lines):
+        found, i = {}, 0
+        while i < len(lines):
+            head = _NUMPY_HEAD.match(lines[i])
+            i += 1
+            if not head:
+                continue
+            depth, body = len(head.group(1)), []
+            while i < len(lines) and lines[i].strip() and \
+                    len(lines[i]) - len(lines[i].lstrip()) > depth:
+                body.append(lines[i].strip())
+                i += 1
+            if body:
+                found[head.group(2)] = " ".join(body)
+        return found
+    return {m.group(1): m.group(2) for line in lines if (m := _PARAM_LINE.match(line))}
 
 
 def _json_type(tp, where: str) -> dict:
@@ -499,14 +528,8 @@ def _json_type(tp, where: str) -> dict:
         kinds = {type(a) for a in args}
         base = _json_type(kinds.pop(), where) if len(kinds) == 1 else {}
         return {**base, "enum": list(args)}
-    if tp is bool:                                  # before int: a bool is an int
-        return {"type": "boolean"}
-    if tp is int:
-        return {"type": "integer"}
-    if tp is float:
-        return {"type": "number"}
-    if tp is str:
-        return {"type": "string"}
+    if tp in _PRIMITIVE:
+        return {"type": _PRIMITIVE[tp]}
     if tp in (list, tuple, set) or origin in (list, tuple, set):
         return {"type": "array", **({"items": _json_type(args[0], where)} if args else {})}
     if tp is dict or origin is dict:
@@ -543,12 +566,17 @@ class FunctionTool(Tool):
         from ._permissions import RISK_CLASSES
         if not callable(fn):
             raise TypeError(f"@tool wraps a function; got {type(fn).__name__}")
-        label = getattr(fn, "__name__", type(fn).__name__)
+        # A partial is its function with some arguments fixed: the name and
+        # the docstring are the function's, the signature the partial's.
+        inner = fn
+        while isinstance(inner, functools.partial):
+            inner = inner.func
+        label = getattr(inner, "__name__", type(inner).__name__)
         self.name = name or label
-        if not _TOOL_NAME.match(self.name):
+        if not _TOOL_NAME.fullmatch(self.name):
             raise ValueError(f"tool name {self.name!r} must be 1 to 64 letters, digits, '_' or '-' — "
                              "what providers accept; pass name=")
-        doc = _inspect.getdoc(fn) or ""
+        doc = _inspect.getdoc(inner) or ""
         self.description = description or (doc.strip().splitlines()[0].strip() if doc.strip() else "")
         if not self.description:
             raise ValueError(f"@tool {label}: no description — a model decides whether to call a "
@@ -558,15 +586,21 @@ class FunctionTool(Tool):
         self.risk = risk
 
         sig = _inspect.signature(fn)
-        hints = _typing.get_type_hints(fn) if not isinstance(fn, type) else {}
-        lines = {m.group(1): m.group(2) for line in doc.splitlines()[1:]
-                 if (m := _PARAM_LINE.match(line))}
+        try:
+            hints = _typing.get_type_hints(inner) if not isinstance(inner, type) else {}
+        except NameError as exc:
+            raise TypeError(f"@tool {label}: an annotation names something not defined where "
+                            f"the function is ({exc}); import it, or annotate with a builtin") from None
+        lines = _param_docs(doc)
         props, required = {}, []
         for p in sig.parameters.values():
             if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
                 raise TypeError(f"@tool {label}: *{p.name} has no schema — a model passes named "
                                 "arguments; declare each one")
-            spec = _json_type(hints.get(p.name, p.annotation), f"@tool {label}, parameter {p.name!r}")
+            annotation = hints.get(p.name, p.annotation)
+            if annotation is p.empty and type(p.default) in (*_PRIMITIVE, list, dict):
+                annotation = type(p.default)      # `count=3` is an integer, not a string
+            spec = _json_type(annotation, f"@tool {label}, parameter {p.name!r}")
             if p.name in lines:
                 spec["description"] = lines[p.name]
             props[p.name] = spec
@@ -574,7 +608,7 @@ class FunctionTool(Tool):
                 required.append(p.name)
         self.parameters = {"type": "object", "properties": props, "required": required}
         self.__wrapped__ = fn
-        self.__doc__ = fn.__doc__
+        self.__doc__ = inner.__doc__
         self._takes_options = "options" in sig.parameters
 
     def run(self, *args, **kwargs):  # type: ignore[override]

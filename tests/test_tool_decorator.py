@@ -155,5 +155,55 @@ class TestWhereItRuns(unittest.TestCase):
         self.assertFalse(os.path.exists(path))
 
 
+class TestWhatTheSchemaIsReadFrom(unittest.TestCase):
+
+    def test_a_numpy_docstring_gives_descriptions_not_types(self):
+        def scale(value: float, factor: float = 2.0) -> float:
+            """Multiply a value.
+
+            Parameters
+            ----------
+            value : float
+                The number to scale.
+            factor : float, optional
+                How much to scale it by,
+                twice by default.
+            """
+            return value * factor
+        props = tool(scale).parameters["properties"]
+        self.assertEqual(props["value"]["description"], "The number to scale.")
+        self.assertEqual(props["factor"]["description"], "How much to scale it by, twice by default.")
+
+    def test_a_partial_is_named_and_described_by_its_function(self):
+        import functools
+
+        def greet(greeting: str, name: str) -> str:
+            """Greet someone."""
+            return f"{greeting}, {name}"
+        t = tool(functools.partial(greet, "hello"))
+        self.assertEqual((t.name, t.description), ("greet", "Greet someone."))
+        self.assertEqual(list(t.parameters["properties"]), ["name"])
+        self.assertEqual(t.run(name="Ann"), "hello, Ann")
+
+    def test_a_default_gives_the_type_where_there_is_no_annotation(self):
+        def page(query, count=3, exact=False, tags=None):
+            """Search."""
+        props = tool(page).parameters["properties"]
+        self.assertEqual([props[k]["type"] for k in ("query", "count", "exact", "tags")],
+                         ["string", "integer", "boolean", "string"])
+
+    def test_an_undefined_annotation_names_the_function(self):
+        def broken(x: "Missing") -> str:      # noqa: F821
+            """Broken."""
+        with self.assertRaisesRegex(TypeError, "@tool broken"):
+            tool(broken)
+
+    def test_a_name_with_a_newline_is_refused(self):
+        def ok(x: str) -> str:
+            """Ok."""
+        with self.assertRaises(ValueError):
+            tool(ok, name="ok\n")
+
+
 if __name__ == "__main__":
     unittest.main()
