@@ -21,6 +21,13 @@ where a fix is named below.
   `PoolResult` read it through the truthiness of `Usage`, which is false with
   no tokens — so a cost the provider reported, or a price per picture, read as
   `None`. One `Spend` mixin serves both now.
+- **Chain and Pool recognise an agent or a tool by type.** Both matched the
+  class *name* in the MRO, so any class called `Agent` was run as an agent and
+  another library's `Tool` as ours. One `_runners` module answers for both, by
+  `isinstance`.
+- **A chain with a `gate()` and no store warns,** as one with a `wait()` did:
+  the check read the class name `Wait`, and now reads whether a step
+  suspends.
 - **The chunker keeps a space it used to drop** when a single token longer
   than `max_chars` was cut.
 

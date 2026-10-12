@@ -70,14 +70,7 @@ from ..state import Suspend
 # Runner-type helpers  (same lazy checks as chain._chain)
 # ---------------------------------------------------------------------------
 
-def _is_tool(runner) -> bool:
-    """True for any Tool subclass regardless of where it is defined."""
-    return any(cls.__name__ == "Tool" for cls in type(runner).__mro__)
-
-
-def _is_agent(runner) -> bool:
-    """True for any Agent subclass regardless of where it is defined."""
-    return any(cls.__name__ == "Agent" for cls in type(runner).__mro__)
+from .._runners import is_tool as _is_tool, is_agent as _is_agent
 
 
 def _build_tool_kwargs(tool, variables: dict) -> dict:

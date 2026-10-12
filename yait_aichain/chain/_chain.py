@@ -153,18 +153,7 @@ def _usage_to_dict(usage) -> dict:
     }
 
 
-def _is_tool(runner) -> bool:
-    """Return True if *runner* is a Tool instance (lazy, import-free check)."""
-    # Check the MRO by class name so custom Tool subclasses defined outside
-    # the tools/ package (e.g. in user scripts) are detected correctly.
-    return any(cls.__name__ == "Tool" for cls in type(runner).__mro__)
-
-
-def _is_agent(runner) -> bool:
-    """Return True if *runner* is an Agent instance (lazy, import-free check)."""
-    # Check the MRO by class name (same approach as _is_tool) so the check
-    # works regardless of the package the Agent class was imported from.
-    return any(cls.__name__ == "Agent" for cls in type(runner).__mro__)
+from .._runners import is_tool as _is_tool, is_agent as _is_agent
 
 
 def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
@@ -369,7 +358,7 @@ class Chain:
         # with no Wait has nothing to persist.
         # A normalised step is (runner, output_key, input_map, kind, options).
         if store is None and any(
-            type(st[0]).__name__ == "Wait" for st in self._steps
+            getattr(st[0], "suspends", False) for st in self._steps
         ):
             import warnings
             warnings.warn(

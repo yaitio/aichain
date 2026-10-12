@@ -93,8 +93,11 @@ class _Result:
         return self.ok
 
 
-class Agent:
-    """Detected as an agent step by class name, as the real one is."""
+from yait_aichain.agent import Agent as _RealAgent  # noqa: E402
+
+
+class Agent(_RealAgent):
+    """An Agent by type — the check is isinstance — with a scripted run and no model."""
     name = "fake-agent"
 
     def __init__(self, ok=True):
