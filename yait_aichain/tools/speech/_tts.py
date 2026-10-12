@@ -19,10 +19,8 @@ streaming synthesis is reserved for a future release.
 
 Installation
 ------------
-  OpenAI  :  pip install openai
-  Google  :  pip install google-cloud-texttospeech
-  xAI     :  pip install openai   (uses the OpenAI-compatible xAI endpoint)
-  Qwen    :  pip install urllib3  (pure HTTP; no extra SDK needed)
+  OpenAI, xAI, Qwen :  nothing extra — plain HTTP
+  Google            :  pip install google-cloud-texttospeech
 
 Environment variables
 ---------------------
@@ -202,7 +200,56 @@ class Speech(Tool):
 
 # ── ttsOpenAI ─────────────────────────────────────────────────────────────────
 
-class ttsOpenAI(Speech):
+class _OpenAISpeech(Speech):
+    """The OpenAI speech wire, which xAI speaks too: ``POST {base}/audio/speech``
+    with model, voice, input, format and speed; the answer is the audio.
+
+    A provider on it is data — ``_BASE_URL``, ``_ENV_KEY``, ``_LABEL`` and its
+    defaults. Plain HTTP, so neither needs the ``openai`` package.
+    """
+
+    # The endpoint has no language field — the voice and the model carry it.
+    parameters = _without_options(Speech.parameters, "language")
+
+    _BASE_URL: str = ""
+    _ENV_KEY:  str = ""
+    _LABEL:    str = ""
+
+    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+        self.model = _model_setting(self, model)
+        self._api_key = api_key or os.environ.get(self._ENV_KEY)
+        if not self._api_key:
+            raise ValueError(f"No {self._LABEL} API key found.  "
+                             f"Pass api_key= or set the {self._ENV_KEY} environment variable.")
+        self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=60.0),
+                               retries=urllib3.Retry(total=2, backoff_factor=0.5))
+
+    def run(self, input: str, options: dict | None = None) -> str:
+        """
+        Synthesise *input* and save it as an audio file; return its path.
+
+        options: ``voice``, ``speed`` (0.25–4.0, default 1.0), ``format``
+        (``"mp3"`` default, ``"wav"``, ``"opus"``, ``"flac"``, ``"pcm"``) and
+        ``output_path`` (generated when omitted). The path is checked before
+        the request, so a refused one costs nothing.
+        """
+        _no_model_option(self, options or {})
+        opts = options or {}
+        fmt  = opts.get("format", _DEFAULT_FORMAT)
+        output_path = confine_output_path(opts.get("output_path") or _auto_path(fmt))
+        audio = request(self._http, "POST", f"{self._BASE_URL}/audio/speech",
+                        json={"model": self.model, "voice": opts.get("voice", self._DEFAULT_VOICE),
+                              "input": input, "response_format": fmt,
+                              "speed": float(opts.get("speed", _DEFAULT_SPEED))},
+                        headers={"Authorization": f"Bearer {self._api_key}"},
+                        what=f"{self._LABEL} speech API").data
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as fh:
+            fh.write(audio)
+        return output_path
+
+
+class ttsOpenAI(_OpenAISpeech):
     """
     Text-to-speech via the OpenAI TTS API.
 
@@ -245,67 +292,12 @@ class ttsOpenAI(Speech):
         path = tool.run(input="Hello!", options={"voice": "echo"})
     """
 
-    # OpenAI's /v1/audio/speech has no language field — the voice and the
-    # model carry it. The shared description claimed otherwise.
-    parameters = _without_options(Speech.parameters, "language")
-
     name           = "ttsOpenAI"
+    _BASE_URL      = "https://api.openai.com/v1"
+    _ENV_KEY       = "OPENAI_API_KEY"
+    _LABEL         = "OpenAI"
     _DEFAULT_MODEL = "tts-1"
     _DEFAULT_VOICE = "alloy"
-
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
-        self.model = _model_setting(self, model)
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not self._api_key:
-            raise ValueError(
-                "No OpenAI API key found.  "
-                "Pass api_key= or set the OPENAI_API_KEY environment variable."
-            )
-
-    def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Synthesise *input* text and save to an audio file.
-
-        Parameters
-        ----------
-        input : str
-            Text to synthesise (max 4 096 characters).
-        options : dict | None, optional
-            ``voice``       — voice ID.  Default: ``"alloy"``.
-            ``speed``       — 0.25–4.0, default 1.0.
-            ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``,
-                              ``"flac"``, ``"pcm"``.
-            ``output_path`` — destination path.  Auto-generated if omitted.
-
-        Returns
-        -------
-        str
-            Absolute path to the saved audio file.
-        """
-        _no_model_option(self, options or {})
-        openai = require("openai", package="openai", who="ttsOpenAI")
-
-        opts        = options or {}
-        voice       = opts.get("voice",       self._DEFAULT_VOICE)
-        model       = self.model
-        speed       = float(opts.get("speed", _DEFAULT_SPEED))
-        fmt         = opts.get("format",      _DEFAULT_FORMAT)
-        output_path = opts.get("output_path") or _auto_path(fmt)
-
-        client   = openai.OpenAI(api_key=self._api_key)
-        response = client.audio.speech.create(
-            model           = model,
-            voice           = voice,
-            input           = input,
-            response_format = fmt,
-            speed           = speed,
-        )
-
-        output_path = confine_output_path(output_path)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        response.stream_to_file(output_path)
-
-        return output_path
 
 
 # ── ttsGoogle ─────────────────────────────────────────────────────────────────
@@ -443,7 +435,7 @@ class ttsGoogle(Speech):
 
 # ── ttsXAI ────────────────────────────────────────────────────────────────────
 
-class ttsXAI(Speech):
+class ttsXAI(_OpenAISpeech):
     """
     Text-to-speech via the xAI TTS API.
 
@@ -471,66 +463,12 @@ class ttsXAI(Speech):
         )
     """
 
-    # Same as OpenAI's: the xAI speech endpoint takes no language.
-    parameters = _without_options(Speech.parameters, "language")
-
     name           = "ttsXAI"
     _BASE_URL      = "https://api.x.ai/v1"
+    _ENV_KEY       = "XAI_API_KEY"
+    _LABEL         = "xAI"
     _DEFAULT_MODEL = "grok-tts"    # check docs.x.ai for current model names
     _DEFAULT_VOICE = "default"     # check docs.x.ai for available voice IDs
-
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
-        self.model = _model_setting(self, model)
-        self._api_key = api_key or os.environ.get("XAI_API_KEY")
-        if not self._api_key:
-            raise ValueError(
-                "No xAI API key found.  "
-                "Pass api_key= or set the XAI_API_KEY environment variable."
-            )
-
-    def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Synthesise *input* text and save to an audio file.
-
-        Parameters
-        ----------
-        input : str
-            Text to synthesise.
-        options : dict | None, optional
-            ``voice``       — voice ID.  Default: ``"default"``.
-            ``speed``       — 0.25–4.0, default 1.0.
-            ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``.
-            ``output_path`` — destination path.  Auto-generated if omitted.
-
-        Returns
-        -------
-        str
-            Absolute path to the saved audio file.
-        """
-        _no_model_option(self, options or {})
-        openai = require("openai", package="openai", who="ttsXAI")
-
-        opts        = options or {}
-        voice       = opts.get("voice",  self._DEFAULT_VOICE)
-        model       = self.model
-        speed       = float(opts.get("speed", _DEFAULT_SPEED))
-        fmt         = opts.get("format", _DEFAULT_FORMAT)
-        output_path = opts.get("output_path") or _auto_path(fmt)
-
-        client   = openai.OpenAI(api_key=self._api_key, base_url=self._BASE_URL)
-        response = client.audio.speech.create(
-            model           = model,
-            voice           = voice,
-            input           = input,
-            response_format = fmt,
-            speed           = speed,
-        )
-
-        output_path = confine_output_path(output_path)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        response.stream_to_file(output_path)
-
-        return output_path
 
 
 # ── ttsQwen ───────────────────────────────────────────────────────────────────

@@ -19,6 +19,12 @@ where a fix is named below.
   still does. The message reads `[HTTP 401] Brave Search API: …` where it read
   `Brave Search API error [401]: …`.
 
+- **`speech("openai")` and `speech("xai")` need no `openai` package.** They
+  called the OpenAI SDK for one JSON POST; they share one plain-HTTP class now,
+  and the output path is checked before the paid request instead of after.
+  Verified live on OpenAI 2026-10-12; the xAI account answered 403, so xAI is
+  checked offline only.
+
 ### Deprecated
 
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
