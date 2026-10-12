@@ -24,6 +24,7 @@ from .._budget import as_budget, start_run
 from .._require import require
 import json
 import os
+import random
 import time
 from typing import TYPE_CHECKING
 
@@ -42,37 +43,45 @@ if TYPE_CHECKING:
     from .._budget import Budget
     from ..models._base import Model
 
-# HTTP status codes that indicate a transient server-side condition and are
-# safe to retry.  Client errors (4xx other than 429) are permanent — they
-# indicate a problem with the request itself and must not be retried.
-_TRANSIENT_STATUSES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+#: What a retry or a fallback may answer: a rate limit, a server error —
+#: Anthropic's 529 overloaded among them — or no response at all. One tuple
+#: for both, where a list of statuses for the retry and a list of classes for
+#: the fallback had already drifted apart.
+_TRANSIENT = (RateLimitError, ServerError, NetworkError)
+
+#: The longest pause between two attempts, whatever the server asks for.
+_MAX_BACKOFF = 60.0
 
 
 def _attempts(max_retries: int, delay: float):
-    """Attempt numbers from 0, sleeping before each retry; the delay doubles."""
-    for attempt in range(max(0, max_retries) + 1):
-        if attempt:
-            time.sleep(delay * (2 ** (attempt - 1)))
-        yield attempt
+    """Attempt numbers from 0; the pause before each retry is set by `_pause`."""
+    if delay < 0:
+        raise ValueError(f"retry_delay is seconds, at least 0; got {delay!r}")
+    yield from range(max(0, max_retries) + 1)
+
+
+def _pause(exc: APIError, attempt: int, delay: float) -> None:
+    """Wait before attempt *attempt* + 1: twice as long each time, at least as
+    long as the server's ``Retry-After``, with up to a second of jitter, and
+    never past `_MAX_BACKOFF`."""
+    wait = max(getattr(exc, "retry_after", None) or 0.0, delay * (2 ** attempt))
+    time.sleep(min(_MAX_BACKOFF, wait + random.uniform(0, 1.0 if wait else 0.0)))
 
 
 def _retryable(exc: APIError, attempt: int, max_retries: int) -> bool:
-    """A transient failure — 429, 5xx, or no response (`NetworkError` has
-    status 0) — with retries left. Never a failed async task, whose retry is a
-    new billable job, nor an empty balance, which can arrive as 429 and which
-    no retry on the same account refills."""
-    return ((exc.status in _TRANSIENT_STATUSES or isinstance(exc, NetworkError))
+    """A transient failure with retries left. Never a failed async task, whose
+    retry is a new billable job, nor an empty balance, which can arrive as 429
+    and which no retry on the same account refills."""
+    return (isinstance(exc, _TRANSIENT)
             and not isinstance(exc, (TaskFailedError, InsufficientCreditsError))
             and attempt < max_retries)
+
 
 # Output spec for intermediate generate turns in multi-turn directed reasoning —
 # always plain text (they only feed the running context; only the final turn
 # uses the skill's real output format).
 _TEXT_OUTPUT: dict = {"modalities": ["text"], "format": {"type": "text"}}
 
-# Error types that trigger fallback to the next model in the chain.  Auth /
-# invalid-request / not-found are NOT here — falling back would hide them.
-_FALLBACK_ERRORS = (RateLimitError, ServerError, NetworkError)
 
 
 class Skill:
@@ -408,7 +417,7 @@ class Skill:
                 result = self._run_on_model(
                     model, messages, _max_retries, _retry_delay
                 )
-            except _FALLBACK_ERRORS as exc:
+            except _TRANSIENT as exc:
                 if i == len(self.models) - 1:
                     for note in failed:           # the earlier failures, not lost
                         getattr(exc, "add_note", lambda _: None)(note)
@@ -481,6 +490,7 @@ class Skill:
                 # contradict it. Before that, the attempt is discardable and
                 # there is no reason to be less reliable than `run()`.
                 if isinstance(exc, APIError) and not pieces and _retryable(exc, attempt, self.max_retries):
+                    _pause(exc, attempt, self.retry_delay)
                     continue
                 raise
 
@@ -626,6 +636,7 @@ class Skill:
                 self._ended(model, t0, error=exc)
                 if not _retryable(exc, attempt, max_retries):
                     raise
+                _pause(exc, attempt, retry_delay)
 
     # ------------------------------------------------------------------
     # Persistence

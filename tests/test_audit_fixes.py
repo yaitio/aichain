@@ -158,15 +158,46 @@ class TestRetryPolicy(unittest.TestCase):
     def test_post_retries_only_safe_statuses(self):
         """POST retries pre-inference codes only — no double-billing risk."""
         from yait_aichain.clients._constants import DEFAULT_RETRIES
-        self.assertEqual(set(DEFAULT_RETRIES.status_forcelist), {429, 503})
+        self.assertEqual(set(DEFAULT_RETRIES.status_forcelist), {429, 503, 529})
 
     def test_idempotent_policy_covers_full_5xx(self):
         from yait_aichain.clients._constants import DEFAULT_IDEMPOTENT_RETRIES
         self.assertEqual(
             set(DEFAULT_IDEMPOTENT_RETRIES.status_forcelist),
-            {429, 500, 502, 503, 504},
+            {429, 500, 502, 503, 504, 529},
         )
         self.assertFalse(DEFAULT_IDEMPOTENT_RETRIES._is_method_retryable("POST"))
+
+    def test_a_failed_read_is_not_sent_again(self):
+        """The request reached the model and may have been paid for."""
+        from yait_aichain.clients._constants import DEFAULT_RETRIES
+        self.assertIs(DEFAULT_RETRIES.read, False)
+
+    def test_a_long_retry_after_is_handed_to_the_caller(self):
+        from unittest.mock import MagicMock
+        from urllib3.exceptions import MaxRetryError
+        from yait_aichain.clients._constants import DEFAULT_RETRIES
+        hour = MagicMock(status=429, headers={"Retry-After": "3600"})
+        hour.getheader = lambda name, default=None: hour.headers.get(name, default)
+        with self.assertRaisesRegex(MaxRetryError, "past the ceiling"):
+            DEFAULT_RETRIES.increment("POST", "/v1/x", response=hour)
+
+    def test_skill_backoff_honours_retry_after_and_has_a_ceiling(self):
+        from unittest.mock import patch
+        from yait_aichain.clients._errors import RateLimitError
+        from yait_aichain.skills._skill import _MAX_BACKOFF, _attempts, _pause
+        with patch("yait_aichain.skills._skill.time.sleep") as sleep:
+            _pause(RateLimitError(429, "slow", retry_after=7.0), 0, 0.5)
+            _pause(RateLimitError(429, "slow", retry_after=900.0), 0, 0.5)
+        self.assertGreaterEqual(sleep.call_args_list[0].args[0], 7.0)
+        self.assertEqual(sleep.call_args_list[1].args[0], _MAX_BACKOFF)
+        with self.assertRaises(ValueError):
+            list(_attempts(2, -1.0))
+
+    def test_529_is_retried_and_falls_back(self):
+        from yait_aichain.clients._errors import error_from_status
+        from yait_aichain.skills._skill import _retryable
+        self.assertTrue(_retryable(error_from_status(529, "overloaded"), 0, 2))
 
 
 # ---------------------------------------------------------------------------

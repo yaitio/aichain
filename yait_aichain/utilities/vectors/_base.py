@@ -34,7 +34,7 @@ from typing import Any
 from yait_aichain.clients._base import make_http
 
 from ...clients._http import request
-from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ...clients._constants import TOOL_TIMEOUT, DEFAULT_RETRIES
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ class VectorBackend(ABC):
         self._url     = url.rstrip("/")
         self._api_key = api_key
         self._http    = make_http(
-            timeout = DEFAULT_TIMEOUT,
+            timeout = TOOL_TIMEOUT,
             retries = DEFAULT_RETRIES,
         )
 

@@ -15,8 +15,18 @@ class Retry(urllib3.Retry):
     the first answer.
     """
 
+    #: The longest ``Retry-After`` slept through here. A server asking for
+    #: longer — an hour is not unusual on a daily quota — is answered at once
+    #: with its 429, so the caller gets `RateLimitError.retry_after` and
+    #: decides, instead of a thread that sleeps for six hours.
+    MAX_RETRY_AFTER = 60.0
+
     def increment(self, method=None, url=None, response=None, error=None,
                   _pool=None, _stacktrace=None):
+        if response is not None and self.respect_retry_after_header:
+            wait = self.get_retry_after(response)
+            if wait is not None and wait > self.MAX_RETRY_AFTER:
+                raise MaxRetryError(_pool, url, f"Retry-After {wait:.0f}s is past the ceiling")
         if response is not None and response.status == 429:
             from ._errors import _looks_like_billing
             try:
@@ -37,32 +47,43 @@ class Retry(urllib3.Retry):
 # Long read timeout covers slow model inference (e.g. large-context requests).
 DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=600.0)
 
-# 5 total attempts (4 retries after the first failure), up to 2 redirects.
-# backoff_factor=2 → sleeps 0 s, 2 s, 4 s, 8 s, 16 s between attempts
-# (≈30 s total exposure) — enough to survive a brief provider rolling-restart
-# or transient 503 storm without holding up short interactive calls too long.
-#
-# allowed_methods includes POST: every generative/embedding call is a POST,
-# and urllib3's default method list would silently exclude them from status
-# retries. POST is only retried on 429/503 — statuses providers return
-# *before* running inference — so a retry cannot double-bill a generation.
-# 500/502/504 may arrive after the request started processing and are
-# therefore retried only for idempotent methods.
+# For a tool's call that does not generate text — embeddings, reranking, a
+# vector store: a minute is generous, and ten would hold a Lambda for nothing.
+TOOL_TIMEOUT = urllib3.Timeout(connect=10.0, read=60.0)
+
+# The statuses a provider returns *before* it runs anything: a rate limit, a
+# service briefly unavailable, Anthropic's 529 overloaded. Retrying them cannot
+# bill a generation twice. 500/502/504 can arrive after the work started, and
+# are left to the caller's own retry (`Skill(max_retries=…)`), so a POST has
+# one layer that may repeat it, not two that multiply.
+PRE_INFERENCE = frozenset({429, 503, 529})
+
+# Three attempts. `read=False`: a read that failed — a balancer cutting a long
+# generation, a 600 s timeout — means the request reached the model and may
+# have been paid for, so it is never sent again from here; connection errors,
+# which fail before anything is sent, still are. Backoff 1 s then 2 s, with up
+# to a second of jitter so a fleet of Lambdas does not retry in step.
+# allowed_methods=None so POST — every generative call — is covered for the
+# statuses above, which urllib3's default method list would exclude.
 DEFAULT_RETRIES = Retry(
-    total=5,
+    total=3,
+    read=False,
     redirect=2,
-    backoff_factor=2.0,
-    status_forcelist={429, 503},  # safe pre-inference statuses, incl. POST
-    allowed_methods=None,         # retry all methods on the codes above
+    backoff_factor=1.0,
+    backoff_jitter=1.0,
+    status_forcelist=PRE_INFERENCE,
+    allowed_methods=None,
     raise_on_status=False,
 )
 
 # Idempotent requests (GET model lists, fetch/count) can additionally retry
-# the riskier 5xx codes without double-charge concerns.
+# the 5xx codes that may follow the start of the work, without double-charge
+# concerns.
 DEFAULT_IDEMPOTENT_RETRIES = Retry(
-    total=5,
+    total=3,
     redirect=2,
-    backoff_factor=2.0,
-    status_forcelist={429, 500, 502, 503, 504},
+    backoff_factor=1.0,
+    backoff_jitter=1.0,
+    status_forcelist=PRE_INFERENCE | {500, 502, 504},
     raise_on_status=False,
 )

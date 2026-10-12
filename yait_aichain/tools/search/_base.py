@@ -82,7 +82,8 @@ SEARCH_TIMEOUT = urllib3.Timeout(connect=10.0, read=120.0)
 SEARCH_RETRIES = Retry(
     total=3,
     backoff_factor=1.0,
-    status_forcelist={429, 500, 502, 503, 504},
+    backoff_jitter=1.0,
+    status_forcelist={429, 500, 502, 503, 504, 529},
     allowed_methods=None,   # include POST — see note above
     raise_on_status=False,
 )

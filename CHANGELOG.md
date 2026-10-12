@@ -118,6 +118,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **A retried call cannot bill a generation twice, or sleep for hours.** The
+  transport repeated a POST whose read failed — a balancer cutting a long
+  generation, a 600 s timeout — up to five more times, each paid, and slept
+  through any `Retry-After`, six hours included; with `Skill(max_retries=2)`
+  on top, one turn could be eighteen requests. A failed read is never resent
+  now; the transport retries only the statuses returned before any work
+  (429, 503 and Anthropic's 529 overloaded, which no layer retried before),
+  three attempts with jitter, and a `Retry-After` past 60 s goes straight to
+  the caller as `RateLimitError.retry_after`. A Skill's retry and its
+  fallback share one definition of transient, its backoff waits at least the
+  server's `Retry-After` and at most 60 s, and a negative `retry_delay` is
+  refused. Embeddings, reranking and vector stores read for a minute, not
+  ten.
 - **What a provider attaches to a tool-calling turn comes back with it.**
   Gemini 3 signs each function call with a `thoughtSignature` and answers 400
   when the call returns without it; the library rebuilt calls from name and

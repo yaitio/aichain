@@ -52,7 +52,7 @@ from typing import Any
 
 from yait_aichain.clients._base import make_http
 
-from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
+from ...clients._constants import TOOL_TIMEOUT, DEFAULT_RETRIES
 from ...clients._http import request_json
 from .._base import Tool
 
@@ -195,7 +195,7 @@ class RerankBase(Tool):
             f"Put documents in order of how well they answer a query, with {label}'s {model}; "
             "returns them best first, each with its score.")
         self._http    = make_http(
-            timeout = DEFAULT_TIMEOUT,
+            timeout = TOOL_TIMEOUT,
             retries = DEFAULT_RETRIES,
         )
 

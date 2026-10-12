@@ -24,15 +24,10 @@ Environment variable
 from __future__ import annotations
 
 
-from ...clients._constants import DEFAULT_RETRIES
 from ._base import Decision, _level
 
 _ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 
-#: 529 is TypeSafe's "temporarily overloaded" — refused before inference, like
-#: the 429 and 503 every client already retries, so a POST is safe to repeat.
-_RETRIES = DEFAULT_RETRIES.new(
-    status_forcelist=set(DEFAULT_RETRIES.status_forcelist) | {529})
 
 
 def _wire_questions(questions: dict) -> dict:
@@ -94,7 +89,6 @@ class decisionTypeSafe(Decision):
     _PRICE_PER_INPUT_TOKEN = 0.042 / 1_000_000
     _PRICE_SOURCE          = "docs.typesafe.ai/models, read 2026-10-02"
     images                 = False
-    _RETRIES               = _RETRIES
 
     _ENDPOINT              = _ENDPOINT
     _API_NAME              = "TypeSafe API"
