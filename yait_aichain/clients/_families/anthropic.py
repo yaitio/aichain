@@ -222,8 +222,9 @@ class AnthropicClient(BaseClient):
             # The model's own request to act: tool_use blocks, with any
             # accompanying prose as a text block in the same message.
             if role == "assistant" and msg.get("tool_calls"):
-                blocks = [_part_to_anthropic(p) for p in msg.get("parts") or []]
-                blocks = [b for b in blocks if b is not None]
+                blocks = list((msg.get("opaque") or {}).get("anthropic") or [])
+                blocks += [b for b in (_part_to_anthropic(p) for p in msg.get("parts") or [])
+                           if b is not None]
                 blocks += [{"type": "tool_use", "id": c.get("id", ""),
                             "name": c["name"], "input": c.get("arguments", {})}
                            for c in msg["tool_calls"]]
@@ -458,11 +459,16 @@ class AnthropicClient(BaseClient):
         calls = [b for b in content if b.get("type") == "tool_use"]
         if calls:
             from ...models._calls import ToolCall, ToolCallRequest
+            # With extended thinking on, the turn that asked for the calls has
+            # to come back opening with its thinking blocks, unchanged — the
+            # signature is checked — or the next request is a 400.
+            thinking = [b for b in content if b.get("type") in ("thinking", "redacted_thinking")]
             return ToolCallRequest(
                 calls=tuple(ToolCall(id=b.get("id", ""), name=b.get("name", ""),
                                      arguments=b.get("input") or {})
                             for b in calls),
                 text=text,
+                opaque={"anthropic": thinking} if thinking else {},
             )
         if ftype == "json":
             t = text.strip()

@@ -72,10 +72,16 @@ class ToolCallRequest:
         Every call the model asked for in this turn, in order.
     text : str
         Prose the model sent beside them, if any.
+    opaque : dict
+        What a provider needs back verbatim on the next turn, keyed by the
+        provider family — Anthropic's thinking blocks, which must open the
+        assistant turn before a tool result when extended thinking is on.
+        Not for reading; carried so the history stays one the provider takes.
     """
 
     calls: tuple[ToolCall, ...]
     text:  str = ""
+    opaque: dict = field(default_factory=dict, hash=False, compare=False)
 
     def __bool__(self) -> bool:
         return bool(self.calls)
@@ -91,6 +97,8 @@ class ToolCallRequest:
         }
         if self.text:
             turn["parts"] = [{"type": "text", "text": self.text}]
+        if self.opaque:
+            turn["opaque"] = dict(self.opaque)
         return turn
 
 

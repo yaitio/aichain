@@ -331,7 +331,7 @@ One requested call: which tool, with which arguments.
 ## `ToolCallRequest`
 
 ```python
-ToolCallRequest(calls: tuple[ToolCall, ...], text: str = '')
+ToolCallRequest(calls: tuple[ToolCall, ...], text: str = '', opaque: dict = <factory>)
 ```
 
 A model reply that asks for tool calls.
@@ -348,6 +348,10 @@ silently narrow the channel this feature exists to widen.
 
 - `calls` (*tuple[ToolCall, ...]*) — Every call the model asked for in this turn, in order.
 - `text` (*str*, default `''`) — Prose the model sent beside them, if any.
+- `opaque` (*dict*, default `<factory>`) — What a provider needs back verbatim on the next turn, keyed by the
+  provider family — Anthropic's thinking blocks, which must open the
+  assistant turn before a tool result when extended thinking is on.
+  Not for reading; carried so the history stays one the provider takes.
 
 ### `ToolCallRequest.as_turn()`
 

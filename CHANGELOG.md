@@ -115,6 +115,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **An Anthropic agent with reasoning survives its second step.** With
+  extended thinking on, the assistant turn before a tool result must open
+  with its thinking blocks, unchanged; the library kept only the calls, so
+  every such agent answered HTTP 400 on its second request.
+  `ToolCallRequest.opaque` now carries what a provider needs back verbatim —
+  Anthropic's `thinking` and `redacted_thinking` blocks — and the Anthropic
+  builder puts them first. The streamed path does not carry them yet.
 - **Parallel tool calls work on Gemini, and with pictures on OpenAI.** Gemini
   needs every function response of a turn in one content; each went in its
   own, so any turn with two calls answered HTTP 400. Chat Completions and the
