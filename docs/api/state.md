@@ -47,7 +47,7 @@ The `RunContext` of the run in flight, or None outside one.
 
 ---
 
-## `using`
+## `using()`
 
 ```python
 using(context)

@@ -545,13 +545,8 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
-        journal  = Journal()
-        messages = self.opening(task, variables, ground_rules=True)
-        state    = self.new_state()
-        self._run_id = uuid.uuid4().hex
+        journal, messages, state = self._begin(task, variables)
         self._emit("run.started", payload={"task": task, "mode": self.mode})
-
-        self._doc_id = None
         with collecting_beacons() as board:
             result = self._loop(messages, state, journal)
         return self._finished(result, journal, board)
@@ -586,10 +581,7 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
-        journal  = Journal()
-        messages = self.opening(task, variables, ground_rules=True)
-        state    = self.new_state()
-        self._run_id = uuid.uuid4().hex
+        journal, messages, state = self._begin(task, variables)
         self.last_result = None
 
         sink: list = []
@@ -599,28 +591,18 @@ class Agent:
         collect = sink.append          # bound once, so `remove` finds it
         self.hooks.append(collect)
         self._streaming = True
-        beacons_scope = collecting_beacons()
-        board = beacons_scope.__enter__()
         try:
-            self._emit("run.started", payload={"task": task, "mode": self.mode})
-            while sink:
-                yield sink.pop(0)
-
-            walk = self._loop_events(messages, state, journal, sink=sink)
-            while True:
-                try:
-                    yield next(walk)
-                except StopIteration as done:
-                    result = done.value
-                    break
-
-            result = self._finished(result, journal, board)
+            with collecting_beacons() as board:
+                self._emit("run.started", payload={"task": task, "mode": self.mode})
+                while sink:
+                    yield sink.pop(0)
+                result = yield from self._loop_events(messages, state, journal, sink=sink)
+                result = self._finished(result, journal, board)
             while sink:
                 yield sink.pop(0)
             self.last_result = result
         finally:
             self._streaming = False
-            beacons_scope.__exit__(None, None, None)
             try:
                 self.hooks.remove(collect)
             except ValueError:                       # already gone; fine
@@ -657,25 +639,19 @@ class Agent:
         variables : dict | None, optional
             Data the run starts with, beside what the signal brings.
         """
-        from ..state import RunDocument, StepStatus
-
         if self.store is None:
             raise ValueError(
                 "arming needs somewhere to keep the run: pass "
                 "Agent(store=FileStore('runs/')) — or InMemoryStore() when the "
                 "signal arrives in this same process.")
 
-        doc = RunDocument.new(
-            "agent", [self.name or "agent"],
-            variables={"messages": [], "journal": [],
-                       "state": self._portable_state(self.new_state()),
-                       "variables": dict(variables or {})},
-        )
         awaiting = {"reason": reason, "resume_with": dict(resume_with or {}),
                     "hint": hint, "at": "start"}
-        doc.steps[0]["status"]  = StepStatus.SUSPENDED
-        doc.steps[0]["suspend"] = awaiting
-        self.store.save(doc.run_id, doc.to_dict())
+        doc = self._save_parked(
+            {"messages": [], "journal": [],
+             "state": self._portable_state(self.new_state()),
+             "variables": dict(variables or {})},
+            awaiting)
         self._emit("run.armed", payload={"run_id": doc.run_id,
                                          "agent": self.name or "", **awaiting})
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
@@ -728,13 +704,10 @@ class Agent:
             # continue. The signal is the task, and this is an ordinary run
             # that happens to have been waiting for its input.
             task, seeded = self._task_from_signal(signal, parked, doc)
-            self._run_id = uuid.uuid4().hex
+            journal, messages, state = self._begin(task, seeded)
             self._doc_id = run_id
             self._emit("run.started", payload={"task": task, "mode": self.mode,
                                                "run_id": run_id})
-            journal  = Journal()
-            state    = self.new_state()
-            messages = self.opening(task, seeded, ground_rules=True)
             with collecting_beacons() as board:
                 result = self._loop(messages, state, journal)
             return self._finished(result, journal, board)
@@ -887,6 +860,15 @@ class Agent:
 
     # ── The loop ─────────────────────────────────────────────────────────
 
+    def _begin(self, task: str, variables: "dict | None"):
+        """A run's first moments, for `run()` and `stream()` alike: a fresh
+        journal, the opening messages, working state, a new run id — and no
+        document of an earlier run, which a finishing run would otherwise
+        delete or overwrite."""
+        self._run_id = uuid.uuid4().hex
+        self._doc_id = None
+        return Journal(), self.opening(task, variables, ground_rules=True), self.new_state()
+
     def _loop(self, messages: list, state: dict, journal: Journal) -> AgentResult:
         """Drive the loop to its end and return the result.
 
@@ -898,11 +880,11 @@ class Agent:
         lives.
         """
         walk = self._loop_events(messages, state, journal)
-        while True:
-            try:
+        try:
+            while True:
                 next(walk)
-            except StopIteration as done:
-                return done.value
+        except StopIteration as done:
+            return done.value
 
     def _loop_events(self, messages: list, state: dict, journal: Journal,
                      sink: "list | None" = None):
@@ -1381,8 +1363,6 @@ class Agent:
         deliberately left **unanswered**: that gap is what the run is waiting
         for, and `resume()` fills exactly it.
         """
-        from ..state import RunDocument, StepStatus
-
         for other in reply.calls[reply.calls.index(call) + 1:]:
             messages.append(tool_result_turn(
                 other.id or other.name,
@@ -1390,21 +1370,12 @@ class Agent:
                                              f"{call.name!r} before this call")))
 
         awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with)}
-        doc = RunDocument.new(
-            "agent", [self.name or "agent"],
-            variables={"messages": messages,
-                       "state":    self._portable_state(state),
-                       "journal":  journal.to_list(),
-                       "run_id":   self._run_id},
-        )
-        if self._doc_id is not None:
-            doc.run_id = self._doc_id            # parked again: one identifier
-        doc.steps[0]["status"]  = StepStatus.SUSPENDED
-        doc.steps[0]["suspend"] = {**awaiting, "hint": susp.hint,
-                                   "call_id": call.id or call.name,
-                                   "tool": call.name,
-                                   "arguments": dict(call.arguments or {})}
-        self.store.save(doc.run_id, doc.to_dict())
+        doc = self._save_parked(
+            {"messages": messages, "state": self._portable_state(state),
+             "journal": journal.to_list(), "run_id": self._run_id},
+            {**awaiting, "hint": susp.hint, "call_id": call.id or call.name,
+             "tool": call.name, "arguments": dict(call.arguments or {})},
+            run_id=self._doc_id)                 # parked again: one identifier
         self._doc_id = doc.run_id
 
         self._emit("run.suspended", name=call.name, step=state.get("steps"),
@@ -1414,6 +1385,18 @@ class Agent:
         self._log(1, f"\n[Paused] … {susp.reason or call.name} · {doc.run_id}")
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
+
+    def _save_parked(self, variables: dict, suspend: dict, run_id=None):
+        """Store a run document whose one step is suspended on *suspend*."""
+        from ..state import RunDocument, StepStatus
+
+        doc = RunDocument.new("agent", [self.name or "agent"], variables=variables)
+        if run_id is not None:
+            doc.run_id = run_id
+        doc.steps[0]["status"]  = StepStatus.SUSPENDED
+        doc.steps[0]["suspend"] = suspend
+        self.store.save(doc.run_id, doc.to_dict())
+        return doc
 
     @staticmethod
     def _task_from_signal(signal, parked: dict, doc):

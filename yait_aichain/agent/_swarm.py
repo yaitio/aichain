@@ -30,6 +30,7 @@ anyone builds behaviour on it.
 from __future__ import annotations
 
 import contextvars
+from contextlib import contextmanager
 import hashlib
 import json
 import threading
@@ -99,24 +100,22 @@ _BOARD: contextvars.ContextVar = contextvars.ContextVar(
     "yait_aichain_beacon_board", default=None)
 
 
-class collecting_beacons:
+@contextmanager
+def collecting_beacons():
     """Open a board for the duration of a run, nested under any outer one."""
-
-    def __enter__(self) -> _Board:
-        self._board = _Board(parent=_BOARD.get())
-        self._token = _BOARD.set(self._board)
-        return self._board
-
-    def __exit__(self, *exc) -> bool:
+    board = _Board(parent=_BOARD.get())
+    token = _BOARD.set(board)
+    try:
+        yield board
+    finally:
         try:
-            _BOARD.reset(self._token)
+            _BOARD.reset(token)
         except ValueError:
             # A streaming run is a generator, and a generator may be resumed
             # in a different context from the one it started in. The board is
             # already detached from the run by then; failing the run over it
             # would turn bookkeeping into a crash.
             pass
-        return False
 
 
 def beacon(kind: str, message: str, *, source: str = "") -> Beacon:

@@ -26,6 +26,7 @@ in it.
 from __future__ import annotations
 
 import contextvars
+from contextlib import contextmanager
 
 _CURRENT: contextvars.ContextVar = contextvars.ContextVar(
     "yait_aichain_run_context", default=None)
@@ -36,7 +37,8 @@ def current():
     return _CURRENT.get()
 
 
-class using:
+@contextmanager
+def using(context):
     """Make *context* the current one for the duration of a block.
 
     ::
@@ -49,18 +51,11 @@ class using:
     context : RunContext
         The context every call inside the block sees.
     """
-
-    def __init__(self, context) -> None:
-        self._context = context
-        self._token = None
-
-    def __enter__(self):
-        self._token = _CURRENT.set(self._context)
-        return self._context
-
-    def __exit__(self, *exc) -> bool:
+    token = _CURRENT.set(context)
+    try:
+        yield context
+    finally:
         # Reset by token rather than to None: runs nest — an Agent inside a
         # Chain step — and clearing on the way out of the inner one would
         # leave the outer run without its own tenant for the rest of its life.
-        _CURRENT.reset(self._token)
-        return False
+        _CURRENT.reset(token)

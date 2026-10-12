@@ -218,6 +218,14 @@ class TestResuming(unittest.TestCase):
         self.assertEqual(second.run_id, first.run_id)
         self.assertTrue(agent.resume(second.run_id, signal={"approved": True}).success)
 
+    def test_a_later_stream_leaves_a_parked_run_alone(self):
+        agent  = _agent(_calls(("c1", "wait", {})), _text("done"))
+        parked = agent.run("send the refund")
+        list(agent.stream("something else"))
+
+        self.assertIsNotNone(agent.store.load(parked.run_id))
+        self.assertTrue(agent.resume(parked.run_id, signal={"approved": True}).success)
+
 
 class TestGateInAnAgent(unittest.TestCase):
 

@@ -36,6 +36,11 @@ where a fix is named below.
 
 ### Fixed
 
+- **A stream no longer deletes a parked run.** `stream()` kept the document
+  id of the agent's previous run, so a stream that finished after a `run()`
+  had parked removed that parked run from the store, and its `resume()` then
+  raised `KeyError`. `run()`, `stream()` and `resume()` start a run through
+  one method now, which clears it.
 - **`Shell("/")` reads.** The containment check compared string prefixes, so
   with the filesystem root as the folder every path had to start with `//`
   and nothing was inside. It compares path components now, in one `within()`
