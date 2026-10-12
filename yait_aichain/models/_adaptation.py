@@ -36,6 +36,8 @@ thing the mechanism exists to prevent.
 
 from __future__ import annotations
 
+from .._multipart import Multipart
+
 from .._picklable import Picklable
 
 import threading
@@ -154,6 +156,8 @@ def reset_warnings() -> None:
 # ── Detecting what simply never arrived ──────────────────────────────────────
 
 def _leaves(obj, path=()) -> dict:
+    if isinstance(obj, Multipart):
+        return _leaves(obj.fields, path + ("fields",))
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
@@ -194,7 +198,7 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     # "0.4" and a type-exact match reports a delivered option as declined.
     # The looser comparison is confined to that shape: on a JSON body an
     # unrelated "1" must not stand in for an asked 1.
-    multipart = isinstance(body, dict) and bool(body.get("_multipart"))
+    multipart = isinstance(body, Multipart)
 
     values = set()
     for v in _leaves(body).values():

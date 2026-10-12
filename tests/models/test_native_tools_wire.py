@@ -209,6 +209,8 @@ class TestGates(unittest.TestCase):
         m = Model("gpt-4o", api_key="k")
 
         class _NoToolsClient:
+            supports_tools = False
+
             def build_request(self, *a, **k):        # pragma: no cover
                 raise AssertionError("gate must fire before the build")
 

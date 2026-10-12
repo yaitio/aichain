@@ -578,7 +578,7 @@ class Model:
             Function-calling schemas, as ``Tool.schema()`` returns them.
         """
         if tools:
-            if not getattr(self.client, "supports_tools", False):
+            if not self.client.supports_tools:
                 raise ValueError(
                     f"provider family {type(self.client).__name__!r} does not "
                     f"support native tool calling yet; model {self.name!r} "
@@ -643,12 +643,7 @@ class Model:
 
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
-            if tools is not None:
-                path, body = self.client.build_request(
-                    messages, output, self._params(), tools=tools)
-            else:
-                path, body = self.client.build_request(
-                    messages, output, self._params())
+            path, body = self.client.build_request(messages, output, self._params(), tools=tools)
 
         # Options set in the output format travel beside the model's own, and
         # are asked for per call rather than per model.
@@ -661,7 +656,7 @@ class Model:
             # escape hatch that does not escape. Multipart bodies are a list
             # of pairs, not a mapping, and are left alone rather than
             # corrupted.
-            if isinstance(body, dict) and not body.get("_multipart"):
+            if isinstance(body, dict):
                 body.update(self.extra)
         note_absent(made, asked, body, self.name, provider=self._provider)
         announce(made)

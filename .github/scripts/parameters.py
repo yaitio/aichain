@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from yait_aichain import Model                                   # noqa: E402
+from yait_aichain._multipart import Multipart                    # noqa: E402
 
 SNAPSHOT = ROOT / "tests" / "fixtures" / "parameters_matrix.json"
 DOC      = ROOT / "docs" / "reference" / "parameters.md"
@@ -127,6 +128,8 @@ IMAGE_OUT  = {"format": {"type": "image"}, "modalities": ["image"]}
 
 def _leaves(obj, path=()) -> dict:
     """Flatten a request body into {path: value}; lists are indexed."""
+    if isinstance(obj, Multipart):
+        obj = {"fields": obj.fields}
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():

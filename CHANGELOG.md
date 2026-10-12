@@ -80,6 +80,13 @@ where a fix is named below.
   `Usage + Usage` sums every count, so a counter added later cannot be
   dropped by the sum.
 
+- **A client family's `build_request` takes `tools=None`**, as
+  `BaseClient.build_request` now declares, and `supports_tools` is a field of
+  the base (False). An override without the parameter raises `TypeError`
+  when its class is defined — the shape of the 3.1.0 defect where Qwen
+  dropped tools while inheriting `supports_tools = True`. A file-upload body
+  is a `Multipart` instead of a dict carrying a `_multipart` key.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and

@@ -191,5 +191,30 @@ class TestBaseClientCheckAuth(unittest.TestCase):
         self.assertEqual(ctx.exception.status, 0)
 
 
+class TestTheFamilyContract(unittest.TestCase):
+    """An override of `build_request` takes `tools`, checked when the class
+    is defined: the Qwen override in 3.1.0 dropped it while inheriting
+    `supports_tools = True`, and tools were lost without a word."""
+
+    def test_an_override_without_tools_is_refused(self):
+        with self.assertRaisesRegex(TypeError, "must accept tools"):
+            class Lossy(BaseClient):
+                def build_request(self, messages, output, params):
+                    return "/", {}
+
+    def test_every_family_takes_tools_and_says_whether_it_sends_them(self):
+        import inspect
+        from yait_aichain.clients._families import (anthropic, bfl, google, openai,
+                                                    perplexity, qwen, recraft)
+        families = [c for m in (anthropic, bfl, google, openai, perplexity, qwen, recraft)
+                    for c in vars(m).values()
+                    if isinstance(c, type) and issubclass(c, BaseClient) and c is not BaseClient]
+        self.assertGreaterEqual(len(families), 7)
+        for cls in families:
+            with self.subTest(cls.__name__):
+                self.assertIn("tools", inspect.signature(cls.build_request).parameters)
+                self.assertIsInstance(cls.supports_tools, bool)
+
+
 if __name__ == "__main__":
     unittest.main()

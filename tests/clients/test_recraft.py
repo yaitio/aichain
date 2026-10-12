@@ -10,6 +10,8 @@ import base64
 import os
 import sys
 import unittest
+
+from yait_aichain._multipart import Multipart
 from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -47,7 +49,7 @@ class TestRecraftGeneration(unittest.TestCase):
         self.assertEqual(body["prompt"], "a red bicycle")
         self.assertEqual(body["response_format"], "b64_json")
         self.assertEqual(body["size"], "1024x1024")
-        self.assertNotIn("_multipart", body)
+        self.assertNotIsInstance(body, Multipart)
 
     def test_style_passthrough(self):
         m = Model("recraftv4_1", api_key="k")
@@ -62,12 +64,12 @@ class TestRecraftEdit(unittest.TestCase):
         m = Model("recraftv3", api_key="k")
         path, body = m.to_request(_edit_msgs(), _OUT)
         self.assertEqual(path, "/v1/images/imageToImage")
-        self.assertTrue(body["_multipart"])
-        names = [f[0] for f in body["fields"]]
+        self.assertIsInstance(body, Multipart)
+        names = [f[0] for f in body.fields]
         self.assertIn("image", names)
         self.assertIn("strength", names)
         self.assertIn("prompt", names)
-        file_field = next(f for f in body["fields"] if f[0] == "image")
+        file_field = next(f for f in body.fields if f[0] == "image")
         self.assertEqual(file_field[1][1], _PNG)
 
     def test_strength_default_and_fidelity_inverted(self):
@@ -77,15 +79,15 @@ class TestRecraftEdit(unittest.TestCase):
         it with the prompt, which is what fixes the direction."""
         m = Model("recraftv3", api_key="k")
         _, body = m.to_request(_edit_msgs(), {"format": {"type": "image"}})
-        self.assertEqual(dict(body["fields"])["strength"], "0.2")
+        self.assertEqual(dict(body.fields)["strength"], "0.2")
 
         _, kept = m.to_request(_edit_msgs(),
                                {"format": {"type": "image", "fidelity": 0.9}})
-        self.assertEqual(dict(kept["fields"])["strength"], "0.1")
+        self.assertEqual(dict(kept.fields)["strength"], "0.1")
 
         _, changed = m.to_request(_edit_msgs(),
                                   {"format": {"type": "image", "fidelity": 0.1}})
-        self.assertEqual(dict(changed["fields"])["strength"], "0.9")
+        self.assertEqual(dict(changed.fields)["strength"], "0.9")
 
     def test_url_source_rejected(self):
         m = Model("recraftv3", api_key="k")
@@ -95,7 +97,7 @@ class TestRecraftEdit(unittest.TestCase):
     def test_multipart_send_drops_content_type(self):
         c = RecraftClient("k", data=_PROVIDERS["recraft"])
         c._post_form = MagicMock(return_value=b"{}")
-        c.send("/v1/images/imageToImage", {"_multipart": True, "fields": [("model", "recraftv3")]},
+        c.send("/v1/images/imageToImage", Multipart([("model", "recraftv3")]),
                {"Authorization": "Bearer k", "Content-Type": "application/json"})
         c._post_form.assert_called_once()
         self.assertNotIn("Content-Type", c._post_form.call_args[0][2])
@@ -141,8 +143,8 @@ class TestRecraftVectorize(unittest.TestCase):
         msgs = [{"role": "user", "parts": [_img(data=_B64, mime="image/png")]}]
         path, body = m.to_request(msgs, _OUT)
         self.assertEqual(path, "/v1/images/vectorize")
-        self.assertTrue(body["_multipart"])
-        names = [f[0] for f in body["fields"]]
+        self.assertIsInstance(body, Multipart)
+        names = [f[0] for f in body.fields]
         self.assertEqual(names, ["response_format", "image"])   # no model, no prompt
 
     def test_url_source_rejected(self):

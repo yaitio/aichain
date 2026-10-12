@@ -129,7 +129,7 @@ class TestOneAxisRunBothWays(unittest.TestCase):
             warnings.simplefilter("ignore")
             m = Model(name, api_key="k")
             _, body = m.to_request(msgs, {"format": {"type": "image", **fmt}})
-        return dict(body["fields"])
+        return dict(body.fields)
 
     def test_keeping_the_original_means_a_small_change_on_recraft(self):
         self.assertEqual(self._edit("recraftv3", fidelity=0.9)["strength"], "0.1")

@@ -16,6 +16,8 @@ property of the API, so it belongs in the client layer).
 
 from __future__ import annotations
 
+from ..._multipart import Multipart
+
 import json as _json
 import os as _os
 from types import SimpleNamespace
@@ -98,9 +100,9 @@ class OpenAIClient(BaseClient):
         # Image edits go out as multipart/form-data: urllib3 sets the
         # Content-Type (with its boundary), so the JSON Content-Type we carry
         # for every other call must be dropped. Everything else is a JSON POST.
-        if isinstance(body, dict) and body.get("_multipart"):
+        if isinstance(body, Multipart):
             h = {k: v for k, v in headers.items() if k.lower() != "content-type"}
-            return self._post_form(path, body["fields"], h)
+            return self._post_form(path, body.fields, h)
         return super().send(path, body, headers)
 
     # ── format: model params → provider body ─────────────────────────

@@ -72,7 +72,7 @@ class BFLClient(BaseClient):
         )
 
     # ── format: universal → BFL body ─────────────────────────────────
-    def build_request(self, messages, output, params) -> tuple[str, dict]:
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         name = params["name"]
         fmt  = output.get("format", {})
 

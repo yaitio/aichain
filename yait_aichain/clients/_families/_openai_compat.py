@@ -9,6 +9,8 @@ kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
 
 from __future__ import annotations
 
+from ..._multipart import Multipart
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -789,7 +791,7 @@ def _build_image_edits_request(
     Build an OpenAI ``/v1/images/edits`` **multipart** ``(path, body)`` pair.
 
     The body is a sentinel the client's ``send()`` seam turns into a
-    ``multipart/form-data`` POST: ``{"_multipart": True, "fields": [...]}`` —
+    ``multipart/form-data`` POST: a :class:`Multipart` of the fields —
     a list of ``(name, value)`` tuples so multiple input images can share the
     ``image[]`` key. ``gpt-image-*`` accepts multiple references via ``image[]``;
     ``dall-e-2`` takes a single ``image``. ``response_format`` is omitted
@@ -834,7 +836,7 @@ def _build_image_edits_request(
         ext  = mime.split("/")[-1]
         fields.append((field_name, (f"image_{i}.{ext}", raw, mime)))
 
-    return path, {"_multipart": True, "fields": fields}
+    return path, Multipart(fields)
 
 
 def _build_xai_image_edit_request(

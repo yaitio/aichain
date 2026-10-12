@@ -9,7 +9,7 @@ Recraft is image-only and rides the OpenAI Bearer transport (inherited from
 * image-to-image → ``POST /v1/images/imageToImage``  (multipart/form-data)
 
 The multipart edit goes out through the ``send()`` seam already implemented on
-``OpenAIClient`` (it turns a ``{"_multipart": True, "fields": [...]}`` body into
+``OpenAIClient`` (it turns a ``Multipart`` body into
 a form POST), and the ``{"data": [...]}`` response is parsed by the shared image
 parser — so this client is just the request shaping.
 
@@ -17,6 +17,8 @@ Verified live against the Recraft API (external.api.recraft.ai).
 """
 
 from __future__ import annotations
+
+from ..._multipart import Multipart
 
 from ._shape import size_from_ratio
 import base64
@@ -120,7 +122,7 @@ def _build_recraft_edit_request(name, messages, output, path):
             fields.append((k, str(fmt[k])))
     fields.append(("image", (f"image.{ext}", raw, mime)))
 
-    return path, {"_multipart": True, "fields": fields}
+    return path, Multipart(fields)
 
 
 def _build_recraft_vectorize_request(messages, output, path):
@@ -147,7 +149,7 @@ def _build_recraft_vectorize_request(messages, output, path):
         ("response_format", fmt.get("response_format", "b64_json")),
         ("image", (f"image.{ext}", raw, mime)),
     ]
-    return path, {"_multipart": True, "fields": fields}
+    return path, Multipart(fields)
 
 
 def _parse_vectorize_response(response: dict) -> dict:

@@ -1,9 +1,11 @@
+import inspect
 import os
 import urllib3
 import json
 import base64
 from urllib.parse import unquote, urlsplit, urlunsplit
 
+from .._multipart import Multipart
 from ._constants import (
     DEFAULT_TIMEOUT,
     DEFAULT_RETRIES,
@@ -124,6 +126,20 @@ class BaseClient:
 
     # Subclasses must override this.
     BASE_URL: str = ""
+    #: Whether this family sends function-calling schemas natively. A model
+    #: given tools on a family that says False is refused before the request.
+    supports_tools: bool = False
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        # A family that overrides `build_request` takes `tools`, whether it
+        # uses them or not: an override that dropped the parameter while
+        # `supports_tools` was inherited True is how tools on Qwen were lost
+        # without a word. Caught when the class is defined, not on a call.
+        super().__init_subclass__(**kwargs)
+        own = cls.__dict__.get("build_request")
+        if own is not None and "tools" not in inspect.signature(own).parameters:
+            raise TypeError(f"{cls.__name__}.build_request must accept tools=None, "
+                            "as BaseClient.build_request declares")
 
     def __init__(
         self,
@@ -199,11 +215,14 @@ class BaseClient:
     # ------------------------------------------------------------------
 
     def build_request(
-        self, messages: list, output: dict, params: dict
-    ) -> "tuple[str, dict]":
+        self, messages: list, output: dict, params: dict, tools: list | None = None
+    ) -> "tuple[str, dict | Multipart]":
         """
         Translate our universal *messages* + *output* spec + model *params*
-        into the provider's native ``(path, body)`` pair.
+        into the provider's native ``(path, body)`` pair — a JSON object, or
+        a :class:`~yait_aichain._multipart.Multipart` for a file upload.
+        *tools* are function-calling schemas, given only when
+        ``supports_tools`` is True.
 
         ``params`` carries the model-level settings the family needs:
         ``{name, temperature, max_tokens, top_p, top_k, reasoning}``.  The

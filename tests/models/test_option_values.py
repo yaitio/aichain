@@ -107,7 +107,7 @@ class TestAMultipartBodyCarriesEverythingAsText(unittest.TestCase):
             warnings.simplefilter("ignore")
             m = Model("recraftv3", api_key="k")
             _, body = m.to_request(msgs, {"format": {"type": "image", **fmt}})
-        return m, dict(body["fields"])
+        return m, dict(body.fields)
 
     def test_a_number_that_arrived_is_not_reported_as_declined(self):
         """It arrives inverted and under another name, so the site records it

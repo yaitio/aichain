@@ -16,6 +16,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+from yait_aichain._multipart import Multipart
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -96,14 +98,14 @@ class TestOpenAIEdit(unittest.TestCase):
         m = Model("gpt-image-1.5", api_key="k")
         path, body = m.to_request(_edit_msgs(), _OUT)
         self.assertEqual(path, "/v1/images/edits")
-        self.assertTrue(body["_multipart"])
-        names = [f[0] for f in body["fields"]]
+        self.assertIsInstance(body, Multipart)
+        names = [f[0] for f in body.fields]
         self.assertIn("model", names)
         self.assertIn("prompt", names)
         self.assertIn("image[]", names)        # gpt-image uses the array key
         self.assertNotIn("response_format", names)   # gpt-image returns b64 natively
         # the image[] field is a file tuple (filename, bytes, mime)
-        file_field = next(f for f in body["fields"] if f[0] == "image[]")
+        file_field = next(f for f in body.fields if f[0] == "image[]")
         self.assertEqual(file_field[1][1], _PNG)
         self.assertEqual(file_field[1][2], "image/png")
 
@@ -112,7 +114,7 @@ class TestOpenAIEdit(unittest.TestCase):
         path, body = m.to_request(
             [{"role": "user", "parts": [{"type": "text", "text": "a fox"}]}], _OUT)
         self.assertEqual(path, "/v1/images/generations")
-        self.assertNotIn("_multipart", body)
+        self.assertNotIsInstance(body, Multipart)
 
     def test_url_source_rejected(self):
         with self.assertRaises(ValueError):
@@ -121,7 +123,7 @@ class TestOpenAIEdit(unittest.TestCase):
 
     def test_dalle2_uses_single_image_field(self):
         _, body = _build_image_edits_request(_wrap("dall-e-2"), _edit_msgs(), _OUT)
-        self.assertIn("image", [f[0] for f in body["fields"]])
+        self.assertIn("image", [f[0] for f in body.fields])
 
 
 class TestOpenAISendSeam(unittest.TestCase):
@@ -134,7 +136,7 @@ class TestOpenAISendSeam(unittest.TestCase):
         c._post_form = MagicMock(return_value=b"{}")
         c._post = MagicMock(return_value=b"{}")
         headers = {"Authorization": "Bearer k", "Content-Type": "application/json"}
-        c.send("/v1/images/edits", {"_multipart": True, "fields": [("model", "x")]}, headers)
+        c.send("/v1/images/edits", Multipart([("model", "x")]), headers)
         c._post_form.assert_called_once()
         sent_headers = c._post_form.call_args[0][2]
         self.assertNotIn("Content-Type", sent_headers)
