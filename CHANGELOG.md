@@ -55,6 +55,14 @@ where a fix is named below.
 - **`VectorBackend` is an `abc.ABC`.** A backend missing a method fails at
   construction, not on its first call.
 
+- **`Eval(verbose=True)` logs instead of printing**, to `yait_aichain.eval`
+  with a console handler installed, as the agent's `verbose` does. The lines
+  read the same and can now be routed or silenced.
+- **`Eval(trials=0)` raises.** It returned an empty report, which reads as a
+  run that went well.
+- **A `Report` counts each `(arm, case, trial)` once.** A ledger holding the
+  same attempt twice weighed that case double; the later line wins.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -67,6 +75,9 @@ where a fix is named below.
 
 ### Fixed
 
+- **An `Eval` can be built where the working directory is read-only.** The
+  constructor created `./eval-runs`, which is an `OSError` on Lambda; the
+  directory is made on the first write.
 - **A vector record reads back as it was written.** Fetch now reads a
   `document` key as the text when `text` is absent, as query did; a Chroma
   document of None is empty text rather than a broken record; and a Chroma

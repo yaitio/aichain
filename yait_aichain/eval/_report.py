@@ -45,8 +45,19 @@ class Report:
     """
 
     def __init__(self, records: "Iterable[Record]") -> None:
-        self.records = [r for r in records]
+        # One attempt is one (arm, case, trial). A ledger written twice for the
+        # same attempt — a retried run, two writers — holds both lines, and
+        # counting both would weigh that case double; the later line wins.
+        latest = {(r.arm, r.case, r.trial): r for r in records}
+        self.records = list(latest.values())
         self._rejected: "dict[str, str]" = {}
+        # Indexed once: every figure below reads an arm's scored rows by case,
+        # and rescanning every record for each one made `paired` and `table`
+        # quadratic in the size of the run.
+        self._scored: "dict[str, dict[str, list[Record]]]" = defaultdict(lambda: defaultdict(list))
+        for r in self.records:
+            if not self._abstained(r):
+                self._scored[r.arm][r.case].append(r)
 
     # ── construction ─────────────────────────────────────────────────────
     @classmethod
@@ -160,12 +171,13 @@ class Report:
                    and self._abstained(r))
 
     def _cases(self, arm: str, group: str = "") -> "dict[str, list[Record]]":
-        out: "dict[str, list[Record]]" = defaultdict(list)
-        for r in self._live():
-            if r.arm == arm and (not group or r.group == group) \
-                    and not self._abstained(r):
-                out[r.case].append(r)
-        return dict(out)
+        if arm in self._rejected or arm not in self._scored:
+            return {}
+        by_case = self._scored[arm]
+        if not group:
+            return dict(by_case)
+        return {c: kept for c, rows in by_case.items()
+                if (kept := [r for r in rows if r.group == group])}
 
     def mean(self, arm: str, group: str = "") -> float:
         """Share of *attempts* that passed — pooled over cases, not averaged.
@@ -235,13 +247,14 @@ class Report:
         return unstable / len(cases)
 
     def spend(self, arm: str, group: str = "") -> "dict[str, float]":
-        rows = [r for c in self._cases(arm, group).values() for r in c]
+        cases = self._cases(arm, group)
+        rows = [r for c in cases.values() for r in c]
         return {"cost":    sum(r.cost   for r in rows),
                 "tokens":  sum(r.tokens for r in rows),
                 "seconds": sum(r.seconds for r in rows),
                 "errors":  sum(1 for r in rows if r.error),
                 "trials":  len(rows),
-                "cases":   len(self._cases(arm, group))}
+                "cases":   len(cases)}
 
     # ── comparison ───────────────────────────────────────────────────────
     def paired(self, a: str, b: str, group: str = "") -> dict:
@@ -269,8 +282,9 @@ class Report:
             Only this group.
         """
         wins_a = wins_b = same = 0
+        cases_b = self._cases(b, group)
         for case, rows_a in self._cases(a, group).items():
-            rows_b = self._cases(b, group).get(case)
+            rows_b = cases_b.get(case)
             if not rows_b:
                 continue
             sa = sum(1 for r in rows_a if r.ok) / len(rows_a)

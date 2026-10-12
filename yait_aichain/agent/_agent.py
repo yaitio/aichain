@@ -43,6 +43,7 @@ import time
 import uuid
 from typing import Any
 
+from .._console import install_console_handler
 from .. import _hints
 from ._swarm import acceptance_from, collecting_beacons
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
@@ -523,7 +524,7 @@ class Agent:
                              for i, w in enumerate(self.team)}
                             if isinstance(self.team, list) else {})
         if verbose:
-            _install_console_handler(verbose)
+            install_console_handler(verbose)
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -1553,16 +1554,3 @@ def _safe(value, limit: int = 200):
     text = json.dumps(value, ensure_ascii=False, default=str) \
         if not isinstance(value, str) else value
     return text if len(text) <= limit else text[:limit] + "…"
-
-
-def _install_console_handler(verbose: int) -> None:
-    """Route ``verbose`` output through the package logger, once."""
-    pkg   = logging.getLogger("yait_aichain")
-    level = logging.INFO if verbose == 1 else logging.DEBUG
-    if not any(getattr(h, "_aichain_console", False) for h in pkg.handlers):
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        handler._aichain_console = True                # type: ignore[attr-defined]
-        pkg.addHandler(handler)
-    if pkg.level == logging.NOTSET or pkg.level > level:
-        pkg.setLevel(level)

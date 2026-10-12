@@ -10,9 +10,9 @@ already been paid for:
 
 **A scorer that cannot decide must not say yes.** An LLM judge whose reply
 fails to parse is a broken instrument, and the tempting default — treat it as a
-pass — inflates every arm at once and looks like a good day. ``judge`` raises
-instead, and the runner records the attempt as an error, where the validity
-guards can see it.
+pass — inflates every arm at once and looks like a good day. ``judge`` and
+``pairwise`` abstain instead: the row is left out of the denominator and
+counted in ``Report.abstentions()``, where the validity guards can see it.
 
 **Silence is not precision.** A scenario that reports nothing has no wrong
 answers in it, so any ratio computed per case hands it a perfect score. That
@@ -114,7 +114,8 @@ def numeric(*, tolerance: float = 0.0) -> Scorer:
             want = float(case.expect)
         except (TypeError, ValueError):
             return False, 0.0
-        return abs(got - want) <= tolerance, 1.0 if abs(got - want) <= tolerance else 0.0
+        ok = abs(got - want) <= tolerance
+        return ok, float(ok)
     return _score
 
 
@@ -127,7 +128,24 @@ _JUDGE_PROMPT = (
     "QUESTION:\n{question}\n\nREFERENCE:\n{expect}\n\nANSWER:\n{answer}"
 )
 
-_VERDICT = _re.compile(r"^\W*(PASS|FAIL)\b", _re.IGNORECASE)
+def _ask(model, text: str, words: "tuple[str, str]"):
+    """Put *text* to the judge *model* and read the first of *words* it opens
+    with. Returns ``(word or None, reply, tokens, cost)`` — the grading is
+    billed to the instrument, never to the arm, so a cost table cannot quietly
+    include the cost of grading."""
+    from ..skills import Skill
+
+    skill = Skill(model, {"messages": [{"role": "user", "parts": [text]}]})
+    reply = _text(skill.run()).strip()
+    head  = _re.match(rf"^\W*({'|'.join(words)})\b", reply, _re.IGNORECASE)
+    usage = skill.last_usage
+    return (head.group(1).upper() if head else None, reply,
+            getattr(usage, "total_tokens", 0) or 0, getattr(usage, "cost", 0.0) or 0.0)
+
+
+def _judge_model(model):
+    from ..models import Model
+    return model if isinstance(model, Model) else Model(model)
 
 
 def judge(model, *, rubric: str = "The answer is correct if it states the same "
@@ -157,35 +175,25 @@ def judge(model, *, rubric: str = "The answer is correct if it states the same "
     prompt : str, optional
         The whole judging prompt, with ``{rubric}``, ``{question}``, ``{expect}`` and ``{answer}``.
     """
-    from ..models import Model
-    from ..skills import Skill
-
-    m = model if isinstance(model, Model) else Model(model)
+    m = _judge_model(model)
 
     def _score(case, output):
         text = prompt.format(rubric=rubric,
                              question=_text(case.input),
                              expect=_text(case.expect),
                              answer=_text(output))
-        skill = Skill(m, {"messages": [{"role": "user", "parts": [text]}]})
-        reply = _text(skill.run())
-        found = _VERDICT.match(reply.strip())
-        if not found:
+        verdict, reply, tokens, cost = _ask(m, text, ("PASS", "FAIL"))
+        if verdict is None:
             # Fail-closed accounting: excluded from the count, never recorded
             # as a clean verdict — guessing "pass" would lift every arm at once
             # and read as a good result — and not raised either, which would
             # end the run over one row. An arm a judge abstained on twenty
             # times has an instrument that does not work, and that shows only
             # if the abstentions are counted.
-            return abstain(f"no verdict for case {case.id!r}: "
-                           f"{reply.strip()[:120]!r}")
-        passed = found.group(1).upper() == "PASS"
-        usage  = getattr(skill, "last_usage", None)
-        return {"ok": passed, "score": 1.0 if passed else 0.0,
-                # billed to the instrument, not to the arm — kept apart so a
-                # cost table cannot quietly include the cost of grading
-                "judge_tokens": getattr(usage, "total_tokens", 0) or 0,
-                "judge_cost":   getattr(usage, "cost", 0.0) or 0.0}
+            return abstain(f"no verdict for case {case.id!r}: {reply[:120]!r}")
+        passed = verdict == "PASS"
+        return {"ok": passed, "score": float(passed),
+                "judge_tokens": tokens, "judge_cost": cost}
     return _score
 
 
@@ -238,31 +246,23 @@ def pairwise(model, *, rubric: str = "Which answer better fulfils the "
     champion : str, optional
         What the candidate is compared with, as named to the judge.
     """
-    from ..models import Model
-    from ..skills import Skill
+    m = _judge_model(model)
 
-    m = model if isinstance(model, Model) else Model(model)
-
-    def _ask(question, first, second):
+    def _compare(question, first, second):
         text = (f"{rubric}\n\nAnswer with exactly one word on the first "
                 f"line — FIRST or SECOND — and nothing else on that line.\n\n"
                 f"QUESTION:\n{question}\n\nFIRST:\n{first}\n\n"
                 f"SECOND:\n{second}")
-        skill = Skill(m, {"messages": [{"role": "user", "parts": [text]}]})
-        reply = _text(skill.run()).strip()
-        head = _re.match(r"^\W*(FIRST|SECOND)\b", reply, _re.IGNORECASE)
-        usage = getattr(skill, "last_usage", None)
-        return (head.group(1).upper() if head else None,
-                getattr(usage, "total_tokens", 0) or 0,
-                getattr(usage, "cost", 0.0) or 0.0)
+        word, _, tokens, cost = _ask(m, text, ("FIRST", "SECOND"))
+        return word, tokens, cost
 
     def _score(case, output):
         question  = _text(case.input)
         candidate = _text(output)
         reference = _text(case.expect)
 
-        first_up,  t1, c1 = _ask(question, candidate, reference)
-        second_up, t2, c2 = _ask(question, reference, candidate)
+        first_up,  t1, c1 = _compare(question, candidate, reference)
+        second_up, t2, c2 = _compare(question, reference, candidate)
         if first_up is None or second_up is None:
             return abstain(f"unreadable comparison for case {case.id!r}")
 

@@ -328,5 +328,36 @@ class TestStatistics(unittest.TestCase):
         self.assertAlmostEqual(se(0.5, 30), 0.0913, places=3)
 
 
+class TestARunWithoutSideEffects(unittest.TestCase):
+    """An Eval is buildable where nothing may be written, says nothing on
+    stdout, and refuses a run that would report nothing."""
+
+    def test_no_directory_until_the_first_attempt(self):
+        out = Path(tempfile.mkdtemp()) / "not-yet" / "run.jsonl"
+        ev = Eval([Case(id="a", input="x", expect="x")], {"echo": lambda c: c.input},
+                  exact(), out=out, verbose=False)
+        self.assertFalse(out.parent.exists())
+        ev.run()
+        self.assertTrue(out.exists())
+
+    def test_trials_is_at_least_one(self):
+        with self.assertRaisesRegex(ValueError, "at least 1"):
+            Eval([], {}, exact(), trials=0, verbose=False)
+
+    def test_progress_goes_to_the_logger_not_stdout(self):
+        import contextlib, io
+        out = Path(tempfile.mkdtemp()) / "run.jsonl"
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertLogs("yait_aichain.eval") as logged:
+            Eval([Case(id="a", input="x", expect="x")], {"echo": lambda c: c.input},
+                 exact(), out=out).run()
+        self.assertEqual(printed.getvalue(), "")
+        self.assertTrue(any("1 of 1 attempts" in line for line in logged.output))
+
+    def test_an_attempt_written_twice_counts_once(self):
+        report = Report([_rec("a", "c1", 1, False), _rec("a", "c1", 1, True), _rec("a", "c2", 1, True)])
+        self.assertEqual((report.mean("a"), report.spend("a")["trials"]), (1.0, 2))
+
+
 if __name__ == "__main__":
     unittest.main()
