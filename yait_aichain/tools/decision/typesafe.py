@@ -97,19 +97,13 @@ class decisionTypeSafe(Decision):
     images                 = False
     _RETRIES               = _RETRIES
 
-    def _ask(self, state, images):
-        body = {"state": state, "model": self.model, "questions": _wire_questions(self.questions)}
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(body).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"TypeSafe API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+    _ENDPOINT              = _ENDPOINT
+    _API_NAME              = "TypeSafe API"
+    _answer                = staticmethod(_answer)
+
+    def _body(self, state, images):
+        return {"state": state, "model": self.model, "questions": _wire_questions(self.questions)}
+
+    def _raw_answers(self, data):
         answers = data.get("answers")
-        if not isinstance(answers, dict):
-            raise RuntimeError(f"TypeSafe returned no answers: {raw}")
-        usage = data.get("usage") or {}
-        return ({n: _answer(q, answers.get(n) or {}) for n, q in self.questions.items()},
-                data.get("model", self.model),
-                {"input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens")})
+        return answers if isinstance(answers, dict) else None

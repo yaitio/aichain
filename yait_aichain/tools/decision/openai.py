@@ -99,27 +99,17 @@ class decisionOpenAI(Decision):
     _PRICE_SOURCE          = "the Decisions guide, read 2026-10-08"
     images                 = True
 
-    def _ask(self, state, images):
+    _ENDPOINT              = _ENDPOINT
+    _API_NAME              = "OpenAI Decisions API"
+    _answer                = staticmethod(_answer)
+
+    def _body(self, state, images):
         text = state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
-        if images:
-            given = [{"type": "input_text", "text": text}]
-            given += [{"type": "input_image", "image_url": url} for url in images]
-            given = [{"role": "user", "content": given}]
-        else:
-            given = text
-        body = {"model": self.model, "input": given, "questions": _wire_questions(self.questions)}
-        response = self._http.request(
-            "POST", _ENDPOINT, body=json.dumps(body).encode("utf-8"),
-            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"})
-        raw = response.data.decode("utf-8", errors="replace")
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"OpenAI Decisions API error [{response.status}]: {raw}")
-        data = json.loads(raw)
+        given = text if not images else [{"role": "user", "content": [
+            {"type": "input_text", "text": text},
+            *({"type": "input_image", "image_url": url} for url in images)]}]
+        return {"model": self.model, "input": given, "questions": _wire_questions(self.questions)}
+
+    def _raw_answers(self, data):
         answers = data.get("answers")
-        if not isinstance(answers, list):
-            raise RuntimeError(f"OpenAI returned no answers: {raw}")
-        by_name = {a.get("name"): a for a in answers}
-        usage = data.get("usage") or {}
-        return ({n: _answer(q, by_name.get(n) or {}) for n, q in self.questions.items()},
-                data.get("model", self.model),
-                {"input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens")})
+        return {a.get("name"): a for a in answers} if isinstance(answers, list) else None

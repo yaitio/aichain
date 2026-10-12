@@ -180,9 +180,8 @@ class Decision(Tool):
 
     A subclass sets ``name``, ``_ENV_KEY``, ``_PROVIDER``,
     ``_PRICE_PER_INPUT_TOKEN``, ``_DEFAULT_MODEL``, ``images`` (whether it takes
-    them) and, if its API needs other retries, ``_RETRIES``; and implements
-    ``_ask(state, images) -> (answers, model, usage)`` with ``answers`` already
-    in the common format.
+    them) and, if its API needs other retries, ``_RETRIES``; and says how its
+    API is asked and answers — see ``_ask``.
     """
 
     name        = "decision"
@@ -268,8 +267,24 @@ class Decision(Tool):
                 lines.append(f"{name}: score {_p(a.get('score'))} (confidence {_p(a.get('confidence'))}; {rest})")
         return "\n".join(lines)
 
-    def _ask(self, state, images: list) -> tuple[dict, str, dict]:  # pragma: no cover
-        raise NotImplementedError(f"{type(self).__name__} must implement _ask()")
+    def _ask(self, state, images: list) -> tuple[dict, str, dict]:
+        """One request: the answers by question, the model that answered, and
+        usage. A provider gives `_ENDPOINT`, `_API_NAME`, `_body(state, images)`,
+        `_raw_answers(data)` — by question name, or None — and `_answer(q, a)`."""
+        response = self._http.request(
+            "POST", self._ENDPOINT, body=json.dumps(self._body(state, images)).encode("utf-8"),
+            headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"})
+        raw = response.data.decode("utf-8", errors="replace")
+        if not 200 <= response.status < 300:
+            raise RuntimeError(f"{self._API_NAME} error [{response.status}]: {raw}")
+        data = json.loads(raw)
+        answers = self._raw_answers(data)
+        if answers is None:
+            raise RuntimeError(f"{self._PROVIDER} returned no answers: {raw}")
+        usage = data.get("usage") or {}
+        return ({n: self._answer(q, answers.get(n) or {}) for n, q in self.questions.items()},
+                data.get("model", self.model),
+                {"input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens")})
 
     def _serialise_init_args(self) -> dict:
         """What `Chain.save` writes: the questions and the model, never the key."""

@@ -152,36 +152,13 @@ def _headings_list(stack: list[tuple[int, str]]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _force_split(text: str, max_chars: int) -> list[str]:
+    """Cut *text* into pieces of at most *max_chars* characters.
+
+    The last resort of `_split_by_priority`, reached only when even a space
+    did not split the text — so it is one oversized token, and characters are
+    all there is to cut on.
     """
-    Split *text* at word boundaries into pieces of at most *max_chars*.
-
-    A single token longer than *max_chars* is hard-split at the character
-    level as a last resort.
-    """
-    if len(text) <= max_chars:
-        return [text]
-
-    chunks: list[str] = []
-    buf = ""
-
-    for word in text.split(" "):
-        candidate = (buf + " " + word) if buf else word
-        if len(candidate) <= max_chars:
-            buf = candidate
-        else:
-            if buf:
-                chunks.append(buf)
-            if len(word) > max_chars:
-                # Hard-split oversized token
-                for i in range(0, len(word), max_chars):
-                    chunks.append(word[i : i + max_chars])
-                buf = ""
-            else:
-                buf = word
-
-    if buf:
-        chunks.append(buf)
-    return chunks
+    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
 
 
 def _split_by_priority(
@@ -236,7 +213,7 @@ def _split_by_priority(
 
         return [c for c in chunks if c.strip()]
 
-    # No separator produced a split — fall back to word boundaries
+    # No separator produced a split: one token longer than the limit.
     return _force_split(text, max_chars)
 
 
@@ -245,134 +222,66 @@ _PLAIN_TEXT_SEPS = ["\n\n", ". ", " "]
 
 
 # ---------------------------------------------------------------------------
-# Code block chunking
+# Code blocks and tables: lines packed under a repeated header
 # ---------------------------------------------------------------------------
 
-def _chunk_code(
-    header:    str,
-    body:      str,
-    fence:     str,
-    max_chars: int,
-) -> list[_Chunk]:
+def _pack(prefix: str, lines: list[str], suffix: str, max_chars: int,
+          is_code: bool = False) -> list[_Chunk]:
+    """Pack *lines* into chunks of at most *max_chars*, each wrapped in
+    *prefix* and *suffix* so every piece stands on its own — a code block
+    keeps its fences, a table its header rows.
+
+    A single line longer than the whole budget is cut by characters: the
+    pieces are no longer well-formed lines, but the size contract downstream
+    (metadata and token limits) matters more.
     """
-    Chunk a fenced code block.
+    budget = max(1, max_chars - len(prefix) - len(suffix))
+    chunks: list[_Chunk] = []
+    buf: list[str] = []
 
-    Parameters
-    ----------
-    header : str   — opening fence line, e.g. ````` ```python `````
-    body   : str   — code content between fences
-    fence  : str   — fence character sequence (````` ``` ````` or ``~~~``)
-    """
-    full = f"{header}\n{body}\n{fence}"
-    if len(full) <= max_chars:
-        return [_Chunk(text=full, is_code=True)]
-
-    # Split line by line; repeat header + fence in every sub-chunk
-    lines:     list[str]   = body.split("\n")
-    chunks:    list[_Chunk] = []
-    buf_lines: list[str]   = []
-
-    # Budget for code content inside one chunk (header + body + fence and
-    # the two joining newlines must all fit into max_chars).
-    line_budget = max(1, max_chars - len(header) - len(fence) - 2)
-
-    def _flush(lines_: list[str]) -> None:
-        if lines_:
-            chunks.append(_Chunk(
-                text    = f"{header}\n" + "\n".join(lines_) + f"\n{fence}",
-                is_code = True,
-            ))
+    def flush(rows: list[str]) -> None:
+        if rows:
+            chunks.append(_Chunk(text=prefix + "\n".join(rows) + suffix, is_code=is_code))
 
     for line in lines:
-        if len(line) > line_budget:
-            # A single line longer than the whole budget: hard-wrap it,
-            # otherwise the chunk would break the `chars <= max_chars`
-            # contract (and downstream metadata/token limits with it).
-            _flush(buf_lines)
-            buf_lines = []
-            for i in range(0, len(line), line_budget):
-                _flush([line[i : i + line_budget]])
-            continue
-        candidate = f"{header}\n" + "\n".join(buf_lines + [line]) + f"\n{fence}"
-        if len(candidate) <= max_chars:
-            buf_lines.append(line)
+        if len(line) > budget:
+            flush(buf)
+            buf = []
+            for piece in _force_split(line, budget):
+                flush([piece])
+        elif len(prefix + "\n".join(buf + [line]) + suffix) <= max_chars:
+            buf.append(line)
         else:
-            _flush(buf_lines)
-            buf_lines = [line]
-
-    _flush(buf_lines)
+            flush(buf)
+            buf = [line]
+    flush(buf)
     return chunks
 
 
-# ---------------------------------------------------------------------------
-# Table chunking
-# ---------------------------------------------------------------------------
+def _chunk_code(header: str, body: str, fence: str, max_chars: int) -> list[_Chunk]:
+    """A fenced code block, split by lines with the opening line and the
+    fence repeated in every piece."""
+    full = f"{header}\n{body}\n{fence}"
+    if len(full) <= max_chars:
+        return [_Chunk(text=full, is_code=True)]
+    return _pack(f"{header}\n", body.split("\n"), f"\n{fence}", max_chars, is_code=True)
+
 
 _SEP_ROW_RE = re.compile(r'^\s*\|[\s\-:|]+\|')
 
 
 def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
-    """
-    Chunk a Markdown table.
-
-    Keeps header rows + separator row in every sub-chunk so each piece is a
-    valid, self-contained table.
-    """
+    """A Markdown table, split by rows with the header rows and the separator
+    row repeated in every piece, so each is a valid table."""
     if len(table) <= max_chars:
         return [_Chunk(text=table)]
-
-    rows    = table.split("\n")
+    rows = table.split("\n")
     sep_idx = next((i for i, r in enumerate(rows) if _SEP_ROW_RE.match(r)), None)
-
-    if sep_idx is None:
-        # Not a proper table — fall back to text splitting
-        pieces = _split_by_priority(table, max_chars, _MD_TEXT_SEPS)
-        return [_Chunk(text=p.rstrip()) for p in pieces]
-
-    header_rows  = rows[:sep_idx]
-    sep_row      = rows[sep_idx]
-    data_rows    = rows[sep_idx + 1 :]
-    header_block = "\n".join(header_rows) + "\n" + sep_row
-
-    # If the header block alone leaves no room for even one data row, repeating
-    # it in every sub-chunk would break the `chars <= max_chars` contract.
-    # Fall back to plain size-based splitting of the whole table instead.
-    if len(header_block) + 2 >= max_chars:
-        pieces = _split_by_priority(table, max_chars, _MD_TEXT_SEPS)
-        return [_Chunk(text=p.rstrip()) for p in pieces]
-
-    chunks:   list[_Chunk] = []
-    buf_rows: list[str]    = []
-
-    def _flush_table(rows_: list[str]) -> None:
-        if rows_:
-            chunks.append(_Chunk(text=header_block + "\n" + "\n".join(rows_)))
-
-    # Budget for data rows inside one chunk (header block + newline + rows).
-    row_budget = max(1, max_chars - len(header_block) - 1)
-
-    for row in data_rows:
-        if not row.strip():
-            continue
-        if len(row) > row_budget:
-            # A single row longer than the whole budget: hard-wrap it so the
-            # `chars <= max_chars` contract holds.  The wrapped pieces are
-            # no longer well-formed table rows, but staying within the size
-            # contract matters more (metadata/token limits downstream).
-            _flush_table(buf_rows)
-            buf_rows = []
-            for i in range(0, len(row), row_budget):
-                _flush_table([row[i : i + row_budget]])
-            continue
-        candidate = header_block + "\n" + "\n".join(buf_rows + [row])
-        if len(candidate) <= max_chars:
-            buf_rows.append(row)
-        else:
-            _flush_table(buf_rows)
-            buf_rows = [row]
-
-    _flush_table(buf_rows)
-    return chunks
+    header = "\n".join(rows[:sep_idx + 1]) if sep_idx is not None else ""
+    # Not a table, or a header that leaves no room for a row: split as text.
+    if sep_idx is None or len(header) + 2 >= max_chars:
+        return [_Chunk(text=p.rstrip()) for p in _split_by_priority(table, max_chars, _MD_TEXT_SEPS)]
+    return _pack(header + "\n", [r for r in rows[sep_idx + 1:] if r.strip()], "", max_chars)
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +295,19 @@ class _Segment:
     level:   int = 0   # headings only
     header:  str = ""  # code: opening fence line
     fence:   str = ""  # code: fence characters (``` or ~~~)
+
+
+_FENCE_RE   = re.compile(r'^(`{3,}|~{3,})')
+_HEADING_RE = re.compile(r'^(#{1,6})\s+(.*)')
+_ROW_RE     = re.compile(r'^\s*\|')
+
+
+def _starts_block(line: str) -> bool:
+    """True when *line* opens a code block, a heading or a table. One
+    definition for the parser and for where plain text stops — two copies
+    that disagreed would leave the text loop taking nothing and the outer
+    loop spinning on the same line."""
+    return bool(_FENCE_RE.match(line) or _HEADING_RE.match(line) or _ROW_RE.match(line))
 
 
 def _parse_markdown(text: str) -> list[_Segment]:
@@ -403,7 +325,7 @@ def _parse_markdown(text: str) -> list[_Segment]:
         line = lines[i]
 
         # ── Fenced code block ─────────────────────────────────────────
-        fence_m = re.match(r'^(`{3,}|~{3,})', line)
+        fence_m = _FENCE_RE.match(line)
         if fence_m:
             fence_chars = fence_m.group(1)
             header      = line
@@ -433,7 +355,7 @@ def _parse_markdown(text: str) -> list[_Segment]:
             continue
 
         # ── ATX heading ───────────────────────────────────────────────
-        head_m = re.match(r'^(#{1,6})\s+(.*)', line)
+        head_m = _HEADING_RE.match(line)
         if head_m:
             segments.append(_Segment(
                 kind    = "heading",
@@ -444,9 +366,9 @@ def _parse_markdown(text: str) -> list[_Segment]:
             continue
 
         # ── Table ─────────────────────────────────────────────────────
-        if re.match(r'^\s*\|', line):
+        if _ROW_RE.match(line):
             tbl_lines: list[str] = []
-            while i < n and re.match(r'^\s*\|', lines[i]):
+            while i < n and _ROW_RE.match(lines[i]):
                 tbl_lines.append(lines[i])
                 i += 1
             if tbl_lines:
@@ -455,13 +377,8 @@ def _parse_markdown(text: str) -> list[_Segment]:
 
         # ── Plain text ────────────────────────────────────────────────
         txt_lines: list[str] = []
-        while i < n:
-            l = lines[i]
-            if (re.match(r'^(`{3,}|~{3,})', l)
-                    or re.match(r'^#{1,6}\s', l)
-                    or re.match(r'^\s*\|', l)):
-                break
-            txt_lines.append(l)
+        while i < n and not _starts_block(lines[i]):
+            txt_lines.append(lines[i])
             i += 1
         content = "\n".join(txt_lines)
         if content.strip():
