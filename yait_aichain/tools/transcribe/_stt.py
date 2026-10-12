@@ -26,11 +26,9 @@ base URL.
 
 Installation
 ------------
-  OpenAI  :  pip install openai
-  Google  :  pip install google-cloud-speech
-  xAI     :  pip install openai   (uses the OpenAI-compatible xAI endpoint)
-  Qwen    :  pip install openai   (uses the DashScope compatible-mode endpoint)
-  Chunking:  pip install pydub    (only needed when audio exceeds size limit)
+  OpenAI, xAI, Qwen :  nothing extra — plain HTTP
+  Google            :  pip install google-cloud-speech
+  Chunking          :  pip install pydub   (only when audio exceeds the size limit)
 
 Environment variables
 ---------------------
@@ -48,6 +46,11 @@ from ..._require import require
 import json
 import os
 import tempfile
+
+import urllib3
+
+from ...clients._base import make_http
+from ...clients._http import request
 
 from .._base import Tool
 
@@ -178,11 +181,12 @@ class Transcription(Tool):
 class _OpenAICompatSTT(Transcription):
     """
     Shared implementation for STT providers with an OpenAI-compatible
-    transcriptions endpoint (OpenAI Whisper, xAI STT).
+    transcriptions endpoint (OpenAI Whisper, xAI STT, DashScope) — one
+    multipart POST to ``{_BASE_URL}/audio/transcriptions``, in plain HTTP.
 
     Subclasses configure behaviour through class-level variables:
 
-    _BASE_URL        str | None  API base URL.  None = official OpenAI endpoint.
+    _BASE_URL        str         API base URL.
     _DEFAULT_MODEL   str         Default model name.
     _ENV_KEY         str         Environment variable that holds the API key.
     _CHUNK_SECONDS   int         Max audio duration (seconds) per API call.
@@ -190,7 +194,7 @@ class _OpenAICompatSTT(Transcription):
     _MAX_FILE_MB     float       Files above this size (MB) are chunked.
     """
 
-    _BASE_URL:        "str | None" = None
+    _BASE_URL:        str          = "https://api.openai.com/v1"
     _DEFAULT_MODEL:   str          = "whisper-1"
     _ENV_KEY:         str          = "OPENAI_API_KEY"
     # ── Chunking — advanced: adjust on the class before instantiating ─────
@@ -206,6 +210,8 @@ class _OpenAICompatSTT(Transcription):
                 f"No API key found for {type(self).__name__}.  "
                 f"Pass api_key= or set the {self._ENV_KEY} environment variable."
             )
+        self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=600.0),
+                               retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
         """
@@ -228,8 +234,6 @@ class _OpenAICompatSTT(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        openai = require("openai", package="openai", who="this transcription tool")
-
         if not os.path.isfile(input):
             raise FileNotFoundError(f"Audio file not found: {input!r}")
 
@@ -240,78 +244,42 @@ class _OpenAICompatSTT(Transcription):
         prompt     = opts.get("prompt")
         fmt        = opts.get("format", "text")
 
-        client_kwargs: dict = {"api_key": self._api_key}
-        if self._BASE_URL:
-            client_kwargs["base_url"] = self._BASE_URL
-        import openai as _openai
-        client = _openai.OpenAI(**client_kwargs)
-
         file_mb = os.path.getsize(input) / (1024 * 1024)
         if file_mb > self._MAX_FILE_MB:
-            return self._transcribe_chunked(
-                client, input, model, language, prompt, timestamps, fmt
-            )
-        return self._transcribe_single(
-            client, input, model, language, prompt, timestamps, fmt
-        )
+            return self._transcribe_chunked(input, model, language, prompt, timestamps, fmt)
+        return self._transcribe_single(input, model, language, prompt, timestamps, fmt)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _transcribe_single(
-        self,
-        client,
-        path:       str,
-        model:      str,
-        language:   "str | None",
-        prompt:     "str | None",
-        timestamps: bool,
-        fmt:        str,
-    ) -> str:
+    def _transcribe_single(self, path: str, model: str, language: "str | None",
+                           prompt: "str | None", timestamps: bool, fmt: str) -> str:
         """Send one file to the transcription endpoint and return the result."""
-        api_kwargs: dict = {"model": model}
-        if language:
-            api_kwargs["language"] = language
-        if prompt:
-            api_kwargs["prompt"] = prompt
-
-        with open(path, "rb") as audio_file:
-            api_kwargs["file"] = audio_file
-
-            if timestamps or fmt == "json":
-                api_kwargs["response_format"]        = "verbose_json"
-                api_kwargs["timestamp_granularities"] = ["word"]
-                result = client.audio.transcriptions.create(**api_kwargs)
-                return json.dumps(
-                    {
-                        "text":     result.text,
-                        "words":    [
-                            {
-                                "word":  w.word,
-                                "start": w.start,
-                                "end":   w.end,
-                            }
-                            for w in (result.words or [])
-                        ],
-                        "segments": [
-                            {
-                                "text":  s.text,
-                                "start": s.start,
-                                "end":   s.end,
-                            }
-                            for s in (result.segments or [])
-                        ],
-                    },
-                    ensure_ascii=False,
-                )
-            else:
-                api_kwargs["response_format"] = "text"
-                return client.audio.transcriptions.create(**api_kwargs)
+        verbose = timestamps or fmt == "json"
+        with open(path, "rb") as fh:
+            audio = fh.read()
+        fields = [("model", model), ("file", (os.path.basename(path), audio)),
+                  ("response_format", "verbose_json" if verbose else "text")]
+        fields += [(k, v) for k, v in (("language", language), ("prompt", prompt)) if v]
+        if verbose:
+            fields.append(("timestamp_granularities[]", "word"))
+        raw = request(self._http, "POST", f"{self._BASE_URL}/audio/transcriptions", fields=fields,
+                      headers={"Authorization": f"Bearer {self._api_key}"},
+                      what=f"{type(self).__name__} transcription API").data.decode("utf-8")
+        if not verbose:
+            return raw
+        data = json.loads(raw)
+        return json.dumps({
+            "text":     data.get("text", ""),
+            "words":    [{"word": w.get("word"), "start": w.get("start"), "end": w.get("end")}
+                         for w in data.get("words") or []],
+            "segments": [{"text": x.get("text"), "start": x.get("start"), "end": x.get("end")}
+                         for x in data.get("segments") or []],
+        }, ensure_ascii=False)
 
     def _transcribe_chunked(
         self,
-        client,
         path:       str,
         model:      str,
         language:   "str | None",
@@ -340,10 +308,8 @@ class _OpenAICompatSTT(Transcription):
                 tmp_path = tmp.name
             try:
                 chunk.export(tmp_path, format="mp3")
-                part = self._transcribe_single(
-                    client, tmp_path, model, language, prompt,
-                    timestamps=False, fmt="text",
-                )
+                part = self._transcribe_single(tmp_path, model, language, prompt,
+                                               timestamps=False, fmt="text")
                 parts.append(part.strip())
             finally:
                 os.unlink(tmp_path)
@@ -404,7 +370,7 @@ class sttOpenAI(_OpenAICompatSTT):
     name = "sttOpenAI"
 
     # ── Chunking settings — advanced: adjust on the class before instantiating
-    _BASE_URL        = None
+    _BASE_URL        = "https://api.openai.com/v1"
     _DEFAULT_MODEL   = "whisper-1"
     _ENV_KEY         = "OPENAI_API_KEY"
     _CHUNK_SECONDS   = 600
@@ -765,7 +731,7 @@ class sttQwen(_OpenAICompatSTT):
     def __init__(self, api_key: "str | None" = None, model: "str | None" = None) -> None:
         self.model = _model_setting(self, model)
         # Resolve the region-aware base URL before calling the parent __init__
-        # (which reads self._BASE_URL to build the OpenAI client).
+        # (which reads self._BASE_URL for its requests).
         from ...clients._families.qwen import resolve_qwen_base_url
         self._BASE_URL = resolve_qwen_base_url() + "/compatible-mode/v1"
         super().__init__(api_key=api_key, model=model)

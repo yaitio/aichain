@@ -19,6 +19,10 @@ where a fix is named below.
   still does. The message reads `[HTTP 401] Brave Search API: …` where it read
   `Brave Search API error [401]: …`.
 
+- **`transcribe("openai")`, `"xai"` and `"qwen"` need no `openai` package.**
+  One multipart POST each, made directly. Verified live on OpenAI 2026-10-12:
+  a sentence synthesised by `speech("openai")` came back word for word, as
+  text and as JSON with word timings.
 - **`speech("openai")` and `speech("xai")` need no `openai` package.** They
   called the OpenAI SDK for one JSON POST; they share one plain-HTTP class now,
   and the output path is checked before the paid request instead of after.
