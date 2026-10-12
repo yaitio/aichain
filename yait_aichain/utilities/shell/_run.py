@@ -19,6 +19,7 @@ sandbox root (or a sub-directory of it).
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 
@@ -109,12 +110,12 @@ class LocalRunTool(Tool, SandboxedTool):
 
         # Build command
         command = input.strip()
-        if force_python or command.endswith(".py"):
-            # If it looks like a bare .py path (no spaces), validate it
-            parts = command.split()
-            if len(parts) == 1 and parts[0].endswith(".py"):
-                self._resolve(parts[0])   # sandbox check
-            command = f"{sys.executable} {command}"
+        # The interpreter goes in front only when asked, or when the command
+        # *starts* with a script: "python x.py", "pytest t.py" and "cat m.py"
+        # all end in .py and were rewritten to "<python> python x.py".
+        first = command.split(maxsplit=1)[0] if command else ""
+        if force_python or first.endswith(".py"):
+            command = f"{shlex.quote(sys.executable)} {command}"
 
         # Execute
         try:

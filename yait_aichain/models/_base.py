@@ -364,7 +364,10 @@ class Model:
         self._api_key = resolved_key
 
         # ── merge options with provider defaults (from data) ──────────
-        opts = options or {}
+        # A copy: the caller's dict is theirs. Popping `extra` out of it made
+        # the second Model built from the same options lose its provider
+        # fields — the A/B arm that differs by one thing differed by two.
+        opts = dict(options or {})
         # What the caller asked for, apart from what the defaults supply. Only
         # these are reported when an option does not survive to the wire: a
         # default that a provider ignores is not something anybody chose.

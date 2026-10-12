@@ -114,7 +114,7 @@ class Echo(Tool):
 
 class Boom(Tool):
     name       = "boom"
-    parameters = {"type": "object", "properties": {}, "required": []}
+    parameters = {"type": "object", "properties": {"value": {"type": "string"}}, "required": []}
 
     def run(self, **kw):
         raise RuntimeError("tool exploded")

@@ -65,9 +65,13 @@ class Gate(Tool):
     """
     Gate any Tool behind an external signal.
 
-    On first reach the run pauses; on resume, if the signal grants approval
-    (``signal[decision_key]`` is truthy) the wrapped tool runs with the same
-    arguments, otherwise it is skipped.
+    On first reach the run pauses; on resume the wrapped tool runs with the
+    same arguments when ``signal[decision_key]`` is ``True`` — the boolean,
+    nothing that merely looks true — and is skipped when it is ``False``.
+    Anything else is a ``TypeError`` naming the shape expected: a form, Slack
+    or a query string sends ``"false"``, and a check for truthiness read that
+    as yes. The gate carries the wrapped tool's risk, so a permission policy
+    sees ``gate(wipe_table)`` as the destructive call it guards.
 
     Parameters
     ----------
@@ -93,8 +97,14 @@ class Gate(Tool):
                  decision_key: str = "approved",
                  name: str | None = None,
                  hint: dict | None = None) -> None:
-        tool_name = getattr(tool, "name", "tool")
+        if not isinstance(tool, Tool):
+            if not callable(tool):
+                raise TypeError(f"Gate wraps a tool; got {type(tool).__name__}")
+            from .._base import tool as as_tool
+            tool = as_tool(tool)               # a plain function, checked now, not after approval
+        tool_name = tool.name
         self._tool         = tool
+        self.risk          = tool.risk
         self._decision_key = decision_key
         self.name          = name or f"gate_{tool_name}"
         self.description   = (f"Gate '{tool_name}' behind approval. "
@@ -108,6 +118,10 @@ class Gate(Tool):
     def run(self, _signal=None, **kwargs):
         if _signal is None:
             raise Suspend(self._reason, self._resume_with, hint=self._hint)
-        if _signal.get(self._decision_key):
+        decision = _signal.get(self._decision_key) if isinstance(_signal, dict) else None
+        if decision is True:
             return self._tool.run(**kwargs)            # approved → run the action
-        return {self._decision_key: False, "skipped": True}
+        if decision is False:
+            return {self._decision_key: False, "skipped": True}
+        raise TypeError(f"gate {self.name!r} resumes with {{{self._decision_key!r}: True}} or "
+                        f"{{{self._decision_key!r}: False}}; got {_signal!r}")

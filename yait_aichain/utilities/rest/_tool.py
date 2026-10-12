@@ -371,7 +371,14 @@ class RestApiTool(Tool):
                     f"RestApiTool '{self.name}': "
                     f"path parameter '{p}' is required but was not provided."
                 )
-            url = url.replace("{" + p + "}", urllib.parse.quote(str(val), safe=""))
+            text = str(val)
+            # `quote` leaves `.` and `..` alone and the HTTP layer collapses
+            # them, so `{mid}` = ".." turned DELETE /projects/1/members/{mid}
+            # into DELETE /projects/1. An empty value made `//`.
+            if text in ("", ".", ".."):
+                raise ValueError(f"RestApiTool '{self.name}': path parameter '{p}' "
+                                 f"cannot be {text!r}")
+            url = url.replace("{" + p + "}", urllib.parse.quote(text, safe=""))
 
         # ── 3. Build query string ──────────────────────────────────────
         qs_parts: list[tuple[str, str]] = []

@@ -106,6 +106,40 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: the agent's `pool` tool went around the permission policy.**
+  The gate looked a call up by its own name, `pool` is in no tool map, and
+  the fan-out then ran the named tool directly — so
+  `pool(tool="local_run", items=[...])` ran a denied or privileged tool with
+  no policy, no approver and no argument check. The policy now decides on the
+  tool the pool names, asks once with the whole list, and every item is
+  checked against that tool's schema before any of them starts.
+- **Security: `Agent.execute()` applied no permission policy.** It is the
+  seam a serverless driver runs tools through, and a denied tool ran there.
+  It applies the same policy and approver as `run()`, and a refusal is
+  `(None, reason)`.
+- **Security: a `Gate` opened on any truthy value**, so the string `"false"`
+  from a form or a query string ran the action. It opens on `True`, skips on
+  `False`, and raises `TypeError` with the expected shape on anything else.
+  It carries the risk class of the tool it wraps, so a policy that denies
+  `destructive` sees `Gate(wipe_table)` as destructive, and a plain function
+  is made a tool when the gate is built, not after a person approved it.
+- **Security: a REST path parameter of `..` left its endpoint.** `quote`
+  keeps dot segments and the HTTP layer collapses them, so
+  `DELETE /projects/1/members/{mid}` with `mid=".."` deleted the project.
+  `.`, `..` and the empty string are refused.
+- **`pool(prompt=…)` spends inside the run.** Its calls ran without the
+  agent's `max_cost`, hooks or retries, and their tokens and cost reached
+  neither the run's counters nor the result. A pool also takes at most 200
+  items and runs at most 8 at once; both numbers were the model's to choose.
+- **The model reads what a `pool` call returned**: the list of results, a
+  failed entry as `{"error": …}`, where it read `PoolResult(ok, items=3)`.
+- **`local_run` runs `python x.py` as written.** Any command ending in `.py`
+  had the interpreter put in front of it, so `python x.py`, `pytest t.py` and
+  `cat m.py` all failed; only a command that starts with a script, or
+  `python=True`, gets it now, quoted.
+- **`Model(options=OPTS)` leaves `OPTS` alone.** It popped `extra` out of the
+  caller's dict, so a second model built from the same options — the other
+  arm of a comparison — lost its provider fields.
 - **Small contracts in the agent and the run document.** An `Agent` told a
   user's own class named `Utility` or `Skill` it was the library's, because
   it compared class names; it checks types now. A plan given as one string

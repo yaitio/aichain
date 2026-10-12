@@ -259,9 +259,12 @@ Agent.execute(call, state: dict | None = None)
 ```
 
 Run one `ToolCall`. Returns `(result, error)`: a tool that
-fails is an error, not an exception. The one exception that passes is
-`Suspend` — a `wait()` or `gate()` asking the run to park, which
-the driver handles as a pause, not a failure.
+fails is an error, not an exception, and so is a call the permission
+policy refuses — the same policy, approver included, that `run()`
+applies, because this is the seam a serverless driver runs tools
+through and a policy it skipped would govern nothing there. The one
+exception that passes is `Suspend` — a `wait()` or `gate()`
+asking the run to park, which the driver handles as a pause.
 
 **Parameters**
 

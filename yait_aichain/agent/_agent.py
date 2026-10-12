@@ -64,7 +64,6 @@ from ..models._calls import (ToolCallRequest, dangling_calls,
                              tool_result_turn)
 from ..pool    import Pool
 from ..state   import Suspend, SuspendedResult
-from ..tools._base import Tool
 
 _logger = logging.getLogger("yait_aichain.agent")
 
@@ -324,6 +323,11 @@ def _delegate_schema(team) -> dict:
 
 
 # ── Agent ────────────────────────────────────────────────────────────────────
+
+#: The most entries one `pool` call fans out to, and the most at once. A
+#: model sets both; unbounded, a thousand items were a thousand threads.
+MAX_POOL_ITEMS = 200
+MAX_POOL_FLOWS = 8
 
 #: Returned by `_ask_permission` when a request has gone out and the answer
 #: has not been asked for yet. A string would be a denial and None a pass, so
@@ -853,9 +857,12 @@ class Agent:
 
     def execute(self, call, state: dict | None = None):
         """Run one :class:`ToolCall`. Returns ``(result, error)``: a tool that
-        fails is an error, not an exception. The one exception that passes is
-        ``Suspend`` — a ``wait()`` or ``gate()`` asking the run to park, which
-        the driver handles as a pause, not a failure.
+        fails is an error, not an exception, and so is a call the permission
+        policy refuses — the same policy, approver included, that ``run()``
+        applies, because this is the seam a serverless driver runs tools
+        through and a policy it skipped would govern nothing there. The one
+        exception that passes is ``Suspend`` — a ``wait()`` or ``gate()``
+        asking the run to park, which the driver handles as a pause.
 
         Parameters
         ----------
@@ -864,7 +871,13 @@ class Agent:
         state : dict | None, optional
             The same working state passed to ``step()``.
         """
-        return self._execute(call, state if state is not None else self.new_state())
+        state = state if state is not None else self.new_state()
+        denial = self._ask_permission(call, state)
+        if denial is _AWAITING:
+            denial = self._resolve_permission(state)
+        if denial:
+            return None, denial
+        return self._execute(call, state)
 
     # ── The loop ─────────────────────────────────────────────────────────
 
@@ -1118,7 +1131,7 @@ class Agent:
         """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
         try:
             if call.name == "pool":
-                return self._do_pool(call.arguments), None
+                return self._do_pool(call.arguments, state), None
             if call.name == "delegate":
                 return self._do_delegate(call.arguments, state), None
             if call.name == "write_plan":
@@ -1147,6 +1160,15 @@ class Agent:
             self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
 
+    def _gated_tool(self, call):
+        """The tool a call will run, which the policy decides on. For `pool`
+        it is the tool the pool names — the fan-out runs that tool, once per
+        item, and asking about `pool` itself asked about nothing. One approval
+        covers the whole list, which the request carries as its arguments."""
+        if call.name == "pool":
+            return self._tool_map.get((call.arguments or {}).get("tool") or "")
+        return self._tool_map.get(call.name)
+
     def _ask_permission(self, call, state: dict | None = None):
         """Consult the policy before a tool runs. Returns a denial, or None.
 
@@ -1161,7 +1183,7 @@ class Agent:
         matters most: otherwise the call simply fails and nothing says it was
         governance rather than a broken tool.
         """
-        tool = self._tool_map.get(call.name)
+        tool = self._gated_tool(call)
         if tool is None or not self.permissions:
             return None
         from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
@@ -1232,19 +1254,27 @@ class Agent:
         self._log(1, f"  ▣  plan: {len(items)} item(s)")
         return "Plan recorded. Begin."
 
-    def _do_pool(self, args: dict) -> Any:
+    def _do_pool(self, args: dict, state: dict) -> Any:
         """
         One call repeated over a list.
 
         Every other call is exactly one execution. Without this, a model asked
         to "read every document" reads one and reports success — measured at
         2 of 8, silently.
+
+        The pool is no way around the policy: the loop asked about the tool
+        it names before this ran (see `_gated_tool`), and each item is checked
+        against that tool's schema before any of them starts. Its spend is the
+        run's — under `max_cost`, in `state`, and so in the result.
         """
         items = args.get("items")
         if not isinstance(items, (list, tuple)) or not items:
             raise ValueError("pool needs a non-empty 'items' list")
+        if len(items) > MAX_POOL_ITEMS:
+            raise ValueError(f"pool takes at most {MAX_POOL_ITEMS} items in one call; "
+                             f"got {len(items)} — split the list")
 
-        max_flows = max(1, min(int(args.get("max_flows") or 4), len(items)))
+        max_flows = max(1, min(int(args.get("max_flows") or 4), len(items), MAX_POOL_FLOWS))
 
         if args.get("tool"):
             tool = self._tool_map.get(args["tool"])
@@ -1258,24 +1288,35 @@ class Agent:
             # every call on what it never received.
             pool_items = [it if (isinstance(it, dict) and not args.get("arg"))
                           else {arg: it} for it in items]
+            for i, item in enumerate(pool_items):
+                if (problem := tool.check_args(item)) is not None:
+                    raise ValueError(f"pool item {i}: {problem}")
+            runner = tool
         elif args.get("prompt"):
-            tool = _MappedSkill(self, args["prompt"])
+            runner = Skill(self.model, prompt=args["prompt"], max_cost=self.max_cost,
+                           hooks=self._stamping_hooks(), max_retries=2)
             pool_items = [{"item": it} for it in items]
         else:
             raise ValueError("pool needs either 'tool' or 'prompt'")
 
         self._log(1, f"  ⇉  pool ×{len(items)} (max_flows={max_flows})")
-        pool    = Pool(tool, items=pool_items, max_flows=max_flows,
-                       on_error="collect")
-        results = pool.run()
-        errors  = [str(h.get("error")) for h in pool.history if h.get("error")]
-        if errors and len(errors) == len(pool_items):
+        results = Pool(runner, items=pool_items, max_flows=max_flows,
+                       on_error="collect", max_cost=self.max_cost).run()
+        if results.usage is not None:
+            state["tokens"] += results.tokens_used
+            if results.cost is not None:
+                state["cost"] = (state["cost"] or 0.0) + results.cost
+        errors = [e for e in results.errors if e is not None]
+        if len(errors) == len(pool_items):
             raise RuntimeError(f"all {len(pool_items)} fanned-out calls failed. "
                                f"First: {errors[0]}")
         if errors:
             self._log(1, f"  ⚠  {len(errors)}/{len(pool_items)} entries failed; "
                          f"first: {errors[0]}")
-        return results
+        # A list, which is what a model reads: the result object rendered to
+        # its repr, `PoolResult(ok, items=3)`, told it nothing it had asked for.
+        return [out if err is None else {"error": err}
+                for out, err in zip(results.output, results.errors)]
 
     def _do_delegate(self, args: dict, state: dict) -> Any:
         """
@@ -1537,25 +1578,6 @@ class Agent:
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
-class _MappedSkill(Tool):
-    """Runs one ``Skill`` per pool entry."""
-
-    name        = "_mapped_skill"
-    description = "Internal: run the model over one pool entry."
-    parameters  = {"type": "object", "properties": {"item": {}}}
-    risk        = "read"
-
-    def __init__(self, agent: Agent, prompt: str) -> None:
-        self._agent  = agent
-        self._prompt = prompt
-
-    def run(self, item=None, options=None):
-        text  = (self._prompt or "{item}").replace("{item}", str(item))
-        skill = Skill(model=self._agent.model,
-                      input={"messages": [{"role": "user", "parts": [text]}]})
-        return skill.run()
-
 
 def _safe(value, limit: int = 200):
     """A short rendering for logs and the journal."""
