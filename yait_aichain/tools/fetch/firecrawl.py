@@ -45,7 +45,7 @@ class fetchFirecrawl(Fetch):
 
         from yait_aichain.tools import fetchFirecrawl
 
-        fetchFirecrawl().fetch(["https://example.com/a", "https://example.com/b"])["pages"]
+        fetchFirecrawl().run(["https://example.com/a", "https://example.com/b"])["pages"]
     """
 
     name        = "fetchFirecrawl"

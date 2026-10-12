@@ -87,6 +87,10 @@ where a fix is named below.
   dropped tools while inheriting `supports_tools = True`. A file-upload body
   is a `Multipart` instead of a dict carrying a `_multipart` key.
 
+- **A fetch tool offers a model several URLs in one call.** `url` is an
+  array of strings in the schema, so a model asking for three pages makes one
+  call rather than three; `run()` still takes a single string.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -94,11 +98,20 @@ where a fix is named below.
   agent's state is its conversation, and the field is always empty. A dict
   does the in-process half and `state.FileStore` the on-disk half. They warn
   now and go in 5.0.
+- **`fetch*().fetch()`** — it is `run()`, kept from 3.2 when `run()`
+  returned text; `search()` went in 4.0 and this goes in 5.0, so both
+  families have one method. It warns now.
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
   a list. It warns now and goes in 5.0.
 
 ### Fixed
 
+- **A search result's date is a real day or none.** `2026-13-45` and
+  `Feb 30, 2026` came back as dates; they are `""` now.
+- **Google transcription no longer pays twice for the end of a file.** The
+  chunk loop transcribed one more chunk made only of the last overlap; the
+  chunk that reaches the end is the last. Chunks go to the API from memory
+  instead of a temporary file.
 - **`@tool` reads what a function says about itself.** A NumPy-style
   docstring — the form this library writes — gave each parameter the
   description `float`, the type after the colon; it now gives the indented

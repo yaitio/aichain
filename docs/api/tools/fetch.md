@@ -56,7 +56,7 @@ fetchFirecrawl(
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | ✓ | The page's URL, http or https. |
+| `url` | `list[string]` | ✓ | The pages' URLs, http or https — one or several. |
 | `options.max_chars` | `integer` |  | Most characters of text per page (default 20 000). |
 | `options.only_main_content` | `boolean` |  | Drop navigation, headers and footers (default true). |
 
@@ -81,7 +81,7 @@ fetchTavily(
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | ✓ | The page's URL, http or https. |
+| `url` | `list[string]` | ✓ | The pages' URLs, http or https — one or several. |
 | `options.max_chars` | `integer` |  | Most characters of text per page (default 20 000). |
 | `options.extract_depth` | `string` |  | 'basic' (default); 'advanced' reaches tables and embedded content at twice the price. One of `basic`, `advanced`. |
 
@@ -106,7 +106,7 @@ fetchExa(
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | ✓ | The page's URL, http or https. |
+| `url` | `list[string]` | ✓ | The pages' URLs, http or https — one or several. |
 | `options.max_chars` | `integer` |  | Most characters of text per page (default 20 000). |
 | `options.max_age_hours` | `integer` |  | Use a cached copy younger than this (0 fetches fresh, -1 cache only; at most 720). |
 
@@ -131,7 +131,7 @@ fetchParallel(
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | ✓ | The page's URL, http or https. |
+| `url` | `list[string]` | ✓ | The pages' URLs, http or https — one or several. |
 | `options.max_chars` | `integer` |  | Most characters of text per page (default 20 000). |
 | `options.max_age_seconds` | `integer` |  | Fetch a page live when the cached copy is older than this (600 or more). Slower. |
 
@@ -158,6 +158,6 @@ fetchLocal(
 
 | Name | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | ✓ | The page's URL, http or https. |
+| `url` | `list[string]` | ✓ | The pages' URLs, http or https — one or several. |
 | `options.max_chars` | `integer` |  | Most characters of text per page (default 20 000). |
 <!-- /g:tool -->

@@ -41,7 +41,7 @@ class fetchTavily(Fetch):
 
         from yait_aichain.tools import fetchTavily
 
-        fetchTavily().fetch(["https://example.com/a", "https://example.com/b"])["pages"]
+        fetchTavily().run(["https://example.com/a", "https://example.com/b"])["pages"]
     """
 
     name        = "fetchTavily"

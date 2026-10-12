@@ -59,7 +59,7 @@ class fetchLocal(Fetch):
 
         from yait_aichain.tools import fetchLocal
 
-        fetchLocal().fetch("https://example.com")["pages"][0]["text"]
+        fetchLocal().run("https://example.com")["pages"][0]["text"]
     """
 
     name        = "fetchLocal"

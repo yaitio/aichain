@@ -40,7 +40,7 @@ class fetchExa(Fetch):
 
         from yait_aichain.tools import fetchExa
 
-        fetchExa().fetch(["https://example.com/a", "https://example.com/b"], {"max_age_hours": 24})["pages"]
+        fetchExa().run(["https://example.com/a", "https://example.com/b"], {"max_age_hours": 24})["pages"]
     """
 
     name        = "fetchExa"

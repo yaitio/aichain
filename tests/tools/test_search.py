@@ -572,5 +572,15 @@ class TestSearchLive(unittest.TestCase):
     def test_parallel(self): self._check(searchParallel, "PARALLEL_API_KEY")
 
 
+class TestADayThatDoesNotExist(unittest.TestCase):
+
+    def test_an_impossible_date_is_no_date(self):
+        for value in ("2026-13-45", "2026-02-30T10:00:00Z", "Feb 30, 2026", "31 Apr 2026"):
+            with self.subTest(value=value):
+                self.assertEqual(day(value), "")
+        self.assertEqual((day("2026-09-30T12:00:00Z"), day("Sep 3, 2026"), day("3 Sep 2026")),
+                         ("2026-09-30", "2026-09-03", "2026-09-03"))
+
+
 if __name__ == "__main__":
     unittest.main()

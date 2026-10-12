@@ -83,7 +83,7 @@ class TestOneRecord(unittest.TestCase):
     def test_every_provider_returns_the_same_record(self):
         for cls in FIXTURE:
             with self.subTest(cls.__name__):
-                found = _tool(cls).fetch(OK)
+                found = _tool(cls).run(OK)
                 self.assertEqual(set(found), {"pages", "notices", "cost", "cost_basis", "usage"})
                 (p,) = found["pages"]
                 self.assertEqual(set(p), KEYS)
@@ -95,50 +95,50 @@ class TestOneRecord(unittest.TestCase):
     def test_a_failed_url_is_a_page_with_an_error(self):
         for cls in (fetchTavily, fetchExa, fetchParallel):
             with self.subTest(cls.__name__):
-                pages = _tool(cls).fetch([OK, BAD])["pages"]
+                pages = _tool(cls).run([OK, BAD])["pages"]
                 self.assertEqual([p["url"] for p in pages], [OK, BAD])
                 self.assertEqual(pages[0]["error"], "")
                 self.assertTrue(pages[1]["error"])
                 self.assertEqual(pages[1]["text"], "")
 
     def test_exa_says_why(self):
-        self.assertEqual(_tool(fetchExa).fetch([OK, BAD])["pages"][1]["error"], "CRAWL_LIVECRAWL_TIMEOUT (HTTP 504)")
+        self.assertEqual(_tool(fetchExa).run([OK, BAD])["pages"][1]["error"], "CRAWL_LIVECRAWL_TIMEOUT (HTTP 504)")
 
     def test_a_url_the_provider_never_mentions_is_still_a_page(self):
         tool = _tool(fetchTavily, {"results": [], "failed_results": []})
-        (p,) = tool.fetch(OK)["pages"]
+        (p,) = tool.run(OK)["pages"]
         self.assertIn("returned nothing", p["error"])
 
     def test_dates_and_authors_where_the_provider_has_them(self):
-        p = _tool(fetchFirecrawl).fetch(OK)["pages"][0]
+        p = _tool(fetchFirecrawl).run(OK)["pages"][0]
         self.assertEqual((p["published"], p["author"], p["final_url"]), ("2026-09-30", "IANA", OK + "/"))
-        self.assertEqual(_tool(fetchExa).fetch(OK)["pages"][0]["published"], "2026-09-30")
+        self.assertEqual(_tool(fetchExa).run(OK)["pages"][0]["published"], "2026-09-30")
         # Tavily has no date or author at all: empty, never guessed.
-        p = _tool(fetchTavily).fetch(OK)["pages"][0]
+        p = _tool(fetchTavily).run(OK)["pages"][0]
         self.assertEqual((p["published"], p["author"]), ("", ""))
 
     def test_firecrawl_error_page_is_not_the_page(self):
         bad = json.loads(json.dumps(FIRECRAWL)); bad["data"]["metadata"]["statusCode"] = 404
-        p = _tool(fetchFirecrawl, bad).fetch(OK)["pages"][0]
+        p = _tool(fetchFirecrawl, bad).run(OK)["pages"][0]
         self.assertEqual(p["text"], "")
         self.assertIn("404", p["error"])
 
     def test_firecrawl_failure_is_a_page_and_out_of_credits_raises(self):
-        p = _tool(fetchFirecrawl, {"success": False, "error": "timeout"}, status=408).fetch(OK)["pages"][0]
+        p = _tool(fetchFirecrawl, {"success": False, "error": "timeout"}, status=408).run(OK)["pages"][0]
         self.assertIn("timeout", p["error"])
         with self.assertRaises(RuntimeError):
-            _tool(fetchFirecrawl, {"success": False, "error": "Payment required"}, status=402).fetch(OK)
+            _tool(fetchFirecrawl, {"success": False, "error": "Payment required"}, status=402).run(OK)
 
     def test_an_api_error_raises(self):
         for cls in (fetchTavily, fetchExa, fetchParallel):
             with self.subTest(cls.__name__), self.assertRaises(RuntimeError):
-                _tool(cls, {"error": "bad key"}, status=401).fetch(OK)
+                _tool(cls, {"error": "bad key"}, status=401).run(OK)
 
     def test_a_url_that_is_not_http_is_refused_before_the_wire(self):
         tool = _tool(fetchExa)
         for bad in ("file:///etc/passwd", "", "example.com", []):
             with self.subTest(bad), self.assertRaises(ValueError):
-                tool.fetch(bad)
+                tool.run(bad)
         tool._http.request.assert_not_called()
 
 
@@ -149,41 +149,41 @@ class TestBatching(unittest.TestCase):
         for cls, calls in ((fetchFirecrawl, 45), (fetchTavily, 3), (fetchParallel, 3), (fetchExa, 1)):
             with self.subTest(cls.__name__):
                 tool = _tool(cls, {"results": [], "data": {"metadata": {}}, "success": True})
-                tool.fetch(urls)
+                tool.run(urls)
                 self.assertEqual(tool._http.request.call_count, calls)
 
     def test_duplicates_are_fetched_once(self):
         tool = _tool(fetchExa)
-        self.assertEqual(len(tool.fetch([OK, OK, OK])["pages"]), 1)
+        self.assertEqual(len(tool.run([OK, OK, OK])["pages"]), 1)
         self.assertEqual(_sent(tool)["urls"], [OK])
 
 
 class TestMaxChars(unittest.TestCase):
 
     def test_reaches_the_provider_where_it_takes_a_limit(self):
-        tool = _tool(fetchExa); tool.fetch(OK, {"max_chars": 500})
+        tool = _tool(fetchExa); tool.run(OK, {"max_chars": 500})
         self.assertEqual(_sent(tool)["text"], {"maxCharacters": 500})
-        tool = _tool(fetchParallel); tool.fetch(OK, {"max_chars": 500})
+        tool = _tool(fetchParallel); tool.run(OK, {"max_chars": 500})
         self.assertEqual(_sent(tool)["advanced_settings"]["full_content"], {"max_chars_per_result": 500})
 
     def test_cut_here_for_every_provider(self):
         for cls in FIXTURE:
             with self.subTest(cls.__name__):
-                self.assertEqual(len(_tool(cls).fetch(OK, {"max_chars": 10})["pages"][0]["text"]), 10)
+                self.assertEqual(len(_tool(cls).run(OK, {"max_chars": 10})["pages"][0]["text"]), 10)
 
 
 class TestProviderOptions(unittest.TestCase):
 
     def test_each_reaches_the_wire(self):
-        tool = _tool(fetchFirecrawl); tool.fetch(OK, {"only_main_content": False})
+        tool = _tool(fetchFirecrawl); tool.run(OK, {"only_main_content": False})
         self.assertIs(_sent(tool)["onlyMainContent"], False)
-        tool = _tool(fetchFirecrawl); tool.fetch(OK)
+        tool = _tool(fetchFirecrawl); tool.run(OK)
         self.assertIs(_sent(tool)["onlyMainContent"], True)
-        tool = _tool(fetchTavily); tool.fetch(OK, {"extract_depth": "advanced"})
+        tool = _tool(fetchTavily); tool.run(OK, {"extract_depth": "advanced"})
         self.assertEqual(_sent(tool)["extract_depth"], "advanced")
-        tool = _tool(fetchExa); tool.fetch(OK, {"max_age_hours": 0})
+        tool = _tool(fetchExa); tool.run(OK, {"max_age_hours": 0})
         self.assertEqual(_sent(tool)["maxAgeHours"], 0)
-        tool = _tool(fetchParallel); tool.fetch(OK, {"max_age_seconds": 600})
+        tool = _tool(fetchParallel); tool.run(OK, {"max_age_seconds": 600})
         self.assertEqual(_sent(tool)["advanced_settings"]["fetch_policy"], {"max_age_seconds": 600})
 
     def test_options_are_declared_in_the_schema(self):
@@ -196,37 +196,37 @@ class TestProviderOptions(unittest.TestCase):
         tool = _tool(fetchParallel)
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
-            self.assertEqual(tool.fetch(OK)["notices"], [])
+            self.assertEqual(tool.run(OK)["notices"], [])
         other = dict(PARALLEL, warnings=[{"type": "warning", "message": "URL was truncated"}])
         with warnings.catch_warnings(record=True) as seen:
             warnings.simplefilter("always")
-            self.assertEqual(_tool(fetchParallel, other).fetch(OK)["notices"], ["Parallel: URL was truncated"])
+            self.assertEqual(_tool(fetchParallel, other).run(OK)["notices"], ["Parallel: URL was truncated"])
         self.assertTrue(seen)
 
 
 class TestWhatACallCost(unittest.TestCase):
 
     def test_read_from_the_answer(self):
-        self.assertAlmostEqual(_tool(fetchExa).fetch(OK)["cost"], 0.001)
-        self.assertEqual(_tool(fetchExa).fetch(OK)["cost_basis"], "reported by Exa")
-        found = _tool(fetchFirecrawl).fetch(OK)
+        self.assertAlmostEqual(_tool(fetchExa).run(OK)["cost"], 0.001)
+        self.assertEqual(_tool(fetchExa).run(OK)["cost_basis"], "reported by Exa")
+        found = _tool(fetchFirecrawl).run(OK)
         self.assertAlmostEqual(found["cost"], 19 / 5000)
         self.assertEqual(found["usage"], {"credits": 1})
-        found = _tool(fetchParallel).fetch(OK)
+        found = _tool(fetchParallel).run(OK)
         self.assertAlmostEqual(found["cost"], 0.001)
         self.assertEqual(found["usage"], {"sku_extract_excerpts": 1})
         # Tavily bills per five URLs, and reports 0 below that: what it says is what is returned.
-        self.assertEqual(_tool(fetchTavily).fetch(OK)["cost"], 0.0)
+        self.assertEqual(_tool(fetchTavily).run(OK)["cost"], 0.0)
 
     def test_summed_over_batches(self):
         tool = _tool(fetchFirecrawl)
-        found = tool.fetch([OK, OK + "/a", OK + "/b"])
+        found = tool.run([OK, OK + "/a", OK + "/b"])
         self.assertAlmostEqual(found["cost"], 3 * 19 / 5000)
         self.assertEqual(found["usage"], {"credits": 3})
 
     def test_published_rate_when_the_answer_is_silent(self):
         tool = _tool(fetchExa, {"results": EXA["results"]})
-        found = tool.fetch(OK)
+        found = tool.run(OK)
         self.assertAlmostEqual(found["cost"], 0.001)
         self.assertIn("published rate", found["cost_basis"])
 
@@ -255,7 +255,7 @@ class TestTheTextAModelReads(unittest.TestCase):
 
     def test_fetch_is_run_under_its_old_name(self):
         tool = _tool(fetchExa)
-        self.assertEqual(dict(tool.fetch(OK)), dict(tool.run(OK)))
+        self.assertEqual(dict(tool.run(OK)), dict(tool.run(OK)))
 
 
 class TestFactory(unittest.TestCase):
@@ -337,7 +337,7 @@ def _local(robots=None, robots_status=200, page_status=200, robots_raises=False,
 class TestLocal(unittest.TestCase):
 
     def test_a_page_with_its_head(self):
-        found = _local().fetch(OK)
+        found = _local().run(OK)
         (p,) = found["pages"]
         self.assertEqual((p["title"], p["published"], p["author"], p["text"]),
                          ("Example Domain", "2026-09-30", "IANA", TEXT))
@@ -345,29 +345,29 @@ class TestLocal(unittest.TestCase):
 
     def test_robots_refusal_skips_the_page_without_requesting_it(self):
         tool = _local("User-agent: ClaudeBot\nDisallow: /\n")
-        (p,) = tool.fetch(OK + "/article")["pages"]
+        (p,) = tool.run(OK + "/article")["pages"]
         self.assertEqual(p["error"], "robots.txt disallows ClaudeBot")
         asked = [c.args[0] for c in tool._session.get.call_args_list]
         self.assertEqual(asked, [OK + "/robots.txt"])
 
     def test_robots_is_read_once_per_host(self):
         tool = _local("User-agent: *\nAllow: /\n")
-        tool.fetch([OK + "/a", OK + "/b"])
+        tool.run([OK + "/a", OK + "/b"])
         asked = [c.args[0] for c in tool._session.get.call_args_list]
         self.assertEqual(asked.count(OK + "/robots.txt"), 1)
 
     def test_rfc_9309_status_codes(self):
-        self.assertEqual(_local(robots_status=404).fetch(OK)["pages"][0]["error"], "")
-        self.assertIn("server error", _local(robots_status=503).fetch(OK)["pages"][0]["error"])
-        self.assertIn("could not be reached", _local(robots_raises=True).fetch(OK)["pages"][0]["error"])
+        self.assertEqual(_local(robots_status=404).run(OK)["pages"][0]["error"], "")
+        self.assertIn("server error", _local(robots_status=503).run(OK)["pages"][0]["error"])
+        self.assertIn("could not be reached", _local(robots_raises=True).run(OK)["pages"][0]["error"])
 
     def test_robots_can_be_turned_off_or_narrowed(self):
-        self.assertEqual(_local("User-agent: *\nDisallow: /\n", respect_robots=False).fetch(OK)["pages"][0]["error"], "")
+        self.assertEqual(_local("User-agent: *\nDisallow: /\n", respect_robots=False).run(OK)["pages"][0]["error"], "")
         tool = _local("User-agent: ClaudeBot\nDisallow: /\n", robots_agents=("*",))
-        self.assertEqual(tool.fetch(OK)["pages"][0]["error"], "")
+        self.assertEqual(tool.run(OK)["pages"][0]["error"], "")
 
     def test_an_http_error_is_a_page(self):
-        self.assertEqual(_local(page_status=403).fetch(OK)["pages"][0]["error"], "HTTP 403")
+        self.assertEqual(_local(page_status=403).run(OK)["pages"][0]["error"], "HTTP 403")
 
 
 class TestLocalNeedsMarkItDown(unittest.TestCase):
@@ -397,7 +397,7 @@ class TestFetchLive(unittest.TestCase):
     def _check(self, cls, var=None):
         if var and not _real(var):
             self.skipTest(f"{var} not set to a real key")
-        (p,) = cls().fetch(self.URL)["pages"]
+        (p,) = cls().run(self.URL)["pages"]
         self.assertEqual(set(p), KEYS)
         self.assertEqual(p["error"], "")
         self.assertIn("example", p["text"].lower())
@@ -407,6 +407,18 @@ class TestFetchLive(unittest.TestCase):
     def test_exa(self): self._check(fetchExa, "EXA_API_KEY")
     def test_parallel(self): self._check(fetchParallel, "PARALLEL_API_KEY")
     def test_local(self): self._check(fetchLocal)
+
+
+class TestOneMethodAndABatchableSchema(unittest.TestCase):
+
+    def test_fetch_is_run_and_says_it_is_going(self):
+        tool = _tool(fetchExa)
+        with self.assertWarnsRegex(DeprecationWarning, "5.0"):
+            self.assertEqual(tool.fetch(OK)["pages"][0]["url"], OK)
+
+    def test_a_model_is_offered_several_urls_in_one_call(self):
+        url = fetchExa.parameters["properties"]["url"]
+        self.assertEqual((url["type"], url["items"]["type"]), ("array", "string"))
 
 
 if __name__ == "__main__":

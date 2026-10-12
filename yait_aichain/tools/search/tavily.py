@@ -96,7 +96,7 @@ class searchTavily(Search):
 
         tool = searchTavily()
         tool.run(input="EU AI Act enforcement", options={"recency": "month", "country": "DE"})
-        tool.search(input="AI and leadership", options={
+        tool.run(input="AI and leadership", options={
             "domains": ["hbr.org"], "start_date": "2026-09-28", "end_date": "2026-10-04",
             "filter_by_published_date": True})
     """

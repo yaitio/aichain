@@ -106,6 +106,14 @@ _MONTHS = {m: i for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 
 
+def _iso(year, month, dom) -> str:
+    """The date, or ``""`` when there is no such day — "2026-13-45" is not one."""
+    try:
+        return date(int(year), int(month), int(dom)).isoformat()
+    except ValueError:
+        return ""
+
+
 def day(value) -> str:
     """A provider's date as ``YYYY-MM-DD``, or ``""`` when it is not one.
 
@@ -118,13 +126,13 @@ def day(value) -> str:
     s = re.sub(r"^[A-Za-z]{3},\s*", "", str(value).strip())
     m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
     if m:
-        return "-".join(m.groups())
-    m = re.match(r"([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})", s) or None
+        return _iso(*m.groups())
+    m = re.match(r"([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})", s)
     if m and m.group(1).lower() in _MONTHS:
-        return f"{m.group(3)}-{_MONTHS[m.group(1).lower()]:02d}-{int(m.group(2)):02d}"
+        return _iso(m.group(3), _MONTHS[m.group(1).lower()], m.group(2))
     m = re.match(r"(\d{1,2}) ([A-Za-z]{3})[a-z]*\.? (\d{4})", s)
     if m and m.group(2).lower() in _MONTHS:
-        return f"{m.group(3)}-{_MONTHS[m.group(2).lower()]:02d}-{int(m.group(1)):02d}"
+        return _iso(m.group(3), _MONTHS[m.group(2).lower()], m.group(1))
     m = re.match(r"(\d+) (minute|hour|day|week|month)s? ago", s)
     if m:
         n, unit = int(m.group(1)), m.group(2)

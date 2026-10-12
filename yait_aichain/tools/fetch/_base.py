@@ -60,6 +60,11 @@ STANDARD_OPTIONS = {
 }
 
 
+#: An array, so a model asking for three pages makes one call rather than
+#: three; `run()` takes a single string too, for code and for a Chain step.
+_URL_SCHEMA = {"type": "array", "items": {"type": "string"},
+               "description": "The pages' URLs, http or https — one or several."}
+
 class Fetch(Tool):
     """
     Base of the fetch tools: one record of a page, a provider per subclass.
@@ -86,7 +91,7 @@ class Fetch(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "url":     {"type": "string", "description": "The page's URL, http or https."},
+            "url":     _URL_SCHEMA,
             "options": {"type": "object", "description": "Optional settings.", "properties": dict(STANDARD_OPTIONS)},
         },
         "required": ["url"],
@@ -94,11 +99,11 @@ class Fetch(Tool):
 
     def __init_subclass__(cls, **kw):
         super().__init_subclass__(**kw)
-        props = dict(STANDARD_OPTIONS); props.update(cls.extra_options)
+        props = {**STANDARD_OPTIONS, **cls.extra_options}
         cls.parameters = {
             "type": "object",
             "properties": {
-                "url":     {"type": "string", "description": "The page's URL, http or https."},
+                "url":     _URL_SCHEMA,
                 "options": {"type": "object", "description": "Optional settings.", "properties": props},
             },
             "required": ["url"],
@@ -146,12 +151,14 @@ class Fetch(Tool):
         total = {"usd": 0.0, "usage": {}, "basis": ""}
         got: dict = {}
         for i in range(0, len(wanted), self.max_batch):
+            batch = wanted[i:i + self.max_batch]
             cost: dict = {}
-            got.update(self._fetch(wanted[i:i + self.max_batch], opts, notices, cost))
+            got.update(self._fetch(batch, opts, notices, cost))
             if "usd" not in cost:
-                cost.update(usd=self._LIST_PRICE * len(wanted[i:i + self.max_batch]),
+                cost.update(usd=self._LIST_PRICE * len(batch),
                             basis=f"published rate ({self._PRICE_SOURCE})")
-            total["usd"] += cost["usd"]; total["basis"] = cost["basis"]
+            total["usd"] += cost["usd"]
+            total["basis"] = cost["basis"]
             for k, v in (cost.get("usage") or {}).items():
                 total["usage"][k] = total["usage"].get(k, 0) + v if isinstance(v, (int, float)) else v
         pages = []
@@ -164,7 +171,10 @@ class Fetch(Tool):
                        "cost_basis": total["basis"], "usage": total["usage"]}, self.render)
 
     def fetch(self, urls, options: dict | None = None) -> Record:
-        """The same as :meth:`run` — kept from 3.2, when ``run()`` returned the text."""
+        """Deprecated: the same as :meth:`run`. Removed in 5.0, as ``search()``
+        was in 4.0 — one method for both families."""
+        warnings.warn(f"{type(self).__name__}.fetch() is run() and goes in 5.0; call run()",
+                      DeprecationWarning, stacklevel=2)
         return self.run(urls, options)
 
     def render(self, found: dict) -> str:

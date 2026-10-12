@@ -45,7 +45,7 @@ class fetchParallel(Fetch):
 
         from yait_aichain.tools import fetchParallel
 
-        fetchParallel().fetch(["https://example.com/a", "https://example.com/b"])["pages"]
+        fetchParallel().run(["https://example.com/a", "https://example.com/b"])["pages"]
     """
 
     name        = "fetchParallel"

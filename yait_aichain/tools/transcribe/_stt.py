@@ -43,6 +43,7 @@ from __future__ import annotations
 
 from ..._require import require
 
+import io
 import json
 import os
 import tempfile
@@ -293,16 +294,14 @@ class _OpenAICompatSTT(Transcription):
         audio      = AudioSegment.from_file(path)
         chunk_ms   = self._CHUNK_SECONDS * 1000
         parts: list[str] = []
-        start_ms = 0
 
         # Chunks are CONTIGUOUS (no overlap): this path joins plain transcript
         # text and has no word-timing data to de-duplicate an overlap region,
         # so overlapping audio would repeat a few seconds of speech at every
         # boundary. A clean cut at a 10-minute boundary risks splitting at most
         # one word — far less harmful than duplicated phrases.
-        while start_ms < len(audio):
-            end_ms = min(start_ms + chunk_ms, len(audio))
-            chunk  = audio[start_ms:end_ms]
+        for start_ms in range(0, len(audio), chunk_ms):
+            chunk = audio[start_ms:start_ms + chunk_ms]
 
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
                 tmp_path = tmp.name
@@ -313,10 +312,6 @@ class _OpenAICompatSTT(Transcription):
                 parts.append(part.strip())
             finally:
                 os.unlink(tmp_path)
-
-            if end_ms >= len(audio):
-                break
-            start_ms = end_ms
 
         combined = " ".join(p for p in parts if p)
         if fmt == "json" or timestamps:
@@ -573,60 +568,52 @@ class sttGoogle(Transcription):
         overlap_ms = self._OVERLAP_SECONDS * 1000
         parts: list[str]  = []
         words: list[dict] = []
-        start_ms = 0
 
-        while start_ms < len(audio):
-            end_ms = min(start_ms + chunk_ms, len(audio))
-            chunk  = audio[start_ms:end_ms]
+        # Each chunk starts an overlap before the last one ended, and the last
+        # chunk is the one that reaches the end: a further chunk would be the
+        # overlap alone, transcribed and billed a second time.
+        for start_ms in range(0, len(audio), chunk_ms - overlap_ms):
+            chunk = audio[start_ms:start_ms + chunk_ms]
+            buffer = io.BytesIO()
+            chunk.export(buffer, format="wav")
+            content = buffer.getvalue()
+            chunk_config = _speech.RecognitionConfig(
+                encoding      = _speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                language_code = config.language_code,
+                model         = config.model,
+                enable_word_time_offsets     = timestamps,
+                enable_automatic_punctuation = True,
+            )
+            resp = client.recognize(
+                config = chunk_config,
+                audio  = _speech.RecognitionAudio(content=content),
+            )
+            part = " ".join(
+                r.alternatives[0].transcript
+                for r in resp.results
+                if r.alternatives
+            )
+            parts.append(part.strip())
 
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                tmp_path = tmp.name
-            try:
-                chunk.export(tmp_path, format="wav")
-                with open(tmp_path, "rb") as fh:
-                    content = fh.read()
-                chunk_config = _speech.RecognitionConfig(
-                    encoding      = _speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                    language_code = config.language_code,
-                    model         = config.model,
-                    enable_word_time_offsets     = timestamps,
-                    enable_automatic_punctuation = True,
-                )
-                resp = client.recognize(
-                    config = chunk_config,
-                    audio  = _speech.RecognitionAudio(content=content),
-                )
-                part = " ".join(
-                    r.alternatives[0].transcript
-                    for r in resp.results
-                    if r.alternatives
-                )
-                parts.append(part.strip())
-
-                if timestamps:
-                    offset_s = start_ms / 1000.0
-                    for r in resp.results:
-                        if not r.alternatives:
+            if timestamps:
+                offset_s = start_ms / 1000.0
+                for r in resp.results:
+                    if not r.alternatives:
+                        continue
+                    for w in r.alternatives[0].words:
+                        local_start = w.start_time.total_seconds()
+                        # Words inside the leading overlap of a non-first
+                        # chunk were already captured by the previous
+                        # chunk — drop them to avoid duplicates.
+                        if start_ms > 0 and local_start < self._OVERLAP_SECONDS:
                             continue
-                        for w in r.alternatives[0].words:
-                            local_start = w.start_time.total_seconds()
-                            # Words inside the leading overlap of a non-first
-                            # chunk were already captured by the previous
-                            # chunk — drop them to avoid duplicates.
-                            if start_ms > 0 and local_start < self._OVERLAP_SECONDS:
-                                continue
-                            words.append({
-                                "word":  w.word,
-                                "start": local_start + offset_s,
-                                "end":   w.end_time.total_seconds() + offset_s,
-                            })
-            finally:
-                os.unlink(tmp_path)
-
-            next_start = end_ms - overlap_ms
-            if next_start <= start_ms:
+                        words.append({
+                            "word":  w.word,
+                            "start": local_start + offset_s,
+                            "end":   w.end_time.total_seconds() + offset_s,
+                        })
+            if start_ms + chunk_ms >= len(audio):
                 break
-            start_ms = next_start
 
         # NB: the plain-text join may duplicate a word or two at chunk
         # boundaries (the 2 s overlap is transcribed twice); the word list
