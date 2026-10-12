@@ -124,6 +124,22 @@ StateStore.load(run_id: str) -> dict | None
 
 Return the stored document, or `None` if there is none.
 
+### `StateStore.take()`
+
+```python
+StateStore.take(run_id: str) -> dict | None
+```
+
+Remove the document and return it, as one step: the claim a resume
+makes before it acts, so that two deliveries of one signal — an SQS
+message seen twice, a webhook retried — cannot both run the approved
+action. `None` when there is nothing to take, which a second
+delivery reads as "already handled".
+
+This default loads then deletes, which is **not** atomic. A store
+shared between processes overrides it with the backend's own claim:
+a conditional delete in DynamoDB, `GETDEL` in Redis.
+
 ---
 
 ## `InMemoryStore`
@@ -135,6 +151,22 @@ InMemoryStore()
 Process-local store (the default). Survives suspend→resume **within one
 process** only; for cross-process / serverless use a shared store
 (`FileStore` or a custom S3/Dynamo backend).
+
+### `InMemoryStore.take()`
+
+```python
+InMemoryStore.take(run_id: str) -> dict | None
+```
+
+Remove the document and return it, as one step: the claim a resume
+makes before it acts, so that two deliveries of one signal — an SQS
+message seen twice, a webhook retried — cannot both run the approved
+action. `None` when there is nothing to take, which a second
+delivery reads as "already handled".
+
+This default loads then deletes, which is **not** atomic. A store
+shared between processes overrides it with the backend's own claim:
+a conditional delete in DynamoDB, `GETDEL` in Redis.
 
 ### `InMemoryStore.load()`
 
@@ -167,6 +199,16 @@ FileStore.load(run_id: str) -> dict | None
 ```
 
 Return the stored document, or `None` if there is none.
+
+### `FileStore.take()`
+
+```python
+FileStore.take(run_id: str) -> dict | None
+```
+
+Claimed by a rename, which the filesystem makes atomic: of two
+processes taking one run, one rename succeeds and the other finds no
+file.
 
 ---
 

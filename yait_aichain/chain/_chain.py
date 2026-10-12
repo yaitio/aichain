@@ -584,7 +584,9 @@ class Chain:
         from ..state import RunDocument, RunContext
         from ..models._usage import Usage
 
-        raw = self._store.load(run_id)
+        # Claimed, not read: two deliveries of one signal cannot both run the
+        # step a person approved. The second finds nothing.
+        raw = self._store.take(run_id)
         if raw is None:
             raise KeyError(
                 f"No suspended run {run_id!r} in the store "
@@ -597,8 +599,16 @@ class Chain:
         if context is None:
             from ..state import current
             context = current()
+        from ..state import StepStatus
+        failed = next((st for st in doc.steps if st["status"] == StepStatus.FAILED), None)
+        if doc.suspended_step() is None and failed is not None:
+            # A resumed run that failed afterwards was kept with that step
+            # marked; resuming it again retries that step and what follows,
+            # never the ones already done — an approved refund among them.
+            failed["status"] = StepStatus.PENDING
+            signal = None
         start = doc.first_pending()
-        if start is None or doc.suspended_step() is None:
+        if start is None or (doc.suspended_step() is None and failed is None):
             return None   # not actually suspended → idempotent no-op
 
         accumulated = dict(doc.variables)
@@ -626,7 +636,7 @@ class Chain:
             return self._run_from(doc, accumulated, start_idx=start,
                                   signal=signal,
                                   usage_in=usage_in, on_error=_on_error,
-                                  context=context)
+                                  context=context, resumed=True)
 
     def _lend_budget(self):
         """Put this chain's budget on every step that can hold one.
@@ -672,7 +682,7 @@ class Chain:
                                document=doc.to_dict())
 
     def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
-                  on_error, context) -> ChainResult:
+                  on_error, context, resumed: bool = False) -> ChainResult:
         """
         Shared step loop for ``run()`` (from step 0) and ``resume()`` (from the
         suspended step). On ``resume``, *signal* is delivered to the step at
@@ -799,11 +809,15 @@ class Chain:
                 })
 
                 if on_error in ("raise", "stop"):
-                    # Terminal exit: mark the step failed and drop any parked
-                    # document so a re-resume can't re-run the already-attempted
-                    # steps (a duplicate trigger becomes a no-op / KeyError).
+                    # Terminal exit, with the step marked failed. A resumed run
+                    # is kept so: the store already gave it up to this resume,
+                    # and a transient failure after an approved step would
+                    # otherwise lose the run — resume() retries from this step.
                     doc.steps[idx]["status"] = StepStatus.FAILED
-                    self._store.delete(doc.run_id)
+                    if resumed:
+                        doc.variables = dict(accumulated)
+                        doc.usage     = _usage_to_dict(usage_total)
+                        self._store.save(doc.run_id, doc.to_dict())
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total

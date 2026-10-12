@@ -17,6 +17,8 @@ import copy
 import json
 import os
 import tempfile
+import threading
+import uuid
 
 
 class StateStore:
@@ -32,6 +34,22 @@ class StateStore:
     def delete(self, run_id: str) -> None:
         raise NotImplementedError
 
+    def take(self, run_id: str) -> dict | None:
+        """Remove the document and return it, as one step: the claim a resume
+        makes before it acts, so that two deliveries of one signal — an SQS
+        message seen twice, a webhook retried — cannot both run the approved
+        action. ``None`` when there is nothing to take, which a second
+        delivery reads as "already handled".
+
+        This default loads then deletes, which is **not** atomic. A store
+        shared between processes overrides it with the backend's own claim:
+        a conditional delete in DynamoDB, ``GETDEL`` in Redis.
+        """
+        document = self.load(run_id)
+        if document is not None:
+            self.delete(run_id)
+        return document
+
 
 class InMemoryStore(StateStore):
     """
@@ -42,9 +60,14 @@ class InMemoryStore(StateStore):
 
     def __init__(self) -> None:
         self._runs: dict[str, dict] = {}
+        self._lock = threading.Lock()
 
     def save(self, run_id: str, document: dict) -> None:
         self._runs[run_id] = copy.deepcopy(document)
+
+    def take(self, run_id: str) -> dict | None:
+        with self._lock:
+            return self._runs.pop(run_id, None)
 
     def load(self, run_id: str) -> dict | None:
         doc = self._runs.get(run_id)
@@ -122,3 +145,18 @@ class FileStore(StateStore):
             os.unlink(self._path(run_id))
         except FileNotFoundError:
             pass
+
+    def take(self, run_id: str) -> dict | None:
+        """Claimed by a rename, which the filesystem makes atomic: of two
+        processes taking one run, one rename succeeds and the other finds no
+        file."""
+        claimed = f"{self._path(run_id)}.{uuid.uuid4().hex}.taken"
+        try:
+            os.rename(self._path(run_id), claimed)
+        except FileNotFoundError:
+            return None
+        try:
+            with open(claimed, encoding="utf-8") as fh:
+                return json.load(fh)
+        finally:
+            os.unlink(claimed)

@@ -118,6 +118,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **An approved action runs once, however often its signal arrives.** A
+  resume loaded the parked run, ran the rest and deleted it at the end, so
+  two deliveries of one signal — an SQS message seen twice, a webhook
+  retried — both refunded. `StateStore.take()` now claims a run in one step
+  (a lock in memory, a rename on disk; a shared store overrides it with its
+  backend's conditional delete), and the second delivery gets `KeyError`.
+  A resumed run that then fails on the model, or on a later chain step, is
+  kept with what already happened — the approved action's result included —
+  and `resume(run_id)` retries from there without repeating it, where the
+  run used to be deleted and a person's approval lost to a transient error.
+  Delivery is at most once for the action.
 - **A reply cut off at the token ceiling is not executed, and not a
   success.** The stop reason was read only when parsing JSON: a tool call cut
   at `max_tokens` ran with `{}` or half its arguments, and an empty answer —

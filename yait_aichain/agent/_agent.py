@@ -732,11 +732,14 @@ class Agent:
         if self.store is None:
             raise ValueError(f"agent {self.name or ''!r} has no store, so it "
                              "never parked a run. Pass Agent(store=...).")
-        raw = self.store.load(run_id)
+        # Claimed, not read: a second delivery of the same signal finds
+        # nothing and gets the KeyError below, where loading then deleting at
+        # the end let two deliveries both run the approved action.
+        raw = self.store.take(run_id)
         if raw is None:
             raise KeyError(
                 f"no suspended run {run_id!r} in the store — it has already "
-                "been resumed to completion, or it was never parked here.")
+                "been resumed, or it was never parked here.")
 
         doc = RunDocument.from_dict(raw)
         # The tenant the run was parked under, restored: the signal may arrive
@@ -760,6 +763,9 @@ class Agent:
                                                "run_id": run_id})
             with collecting_beacons() as board:
                 result = self._loop(messages, state, journal)
+            if _interrupted(result):
+                # Nothing has acted yet, so the run is armed again as it was.
+                self.store.save(run_id, doc.to_dict())
             return self._finished(result, journal, board)
 
         messages = list(doc.variables.get("messages") or [])
@@ -771,6 +777,14 @@ class Agent:
         self._run_id = doc.variables.get("run_id") or uuid.uuid4().hex
         self._doc_id = run_id
         call_id      = parked.get("call_id") or ""
+        if parked.get("at") == "after":
+            # Interrupted after the parked call was answered: its result is in
+            # the history, so the run continues from there and nothing is
+            # completed — or charged, or refunded — a second time.
+            self._emit("run.resumed", step=state.get("steps"),
+                       payload={"run_id": run_id, "after": parked.get("reason", ""),
+                                "agent": self.name or ""})
+            return self._continue(messages, state, journal, run_id)
         self._emit("run.resumed", name=parked.get("tool"),
                    step=state.get("steps"),
                    payload={"run_id": run_id, "tool": parked.get("tool"),
@@ -800,9 +814,22 @@ class Agent:
                    payload={"id": call_id, "result": result,
                             "agent": self.name or ""},
                    error=error)
+        return self._continue(messages, state, journal, run_id)
 
+    def _continue(self, messages, state, journal, run_id: str):
+        """The rest of a resumed run. A failure the run can be retried from —
+        the model's call failing, a reply cut off — keeps the run in the store
+        with what has happened so far, the parked action's result included, so
+        a retry picks up after it instead of losing a run a person approved."""
         with collecting_beacons() as board:
             result = self._loop(messages, state, journal)
+        if _interrupted(result):
+            self._save_parked(
+                {"messages": messages, "state": self._portable_state(state),
+                 "journal": journal.to_list(), "run_id": self._run_id},
+                {"at": "after", "reason": result.error or result.stopped_by or ""},
+                run_id=run_id)
+            self._doc_id = None              # kept on purpose: `_finished` must not delete it
         return self._finished(result, journal, board)
 
     # ── Externally driven: one turn at a time ────────────────────────────
@@ -1647,6 +1674,12 @@ class Agent:
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _interrupted(result) -> bool:
+    """A run that stopped on the model rather than on its own: worth a retry."""
+    return (isinstance(result, AgentResult) and not result.success
+            and result.stopped_by in ("llm_error", "truncated"))
+
 
 def _safe(value, limit: int = 200):
     """A short rendering for logs and the journal."""

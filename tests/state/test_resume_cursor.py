@@ -68,25 +68,51 @@ class TestResumeDoesNotRerunSkipped(unittest.TestCase):
         self.assertEqual(c.calls, 1)               # c ran once after resume
 
 
-class TestErrorDuringResumeClearsStore(unittest.TestCase):
+class TestErrorDuringResumeKeepsTheRun(unittest.TestCase):
+    """A step that fails after a resume leaves the run in the store with that
+    step marked failed: the store gave it up to this resume, and dropping it
+    lost a run a person had approved to a transient error. Resuming again
+    retries the failed step only — the approved one is never re-run."""
 
-    def test_terminal_error_after_resume_is_idempotent(self):
-        store = InMemoryStore()
-        chain = Chain(
-            steps=[Wait(reason="hold"), (Boom(), "x")],
-            store=store,
-            on_step_error="raise",
-        )
+    def test_a_failure_after_resume_is_kept_and_retried_from_the_failed_step(self):
+        from yait_aichain.state import StepStatus
+        store, waits = InMemoryStore(), []
+
+        class Counted(Wait):
+            def run(self, _signal=None, **kw):
+                if _signal is not None:
+                    waits.append(_signal)
+                return super().run(_signal=_signal, **kw)
+
+        chain = Chain(steps=[Counted(reason="hold"), (Boom(), "x")], store=store,
+                      on_step_error="raise")
         res = chain.run(variables={})
         self.assertIsInstance(res, SuspendedResult)
 
         with self.assertRaises(RuntimeError):       # Boom fails after resume
             chain.resume(res.run_id, signal={"ok": True})
+        kept = store.load(res.run_id)
+        self.assertEqual([s["status"] for s in kept["steps"]], [StepStatus.DONE, StepStatus.FAILED])
 
-        # the parked run must be gone — a duplicate trigger can't re-execute it
-        self.assertIsNone(store.load(res.run_id))
+        with self.assertRaises(RuntimeError):       # the retry runs Boom again, not the Wait
+            chain.resume(res.run_id)
+        self.assertEqual(waits, [{"ok": True}])
+
+    def test_two_deliveries_of_one_signal_run_it_once(self):
+        store, done = InMemoryStore(), []
+
+        class Once(Wait):
+            def run(self, _signal=None, **kw):
+                if _signal is not None:
+                    done.append(_signal)
+                return super().run(_signal=_signal, **kw)
+
+        chain = Chain(steps=[Once(reason="approve")], store=store)
+        res = chain.run(variables={})
+        chain.resume(res.run_id, signal={"ok": True})
         with self.assertRaises(KeyError):
             chain.resume(res.run_id, signal={"ok": True})
+        self.assertEqual(len(done), 1)
 
 
 if __name__ == "__main__":
