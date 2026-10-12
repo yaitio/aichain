@@ -81,6 +81,7 @@ class Fetch(Tool):
     description = "Fetch a web page by its URL and return its text as Markdown."
     # It reads the web and changes nothing anywhere.
     risk        = "read"
+    _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     max_batch: int = 1
     extra_options: dict = {}
     _ENV_KEY: str | tuple = ()

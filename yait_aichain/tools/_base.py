@@ -232,6 +232,14 @@ class Tool:
     # no policy attached this attribute is inert.
     risk:        str  = "write"
 
+    # Whether `Chain.load` may build this class from a file nobody vouched
+    # for. A saved chain names the class, its constructor arguments and the
+    # variables it runs with, so the file chooses what happens: a shell tool
+    # from it runs the file's command, an MCP tool the file's server. Off by
+    # default; a class turns it on only when nothing in its arguments points
+    # anywhere — no command, no host, no folder — and its risk is read or draft.
+    _safe_for_untrusted_load: bool = False
+
     # Declares that this tool can park the run by raising ``state.Suspend``
     # (``Wait``, ``Gate``). An engine reads it *before* the run: a `Chain`
     # always has a store, an `Agent` must be given one, and a `Pool` cannot

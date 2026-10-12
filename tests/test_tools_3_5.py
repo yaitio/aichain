@@ -114,9 +114,11 @@ class TestEmbedAndRerankAreTools(unittest.TestCase):
 class TestASavedChainKeepsWhatEachToolIs(unittest.TestCase):
 
     def _round_trip(self, tool):
+        # Trusted: speech writes files and transcription reads them, so a file
+        # nobody vouched for may not build either — and this is our own file.
         path = os.path.join(tempfile.mkdtemp(), "c.yaml")
         Chain(steps=[(tool, "o")]).save(path)
-        return Chain.load(path)._steps[0][0], open(path).read()
+        return Chain.load(path, trusted=True)._steps[0][0], open(path).read()
 
     def test_an_embedder_keeps_its_model_and_settings(self):
         from yait_aichain.tools import EmbeddingQwen

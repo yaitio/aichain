@@ -22,7 +22,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from yait_aichain import Budget, Chain, Model, Tracer                  # noqa: E402
 from yait_aichain.agent import Agent as RealAgent, check, step_count   # noqa: E402
-from yait_aichain.chain._chain import _require_safe_tool_class         # noqa: E402
+from yait_aichain.chain._chain import _import_tool                       # noqa: E402
 from yait_aichain.state import RunContext, current                     # noqa: E402
 from yait_aichain.tools import Chunk, Wait                   # noqa: E402
 from yait_aichain.tools._base import Tool                              # noqa: E402
@@ -111,18 +111,36 @@ class TestUntrustedFilesCannotNameArbitraryCode(unittest.TestCase):
 
     def test_a_class_outside_the_package_is_refused(self):
         with self.assertRaises(ValueError) as ctx:
-            _require_safe_tool_class("subprocess.Popen", trusted=False)
+            _import_tool("subprocess.Popen", {}, trusted=False)
         self.assertIn("trusted=True", str(ctx.exception))
 
     def test_a_lookalike_package_prefix_is_refused(self):
         with self.assertRaises(ValueError):
-            _require_safe_tool_class("yait_aichain_evil.tools.Steal", trusted=False)
+            _import_tool("yait_aichain_evil.tools.Steal", {}, trusted=False)
 
-    def test_the_package_itself_is_allowed(self):
-        _require_safe_tool_class("yait_aichain.tools.chunk._chunk.Chunk", trusted=False)
+    def test_a_safe_tool_of_the_package_is_allowed(self):
+        self.assertEqual(_import_tool("yait_aichain.tools.chunk._chunk.Chunk", {}, trusted=False).risk,
+                         "read")
+
+    def test_the_packages_own_reach_is_refused(self):
+        """A shell, a server, an address: each runs what the file says."""
+        for path, args in (("yait_aichain.utilities.shell._run.LocalRunTool", {}),
+                           ("yait_aichain.utilities.shell._write.LocalWriteTool", {"root_dir": "/"}),
+                           ("yait_aichain.utilities.mcp._tools.MCPTool",
+                            {"name": "x", "description": "x", "server": "sh -c id"}),
+                           ("yait_aichain.utilities.rest._tool.RestApiTool",
+                            {"name": "x", "description": "x", "method": "GET", "url": "http://x"})):
+            with self.subTest(path.rsplit(".", 1)[1]):
+                with self.assertRaisesRegex(ValueError, "untrusted"):
+                    _import_tool(path, args, trusted=False)
+
+    def test_an_image_tool_may_not_be_given_a_folder_by_the_file(self):
+        with self.assertRaisesRegex(ValueError, "a folder the file chose"):
+            _import_tool("yait_aichain.tools.image._tool.Image",
+                         {"model": "gpt-image-1", "output_dir": "/etc"}, trusted=False)
 
     def test_trusted_allows_anything(self):
-        _require_safe_tool_class("subprocess.Popen", trusted=True)
+        self.assertEqual(_import_tool("collections.OrderedDict", {}, trusted=True), {})
 
 
 @unittest.skipUnless(HAS_YAML, "pyyaml not installed")

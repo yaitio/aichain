@@ -115,6 +115,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: `Chain.load()` of an untrusted file could run shell commands.**
+  The guard checked only that a class lived under `yait_aichain.`, and the
+  package ships tools whose arguments say what they reach: `LocalRunTool`
+  (the file's command, through its variables), `LocalWriteTool` (the file's
+  folder), `MCPTool` (`server="sh -c …"`) and `RestApiTool` (the file's
+  address). Agent tools in a saved chain were not checked at all. Now, unless
+  `trusted=True`, a class loads only if it is a `Tool`, opts in with
+  `_safe_for_untrusted_load` and builds as `read` or `draft`: search, fetch,
+  embeddings, reranking, decisions, chunking and images without a folder.
+  Shell, MCP, REST, speech and transcription need `trusted=True`, and both
+  kinds of step go through the same check.
 - **Security: a tool result could make the agent read any local file.** Any
   dict shaped as a media part with `"source": {"kind": "file", "path": …}` —
   from any tool, an MCP or REST server's raw JSON included — was carried as

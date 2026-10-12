@@ -189,6 +189,7 @@ class Decision(Tool):
     description = "Judge a text against fixed typed questions; returns probabilities."
     # It reads the evidence it is given and changes nothing anywhere.
     risk        = "read"
+    _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     parameters  = {
         "type": "object",
         "properties": {

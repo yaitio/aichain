@@ -426,6 +426,9 @@ class Chunk(Tool):
         # chunks[0] == {"text": "...", "chars": 247, "metadata": {"headings": ["Intro"], "is_code": False}}
     """
 
+    risk = "read"                        # it splits text; it reaches nothing
+    _safe_for_untrusted_load = True
+
     name        = "vector_chunk"
     description = (
         "Split text into overlapping chunks for embedding and vector-store "

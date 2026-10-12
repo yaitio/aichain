@@ -198,6 +198,7 @@ class Embedder(Tool):
     # A tool: code, a chain and an agent call it alike. An agent
     # reads a summary, never the vectors (see EmbeddingResult.__str__).
     risk        = "read"
+    _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     parameters  = {
         "type": "object",
         "properties": {

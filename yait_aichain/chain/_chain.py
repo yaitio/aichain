@@ -129,24 +129,49 @@ _AGENT_DEFAULT_OPTIONS: dict = {
 }
 
 
-def _require_safe_tool_class(class_path: str, trusted: bool) -> None:
-    """
-    Guard against arbitrary-code-execution when loading a chain file.
+def _import_tool(class_path: str, init_args: dict, trusted: bool):
+    """Build the tool a chain file names — the one way both kinds of step do.
 
-    A serialised chain names tool classes by import path; importing one runs
-    its module/constructor. Unless *trusted*, only classes under the
-    ``yait_aichain`` package are allowed, so a tampered or untrusted file
-    cannot name (e.g.) ``subprocess.Popen`` and have it instantiated.
+    A file names a class by import path, and importing one runs its module
+    and constructor. Unless *trusted*, the class must be a `Tool` from this
+    package that declares `_safe_for_untrusted_load`, its own refusal hook
+    must not object to the arguments, and what it builds must be `read` or
+    `draft`. A prefix check alone let a file name the package's own shell,
+    MCP and REST tools and give them its command, server or address.
     """
-    if trusted:
-        return
-    module_path = class_path.rsplit(".", 1)[0]
-    if module_path != "yait_aichain" and not module_path.startswith("yait_aichain."):
+    from ..tools._base import Tool
+
+    module_path, _, class_name = class_path.rpartition(".")
+    if not trusted and module_path != "yait_aichain" and not module_path.startswith("yait_aichain."):
         raise ValueError(
-            f"Refusing to import tool class {class_path!r} from outside "
-            f"'yait_aichain' while loading an untrusted chain file. Pass "
-            f"trusted=True to Chain.load() only for files you fully control."
-        )
+            f"Refusing to import tool class {class_path!r} from outside 'yait_aichain' while "
+            "loading an untrusted chain file. Pass trusted=True to Chain.load() only for files "
+            "you fully control.")
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError as exc:
+        raise ImportError(f"Cannot import tool module '{module_path}': {exc}") from exc
+    cls = getattr(module, class_name, None)
+    if cls is None:
+        raise ImportError(f"Module '{module_path}' has no class '{class_name}'")
+    if trusted:
+        return cls(**init_args)
+
+    if not (isinstance(cls, type) and issubclass(cls, Tool)):
+        raise ValueError(f"Refusing to load {class_path}: it is not a Tool")
+    if not getattr(cls, "_safe_for_untrusted_load", False):
+        raise ValueError(
+            f"Refusing to load {class_path} from an untrusted chain file: it runs what the file "
+            "tells it to — a command, a server, an address or a folder. Pass trusted=True to "
+            "Chain.load() for a file you wrote, or build this step in code.")
+    refusal = getattr(cls, "_untrusted_load_refusal", None)
+    if refusal and (why := refusal(init_args)):
+        raise ValueError(f"Refusing to load {class_path}: {why}")
+    tool = cls(**init_args)
+    if getattr(tool, "risk", "write") not in ("read", "draft"):
+        raise ValueError(f"Refusing to load {class_path} from an untrusted chain file: its risk "
+                         f"is {tool.risk!r}. Pass trusted=True for a file you wrote.")
+    return tool
 
 
 def _usage_to_dict(usage) -> dict:
@@ -1156,15 +1181,7 @@ class Chain:
                 # Reconstruct tools from class paths
                 tool_instances = []
                 for tool_path in ad.get("tools", []):
-                    _require_safe_tool_class(tool_path, trusted)
-                    t_mod, t_cls = tool_path.rsplit(".", 1)
-                    try:
-                        t_module = importlib.import_module(t_mod)
-                    except ModuleNotFoundError as exc:
-                        raise ImportError(
-                            f"Cannot import tool module '{t_mod}': {exc}"
-                        ) from exc
-                    tool_instances.append(getattr(t_module, t_cls)())
+                    tool_instances.append(_import_tool(tool_path, {}, trusted))
 
                 from ..agent import cost_budget, step_count, token_budget
                 _BUILDERS = {"step_count": step_count,
@@ -1200,29 +1217,7 @@ class Chain:
                 class_path = td["class"]
                 init_args  = td.get("init_args") or {}
 
-                # Import the tool class dynamically (allowlisted unless trusted)
-                _require_safe_tool_class(class_path, trusted)
-                module_path, class_name = class_path.rsplit(".", 1)
-                try:
-                    module = importlib.import_module(module_path)
-                except ModuleNotFoundError as exc:
-                    raise ImportError(
-                        f"Cannot import tool module '{module_path}': {exc}"
-                    ) from exc
-                try:
-                    tool_cls = getattr(module, class_name)
-                except AttributeError:
-                    raise ImportError(
-                        f"Module '{module_path}' has no class '{class_name}'"
-                    )
-
-                # A class can name what it will not take from an untrusted
-                # file — an endpoint's URL and the variable its token is read
-                # from both come from the file.
-                refusal = getattr(tool_cls, "_untrusted_load_refusal", None)
-                if not trusted and refusal and (why := refusal(init_args)):
-                    raise ValueError(f"Refusing to load {class_path}: {why}")
-                tool  = tool_cls(**init_args)
+                tool = _import_tool(class_path, init_args, trusted)
                 for attr in ("name", "description"):
                     if td.get(attr):
                         setattr(tool, attr, td[attr])

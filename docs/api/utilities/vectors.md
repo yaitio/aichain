@@ -116,7 +116,7 @@ Split text into overlapping chunks for embedding and vector-store ingestion.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import Chunk` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 Chunk(

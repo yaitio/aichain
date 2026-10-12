@@ -49,7 +49,7 @@ Chains and Agents identically.
 | Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `read` |
 | Local | [`local_write`](../api/utilities/shell.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |
 | Local | [`local_run`](../api/utilities/shell.md#localruntool) | `LocalRunTool` | Execute a shell command or Python file. | — | `privileged` |
-| Vector store | [`vector_chunk`](../api/utilities/vectors.md#chunk) | `Chunk` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `write` |
+| Vector store | [`vector_chunk`](../api/utilities/vectors.md#chunk) | `Chunk` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `read` |
 | Vector store | [`vector_upsert`](../api/utilities/vectors.md#vectorupserttool) | `VectorUpsertTool` | Insert or update records in a `VectorStore`. | — | `write` |
 | Vector store | [`vector_query`](../api/utilities/vectors.md#vectorquerytool) | `VectorQueryTool` | Semantic similarity search over a `VectorStore`. | — | `write` |
 | Vector store | [`vector_fetch`](../api/utilities/vectors.md#vectorfetchtool) | `VectorFetchTool` | Retrieve records from a `VectorStore` by exact ID. | — | `write` |

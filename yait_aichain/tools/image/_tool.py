@@ -49,6 +49,7 @@ class Image(Tool):
 
     name        = "image"
     risk        = "draft"
+    _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     parameters  = {
         "type": "object",
         "properties": {
@@ -133,6 +134,14 @@ class Image(Tool):
         with open(path, "wb") as fh:
             fh.write(data)
         return path
+
+    @staticmethod
+    def _untrusted_load_refusal(init_args: dict) -> str | None:
+        """A folder to write into, named by the file, needs a file you trust."""
+        if init_args.get("output_dir"):
+            return (f"it writes into {init_args['output_dir']!r}, a folder the file chose. "
+                    "Pass trusted=True to Chain.load() for a file you wrote.")
+        return None
 
     def _serialise_init_args(self) -> dict:
         """What `Chain.save` writes: the model and the directory, never the key."""

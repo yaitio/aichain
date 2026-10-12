@@ -170,6 +170,7 @@ class Search(Tool):
     description = "Search the web and return a plain-text numbered list of results."
     # It reads the web and changes nothing anywhere.
     risk        = "read"
+    _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     #: The provider's own ceiling on results per call.
     max_results: int = 20
     #: Provider-only option schemas, added beside the standard ones.

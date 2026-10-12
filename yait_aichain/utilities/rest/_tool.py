@@ -556,29 +556,6 @@ class RestApiTool(Tool):
         }
         return {k: v for k, v in args.items() if v not in (None, [], ())}
 
-    @staticmethod
-    def _untrusted_load_refusal(init_args: dict) -> str | None:
-        """Why a file nobody vouched for may not make this endpoint, or None.
-
-        The URL and the name of the token's variable both come from the file.
-        A tampered one could send a key from your environment — any key, by
-        name — to any address, so an endpoint with ``auth`` loads only from a
-        file passed with ``trusted=True``. Its risk class comes from the file
-        too, and a ``DELETE`` saved as ``read`` would walk past a permission
-        policy, so a class other than the method's own needs trust as well.
-        """
-        risk = init_args.get("risk")
-        method = init_args.get("method", "")
-        if risk is not None and risk != risk_for_method(method):
-            return (f"endpoint {init_args.get('name')!r} is {method} with risk {risk!r}, not "
-                    f"{risk_for_method(method)!r}; a file you do not control could lower what a "
-                    f"permission policy sees. Pass trusted=True to Chain.load() for a file you wrote.")
-        if init_args.get("auth"):
-            return (f"endpoint {init_args.get('name')!r} carries auth and sends to "
-                    f"{init_args.get('url')!r}; a file you do not control could point your "
-                    f"credential anywhere. Pass trusted=True to Chain.load() for a file you wrote.")
-        return None
-
     # ------------------------------------------------------------------
     # Dunder helpers
     # ------------------------------------------------------------------

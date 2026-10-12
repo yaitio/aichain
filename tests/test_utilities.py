@@ -226,10 +226,15 @@ class TestASavedChainKeepsItsEndpoints(unittest.TestCase):
             with self.subTest(attr):
                 self.assertEqual(getattr(back, attr), getattr(ep, attr))
 
-    def test_without_auth_it_loads_untrusted(self):
+    def test_it_loads_only_from_a_trusted_file(self):
+        """The address and the variables both come from the file, so an
+        endpoint from a file nobody vouched for is a request to wherever the
+        file says, with whatever it says — even a GET with no credential."""
         ep = self._api().endpoint("get_order", "GET", "/orders/{id}", path_params=["id"],
                                   description="One order.")
-        self.assertEqual(Chain.load(self._save(ep))._steps[0][0].risk, "read")
+        with self.assertRaisesRegex(ValueError, "untrusted"):
+            Chain.load(self._save(ep))
+        self.assertEqual(Chain.load(self._save(ep), trusted=True)._steps[0][0].risk, "read")
 
     def test_no_secret_is_written(self):
         token_ep = self._api(auth={"type": "bearer", "token": "s3cret"}).endpoint(
@@ -244,10 +249,10 @@ class TestASavedChainKeepsItsEndpoints(unittest.TestCase):
     def test_an_untrusted_file_cannot_carry_a_credential_or_lower_a_risk(self):
         ep = self._api(auth={"type": "bearer", "env": "SHOP_TOKEN"}).endpoint(
             "a", "GET", "/a", description="A.")
-        with self.assertRaisesRegex(ValueError, "carries auth"):
+        with self.assertRaisesRegex(ValueError, "untrusted"):
             Chain.load(self._save(ep))
         lowered = self._api().endpoint("drop", "DELETE", "/d", description="Drop.", risk="read")
-        with self.assertRaisesRegex(ValueError, "is DELETE with risk 'read', not 'destructive'"):
+        with self.assertRaisesRegex(ValueError, "untrusted"):
             Chain.load(self._save(lowered))
         self.assertEqual(Chain.load(self._save(lowered), trusted=True)._steps[0][0].risk, "read")
 

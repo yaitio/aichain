@@ -168,7 +168,8 @@ class TestAnImageIsNotASkill(unittest.TestCase):
     def test_a_saved_chain_keeps_the_model_and_the_directory(self):
         path = os.path.join(tempfile.mkdtemp(), "c.yaml")
         Chain(steps=[(image("xai", model="grok-imagine-image", output_dir="images/"), "picture")]).save(path)
-        back = Chain.load(path)._steps[0][0]
+        # Trusted: the folder is one the file names, and our own file is trusted.
+        back = Chain.load(path, trusted=True)._steps[0][0]
         self.assertEqual((back.model, back.output_dir, back.service), ("grok-imagine-image", "images/", "xai"))
 
 
