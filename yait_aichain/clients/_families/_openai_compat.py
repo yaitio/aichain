@@ -14,11 +14,6 @@ import json
 import re
 
 
-#: One warning per (model, parameter): enough to be noticed, few enough to
-#: survive a loop.
-_WARNED_REJECTS: set = set()
-
-
 def _drop_rejected(model, fmt: dict) -> dict:
     """
     Remove parameters the model's API refuses, warning once for each.
@@ -33,11 +28,7 @@ def _drop_rejected(model, fmt: dict) -> dict:
     since for some models the setting is a no-op and for others it is a
     request the API will not honour.
     """
-    rejects = getattr(model, "_REJECTS", None)
-    if rejects is None:                    # a real Model, not a request wrapper
-        from ...models._data import PROVIDERS
-        rejects = ((PROVIDERS.get(getattr(model, "_provider", "")) or {})
-                   .get("models", {}).get(model.name, {}).get("rejects", ()))
+    rejects = getattr(model, "_REJECTS", ())
     if not rejects:
         return fmt
     dropped = [k for k in rejects if fmt.get(k) is not None]
@@ -56,6 +47,18 @@ def _drop_rejected(model, fmt: dict) -> dict:
                 "dropped and the request sent; the model applies its own "
                 "handling for the setting"))
     return {k: v for k, v in fmt.items() if k not in dropped}
+
+
+def _ratio_of(size: str) -> "str | None":
+    """'1024x1536' → '2:3'. Reduced, because a provider that honours any
+    ratio exactly has no list to snap to."""
+    from math import gcd
+    w, _, h = size.partition("x")
+    if not (w.isdigit() and h.isdigit() and int(h)):
+        return None
+    w, h = int(w), int(h)
+    g = gcd(w, h) or 1
+    return f"{w // g}:{h // g}"
 
 
 def _size_from_ratio(ratio: str, short: int = 1024) -> "str | None":
@@ -307,17 +310,17 @@ def _build_openai_compat_request(
     if ftype == "json":
         body["response_format"] = {"type": "json_object"}
     elif ftype == "json_schema":
-        body["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {
-                "name":   fmt.get("name", "response"),
-                "schema": (_sanitize_openai_schema(fmt["schema"])
-                           if fmt.get("strict", True) else fmt["schema"]),
-                "strict": fmt.get("strict", True),
-            },
-        }
+        body["response_format"] = {"type": "json_schema", "json_schema": _json_schema(fmt)}
 
     return path, body
+
+
+def _json_schema(fmt: dict) -> dict:
+    """The schema block both OpenAI wires take: name, schema, strict."""
+    strict = fmt.get("strict", True)
+    return {"name": fmt.get("name", "response"),
+            "schema": _sanitize_openai_schema(fmt["schema"]) if strict else fmt["schema"],
+            "strict": strict}
 
 
 class SchemaNotExpressible(ValueError):
@@ -581,7 +584,8 @@ def content_text(content) -> str:
 # Image generation helpers  (for dall-e-* and gpt-image-* models)
 # ---------------------------------------------------------------------------
 
-_OPENAI_IMAGE_MODEL_PREFIXES = ("dall-e-", "gpt-image-", "chatgpt-image-")
+_GPT_IMAGE = ("gpt-image-", "chatgpt-image-")
+_OPENAI_IMAGE_MODEL_PREFIXES = ("dall-e-", *_GPT_IMAGE)
 
 
 def _is_openai_image_model(name: str) -> bool:
@@ -678,7 +682,7 @@ def _build_image_generations_request(
     # Request base64 output on every model that accepts the parameter.
     # gpt-image-* / chatgpt-image-* always return b64_json natively and reject
     # the param — omit it only for those families (dall-e-* still needs it).
-    if not model.name.startswith(("gpt-image-", "chatgpt-image-")):
+    if not model.name.startswith(_GPT_IMAGE):
         body["response_format"] = "b64_json"
 
     return path, body
@@ -780,7 +784,7 @@ def _image_source_to_data_uri(src: dict) -> str:
     return f"data:{mime};base64,{src['data']}"
 
 
-def _prompt_from_messages(messages: list) -> str:
+def _last_user_text(messages: list) -> str:
     """The last user message's concatenated text — the edit instruction."""
     for msg in reversed(messages):
         if msg["role"] == "user":
@@ -792,7 +796,7 @@ def _prompt_from_messages(messages: list) -> str:
 
 def _is_openai_editable_image_model(name: str) -> bool:
     """True for OpenAI image models that accept the ``/v1/images/edits`` endpoint."""
-    return name.startswith(("gpt-image-", "chatgpt-image-")) or name == "dall-e-2"
+    return name.startswith(_GPT_IMAGE) or name == "dall-e-2"
 
 
 def _build_image_edits_request(
@@ -815,10 +819,9 @@ def _build_image_edits_request(
     if not sources:
         raise ValueError("image edit requires at least one input image part")
 
-    is_gpt_image = model.name.startswith(("gpt-image-", "chatgpt-image-"))
-    field_name   = "image[]" if is_gpt_image else "image"
+    field_name = "image[]" if model.name.startswith(_GPT_IMAGE) else "image"
 
-    fields: list = [("model", model.name), ("prompt", _prompt_from_messages(messages))]
+    fields: list = [("model", model.name), ("prompt", _last_user_text(messages))]
     fmt = _drop_rejected(model, output.get("format", {}))
     # Our name on the left, the provider's on the wire.
     for ours, theirs in (("size", "size"), ("quality", "quality"),
@@ -873,13 +876,12 @@ def _build_xai_image_edit_request(
         raise ValueError("image edit requires at least one input image part")
     imgs = [{"url": _image_source_to_data_uri(s), "type": "image_url"}
             for s in sources[:3]]                      # xAI Imagine: up to 3 source images
-    body = {"model": model.name, "prompt": _prompt_from_messages(messages),
+    body = {"model": model.name, "prompt": _last_user_text(messages),
             "response_format": "b64_json"}
     # Shape control works on this path too — measured 2026-09-09, an edit with
     # aspect_ratio "16:9" came back 1280x720 — and was read by neither the
     # generation nor the edit branch until now.
     fmt = output.get("format", {})
-    from .openai import _ratio_of
     _ratio = fmt.get("aspect_ratio") or (
         _ratio_of(fmt["size"]) if fmt.get("size") else None)
     if _ratio:
@@ -944,7 +946,6 @@ def _build_responses_api_request(
     - ``max_output_tokens`` instead of ``max_completion_tokens``
     - ``text.format``  instead of ``response_format`` for structured output
     """
-    instructions   = None
     system_texts: list = []
     input_messages: list[dict] = []
 
@@ -1016,7 +1017,7 @@ def _build_responses_api_request(
         "max_output_tokens": model.max_tokens,
     }
 
-    instructions = "\n".join(system_texts) or instructions
+    instructions = "\n".join(system_texts)
     if instructions:
         body["instructions"] = instructions
 
@@ -1040,15 +1041,7 @@ def _build_responses_api_request(
     if ftype == "json":
         body["text"] = {"format": {"type": "json_object"}}
     elif ftype == "json_schema":
-        body["text"] = {
-            "format": {
-                "type":   "json_schema",
-                "name":   fmt.get("name", "response"),
-                "schema": (_sanitize_openai_schema(fmt["schema"])
-                           if fmt.get("strict", True) else fmt["schema"]),
-                "strict": fmt.get("strict", True),
-            }
-        }
+        body["text"] = {"format": {"type": "json_schema", **_json_schema(fmt)}}
 
     return "/v1/responses", body
 

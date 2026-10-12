@@ -24,19 +24,10 @@ from ...models._adaptation import (Adaptation, ADAPTED, DECLINED, SWAPPED,
                                    TRANSLATED, record)
 
 
-def _ratio_of(size: str) -> "str | None":
-    """'1024x1536' → '2:3'. Reduced, because a provider that honours any
-    ratio exactly has no list to snap to."""
-    from math import gcd
-    w, _, h = size.partition("x")
-    if not (w.isdigit() and h.isdigit() and int(h)):
-        return None
-    w, h = int(w), int(h)
-    g = gcd(w, h) or 1
-    return f"{w // g}:{h // g}"
-
 from .._base import BaseClient
 from ._openai_compat import (
+    _ratio_of,
+    _last_user_text,
     _part_to_openai,                       # noqa: F401  (kept for parity)
     content_text,
     _build_openai_compat_request,
@@ -474,12 +465,3 @@ class OpenAIClient(BaseClient):
         # ```json. The fence is markup, not content, so it is taken off.
         loose = not ((self._data.get("provider") or {}).get("options") or {}).get("json_schema", True)
         return _parse_openai_compat_response(response, output, strip_fences=loose)
-
-
-def _last_user_text(messages: list) -> str:
-    for msg in reversed(messages):
-        if msg["role"] == "user":
-            texts = [p["text"] for p in msg["parts"] if p["type"] == "text"]
-            if texts:
-                return "\n".join(texts)
-    return ""

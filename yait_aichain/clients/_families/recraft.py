@@ -25,7 +25,7 @@ from ._openai_compat import (
     _image_sources,
     _messages_have_image,
     _parse_image_generations_response,
-    _prompt_from_messages,
+    _last_user_text,
 )
 from .openai import OpenAIClient
 
@@ -78,7 +78,7 @@ def _build_recraft_generation_request(name, messages, output, path):
     fmt = output.get("format", {})
     body = {
         "model":           name,
-        "prompt":          _prompt_from_messages(messages),
+        "prompt":          _last_user_text(messages),
         "n":               1,
         "response_format": "b64_json",
     }
@@ -123,7 +123,7 @@ def _build_recraft_edit_request(name, messages, output, path):
     fmt = output.get("format", {})
     fields = [
         ("model",           name),
-        ("prompt",          _prompt_from_messages(messages)),
+        ("prompt",          _last_user_text(messages)),
         ("strength",        str(_strength_from_fidelity(fmt, name))),
         ("response_format", "b64_json"),
     ]

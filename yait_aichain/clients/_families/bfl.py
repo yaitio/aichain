@@ -30,7 +30,7 @@ import time
 
 from .._base import BaseClient
 from .._errors import TaskFailedError
-from ._openai_compat import _image_sources, _parse_image_generations_response, _prompt_from_messages
+from ._openai_compat import _image_sources, _parse_image_generations_response, _last_user_text
 
 # BFL polling statuses that are terminal failures (anything but Ready / pending).
 _FAILED_STATUSES = frozenset(
@@ -77,7 +77,7 @@ class BFLClient(BaseClient):
         name = params["name"]
         fmt  = output.get("format", {})
 
-        body: dict = {"prompt": _prompt_from_messages(messages)}
+        body: dict = {"prompt": _last_user_text(messages)}
 
         # Size → width/height for generation; Kontext uses aspect_ratio instead.
         size = fmt.get("size")
