@@ -89,20 +89,6 @@ class OpenAIClient(BaseClient):
         self._mtf         = prov.get("max_tokens_field", "max_completion_tokens")
 
     # ── transport ────────────────────────────────────────────────────
-    def _auth_headers(self) -> dict:
-        # An empty key means a keyless provider (auth = "none" — a local
-        # server running open). Sending "Bearer " with nothing after it is
-        # not neutral: some servers 401 on a malformed header where they
-        # would accept no header at all. So no key, no header.
-        # Read once. The property may be a resolver — a vault lookup, a
-        # signed token — and reading it twice per request would do the work
-        # twice for a caller who cannot see that it happened.
-        key = self.api_key
-        if not key:
-            return {"Content-Type": "application/json"}
-        return {"Authorization": f"Bearer {key}",
-                "Content-Type": "application/json"}
-
     def list_models(self) -> list[str]:
         data = self._get(self._models_path, self._auth_headers())
         return [m["id"] for m in _json.loads(data)["data"]]

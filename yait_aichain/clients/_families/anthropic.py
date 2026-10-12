@@ -108,9 +108,7 @@ class AnthropicClient(BaseClient):
 
     # ── transport ────────────────────────────────────────────────────
     def _auth_headers(self) -> dict:
-        return {"x-api-key": self.api_key,
-                "anthropic-version": _API_VERSION,
-                "Content-Type": "application/json"}
+        return {**super()._auth_headers(), "anthropic-version": _API_VERSION}
 
     def list_models(self) -> list[str]:
         data = self._get("/v1/models", self._auth_headers())

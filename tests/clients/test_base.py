@@ -108,13 +108,26 @@ class TestBaseClientInit(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestBaseClientAuthHeaders(unittest.TestCase):
+    """The headers come from the provider's ``auth`` in its data."""
 
     @patch("urllib3.PoolManager")
-    def test_base_class_raises_not_implemented(self, _):
+    def _headers(self, auth, key, _):
         client = object.__new__(BaseClient)
-        BaseClient.__init__(client, "key")
-        with self.assertRaises(NotImplementedError):
-            client._auth_headers()
+        BaseClient.__init__(client, key)
+        if auth is not None:
+            client._data = {"provider": {"auth": auth}}
+        return client._auth_headers()
+
+    def test_each_scheme(self):
+        cases = (("bearer", "k", {"Authorization": "Bearer k"}),
+                 ("x-api-key", "k", {"x-api-key": "k"}),
+                 ("x-goog-api-key", "k", {"x-goog-api-key": "k"}),
+                 ("none", "k", {"Authorization": "Bearer k"}),   # optional key, sent when given
+                 ("none", "", {}),                               # no key, no header
+                 (None, "k", {"Authorization": "Bearer k"}))     # no data: bearer
+        for auth, key, want in cases:
+            with self.subTest(auth=auth, key=key):
+                self.assertEqual(self._headers(auth, key), {"Content-Type": "application/json", **want})
 
 
 # ---------------------------------------------------------------------------

@@ -174,15 +174,25 @@ class BaseClient:
         return key
 
     def _auth_headers(self) -> dict:
-        """
-        Return the provider-specific HTTP headers needed for authentication
-        (e.g. ``Authorization``, ``x-api-key``, versioning headers, etc.).
+        """The headers a request carries, from the provider's ``auth`` in its data:
+        ``bearer`` is ``Authorization: Bearer <key>``, any other word is the
+        header the key goes in, and ``none`` means the key is optional — sent
+        as a bearer when there is one (an aggregator behind ``private/``),
+        and no header at all when there is not, since some servers 401 on an
+        empty ``Bearer`` where they accept nothing.
 
-        Must be implemented by every subclass.
+        The key is read once: it may be a resolver — a vault lookup — and
+        reading it twice would do that work twice.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement _auth_headers()"
-        )
+        key = self.api_key
+        scheme = ((getattr(self, "_data", None) or {}).get("provider") or {}).get("auth", "bearer")
+        headers = {"Content-Type": "application/json"}
+        if key:
+            if scheme in ("bearer", "none"):
+                headers["Authorization"] = f"Bearer {key}"
+            else:
+                headers[scheme] = key
+        return headers
 
     # ------------------------------------------------------------------
     # Format — must be overridden by each API-family client
