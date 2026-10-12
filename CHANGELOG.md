@@ -29,6 +29,17 @@ where a fix is named below.
   Verified live on OpenAI 2026-10-12; the xAI account answered 403, so xAI is
   checked offline only.
 
+- **A fallback is on the record.** When the first model of a chain fails
+  and a later one answers, `last_adaptations` carries a `swapped` entry
+  naming both and why, and an exhausted chain raises the last error with the
+  earlier ones attached as notes (3.11+). The answer and its price came from
+  another model, and nothing said so.
+- **`Skill("gpt-4o")` is refused at construction** with the line to write
+  instead, not on the first call as an `AttributeError`.
+- **`Skill.stream()` retries the way `run()` does**: one rule for what is
+  retried, the budget checked and `llm_call.started`/`ended` emitted per
+  attempt, where it checked once and reported one call however many it made.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -41,6 +52,10 @@ where a fix is named below.
 
 ### Fixed
 
+- **A budget stop between turns leaves the paid turns readable.** A
+  multi-turn skill stopped by `max_cost` before its last turn had `history`
+  and `last_usage` at None, while the error told the caller to read them.
+  They are published turn by turn now.
 - **A stream no longer deletes a parked run.** `stream()` kept the document
   id of the agent's previous run, so a stream that finished after a `run()`
   had parked removed that parked run from the store, and its `resume()` then

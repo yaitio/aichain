@@ -32,17 +32,37 @@ from ..clients._errors import (
     RateLimitError, ServerError, NetworkError, TaskFailedError,
     InsufficientCreditsError,
 )
+from ..models._adaptation import SWAPPED, Adaptation
 from ..models._usage import Usage, extract_usage, attach_cost
 from .._events import Event, emit
 from . import _adapters as adapters
 
 if TYPE_CHECKING:
+    from .._budget import Budget
     from ..models._base import Model
 
 # HTTP status codes that indicate a transient server-side condition and are
 # safe to retry.  Client errors (4xx other than 429) are permanent — they
 # indicate a problem with the request itself and must not be retried.
 _TRANSIENT_STATUSES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+
+def _attempts(max_retries: int, delay: float):
+    """Attempt numbers from 0, sleeping before each retry; the delay doubles."""
+    for attempt in range(max(0, max_retries) + 1):
+        if attempt:
+            time.sleep(delay * (2 ** (attempt - 1)))
+        yield attempt
+
+
+def _retryable(exc: APIError, attempt: int, max_retries: int) -> bool:
+    """A transient failure — 429, 5xx, or no response (`NetworkError` has
+    status 0) — with retries left. Never a failed async task, whose retry is a
+    new billable job, nor an empty balance, which can arrive as 429 and which
+    no retry on the same account refills."""
+    return ((exc.status in _TRANSIENT_STATUSES or isinstance(exc, NetworkError))
+            and not isinstance(exc, (TaskFailedError, InsufficientCreditsError))
+            and attempt < max_retries)
 
 # Output spec for intermediate generate turns in multi-turn directed reasoning —
 # always plain text (they only feed the running context; only the final turn
@@ -196,7 +216,7 @@ class Skill:
         max_retries:  int           = 0,
         retry_delay:  float         = 2.0,
         hooks:        list  | None  = None,
-        max_cost:     "float | object | None" = None,
+        max_cost:     "float | Budget | None" = None,
         _tools:       list  | None  = None,
         _image:       bool          = False,
     ) -> None:
@@ -228,6 +248,9 @@ class Skill:
         self.models = list(model) if isinstance(model, (list, tuple)) else [model]
         if not self.models:
             raise ValueError("Skill requires at least one model.")
+        named = [m for m in self.models if isinstance(m, str)]
+        if named:
+            raise TypeError(f"Skill takes a Model, not its name: Skill(Model({named[0]!r}), ...)")
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
@@ -283,6 +306,25 @@ class Skill:
         """Dispatch an observability :class:`Event` to registered hooks."""
         if self.hooks:
             emit(self.hooks, Event(type=etype, **fields))
+
+    def _started(self, model) -> float:
+        """Check the budget, announce the call, and return its start time.
+
+        Before the call, not after: the length of a reply is not known until
+        it is paid for, so a budget bounds "do not begin another call" and
+        never "do not exceed by a cent".
+        """
+        if self.max_cost is not None:
+            self.max_cost.check(f"{model.name} for skill {self.name or '(unnamed)'}")
+        self._emit("llm_call.started", name=model.name)
+        return time.monotonic()
+
+    def _ended(self, model, t0: float, usage=None, error=None) -> None:
+        self._emit("llm_call.ended", name=model.name,
+                   usage=getattr(usage, "total_tokens", None),
+                   cost=getattr(usage, "cost", None),
+                   duration=time.monotonic() - t0,
+                   **({"error": str(error)} if error is not None else {}))
 
     # ------------------------------------------------------------------
     # Public
@@ -355,15 +397,27 @@ class Skill:
         # (rate limit / server / network) advance to the next model; a
         # non-transient failure (bad request, auth, parse) propagates
         # immediately — falling back would only hide a real error.
+        # The models that failed before the one that answered are recorded as
+        # a swap: the answer, and its price, came from a different model than
+        # the one asked for, and a run record has to be able to say so.
+        failed: list = []
         for i, model in enumerate(self.models):
             try:
-                return self._run_on_model(
+                result = self._run_on_model(
                     model, messages, _max_retries, _retry_delay
                 )
-            except _FALLBACK_ERRORS:
-                if i < len(self.models) - 1:
-                    continue   # try the next model in the chain
-                raise          # last model exhausted
+            except _FALLBACK_ERRORS as exc:
+                if i == len(self.models) - 1:
+                    for note in failed:           # the earlier failures, not lost
+                        getattr(exc, "add_note", lambda _: None)(note)
+                    raise      # last model exhausted
+                failed.append(f"{model.name}: {exc}")
+                continue       # try the next model in the chain
+            if failed:
+                self.last_adaptations.append(Adaptation(
+                    SWAPPED, "model", asked=self.models[0].name, sent=model.name,
+                    why="fallback after " + "; ".join(failed), model=self.models[0].name))
+            return result
 
     def stream(self, variables: "dict | None" = None):
         """
@@ -397,9 +451,6 @@ class Skill:
         variables : dict | None, optional
             Variables for this call, merged over the Skill's own.
         """
-        import json as _json
-        import time as _time
-
         merged = {**self.variables, **(variables or {})}
         messages = adapters.substitute(self._input["messages"], merged)
         messages = adapters.resolve_media(messages)
@@ -413,37 +464,21 @@ class Skill:
         _tools = getattr(self, "_tools", None)
         pieces = []
 
-        if self.max_cost is not None:
-            self.max_cost.check(f"{model.name} for skill "
-                                f"{self.name or '(unnamed)'}")
-        self._emit("llm_call.started", name=model.name)
-        _t0 = _time.monotonic()
-        for attempt in range(max(0, self.max_retries) + 1):
-            if attempt > 0:
-                _time.sleep(self.retry_delay * (2 ** (attempt - 1)))
+        for attempt in _attempts(self.max_retries, self.retry_delay):
+            t0 = self._started(model)
             try:
                 for piece in model.stream(messages, self._output, tools=_tools):
                     pieces.append(piece)
                     yield piece
                 break
-            except APIError as exc:
-                transient = (exc.status in _TRANSIENT_STATUSES
-                             or isinstance(exc, NetworkError))
+            except Exception as exc:
+                self._ended(model, t0, error=exc)
                 # `pieces` is the whole condition that matters: once the
                 # caller has seen something, starting over would replay or
                 # contradict it. Before that, the attempt is discardable and
                 # there is no reason to be less reliable than `run()`.
-                if (transient and not pieces
-                        and not isinstance(exc, (TaskFailedError,
-                                                 InsufficientCreditsError))
-                        and attempt < self.max_retries):
+                if isinstance(exc, APIError) and not pieces and _retryable(exc, attempt, self.max_retries):
                     continue
-                self._emit("llm_call.ended", name=model.name,
-                           duration=_time.monotonic() - _t0, error=str(exc))
-                raise
-            except Exception as exc:
-                self._emit("llm_call.ended", name=model.name,
-                           duration=_time.monotonic() - _t0, error=str(exc))
                 raise
 
         self.last_adaptations = list(getattr(model, "last_adaptations", []))
@@ -466,18 +501,15 @@ class Skill:
             # call any more.
             self.last_result = whole
             self.history = [whole]
-            self._emit("llm_call.ended", name=model.name,
-                       usage=getattr(self.last_usage, "total_tokens", None),
-                       cost=getattr(self.last_usage, "cost", None),
-                       duration=_time.monotonic() - _t0)
+            self._ended(model, t0, self.last_usage)
             return
 
         text = "".join(pieces)
         kind = ((self._output or {}).get("format") or {}).get("type", "text")
         if kind in ("json", "json_schema"):
             try:
-                self.last_result = _json.loads(text)
-            except _json.JSONDecodeError:
+                self.last_result = json.loads(text)
+            except json.JSONDecodeError:
                 # The pieces are handed over as they came; a truncated or
                 # non-JSON answer is not silently turned into None, because
                 # the caller has already seen the text and can say what
@@ -486,10 +518,7 @@ class Skill:
         else:
             self.last_result = text
         self.history = [self.last_result]
-        self._emit("llm_call.ended", name=model.name,
-                   usage=getattr(self.last_usage, "total_tokens", None),
-                   cost=getattr(self.last_usage, "cost", None),
-                   duration=_time.monotonic() - _t0)
+        self._ended(model, t0, self.last_usage)
 
     def _run_on_model(
         self,
@@ -530,9 +559,11 @@ class Skill:
             seq.append(("gen",))
         last_gen = max(k for k, s in enumerate(seq) if s[0] == "gen")
 
+        # Published as the turns are paid for, so a call stopped between
+        # turns — a budget, an error — leaves what was already spent readable.
         running: list = []
-        total_usage = None
         history: list = []
+        self.history, self.last_usage = history, None
         final: "str | dict | None" = None
         for k, item in enumerate(seq):
             if item[0] == "msg":
@@ -541,7 +572,7 @@ class Skill:
             output = self._output if k == last_gen else _TEXT_OUTPUT
             reply, usage = self._call_once(
                 model, running, output, max_retries, retry_delay)
-            total_usage = usage if total_usage is None else total_usage + usage
+            self.last_usage = usage if self.last_usage is None else self.last_usage + usage
             history.append(reply)
             final = reply
             # Splice the reply into the context as an assistant turn so the next
@@ -550,10 +581,8 @@ class Skill:
             running.append({"role": "assistant",
                             "parts": [{"type": "text", "text": text}]})
 
-        self.last_usage = total_usage
         self.last_adaptations = list(
             getattr(model, "last_adaptations", ()) or ())
-        self.history    = history
         return final
 
     def _call_once(
@@ -574,25 +603,10 @@ class Skill:
         else:
             path, body = model.to_request(messages, output)
 
-        for attempt in range(max(0, max_retries) + 1):
-            if attempt > 0:
-                time.sleep(retry_delay * (2 ** (attempt - 1)))
-
+        for attempt in _attempts(max_retries, retry_delay):
+            t0 = self._started(model)
             try:
-                # Before the call, not after: the length of a reply is not
-                # known until it is paid for, so a budget bounds "do not begin
-                # another call" and never "do not exceed by a cent". Saying
-                # otherwise would be lying about the one number a caller
-                # checks.
-                if self.max_cost is not None:
-                    self.max_cost.check(f"{model.name} for skill "
-                                        f"{self.name or '(unnamed)'}")
-                self._emit("llm_call.started", name=model.name)
-                _t0 = time.monotonic()
-                raw      = model.client.send(
-                    path, body, model.client._auth_headers()
-                )
-                response = json.loads(raw)
+                response = json.loads(model.client.send(path, body, model.client._auth_headers()))
                 # ``cache_ttl`` is read leniently where ``name`` is not: a
                 # Model always has it, but this boundary accepts anything
                 # model-shaped, and the lifetime only picks a price multiplier.
@@ -603,32 +617,12 @@ class Skill:
                 if self.max_cost is not None:
                     self.max_cost.charge(getattr(usage, "cost", None))
                 result   = model.from_response(response, output)
-                self._emit("llm_call.ended", name=model.name,
-                           usage=getattr(usage, "total_tokens", None),
-                           cost=getattr(usage, "cost", None),
-                           duration=time.monotonic() - _t0)
+                self._ended(model, t0, usage)
                 return result, usage
-
             except APIError as exc:
-                self._emit("llm_call.ended", name=model.name,
-                           duration=time.monotonic() - _t0, error=str(exc))
-                # Retry transient server conditions and network failures
-                # (NetworkError has status 0, so check the type too). Never
-                # retry TaskFailedError (would create a new billable async job)
-                # or InsufficientCreditsError (which can arrive as 429 but is
-                # terminal — retrying the same account won't add funds).
-                transient = (exc.status in _TRANSIENT_STATUSES
-                             or isinstance(exc, NetworkError))
-                if (transient
-                        and not isinstance(exc, (TaskFailedError,
-                                                 InsufficientCreditsError))
-                        and attempt < max_retries):
-                    continue   # wait and retry the same model
-                raise          # non-transient, or retries exhausted
-
-        # Unreachable: the loop runs at least once (max(0, max_retries)+1 >= 1)
-        # and every iteration returns or raises.
-        raise RuntimeError("retry loop exited without returning or raising")
+                self._ended(model, t0, error=exc)
+                if not _retryable(exc, attempt, max_retries):
+                    raise
 
     # ------------------------------------------------------------------
     # Persistence
@@ -739,7 +733,7 @@ class Skill:
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
-        parts = [f"model={self.model.name!r}"]
+        parts = [f"model={getattr(self.model, 'name', self.model)!r}"]
         if self.name:
             parts.append(f"name={self.name!r}")
         if self.description:

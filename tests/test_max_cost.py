@@ -101,6 +101,18 @@ class TestItBoundsBeginningNotExceeding(unittest.TestCase):
         self.assertIn("max_cost", str(caught.exception))
         self.assertIn("spent", str(caught.exception))
 
+    def test_a_stop_between_turns_leaves_the_paid_turns_readable(self):
+        """A multi-turn skill is several calls; the ones already paid for are
+        on `history` and `last_usage` when the next is refused, which is
+        what the error message tells the caller to read."""
+        skill = Skill(model=_model(), max_cost=0.000_001, input={"messages": [
+            {"role": "user", "parts": ["a"]}, {"role": "assistant"},
+            {"role": "user", "parts": ["b"]}]})
+        with self.assertRaises(BudgetExceeded):
+            skill.run()
+        self.assertEqual(skill.history, ["ANSWER"])
+        self.assertGreater(skill.last_usage.cost, 0)
+
 
 class TestOneObjectShared(unittest.TestCase):
 

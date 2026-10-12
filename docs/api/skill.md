@@ -23,7 +23,7 @@ Skill(
     max_retries: int = 0,
     retry_delay: float = 2.0,
     hooks: list | None = None,
-    max_cost: float | object | None = None,
+    max_cost: float | Budget | None = None,
     _tools: list | None = None,
     _image: bool = False,
 )

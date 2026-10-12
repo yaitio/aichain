@@ -309,5 +309,34 @@ class TestASystemMessageIsGlobalWhereverItSits(unittest.TestCase):
         self.assertEqual(model.last_adaptations, [])
 
 
+class TestTheConversationIsNotTouched(unittest.TestCase):
+    """A Skill hands a provider the conversation itself, not a copy — an agent
+    turn would otherwise copy its whole history twice — so building a request
+    must leave what it was given exactly as it was."""
+
+    def test_no_provider_writes_into_the_messages(self):
+        import copy
+        from yait_aichain.models._calls import tool_result_turn
+        image = {"type": "image", "source": {"kind": "base64", "data": "aGk=", "mime": "image/png"}}
+        conversation = [
+            SYSTEM, USER,
+            {"role": "assistant", "parts": [{"type": "text", "text": "Checking."}],
+             "tool_calls": [{"id": "c1", "name": "look", "arguments": {"q": "x"}}]},
+            tool_result_turn("c1", "found"),
+            tool_result_turn("c1", [image, "and a picture"]),
+            {"role": "user", "parts": [{"type": "text", "text": "Again."}, image]},
+        ]
+        for provider, name in _text_models():
+            for cache in (None, "last"):
+                with self.subTest(provider=provider, cache=cache):
+                    given = copy.deepcopy(conversation)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        model = Model(name, api_key="k",
+                                      **({"options": {"cache_control": cache}} if cache else {}))
+                        model.to_request(given, {"format": {"type": "text"}})
+                    self.assertEqual(given, conversation)
+
+
 if __name__ == "__main__":
     unittest.main()

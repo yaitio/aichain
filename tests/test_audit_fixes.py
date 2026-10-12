@@ -1032,6 +1032,30 @@ class TestFallbackChain(unittest.TestCase):
                   input={"messages": [{"role": "user", "parts": ["x"]}]})
         self.assertEqual(s.run(), "second")
 
+    def test_a_fallback_is_recorded_as_a_swap(self):
+        """The answer came from another model, at another price; a run
+        record has to be able to say so."""
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import RateLimitError
+        s = Skill(model=[self._failing(RateLimitError(429, "slow")),
+                         self._ok("second")],
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        s.run()
+        (swap,) = [a for a in s.last_adaptations if a.kind == "swapped"]
+        self.assertEqual(swap.option, "model")
+        self.assertIn("slow", swap.why)
+
+    @unittest.skipIf(sys.version_info < (3, 11), "exception notes are 3.11+")
+    def test_an_exhausted_chain_keeps_the_earlier_failures(self):
+        from yait_aichain.skills import Skill
+        from yait_aichain.clients._errors import RateLimitError
+        s = Skill(model=[self._failing(RateLimitError(429, "first")),
+                         self._failing(RateLimitError(429, "second"))],
+                  input={"messages": [{"role": "user", "parts": ["x"]}]})
+        with self.assertRaises(RateLimitError) as caught:
+            s.run()
+        self.assertIn("first", " ".join(caught.exception.__notes__))
+
     def test_server_and_network_errors_fall_through(self):
         from yait_aichain.skills import Skill
         from yait_aichain.clients._errors import ServerError, NetworkError
@@ -1058,6 +1082,13 @@ class TestFallbackChain(unittest.TestCase):
                   input={"messages": [{"role": "user", "parts": ["x"]}]})
         with self.assertRaises(RateLimitError):
             s.run()
+
+    def test_a_model_name_is_refused_at_construction(self):
+        """Not on the first call, as an AttributeError about `to_request`."""
+        from yait_aichain.skills import Skill
+        with self.assertRaises(TypeError) as caught:
+            Skill("gpt-4o", prompt="x")
+        self.assertIn("Model('gpt-4o')", str(caught.exception))
 
     def test_empty_model_list_rejected(self):
         from yait_aichain.skills import Skill

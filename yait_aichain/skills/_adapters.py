@@ -509,8 +509,11 @@ def validate_output(output: dict) -> None:
 
 def substitute(messages: list, variables: dict) -> list:
     """
-    Return a deep copy of *messages* with ``{placeholders}`` in text parts
-    replaced by the matching value from *variables*.
+    Return *messages* with ``{placeholders}`` in text parts replaced by the
+    matching value from *variables* — a new list where anything is replaced,
+    and *messages* itself where there are no variables. Nothing downstream
+    writes into a conversation (pinned for every provider), so the copy an
+    agent turn would make of its whole history buys nothing.
 
     Substitution is performed by
     :func:`yait_aichain._template.substitute_placeholders`: only bare
@@ -521,7 +524,7 @@ def substitute(messages: list, variables: dict) -> list:
     Non-text parts are deep-copied unchanged.
     """
     if not variables:
-        return copy.deepcopy(messages)
+        return messages
     result = []
     for msg in messages:
         new_parts = []
