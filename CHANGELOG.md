@@ -87,6 +87,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **The library's exceptions pickle and copy.** `BudgetExceeded`, every
+  `APIError`, `UnsupportedOption` and `Suspend` take their fields in
+  `__init__`, so Python's way of rebuilding them — calling the class with the
+  formatted message — raised `TypeError` or doubled the message. Through a
+  process pool, Celery or Ray the caller got the unpickler's error instead of
+  the one that happened. They are rebuilt from their message and fields now;
+  `BudgetExceeded.what` is kept as a field as well.
 - **An `Eval` can be built where the working directory is read-only.** The
   constructor created `./eval-runs`, which is an `OSError` on Lambda; the
   directory is made on the first write.

@@ -9,12 +9,14 @@ persists the run document, and returns a :class:`SuspendedResult`.
 
 from __future__ import annotations
 
+from .._picklable import Picklable
+
 from dataclasses import dataclass, field
 
 from .. import _hints
 
 
-class Suspend(Exception):
+class Suspend(Picklable, Exception):
     """
     Raised by a suspend tool to pause the current run.
 

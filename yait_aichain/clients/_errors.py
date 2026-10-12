@@ -26,8 +26,10 @@ Mapping (HTTP status → class):
 
 from __future__ import annotations
 
+from .._picklable import Picklable
 
-class APIError(RuntimeError):
+
+class APIError(Picklable, RuntimeError):
     """
     Base class for all provider API failures. A `RuntimeError`, so code that
     caught what a tool raised before tools raised typed errors still does.

@@ -28,8 +28,10 @@ from __future__ import annotations
 
 import threading
 
+from ._picklable import Picklable
 
-class BudgetExceeded(RuntimeError):
+
+class BudgetExceeded(Picklable, RuntimeError):
     """A run stopped because its money ceiling was reached.
 
     A raise rather than a partial result. Returning what was finished with a
@@ -55,6 +57,7 @@ class BudgetExceeded(RuntimeError):
             "BudgetExceeded and read what completed.")
         self.spent = spent
         self.limit = limit
+        self.what  = what
 
 
 class Budget:

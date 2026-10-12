@@ -36,6 +36,8 @@ thing the mechanism exists to prevent.
 
 from __future__ import annotations
 
+from .._picklable import Picklable
+
 import threading
 import warnings
 from dataclasses import dataclass
@@ -235,7 +237,7 @@ def note_absent(made: list, asked: dict, body, model_name: str,
 # ── The caller's own strictness ──────────────────────────────────────────────
 
 
-class UnsupportedOption(ValueError):
+class UnsupportedOption(Picklable, ValueError):
     """An option the caller set could not be honoured, and they asked to be
     stopped rather than warned. Carries the adaptations that caused it.
 
