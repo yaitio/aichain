@@ -297,46 +297,33 @@ class Pool:
                         contextvars.copy_context().run, self._run_one, i, merged)
                     future_to_idx[future] = i
 
-                stopped = False
+                def stop_starting():
+                    # Items in flight finish: killing a call mid-request costs
+                    # the tokens anyway and loses the answer, so stopping can
+                    # only honestly mean not beginning more.
+                    for pending in future_to_idx:
+                        pending.cancel()
+
                 for future in as_completed(future_to_idx):
                     idx = future_to_idx[future]
                     if future.cancelled():
-                        # Never started: left PENDING in the history, which is
-                        # the honest status for work nobody began.
-                        continue
-                    if not stopped and board.attention():
+                        continue        # never started: PENDING in the history, honestly
+                    if board.attention():
                         # A blocker, a question or a changed contract from any
-                        # item — or from anything that item delegated to. Stop
-                        # starting more: the rest of the fan-out would be
-                        # spent on work the beacon just made pointless. Items
-                        # already in flight finish, because killing a call
-                        # mid-request costs the tokens and loses the answer.
-                        stopped = True
-                        for pending in future_to_idx:
-                            pending.cancel()
+                        # item, or from anything it delegated to: the rest of
+                        # the fan-out would be spent on work it made pointless.
+                        stop_starting()
                     try:
                         results[idx] = future.result()
                     except Exception as exc:
                         if self._on_error == "raise":
                             raise
                         if self._on_error == "stop":
-                            # Start no more items. The ones already in flight are
-                            # let finish rather than cancelled: killing a call
-                            # mid-request costs the tokens anyway and loses the
-                            # answer, so the only thing "stop" can honestly buy
-                            # is not beginning more.
-                            stopped = True
-                            for pending in future_to_idx:
-                                pending.cancel()
+                            stop_starting()
                         if self._on_error == "skip":
-                            name = getattr(self._runner, "name", None) or \
-                                   type(self._runner).__name__
-                            warnings.warn(
-                                f"Pool item {idx} ({name!r}) failed and was "
-                                f"skipped: {type(exc).__name__}: {exc}",
-                                RuntimeWarning,
-                                stacklevel=2,
-                            )
+                            name = getattr(self._runner, "name", None) or type(self._runner).__name__
+                            warnings.warn(f"Pool item {idx} ({name!r}) failed and was skipped: "
+                                          f"{type(exc).__name__}: {exc}", RuntimeWarning, stacklevel=2)
                         # "collect", "skip" and "stop" all leave results[idx] None
         self._beacons = board.all()
 

@@ -13,8 +13,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from ..models._usage import Spend
 
-class PoolResult(Sequence):
+
+class PoolResult(Spend, Sequence):
     """
     The outcome of one pool run.
 
@@ -72,14 +74,6 @@ class PoolResult(Sequence):
             if r.get("error"):
                 return f"item {r['index']}: {r['error']}"
         return None
-
-    @property
-    def tokens_used(self) -> int:
-        return (getattr(self.usage, "total_tokens", 0) or 0) if self.usage else 0
-
-    @property
-    def cost(self) -> "float | None":
-        return getattr(self.usage, "cost", None) if self.usage else None
 
     def __getitem__(self, index):
         return self._outputs[index]

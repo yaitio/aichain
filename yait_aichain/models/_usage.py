@@ -85,6 +85,23 @@ class Usage:
         return bool(self.input_tokens or self.output_tokens or self.total_tokens)
 
 
+class Spend:
+    """`tokens_used` and `cost` for a result that carries a `usage`.
+
+    Read through `is not None`, not truthiness: a `Usage` with no tokens is
+    falsy, and a cost the provider reported — or a price per picture — would
+    otherwise read as unknown.
+    """
+
+    @property
+    def tokens_used(self) -> int:
+        return (self.usage.total_tokens or 0) if self.usage is not None else 0
+
+    @property
+    def cost(self) -> "float | None":
+        return self.usage.cost if self.usage is not None else None
+
+
 def extract_usage(response: dict) -> Usage:
     """
     Build a ``Usage`` from a raw provider response dict.

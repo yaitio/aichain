@@ -18,10 +18,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import _hints
+from ..models._usage import Spend
 
 
 @dataclass
-class ChainResult:
+class ChainResult(Spend):
     """
     The outcome of one chain run.
 
@@ -56,14 +57,6 @@ class ChainResult:
 
     def __getattr__(self, name):
         raise _hints.missing(self, name)
-
-    @property
-    def tokens_used(self) -> int:
-        return (getattr(self.usage, "total_tokens", 0) or 0) if self.usage else 0
-
-    @property
-    def cost(self) -> "float | None":
-        return getattr(self.usage, "cost", None) if self.usage else None
 
     def __getitem__(self, key: str):
         try:

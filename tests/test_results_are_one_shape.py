@@ -166,3 +166,19 @@ class TestEvalRecordsTheOutputNotTheObject(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestACostWithNoTokensIsACost(unittest.TestCase):
+    """A Usage with no tokens is falsy, and a cost the provider reported or a
+    price per picture used to read as unknown on Chain and Pool results."""
+
+    def test_both_results_read_it(self):
+        from yait_aichain.chain._result import ChainResult
+        from yait_aichain.models._usage import Usage
+        from yait_aichain.pool._result import PoolResult
+        u = Usage(cost=0.5)
+        self.assertFalse(u)
+        self.assertEqual(ChainResult(output=1, success=True, usage=u).cost, 0.5)
+        self.assertEqual(PoolResult([1], success=True, history=[], usage=u).cost, 0.5)
+        self.assertEqual((ChainResult(output=1, success=True).cost,
+                          ChainResult(output=1, success=True).tokens_used), (None, 0))

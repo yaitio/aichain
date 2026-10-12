@@ -17,6 +17,10 @@ where a fix is named below.
   with the filesystem root as the folder every path had to start with `//`
   and nothing was inside. It compares path components now, in one `within()`
   that `Shell` and output-path confinement share.
+- **A result's `cost` is read when no tokens were counted.** `ChainResult` and
+  `PoolResult` read it through the truthiness of `Usage`, which is false with
+  no tokens — so a cost the provider reported, or a price per picture, read as
+  `None`. One `Spend` mixin serves both now.
 - **The chunker keeps a space it used to drop** when a single token longer
   than `max_chars` was cut.
 
