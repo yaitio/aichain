@@ -97,6 +97,8 @@ After each ``run()`` call, ``chain.history`` holds one record per step::
 
 from __future__ import annotations
 
+from .._require import require
+
 import importlib
 import os
 import warnings
@@ -907,13 +909,7 @@ class Chain:
 
             chain.save("chains/analyse_and_translate.yaml")
         """
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for Chain.save(). "
-                "Install it with: pip install pyyaml"
-            )
+        yaml = require("yaml", package="pyyaml", who="Chain.save()", extra="yaml")
 
         steps_data = []
         for runner, output_key, input_map, kind, options in self._steps:
@@ -1107,13 +1103,7 @@ class Chain:
             result = chain.run(variables={"topic": "AI safety",
                                           "language": "French"})
         """
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for Chain.load(). "
-                "Install it with: pip install pyyaml"
-            )
+        yaml = require("yaml", package="pyyaml", who="Chain.load()", extra="yaml")
 
         with open(path, "r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh)

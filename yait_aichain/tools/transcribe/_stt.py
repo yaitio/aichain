@@ -43,6 +43,8 @@ Environment variables
 
 from __future__ import annotations
 
+from ..._require import require
+
 import json
 import os
 import tempfile
@@ -226,13 +228,7 @@ class _OpenAICompatSTT(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        try:
-            import openai
-        except ImportError:
-            raise ImportError(
-                "openai is required for this STT tool.  "
-                "Install it with:  pip install openai"
-            )
+        openai = require("openai", package="openai", who="this transcription tool")
 
         if not os.path.isfile(input):
             raise FileNotFoundError(f"Audio file not found: {input!r}")
@@ -324,14 +320,7 @@ class _OpenAICompatSTT(Transcription):
         fmt:        str,
     ) -> str:
         """Split oversized audio, transcribe each chunk, stitch results."""
-        try:
-            from pydub import AudioSegment
-        except ImportError:
-            raise ImportError(
-                "pydub is required to transcribe audio files larger than "
-                f"{self._MAX_FILE_MB:.0f} MB.  "
-                "Install it with:  pip install pydub"
-            )
+        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit").AudioSegment
 
         audio      = AudioSegment.from_file(path)
         chunk_ms   = self._CHUNK_SECONDS * 1000
@@ -512,13 +501,7 @@ class sttGoogle(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        try:
-            from google.cloud import speech
-        except ImportError:
-            raise ImportError(
-                "google-cloud-speech is required for sttGoogle.  "
-                "Install it with:  pip install google-cloud-speech"
-            )
+        speech = require("google.cloud.speech", package="google-cloud-speech", who="sttGoogle")
 
         if not os.path.isfile(input):
             raise FileNotFoundError(f"Audio file not found: {input!r}")
@@ -615,14 +598,7 @@ class sttGoogle(Transcription):
     def _transcribe_chunked(
         self, client, config, path: str, timestamps: bool, fmt: str
     ) -> str:
-        try:
-            from pydub import AudioSegment
-        except ImportError:
-            raise ImportError(
-                "pydub is required to transcribe audio files larger than "
-                f"{self._MAX_SYNC_MB:.0f} MB with Google STT.  "
-                "Install it with:  pip install pydub"
-            )
+        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit").AudioSegment
 
         from google.cloud import speech as _speech
 

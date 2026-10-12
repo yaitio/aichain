@@ -19,6 +19,8 @@ Skills can be persisted to YAML with :meth:`Skill.save` and reloaded with
 the :meth:`Skill.load` class method.
 """
 
+
+from .._require import require
 import json
 import os
 import time
@@ -653,13 +655,7 @@ class Skill:
 
             skill.save("skills/translation.yaml")
         """
-        try:
-            import yaml  # PyYAML — optional dependency
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for Skill.save(). "
-                "Install it with: pip install pyyaml"
-            )
+        yaml = require("yaml", package="pyyaml", who="Skill.save()", extra="yaml")
 
         data = {
             "model_name":  self.model.name,
@@ -720,13 +716,7 @@ class Skill:
             skill  = Skill.load("skills/translation.yaml")
             result = skill.run(variables={"text": "Hello, world!"})
         """
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for Skill.load(). "
-                "Install it with: pip install pyyaml"
-            )
+        yaml = require("yaml", package="pyyaml", who="Skill.load()", extra="yaml")
 
         with open(path, "r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh)

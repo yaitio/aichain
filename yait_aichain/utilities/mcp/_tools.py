@@ -57,6 +57,8 @@ Installation
 
 from __future__ import annotations
 
+from ..._require import require
+
 import asyncio
 import threading
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -186,19 +188,8 @@ def _build_client(
     ValueError
         When the server spec is unrecognisable.
     """
-    try:
-        import fastmcp  # noqa: F401
-        from fastmcp import Client
-        from fastmcp.client.transports import (
-            StdioTransport,
-            StreamableHttpTransport,
-            SSETransport,
-        )
-    except ImportError:
-        raise ImportError(
-            "fastmcp is required for MCPTool.  "
-            "Install it with:  pip install fastmcp"
-        )
+    Client = require("fastmcp", package="fastmcp", who="MCP", extra="mcp").Client
+    from fastmcp.client.transports import SSETransport, StdioTransport, StreamableHttpTransport
 
     # ── Dict spec ─────────────────────────────────────────────────────────
     if isinstance(server, dict):

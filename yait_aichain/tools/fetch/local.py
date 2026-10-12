@@ -29,6 +29,8 @@ No User-Agent is invented: the request goes out as ``python-requests`` unless
 
 from __future__ import annotations
 
+from ..._require import require
+
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -71,10 +73,7 @@ class fetchLocal(Fetch):
     def __init__(self, timeout=DEFAULT_TIMEOUT, headers: "dict | None" = None,
                  respect_robots: bool = True, robots_agents=ROBOTS_AGENTS, *,
                  name: "str | None" = None, description: "str | None" = None) -> None:
-        try:
-            from markitdown import MarkItDown
-        except ImportError:
-            raise ImportError('fetchLocal needs MarkItDown. Install it with:  pip install "yait-aichain[fetch]"') from None
+        MarkItDown = require("markitdown", package="markitdown", who="fetchLocal", extra="fetch").MarkItDown
         if isinstance(timeout, list):            # as YAML gives it back after Chain.save
             timeout = tuple(timeout)
         self._session = _session(timeout, headers)

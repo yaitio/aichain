@@ -36,6 +36,8 @@ Environment variables
 
 from __future__ import annotations
 
+from ..._require import require
+
 import datetime
 import json
 import os
@@ -281,13 +283,7 @@ class ttsOpenAI(Speech):
             Absolute path to the saved audio file.
         """
         _no_model_option(self, options or {})
-        try:
-            import openai
-        except ImportError:
-            raise ImportError(
-                "openai is required for ttsOpenAI.  "
-                "Install it with:  pip install openai"
-            )
+        openai = require("openai", package="openai", who="ttsOpenAI")
 
         opts        = options or {}
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
@@ -399,13 +395,7 @@ class ttsGoogle(Speech):
         str
             Absolute path to the saved audio file.
         """
-        try:
-            from google.cloud import texttospeech
-        except ImportError:
-            raise ImportError(
-                "google-cloud-texttospeech is required for ttsGoogle.  "
-                "Install it with:  pip install google-cloud-texttospeech"
-            )
+        texttospeech = require("google.cloud.texttospeech", package="google-cloud-texttospeech", who="ttsGoogle")
 
         opts        = options or {}
         voice_name  = opts.get("voice")
@@ -518,13 +508,7 @@ class ttsXAI(Speech):
             Absolute path to the saved audio file.
         """
         _no_model_option(self, options or {})
-        try:
-            import openai
-        except ImportError:
-            raise ImportError(
-                "openai is required for ttsXAI.  "
-                "Install it with:  pip install openai"
-            )
+        openai = require("openai", package="openai", who="ttsXAI")
 
         opts        = options or {}
         voice       = opts.get("voice",  self._DEFAULT_VOICE)
