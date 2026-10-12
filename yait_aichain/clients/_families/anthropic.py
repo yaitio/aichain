@@ -457,6 +457,10 @@ class AnthropicClient(BaseClient):
             if block.get("type") == "text":
                 text = block["text"]; break
         calls = [b for b in content if b.get("type") == "tool_use"]
+        from ._structured import refuse_cut_off
+        refuse_cut_off(response.get("stop_reason") or "",
+                       (response.get("usage") or {}).get("output_tokens"),
+                       calls=bool(calls), text=text)
         if calls:
             from ...models._calls import ToolCall, ToolCallRequest
             # With extended thinking on, the turn that asked for the calls has

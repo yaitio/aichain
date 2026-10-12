@@ -319,6 +319,16 @@ class GoogleClient(BaseClient):
             budget = rmap.get(params["reasoning"])
             if budget is not None:
                 gc["thinkingConfig"] = {"thinkingBudget": budget}
+                # The budget is spent out of maxOutputTokens: a budget at or
+                # above it left nothing for the answer, which came back empty.
+                if budget > 0 and budget >= gc["maxOutputTokens"]:
+                    raised = budget + gc["maxOutputTokens"]
+                    record(Adaptation(
+                        kind=ADAPTED, option="max_tokens", asked=gc["maxOutputTokens"],
+                        sent=raised, model=params["name"],
+                        why=f"raised above the thinking budget of {budget}, which is "
+                            "spent out of the same allowance"))
+                    gc["maxOutputTokens"] = raised
 
         fmt = output.get("format", {})
         ftype = fmt.get("type", "text")
@@ -376,13 +386,13 @@ class GoogleClient(BaseClient):
         ftype = output.get("format", {}).get("type", "text")
         cands = response.get("candidates", [])
         if not cands:
-            if ftype == "image":
-                block = (response.get("promptFeedback") or {}).get("blockReason")
-                raise ValueError(
-                    "Google returned no image — the request was blocked or refused"
-                    + (f": {block}" if block else ".")
-                )
-            return ""
+            # No candidate is a refusal, not an empty answer: an empty string
+            # here ended an agent's run as a success with nothing in it.
+            block = (response.get("promptFeedback") or {}).get("blockReason")
+            raise ValueError(
+                "Google returned no " + ("image" if ftype == "image" else "answer")
+                + " — the request was blocked or refused"
+                + (f": {block}" if block else "."))
         finish = cands[0].get("finishReason")
         parts  = cands[0].get("content", {}).get("parts", [])
         if ftype == "image":
@@ -401,6 +411,12 @@ class GoogleClient(BaseClient):
             text = next(p["text"] for p in parts if "text" in p)
         except StopIteration:
             text = ""
+        from ._structured import refuse_cut_off
+        refuse_cut_off(finish or "", (response.get("usageMetadata") or {}).get("candidatesTokenCount"),
+                       calls=bool(calls), text=text)
+        if not calls and not text and finish in ("SAFETY", "RECITATION", "BLOCKLIST",
+                                                 "PROHIBITED_CONTENT", "SPII", "OTHER"):
+            raise ValueError(f"Google stopped the answer before any text (finishReason={finish})")
         if calls:
             from ...models._calls import ToolCall, ToolCallRequest
             return ToolCallRequest(

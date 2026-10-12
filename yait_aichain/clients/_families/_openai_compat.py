@@ -532,6 +532,11 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
     # that both says something and calls a tool is a call, with the text
     # carried alongside — collapsing it to the text would silently drop the
     # action, which is the exact failure this channel exists to remove.
+    from ._structured import refuse_cut_off
+    finish = choice.get("finish_reason") or ""
+    spent = (response.get("usage") or {}).get("completion_tokens")
+    refuse_cut_off(finish, spent, calls=bool(message.get("tool_calls")),
+                   text=content_text(message.get("content")))
     if message.get("tool_calls"):
         return _tool_call_request(
             ((c.get("function", {}).get("name", ""),
@@ -1074,6 +1079,15 @@ def _parse_responses_api_response(response: dict, output: dict) -> str | dict:
             for part in item.get("content", []):
                 if part.get("type") == "output_text":
                     text = part["text"]
+    if response.get("status") == "failed":
+        detail = (response.get("error") or {}).get("message", "no reason given")
+        raise ValueError(f"The Responses API reports the response failed: {detail}")
+    if response.get("status") == "incomplete":
+        from ._structured import refuse_cut_off
+        reason = (response.get("incomplete_details") or {}).get("reason") or ""
+        refuse_cut_off("max_tokens" if reason == "max_output_tokens" else reason,
+                       (response.get("usage") or {}).get("output_tokens"),
+                       calls=bool(calls), text=text)
     if calls:
         return _tool_call_request(
             ((c.get("name", ""), c.get("arguments"), c.get("call_id", ""))

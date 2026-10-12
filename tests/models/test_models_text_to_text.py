@@ -485,9 +485,9 @@ class TestGoogleFromResponse(unittest.TestCase):
         result = self.model.from_response(response, _TEXT_OUTPUT)
         self.assertEqual(result, "Gemini reply")
 
-    def test_returns_empty_string_when_no_candidates(self):
-        result = self.model.from_response({"candidates": []}, _TEXT_OUTPUT)
-        self.assertEqual(result, "")
+    def test_no_candidates_is_a_refusal_not_an_empty_answer(self):
+        with self.assertRaisesRegex(ValueError, "blocked or refused"):
+            self.model.from_response({"candidates": []}, _TEXT_OUTPUT)
 
     def test_returns_string_type(self):
         response = {

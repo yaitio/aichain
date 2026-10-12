@@ -48,6 +48,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .._budget import Budget, as_budget, start_run
+from ..clients._errors import TruncatedResponseError
 from ..models import Model
 from ..skills import Skill
 from ..utilities._base import Utility
@@ -995,7 +996,10 @@ class Agent:
                 reply = self._ask(messages, state)
             except Exception as exc:
                 yield from drain()
-                return self._result(state, False, None, "llm_error",
+                # A reply cut at the token ceiling is its own stop: the fix is
+                # a larger max_tokens, not a retry or a different model.
+                cut = isinstance(exc, TruncatedResponseError)
+                return self._result(state, False, None, "truncated" if cut else "llm_error",
                                     error=f"{type(exc).__name__}: {exc}")
             yield from drain()
 

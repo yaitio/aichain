@@ -732,8 +732,9 @@ class TestGoogleFromResponse(unittest.TestCase):
         result = self._model().from_response(self._resp('{"x": 7}'), _json_output())
         self.assertEqual(result["x"], 7)
 
-    def test_empty_response_returns_empty_string(self):
-        self.assertEqual(self._model().from_response({}, _text_output()), "")
+    def test_an_empty_response_is_a_refusal_not_an_empty_answer(self):
+        with self.assertRaisesRegex(ValueError, "blocked or refused"):
+            self._model().from_response({}, _text_output())
 
 
 if __name__ == "__main__":

@@ -33,11 +33,13 @@ class AgentResult:
     cost : float | None
         Dollars, priced per model from the registry; ``None`` when nothing
         could be priced, never an invented zero. A run picked up with
-        ``resume()`` reports the resumed part only.
+        ``resume()`` includes what it spent before the pause.
     stopped_by : str | None
         What ended the run: ``"answered"``, ``"check:<name>"``,
-        ``"step_count"``, ``"token_budget"``, ``"cost_budget"``, or the name
-        of an error.
+        ``"step_count"``, ``"token_budget"``, ``"cost_budget"``,
+        ``"truncated"`` (a reply cut at ``max_tokens`` — raise it),
+        ``"llm_error"`` (the model call failed otherwise), or the name of an
+        error.
     plan : list[dict]
         In ``waterfall`` mode, the plan it wrote — ``{"goal": …}`` per step.
     adaptations : list

@@ -21,6 +21,24 @@ from ...models._schema import check_structure
 _CEILING = {"length", "max_tokens", "MAX_TOKENS"}
 
 
+def refuse_cut_off(finish_reason: str, output_tokens: int | None, *,
+                   calls: bool, text: str) -> None:
+    """Raise `TruncatedResponseError` when the ceiling cut a reply that cannot
+    stand: a tool call — its arguments may be half-written, and a tool run on
+    defaults writes nothing and reports success — or an answer with no text,
+    which ended a run as a success with an empty output. Prose cut short is
+    still prose, and is returned."""
+    if finish_reason not in _CEILING or not (calls or not (text or "").strip()):
+        return
+    at = f" at {output_tokens} output tokens" if output_tokens else ""
+    what = "a tool call" if calls else "the answer, with no text yet"
+    raise TruncatedResponseError(
+        f"Response was cut off{at} (finish_reason={finish_reason!r}) in {what} — raise "
+        f"max_tokens above {output_tokens or 'the current limit'}; reasoning models spend "
+        "much of it thinking.",
+        finish_reason=finish_reason, output_tokens=output_tokens)
+
+
 def parse_structured(text: str, schema: dict | None, *,
                      finish_reason: str = "",
                      output_tokens: int | None = None,

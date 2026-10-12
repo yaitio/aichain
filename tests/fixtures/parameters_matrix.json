@@ -136,7 +136,7 @@
   },
   "reasoning": {
    "outcome": "converted",
-   "detail": "thinkingBudget",
+   "detail": "maxOutputTokens, thinkingBudget",
    "said": [
     "adapted+named"
    ]

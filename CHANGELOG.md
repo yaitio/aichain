@@ -118,6 +118,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **A reply cut off at the token ceiling is not executed, and not a
+  success.** The stop reason was read only when parsing JSON: a tool call cut
+  at `max_tokens` ran with `{}` or half its arguments, and an empty answer —
+  common from reasoning models that spent the budget thinking — ended a run
+  with `success=True`. A cut-off reply that carries a call, or no text, now
+  raises `TruncatedResponseError` on every family, and an agent stops with
+  `stopped_by="truncated"`; prose cut short is still returned. The Responses
+  API's `incomplete` and `failed` statuses are read, Gemini's refusals
+  (no candidate, `SAFETY` and the rest) raise instead of answering `""`, and
+  Gemini's `maxOutputTokens` is raised above a thinking budget that would
+  otherwise use all of it. Not done: one nudge for an empty answer that was
+  not cut off.
 - **Security: a model chose where speech was written.** `output_path` was in
   the schema a model sees and nothing confined it without
   `AICHAIN_OUTPUT_ROOT`, so an injected instruction replaced `~/.zshrc` with

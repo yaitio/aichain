@@ -235,7 +235,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `gpt-4o` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `gpt-5.5` | — | — | — | → `max_output_tokens` | → `effort` | — |
 | `claude-sonnet-4-6` | ✓ | ✓ | ✓ | ✓ | ≈ `budget_tokens, max_tokens, type` | ≈ `text, type` |
-| `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `thinkingBudget` | — |
+| `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `maxOutputTokens, thinkingBudget` | — |
 | `deepseek-chat` | ✓ | ✓ | — | ✓ | ⇄ `deepseek-chat → deepseek-reasoner` | — |
 | `deepseek-reasoner` | — | — | — | ✓ | — | — |
 | `kimi-k2.6` | ✓ | ✓ | — | ✓ | ≈ `type` | — |
