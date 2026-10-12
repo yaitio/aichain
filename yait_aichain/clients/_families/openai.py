@@ -232,21 +232,8 @@ class OpenAIClient(BaseClient):
             # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
             # routes through the Responses API branch above).
             if _is_o_series_model(m.name):
-                for knob in ("temperature", "top_p"):
-                    if body.pop(knob, None) is not None:
-                        record(Adaptation(
-                            kind=DECLINED, option=knob,
-                            asked=getattr(m, knob), model=m.name,
-                            why="a reasoning model sets its own sampling; "
-                                "this provider rejects the field"))
-                if m.reasoning:
-                    eff = m._REASONING_MAP.get(m.reasoning)
-                    if eff:
-                        body["reasoning_effort"] = eff
-                        record(Adaptation(
-                            kind=ADAPTED, option="reasoning", asked=m.reasoning,
-                            sent="reasoning_effort", model=m.name,
-                            why="sent as reasoning_effort"))
+                _decline_sampling(m, body)
+                _set_effort(m, body)
             return path, body
 
         if p == "xai":
@@ -284,14 +271,8 @@ class OpenAIClient(BaseClient):
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
             # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
             # grok models reject it (grok-4 reasoners think natively).
-            if m.reasoning and m.name.startswith("grok-3-mini"):
-                eff = m._REASONING_MAP.get(m.reasoning)
-                if eff:
-                    body["reasoning_effort"] = eff
-                    record(Adaptation(
-                        kind=ADAPTED, option="reasoning", asked=m.reasoning,
-                        sent="reasoning_effort", model=m.name,
-                        why="sent as reasoning_effort"))
+            if m.name.startswith("grok-3-mini"):
+                _set_effort(m, body)
             return path, body
 
         if p in ("perplexity", "private"):
@@ -340,13 +321,7 @@ class OpenAIClient(BaseClient):
                         sent=body["model"], model=m.name,
                         why="this level is served by this same model"))
             if _is_deepseek_reasoner(body["model"]):
-                for knob in ("temperature", "top_p"):
-                    if body.pop(knob, None) is not None:
-                        record(Adaptation(
-                            kind=DECLINED, option=knob,
-                            asked=getattr(m, knob), model=m.name,
-                            why="a reasoning model sets its own sampling; "
-                                "this provider rejects the field"))
+                _decline_sampling(m, body)
             fmt = output.get("format", {}); ft = fmt.get("type", "text")
             if ft in ("json", "json_schema"):
                 body["response_format"] = {"type": "json_object"}
@@ -356,11 +331,7 @@ class OpenAIClient(BaseClient):
                           and "json" in x["content"].lower()
                           for x in body["messages"] if x.get("role") == "system")
                 if not has:
-                    hint = ("Respond with a JSON object that strictly follows this "
-                            f"JSON Schema:\n{_json.dumps(fmt['schema'])}"
-                            if ft == "json_schema" and fmt.get("schema")
-                            else "Respond with a JSON object.")
-                    body["messages"] = [{"role": "system", "content": hint}, *body["messages"]]
+                    _json_in_prompt(body, fmt if ft == "json_schema" else {})
             return path, body
 
         if p == "qwen":
@@ -442,9 +413,7 @@ class OpenAIClient(BaseClient):
             # the schema in the prompt, as for DeepSeek, and say so.
             body["response_format"] = {"type": "json_object"}
             if fmt.get("schema"):
-                hint = ("Respond with a JSON object that strictly follows this JSON Schema:\n"
-                        + _json.dumps(fmt["schema"]))
-                body["messages"] = [{"role": "system", "content": hint}, *body["messages"]]
+                _json_in_prompt(body, fmt)
             record(Adaptation(
                 kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
                 model=m.name, why="this provider takes JSON but not a schema; the schema "
@@ -465,3 +434,29 @@ class OpenAIClient(BaseClient):
         # ```json. The fence is markup, not content, so it is taken off.
         loose = not ((self._data.get("provider") or {}).get("options") or {}).get("json_schema", True)
         return _parse_openai_compat_response(response, output, strip_fences=loose)
+
+
+def _decline_sampling(m, body: dict) -> None:
+    """A reasoning model sets its own sampling; drop temperature and top_p, and say so."""
+    for knob in ("temperature", "top_p"):
+        if body.pop(knob, None) is not None:
+            record(Adaptation(kind=DECLINED, option=knob, asked=getattr(m, knob), model=m.name,
+                              why="a reasoning model sets its own sampling; "
+                                  "this provider rejects the field"))
+
+
+def _set_effort(m, body: dict) -> None:
+    """The reasoning level as ``reasoning_effort``, where the model takes one."""
+    eff = m._REASONING_MAP.get(m.reasoning) if m.reasoning else None
+    if eff:
+        body["reasoning_effort"] = eff
+        record(Adaptation(kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                          sent="reasoning_effort", model=m.name, why="sent as reasoning_effort"))
+
+
+def _json_in_prompt(body: dict, fmt: dict) -> None:
+    """Ask for JSON in a system message — following the schema when *fmt* has one —
+    for a provider that takes JSON mode but no schema."""
+    hint = ("Respond with a JSON object that strictly follows this JSON Schema:\n"
+            + _json.dumps(fmt["schema"])) if fmt.get("schema") else "Respond with a JSON object."
+    body["messages"] = [{"role": "system", "content": hint}, *body["messages"]]
