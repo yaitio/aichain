@@ -115,6 +115,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **Parallel tool calls work on Gemini, and with pictures on OpenAI.** Gemini
+  needs every function response of a turn in one content; each went in its
+  own, so any turn with two calls answered HTTP 400. Chat Completions and the
+  Responses API need a turn's tool results back to back; a tool that returned
+  an image put a user message between them. A turn's results are now sent
+  together and its media in one message after them, on all three.
 - **Security: SSRF through a redirect, a parser disagreement or a shared
   address.** The URL check read the first URL and the HTTP library then
   followed redirects unchecked, so a public page answering `302` to

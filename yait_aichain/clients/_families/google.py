@@ -247,6 +247,20 @@ class GoogleClient(BaseClient):
 
         system_parts: list[dict] = []
         contents: list[dict] = []
+        # Gemini wants every functionResponse of one turn in one content, as
+        # many as there were calls; media the tools produced follows them.
+        responses: list = []
+        held: list = []
+
+        def release():
+            if responses:
+                contents.append({"role": "user", "parts": list(responses)})
+                responses.clear()
+            gparts = [g for g in (_part_to_google(p) for p in held) if g is not None]
+            if gparts:
+                contents.append({"role": "user", "parts": gparts})
+            held.clear()
+
         for msg in messages:
             # One call's result: a functionResponse part in a USER turn.
             if msg["role"] == "tool":
@@ -259,19 +273,17 @@ class GoogleClient(BaseClient):
                 text = "\n".join(p.get("text", "")
                                   for p in msg.get("parts") or []
                                   if p.get("type") == "text")
-                contents.append({"role": "user", "parts": [{
+                responses.append({
                     "functionResponse": {
                         # call_id here carries the function NAME (see class
                         # comment): Gemini has no ids on this wire.
                         "name": msg.get("call_id", ""),
                         "response": {"result": text},
-                    }}]})
+                    }})
                 if follow_up:
-                    gparts = [_part_to_google(p) for p in follow_up["parts"]]
-                    gparts = [g for g in gparts if g is not None]
-                    if gparts:
-                        contents.append({"role": "user", "parts": gparts})
+                    held.extend(follow_up["parts"])
                 continue
+            release()
             # The model's request to act: functionCall parts on a model turn.
             if msg["role"] == "assistant" and msg.get("tool_calls"):
                 gparts = [_part_to_google(p) for p in msg.get("parts") or []]
@@ -291,6 +303,7 @@ class GoogleClient(BaseClient):
                 role = "model" if msg["role"] == "assistant" else "user"
                 contents.append({"role": role, "parts": gparts})
 
+        release()
         gc: dict = {"temperature": params["temperature"],
                     "maxOutputTokens": params["max_tokens"]}
         if params.get("top_p") is not None:

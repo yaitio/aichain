@@ -194,12 +194,23 @@ def _build_openai_compat_request(
                        for Kimi/DeepSeek).
     """
     openai_messages: list[dict] = []
+    # Media the tools of one turn produced, sent in one user message after the
+    # last of that turn's results: the results of parallel calls must follow
+    # their assistant turn back to back, and a user message between two of
+    # them is a 400.
+    held: list = []
+
+    def release():
+        if held:
+            openai_messages.append({"role": "user", "content": [_part_to_openai(p) for p in held]})
+            held.clear()
+
     for msg in messages:
         role = msg["role"]
 
         # A tool turn is one call's result — chat format keys it by id, and
         # that content must be text. Media a tool produced is moved into a
-        # user message straight after, so the model sees it on this turn.
+        # user message after the turn's results, so the model sees it now.
         if role == "tool":
             from ...models._calls import split_media_result
             msg, follow_up = split_media_result(msg)
@@ -209,11 +220,9 @@ def _build_openai_compat_request(
                 "content":      _text_of(msg),
             })
             if follow_up:
-                openai_messages.append({
-                    "role": "user",
-                    "content": [_part_to_openai(p) for p in follow_up["parts"]],
-                })
+                held.extend(follow_up["parts"])
             continue
+        release()
 
         # An assistant turn that asked for calls. ``arguments`` goes out as a
         # JSON string — that is the chat wire format, not a convenience.
@@ -242,6 +251,7 @@ def _build_openai_compat_request(
         else:
             openai_messages.append({"role": role, "content": items})
 
+    release()
     # A system message means the same thing wherever it sits: it applies to
     # the whole conversation. That is not a preference — it is the only
     # meaning every provider can express. Anthropic, Google and the Responses
@@ -943,6 +953,12 @@ def _build_responses_api_request(
     """
     system_texts: list = []
     input_messages: list[dict] = []
+    held: list = []                      # as in the chat builder: after the turn's results
+
+    def release():
+        if held:
+            input_messages.append({"role": "user", "content": [_part_to_responses(p) for p in held]})
+            held.clear()
 
     for msg in messages:
         role = msg["role"]
@@ -958,12 +974,9 @@ def _build_responses_api_request(
                 "output":  _text_of(msg),
             })
             if follow_up:
-                input_messages.append({
-                    "role": "user",
-                    "content": [_part_to_responses(p)
-                                for p in follow_up["parts"]],
-                })
+                held.extend(follow_up["parts"])
             continue
+        release()
         if role == "assistant" and msg.get("tool_calls"):
             for c in msg["tool_calls"]:
                 input_messages.append({
@@ -995,6 +1008,7 @@ def _build_responses_api_request(
             # a defect in the multi-part one.
             input_messages.append({"role": role, "content": items})
 
+    release()
     # gpt-5-family models are reasoning models: the Responses API rejects
     # ``temperature``/``top_p`` for them ("Unsupported parameter"), so the
     # sampling knobs are deliberately omitted here.
