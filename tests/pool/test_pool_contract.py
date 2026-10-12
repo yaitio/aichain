@@ -264,9 +264,22 @@ class TestAgentRunner(unittest.TestCase):
         self.assertIn("gave up", p.history[0]["error"])
 
     def test_the_pool_budget_is_handed_to_the_agent(self):
+        """To the copy that runs the item — the agent the caller holds keeps
+        its own ceiling once the pool is done with it."""
         agent, budget = Agent(), Budget(2.0)
-        Pool(agent, [{"task": "x"}], max_cost=budget).run()
-        self.assertIs(agent.max_cost, budget)
+        seen = []
+        original = type(agent).run
+
+        def run(self, *a, **k):
+            seen.append(self.max_cost)
+            return original(self, *a, **k)
+        type(agent).run = run
+        try:
+            Pool(agent, [{"task": "x"}], max_cost=budget).run()
+        finally:
+            type(agent).run = original
+        self.assertEqual(seen, [budget])
+        self.assertIsNot(agent.max_cost, budget)
 
 
 class TestContextCrossesIntoWorkers(unittest.TestCase):

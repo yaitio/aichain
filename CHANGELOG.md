@@ -115,6 +115,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: two runs of one agent crossed.** The run id, the parked
+  document, the pending approval, the stream flag and the hook a stream
+  collects through all lived on the `Agent`, and one agent serves many runs —
+  a module-level agent in a warm Lambda, a `Pool`'s items. An approver was
+  shown one run's call while another's executed (approved 5, executed 5000),
+  one tenant's stream carried another's task, arguments and results, and
+  events took another run's id. Every `run()`, `stream()`, `resume()` and
+  `execute()` now works on its own copy of that state; the configuration —
+  tools, model, policy, store, a shared `Budget` — stays shared. A stream
+  advances in a context of its own, so two streams in one thread no longer
+  restore each other's beacon board. A `Pool` hands its budget to a copy of
+  an agent runner instead of leaving it on the caller's agent.
+  `ApprovalRequest.run_id` says which run is asking.
 - **An Anthropic agent with reasoning survives its second step.** With
   extended thinking on, the assistant turn before a tool result must open
   with its thinking blocks, unchanged; the library kept only the calls, so

@@ -39,6 +39,8 @@ from __future__ import annotations
 
 import json
 import contextlib
+import contextvars
+import copy
 import logging
 import time
 import uuid
@@ -559,6 +561,9 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
+        return self._fork()._run(task, variables)
+
+    def _run(self, task: str, variables: dict | None = None) -> AgentResult:
         journal, messages, state = self._begin(task, variables)
         self._emit("run.started", payload={"task": task, "mode": self.mode})
         with collecting_beacons() as board:
@@ -595,6 +600,27 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
+        run = self._fork()
+        self.last_result = None
+        # Each step in a context of its own. A generator runs in whichever
+        # context advances it, so two streams advanced in turn in one thread
+        # set and reset the same context variables out of order — the beacon
+        # board, the tenant — and the second reset brought back the first
+        # stream's. A copied context per stream keeps them apart.
+        context = contextvars.copy_context()
+        steps = run._stream(task, variables)
+        try:
+            while True:
+                try:
+                    event = context.run(next, steps)
+                except StopIteration:
+                    break
+                yield event
+        finally:
+            context.run(steps.close)
+        self.last_result = run.last_result
+
+    def _stream(self, task: str, variables: dict | None = None):
         journal, messages, state = self._begin(task, variables)
         self.last_result = None
 
@@ -697,6 +723,9 @@ class Agent:
             parked it. For a run made by ``arm()``, a string is the task, or a dict
             gives it under ``"task"``.
         """
+        return self._fork()._resume(run_id, signal)
+
+    def _resume(self, run_id: str, signal=None) -> AgentResult | SuspendedResult:
         from ..state import RunDocument
 
         if self.store is None:
@@ -880,6 +909,11 @@ class Agent:
         state : dict | None, optional
             The same working state passed to ``step()``.
         """
+        return self._fork()._execute_gated(call, state)
+
+    def _execute_gated(self, call, state: dict | None = None):
+        # The permission gate keeps its pending request on the instance between
+        # asking and answering; a fork keeps two drivers' requests apart.
         state = state if state is not None else self.new_state()
         denial = self._ask_permission(call, state)
         if denial is _AWAITING:
@@ -889,6 +923,25 @@ class Agent:
         return self._execute(call, state)
 
     # ── The loop ─────────────────────────────────────────────────────────
+
+    def _fork(self) -> Agent:
+        """This agent for one run: the same configuration, its own run state.
+
+        A run keeps its id, its parked document, its pending approval, its
+        stream flag and the hooks it emits to; all of them lived on the agent,
+        and one agent serves concurrent runs — a module-level agent in a warm
+        Lambda, a Pool's items, a `delegate` worker. Approvals crossed (a call
+        approved for one run executed in another), one tenant's stream carried
+        another's events, and a run read another's id. A shallow copy keeps the
+        configuration shared — tools, model, policy, store, a shared `Budget` —
+        and gives each run the rest.
+        """
+        run = copy.copy(self)
+        run.hooks = list(self.hooks)
+        run._run_id = run._doc_id = run._pending = None
+        run._streaming = False
+        run.last_result = None
+        return run
 
     def _begin(self, task: str, variables: dict | None):
         """A run's first moments, for `run()` and `stream()` alike: a fresh
@@ -1209,7 +1262,7 @@ class Agent:
 
         self._pending = ApprovalRequest(
             tool=tool.name, risk=risk, arguments=dict(call.arguments or {}),
-            call_id=getattr(call, "id", "") or "", agent=self.name or "")
+            call_id=getattr(call, "id", "") or "", agent=self.name or "", run_id=self._run_id or "")
         self._emit("approval.requested", name=tool.name,
                    step=(state or {}).get("steps"),
                    payload={"id": self._pending.call_id, "tool": tool.name,

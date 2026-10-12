@@ -41,6 +41,7 @@ while the pool is still running (e.g. for progress monitoring).
 
 from __future__ import annotations
 
+import copy
 import threading
 import time
 import warnings
@@ -480,7 +481,10 @@ class Pool:
                 raise ValueError(
                     "Agent runner requires a 'task' key in the item variables."
                 )
+            # A copy carries the pool's budget, so the agent the caller holds
+            # keeps its own ceiling after the pool is done with it.
             if self.max_cost is not None and hasattr(runner, "max_cost"):
+                runner = copy.copy(runner)
                 runner.max_cost = self.max_cost
             result = runner.run(task=task, variables=variables)
             if not result:
@@ -498,7 +502,6 @@ class Pool:
         # Skill or Chain — both expose run(variables=...) and report on
         # ``last_usage``. The copy is shallow: configuration is shared, the
         # usage counter is not.
-        import copy
         own = copy.copy(runner)
         # The copy is shallow, so the budget travels by reference and every
         # item charges the same object — which is the point. Copying the

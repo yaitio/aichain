@@ -144,6 +144,7 @@ ApprovalRequest(
     arguments: dict,
     call_id: str = '',
     agent: str = '',
+    run_id: str = '',
 )
 ```
 
@@ -162,6 +163,7 @@ gate.
 - `arguments` (*what it would be called with.*)
 - `call_id` (*the provider's id for this call, when there is one.*, default `''`)
 - `agent` (*the name of the agent asking, which matters once a team is*, default `''`) — delegating — the approver needs to know who wants this.
+- `run_id` (*the run asking: one agent serves many runs, and an approver*, default `''`) — answering several at once pairs each answer with its run.
 
 ---
 
