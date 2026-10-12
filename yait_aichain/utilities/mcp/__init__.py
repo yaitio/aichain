@@ -27,7 +27,7 @@ another server's tool is unknown here, and the unknown goes to a person.
 from __future__ import annotations
 
 from .._base import Utility
-from ._tools import DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, MCPTools, risk_from_annotations
+from ._tools import DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted, _Server, discover, risk_from_annotations
 
 
 class MCP(Utility):
@@ -42,10 +42,14 @@ class MCP(Utility):
                  connect_timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT,
                  call_timeout: "float | None" = None, risk: "dict | None" = None) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
-        # and one call of a tool. The discovery function calls the first `timeout`.
+        # and one call of a tool.
         self.server = server
-        self._settings = dict(filter=filter, headers=headers, env=env, cwd=cwd, transport=transport,
-                              timeout=connect_timeout, call_timeout=call_timeout)
+        self._conn = _Server(server, headers=headers, env=env, cwd=cwd, transport=transport,
+                             call_timeout=call_timeout)
+        if isinstance(filter, str) or not all(isinstance(n, str) for n in filter or ()):
+            raise TypeError(f"MCP filter is a list of tool names, not {filter!r}")
+        self._filter = None if filter is None else list(filter)
+        self._connect_timeout = connect_timeout
         self._tools: "list | None" = None
         from ...tools._permissions import RISK_CLASSES
         bad = {n: r for n, r in (risk or {}).items() if r not in RISK_CLASSES}
@@ -56,7 +60,7 @@ class MCP(Utility):
     @property
     def tools(self) -> list:
         if self._tools is None:
-            tools = MCPTools(self.server, **self._settings)
+            tools = discover(self._conn, filter=self._filter, timeout=self._connect_timeout)
             missing = sorted(set(self._risk) - {t.name for t in tools})
             if missing:
                 raise KeyError(f"risk= names {missing}, which the server does not have; "
@@ -87,7 +91,7 @@ class MCP(Utility):
         return self.tool(name).run(**arguments)
 
     def __repr__(self) -> str:
-        return f"MCP({self.server!r})"
+        return f"MCP({_redacted(self.server)!r})"
 
 
 __all__ = ["MCP", "MCPTool", "risk_from_annotations"]

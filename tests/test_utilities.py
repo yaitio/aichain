@@ -79,14 +79,14 @@ class TestMCP(unittest.TestCase):
         return MCP("https://example.com/mcp", filter=["ask", "read"]), tools
 
     def test_nothing_is_asked_until_used(self):
-        with patch("yait_aichain.utilities.mcp.MCPTools") as discover:
+        with patch("yait_aichain.utilities.mcp.discover") as discover:
             m = MCP("https://example.com/mcp")
             discover.assert_not_called()
             self.assertEqual(m.TOOLS, ())
 
     def test_tools_names_tool_and_call(self):
         m, tools = self._mcp()
-        with patch("yait_aichain.utilities.mcp.MCPTools", return_value=tools) as discover:
+        with patch("yait_aichain.utilities.mcp.discover", return_value=tools) as discover:
             self.assertEqual(m.names, ["ask", "read"])
             self.assertIs(m.tool("ask"), tools[0])
             self.assertEqual(m.call("ask", question="q"), "answer")

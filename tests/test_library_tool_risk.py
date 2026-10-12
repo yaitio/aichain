@@ -111,14 +111,14 @@ class TestTheMCPUtility(unittest.TestCase):
 
     def test_the_callers_word_outranks_the_servers(self):
         found = _discovered(("ask", "privileged"), ("drop", "read"))
-        with patch("yait_aichain.utilities.mcp.MCPTools", return_value=found):
+        with patch("yait_aichain.utilities.mcp.discover", return_value=found):
             m = MCP("https://example.com/mcp", risk={"ask": "read", "drop": "destructive"})
             self.assertEqual({t.name: t.risk for t in m.tools}, {"ask": "read", "drop": "destructive"})
 
     def test_mistakes_in_risk_are_said(self):
         with self.assertRaisesRegex(ValueError, "each must be one of"):
             MCP("https://example.com/mcp", risk={"ask": "safe"})
-        with patch("yait_aichain.utilities.mcp.MCPTools", return_value=_discovered(("ask", "read"))):
+        with patch("yait_aichain.utilities.mcp.discover", return_value=_discovered(("ask", "read"))):
             with self.assertRaisesRegex(KeyError, r"risk= names \['asc'\], which the server does not have"):
                 MCP("https://example.com/mcp", risk={"asc": "read"}).tools
 

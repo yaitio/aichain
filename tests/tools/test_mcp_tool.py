@@ -2,7 +2,7 @@
 tests.tools.test_mcp_tool
 ==========================
 
-Tests for ``tools.mcp`` — MCPTool, MCPTools, and the supporting helpers
+Tests for ``utilities.mcp`` — MCPTool, discovery, and the supporting helpers
 (_is_sse, _extract_result, _AsyncBridge).
 
 Test organisation
@@ -32,13 +32,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from yait_aichain.utilities.mcp._tools import (
     MCPTool,
-    MCPTools,
+    _Server,
+    discover,
     _is_sse,
     _extract_result,
     _AsyncBridge,
     _MISSING,
 )
 from yait_aichain.tools._base import ToolResult
+
+
+def MCPTools(server, filter=None, **settings):
+    """Discovery as `MCP` drives it: the server settled once, then asked."""
+    return discover(_Server(server, **settings), filter=filter)
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +147,7 @@ class TestMCPToolConstruction(unittest.TestCase):
 
     def test_server_stored(self):
         t = self._make(server="https://api.example.com/mcp")
-        self.assertEqual(t._server, "https://api.example.com/mcp")
+        self.assertEqual(t._conn.spec, "https://api.example.com/mcp")
 
     def test_default_schema_is_permissive(self):
         t = self._make()
@@ -159,23 +165,23 @@ class TestMCPToolConstruction(unittest.TestCase):
 
     def test_optional_attrs_default_to_none(self):
         t = self._make()
-        self.assertIsNone(t._headers)
-        self.assertIsNone(t._env)
-        self.assertIsNone(t._cwd)
-        self.assertIsNone(t._transport)
+        self.assertIsNone(t._conn.headers)
+        self.assertIsNone(t._conn.env)
+        self.assertIsNone(t._conn.cwd)
+        self.assertIsNone(t._conn.transport)
 
     def test_headers_stored(self):
         t = self._make(headers={"Authorization": "Bearer tok"})
-        self.assertEqual(t._headers, {"Authorization": "Bearer tok"})
+        self.assertEqual(t._conn.headers, {"Authorization": "Bearer tok"})
 
     def test_env_stored(self):
         t = self._make(env={"API_KEY": "secret"})
-        self.assertEqual(t._env, {"API_KEY": "secret"})
+        self.assertEqual(t._conn.env, {"API_KEY": "secret"})
 
     def test_dict_server_stored(self):
         spec = {"command": "python", "args": ["server.py"]}
         t = self._make(server=spec)
-        self.assertEqual(t._server, spec)
+        self.assertEqual(t._conn.spec, spec)
 
     def test_is_tool_subclass(self):
         from yait_aichain.tools._base import Tool
@@ -551,14 +557,14 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
         mock   = _mock_client(list_tools_return=[_make_mcp_tool_info("t")])
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools(server)
-        self.assertEqual(tools[0]._server, server)
+        self.assertEqual(tools[0]._conn.spec, server)
 
     def test_tool_inherits_headers(self):
         hdrs = {"Authorization": "Bearer sk-x"}
         mock = _mock_client(list_tools_return=[_make_mcp_tool_info("t")])
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", headers=hdrs)
-        self.assertEqual(tools[0]._headers, hdrs)
+        self.assertEqual(tools[0]._conn.headers, hdrs)
 
     def test_empty_server_returns_empty_list(self):
         mock = _mock_client(list_tools_return=[])
@@ -590,6 +596,54 @@ class TestMCPToolsFactoryMocked(unittest.TestCase):
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             tools = MCPTools("https://example.com/mcp", filter=None)
         self.assertEqual(len(tools), 2)
+
+
+class TestTheServerIsSettledOnce(unittest.TestCase):
+    """What `_Server` refuses, what `_build_client` makes of each form, and
+    what a repr shows — each was a defect before the settings were one value."""
+
+    def _transport(self, spec, **settings):
+        with patch("fastmcp.Client", side_effect=lambda t: t):
+            return __import__("yait_aichain.utilities.mcp._tools", fromlist=["_"])._build_client(
+                _Server(spec, **settings))
+
+    def test_a_query_string_does_not_hide_sse(self):
+        self.assertTrue(_is_sse("https://api.example.com/sse?api_key=k", None))
+        self.assertEqual(type(self._transport("https://api.example.com/sse?api_key=k")).__name__, "SSETransport")
+
+    def test_a_script_runs_under_its_interpreter(self):
+        t = self._transport("./server.py --flag")
+        self.assertEqual((t.command, t.args), (sys.executable, ["./server.py", "--flag"]))
+        self.assertEqual(self._transport({"command": "srv.js"}).command, "node")
+        self.assertEqual(self._transport("fli-mcp").command, "fli-mcp")
+
+    def test_headers_none_in_a_dict_is_no_headers(self):
+        t = self._transport({"url": "https://api.example.com/mcp", "headers": None})
+        self.assertEqual(type(t).__name__, "StreamableHttpTransport")
+
+    def test_what_is_refused(self):
+        for spec, settings, said in (("", {}, "needs a server"), ({"args": []}, {}, "'url' or 'command'"),
+                                     ("x", {"transport": "websocket"}, "not one of")):
+            with self.subTest(spec=spec, **settings):
+                with self.assertRaisesRegex(ValueError, said):
+                    _Server(spec, **settings)
+
+    def test_a_filter_is_names_and_they_must_exist(self):
+        from yait_aichain.utilities import MCP
+        with self.assertRaises(TypeError):
+            MCP("https://example.com/mcp", filter="search")       # a substring match before
+        mock = _mock_client(list_tools_return=[_make_mcp_tool_info("search")])
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
+            with self.assertRaisesRegex(KeyError, r"\['serach'\].*it has \['search'\]"):
+                MCPTools("https://example.com/mcp", filter=["serach"])
+
+    def test_a_repr_shows_no_key(self):
+        from yait_aichain.utilities import MCP
+        for spec in ("https://h.example/mcp?api_key=SECRET",
+                     {"url": "https://h.example/mcp", "headers": {"Authorization": "Bearer SECRET"}},
+                     {"command": "srv", "env": {"API_KEY": "SECRET"}}):
+            with self.subTest(spec=spec):
+                self.assertNotIn("SECRET", repr(MCP(spec)) + repr(MCPTool("t", "", spec)))
 
 
 # ---------------------------------------------------------------------------
@@ -687,7 +741,7 @@ class TestMCPToolFliLive(unittest.TestCase):
 
     def test_tools_inherit_server_spec(self):
         for t in MCPTools(self._SERVER):
-            self.assertEqual(t._server, self._SERVER)
+            self.assertEqual(t._conn.spec, self._SERVER)
 
     # ── MCPTool repr ────────────────────────────────────────────────────────
 

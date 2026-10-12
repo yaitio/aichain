@@ -40,6 +40,10 @@ where a fix is named below.
   retried, the budget checked and `llm_call.started`/`ended` emitted per
   attempt, where it checked once and reported one call however many it made.
 
+- **`MCP(filter=…)` names tools that exist.** A name the server does not
+  have raises `KeyError` listing the ones it has, where it was skipped in
+  silence; a string raises `TypeError`, where it matched substrings.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -52,6 +56,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **MCP servers are reached as written.** `MCP("./server.py")` runs the
+  script under the current interpreter (and `.js` under `node`) instead of
+  executing it as a binary; a URL ending in `/sse` is SSE with a query string
+  too; `headers: None` in a server dict is no headers rather than a crash;
+  `MCP("")` and an unknown `transport=` are refused at construction; and a
+  repr shows no query string, header value or env value, which is where keys
+  live. The settings are one value, checked once, instead of five keywords
+  passed through every signature.
 - **A budget stop between turns leaves the paid turns readable.** A
   multi-turn skill stopped by `max_cost` before its last turn had `history`
   and `last_usage` at None, while the error told the caller to read them.

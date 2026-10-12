@@ -1,10 +1,10 @@
 """
-utilities.mcp._tools — MCPTool, MCPTools
-=========================================
+utilities.mcp._tools — MCPTool and discovery
+=============================================
 
 One ``MCPTool`` wraps one operation on an MCP (Model Context Protocol)
 server behind the standard ``run(input, options=None)`` interface.
-``MCPTools()`` is the internal discovery function :class:`~yait_aichain.utilities.MCP`
+``discover()`` is the internal function :class:`~yait_aichain.utilities.MCP`
 uses to list a server's tools; the way in is ``MCP(server)``.
 
 A tool works anywhere a Tool is accepted: Chain steps, Agent tool lists,
@@ -60,9 +60,14 @@ from __future__ import annotations
 from ..._require import require
 
 import asyncio
+import os
+import shlex
+import sys
 import threading
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from ...tools._base import Tool
 
@@ -145,8 +150,11 @@ def _run_sync(coro: Any, timeout: "float | None" = None) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Transport helpers
+# The server: where it is and how to reach it, settled once
 # ---------------------------------------------------------------------------
+
+_TRANSPORTS = ("http", "streamable", "sse", "stdio")
+
 
 def _is_sse(url: str, transport_hint: "str | None") -> bool:
     """Return True when the SSE transport should be preferred."""
@@ -154,95 +162,82 @@ def _is_sse(url: str, transport_hint: "str | None") -> bool:
         return True
     if transport_hint in ("http", "streamable"):
         return False
-    return url.rstrip("/").endswith("/sse")
+    return urlsplit(url).path.rstrip("/").endswith("/sse")
 
 
-def _build_client(
-    server:    "str | dict | Any",
-    *,
-    headers:   "dict | None" = None,
-    env:       "dict | None" = None,
-    cwd:       "str | None"  = None,
-    transport: "str | None"  = None,
-) -> Any:
-    """
-    Construct a ``fastmcp.Client`` from *server*.
+def _redacted(spec: Any) -> str:
+    """The server for a repr or an error: a URL without its query, a dict
+    without the values of its headers and env, which is where keys live."""
+    if isinstance(spec, str):
+        return urlsplit(spec)._replace(query="", fragment="").geturl() if "://" in spec else spec
+    if isinstance(spec, dict):
+        return repr({k: (sorted(v) if k in ("headers", "env") and isinstance(v, dict) else v)
+                     for k, v in spec.items()})
+    return type(spec).__name__
 
-    Parameters
-    ----------
-    server : str | dict | object
-        See the module docstring for accepted forms.
-    headers : dict | None
-        HTTP headers for HTTP / SSE transports.
-    env : dict | None
-        Extra environment variables for STDIO transports.
-    cwd : str | None
-        Working directory for STDIO subprocess.
-    transport : str | None
-        Force transport: ``"http"``, ``"sse"``, or ``"stdio"``.
 
-    Raises
-    ------
-    ImportError
-        When ``fastmcp`` is not installed.
-    ValueError
-        When the server spec is unrecognisable.
-    """
+@dataclass(frozen=True)
+class _Server:
+    """An MCP server and the settings for reaching it — one value, checked
+    here once, instead of five keywords threaded through every signature."""
+
+    spec:         Any
+    headers:      "dict | None"  = None
+    env:          "dict | None"  = None
+    cwd:          "str | None"   = None
+    transport:    "str | None"   = None
+    call_timeout: "float | None" = None
+
+    def __post_init__(self) -> None:
+        if self.spec is None or (isinstance(self.spec, str) and not self.spec.strip()):
+            raise ValueError("MCP needs a server: a URL, a command such as "
+                             "'python server.py', or a dict with 'url' or 'command'")
+        if self.transport is not None and self.transport not in _TRANSPORTS:
+            raise ValueError(f"MCP transport {self.transport!r} is not one of {list(_TRANSPORTS)}")
+        if isinstance(self.spec, dict):
+            if not (self.spec.get("url") or self.spec.get("command")):
+                raise ValueError("an MCP server dict must have either 'url' or 'command'")
+            # One source for each: given both as an argument and in the server
+            # dict, it is an error rather than a merge where one side wins.
+            for key in ("headers", "env", "cwd", "transport"):
+                if getattr(self, key) and self.spec.get(key):
+                    raise ValueError(f"MCP {key} given twice — as {key}= and in the server dict; "
+                                     "give it in one place")
+
+    def __repr__(self) -> str:
+        return f"_Server({_redacted(self.spec)})"
+
+
+def _build_client(server: _Server) -> Any:
+    """A ``fastmcp.Client`` for *server*; see the module docstring for the forms."""
     Client = require("fastmcp", package="fastmcp", who="MCP", extra="mcp").Client
     from fastmcp.client.transports import SSETransport, StdioTransport, StreamableHttpTransport
 
-    # ── Dict spec ─────────────────────────────────────────────────────────
-    if isinstance(server, dict):
-        # One source for each: given both as an argument and in the server
-        # dict, it is an error rather than a merge where one side wins.
-        for key, given in (("headers", headers), ("env", env), ("cwd", cwd), ("transport", transport)):
-            if given and server.get(key):
-                raise ValueError(f"MCP {key} given twice — as {key}= and in the server dict; "
-                                 "give it in one place")
-        if "url" in server:
-            url      = server["url"]
-            merged_h = {**(headers or {}), **server.get("headers", {})}
-            hint     = transport or server.get("transport")
-            if _is_sse(url, hint):
-                return Client(SSETransport(url=url, headers=merged_h or None))
-            return Client(StreamableHttpTransport(url=url, headers=merged_h or None))
+    spec = server.spec
+    if isinstance(spec, dict):
+        headers   = server.headers or spec.get("headers") or None
+        env       = server.env or spec.get("env") or None
+        cwd       = server.cwd or spec.get("cwd")
+        transport = server.transport or spec.get("transport")
+        url       = spec.get("url")
+        command   = [spec.get("command"), *(spec.get("args") or [])]
+    elif isinstance(spec, str):
+        headers, env, cwd, transport = server.headers, server.env, server.cwd, server.transport
+        is_url  = spec.startswith(("http://", "https://"))
+        url     = spec if is_url or transport in ("http", "streamable", "sse") else None
+        command = shlex.split(spec)
+    else:
+        return Client(spec)                       # an in-process FastMCP server
 
-        # stdio dict: {"command": "...", "args": [...], "env": {...}, "cwd": "..."}
-        cmd     = server.get("command")
-        if not cmd:
-            raise ValueError(
-                "MCPTool server dict must have either 'url' or 'command'."
-            )
-        args    = server.get("args", [])
-        m_env   = {**(env or {}), **server.get("env", {})}
-        m_cwd   = cwd or server.get("cwd")
-        return Client(StdioTransport(
-            command = cmd,
-            args    = args,
-            env     = m_env or None,
-            cwd     = m_cwd,
-        ))
-
-    # ── String: URL or path / command ─────────────────────────────────────
-    if isinstance(server, str):
-        is_url = server.startswith(("http://", "https://"))
-        if is_url or transport in ("http", "sse"):
-            if _is_sse(server, transport):
-                return Client(SSETransport(url=server, headers=headers))
-            return Client(StreamableHttpTransport(url=server, headers=headers))
-
-        # Local path or "python ./server.py --arg" style string → STDIO
-        import shlex
-        parts = shlex.split(server)
-        return Client(StdioTransport(
-            command = parts[0],
-            args    = parts[1:],
-            env     = env or None,
-            cwd     = cwd,
-        ))
-
-    # ── In-process FastMCP server object ──────────────────────────────────
-    return Client(server)
+    if url:
+        kind = SSETransport if _is_sse(url, transport) else StreamableHttpTransport
+        return Client(kind(url=url, headers=headers))
+    # A script is run by its interpreter, not as a binary: `./server.py` has
+    # no business needing an executable bit and a shebang.
+    runner = {".py": sys.executable, ".js": "node"}.get(os.path.splitext(command[0])[1])
+    if runner:
+        command = [runner, *command]
+    return Client(StdioTransport(command=command[0], args=command[1:], env=env, cwd=cwd))
 
 
 # ---------------------------------------------------------------------------
@@ -328,12 +323,15 @@ class MCPTool(Tool):
     headers : dict | None, optional
         HTTP headers for HTTP / SSE transports.
     env : dict | None, optional
-        Extra environment variables for STDIO subprocess servers.
+        Environment variables for a STDIO server, added to a minimal
+        inherited set (``PATH``, ``HOME``, ``USER`` and the like) — not to
+        the whole process environment, so a key in your shell reaches the
+        server only when it is passed here.
     cwd : str | None, optional
         Working directory for STDIO subprocess servers.
     transport : str | None, optional
-        Force transport: ``"http"``, ``"sse"``, or ``"stdio"``.
-        Auto-detected from *server* when omitted.
+        Force transport: ``"http"``, ``"streamable"``, ``"sse"`` or
+        ``"stdio"``. Auto-detected from *server* when omitted.
     risk : str, optional
         The risk class a permission policy reads. ``"privileged"`` when
         omitted: what another server's tool does is unknown here, and the
@@ -344,7 +342,7 @@ class MCPTool(Tool):
     --------
     ::
 
-        from yait_aichain.tools import MCPTool
+        from yait_aichain.utilities.mcp import MCPTool
 
         # ── HTTP server ────────────────────────────────────────────────
         tool = MCPTool(
@@ -389,13 +387,10 @@ class MCPTool(Tool):
             raise ValueError(f"MCPTool {name!r}: risk {risk!r} is not one of {sorted(RISK_CLASSES)}")
         self.risk        = risk
         self.name        = name
-        self._call_timeout = call_timeout
         self.description = description
-        self._server     = server
-        self._headers    = headers
-        self._env        = env
-        self._cwd        = cwd
-        self._transport  = transport
+        self._conn = server if isinstance(server, _Server) else _Server(
+            server, headers=headers, env=env, cwd=cwd, transport=transport,
+            call_timeout=call_timeout)
 
         # Exact schema when available (from discovery); otherwise
         # a permissive fallback so Chain/Agent can still pass kwargs.
@@ -462,7 +457,7 @@ class MCPTool(Tool):
                              + ("timeout is a setting — MCP(…, call_timeout=…)"
                                 if "timeout" in options else
                                 f"a call takes the server's arguments, not options {sorted(options)}"))
-        return _run_sync(self._acall(arguments, timeout=self._call_timeout))
+        return _run_sync(self._acall(arguments))
 
     def __call__(
         self,
@@ -495,14 +490,8 @@ class MCPTool(Tool):
     # Async implementation
     # ------------------------------------------------------------------
 
-    async def _acall(self, arguments: dict, *, timeout: "float | None") -> Any:
-        client = _build_client(
-            self._server,
-            headers   = self._headers,
-            env       = self._env,
-            cwd       = self._cwd,
-            transport = self._transport,
-        )
+    async def _acall(self, arguments: dict) -> Any:
+        client = _build_client(self._conn)
         # The connection/handshake phase gets its own finite cap: the
         # per-call ``timeout`` option only covers ``call_tool``, so a STDIO
         # subprocess that spawns but never speaks the protocol would
@@ -514,12 +503,12 @@ class MCPTool(Tool):
         except asyncio.TimeoutError:
             raise TimeoutError(
                 f"MCP server did not complete the connection handshake "
-                f"within {DEFAULT_MCP_SETUP_TIMEOUT:.0f}s: {self._server!r}"
+                f"within {DEFAULT_MCP_SETUP_TIMEOUT:.0f}s: {_redacted(self._conn.spec)}"
             ) from None
         try:
             call_kwargs: dict = {"raise_on_error": True}
-            if timeout is not None:
-                call_kwargs["timeout"] = timeout
+            if self._conn.call_timeout is not None:
+                call_kwargs["timeout"] = self._conn.call_timeout
             result = await client.call_tool(self.name, arguments, **call_kwargs)
         finally:
             await client.__aexit__(None, None, None)
@@ -530,161 +519,43 @@ class MCPTool(Tool):
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
-        srv = (
-            self._server[:47] + "..."
-            if isinstance(self._server, str) and len(self._server) > 50
-            else str(self._server)
-        )
-        return f"MCPTool(name={self.name!r}, server={srv!r})"
+        srv = _redacted(self._conn.spec)
+        return f"MCPTool(name={self.name!r}, server={srv[:47] + '...' if len(srv) > 50 else srv!r})"
 
 
 # ---------------------------------------------------------------------------
 # Discovery (internal; MCP calls it)
 # ---------------------------------------------------------------------------
 
-def MCPTools(
-    server:    "str | dict | Any",
-    *,
-    filter:    "list[str] | None" = None,
-    headers:   "dict | None"      = None,
-    env:       "dict | None"      = None,
-    cwd:       "str | None"       = None,
-    transport: "str | None"       = None,
-    timeout:   "float | None"     = DEFAULT_MCP_SETUP_TIMEOUT,
-    call_timeout: "float | None"  = None,
-) -> "list[MCPTool]":
+def discover(server: _Server, *, filter: "list[str] | None" = None,
+             timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT) -> "list[MCPTool]":
+    """Ask *server* for its tools, one :class:`MCPTool` each, in its order.
+
+    *filter* keeps the tools it names, and a name the server does not have is
+    a ``KeyError`` listing the ones it has. *timeout* caps the whole discovery
+    — connect, handshake, listing — and ``None`` waits indefinitely. The
+    connection closes here; each tool opens its own when it runs.
     """
-    Connect to an MCP server, discover all exposed tools, and return one
-    :class:`MCPTool` per tool.
-
-    Internal: this is the discovery function :class:`MCP` calls on first
-    use of ``tools``. Callers use ``MCP(server)``, whose ``connect_timeout``
-    becomes ``timeout`` here.
-
-    The discovery connection is opened and closed within this call.  Each
-    returned ``MCPTool`` opens its own connection independently when
-    ``run()`` is called later.
-
-    ``timeout`` caps the whole discovery (connect + handshake + list_tools);
-    a hung server raises ``TimeoutError`` instead of blocking forever.
-    Pass ``timeout=None`` to wait indefinitely.
-
-    Parameters
-    ----------
-    server : str | dict | object
-        MCP server specification.
-
-        **String forms (transport auto-detected):**
-
-        * ``"./server.py"`` or ``"python ./server.py --flag"``
-          → STDIO subprocess.
-        * ``"https://api.example.com/mcp"``
-          → Streamable HTTP.
-        * ``"https://api.example.com/sse"`` (URL ends with ``/sse``)
-          → SSE (legacy).
-
-        **Dict forms (explicit):**
-
-        * ``{"command": "python", "args": ["server.py"]}``
-          → STDIO.
-        * ``{"command": "npx", "args": ["@scope/server", "/path"], "env": {...}}``
-          → STDIO with env vars.
-        * ``{"url": "https://api.example.com/mcp"}``
-          → HTTP.
-        * ``{"url": "https://...", "headers": {"Authorization": "Bearer ..."}}``
-          → HTTP with auth.
-
-    filter : list[str] | None, optional
-        When provided, only return tools whose names appear in this list.
-        All other tools are silently skipped.
-    headers : dict | None, optional
-        HTTP headers for HTTP / SSE transports.  Merged with any headers
-        inside a dict-style *server* spec.
-    env : dict | None, optional
-        Additional environment variables for STDIO transports.  Merged
-        with the current process environment and any ``env`` inside a
-        dict-style *server* spec.
-    cwd : str | None, optional
-        Working directory for STDIO subprocess servers.
-    transport : str | None, optional
-        Force a specific transport: ``"http"``, ``"sse"``, or ``"stdio"``.
-        Auto-detected from *server* when omitted.
-
-    Returns
-    -------
-    list[MCPTool]
-        One :class:`MCPTool` per tool exposed by the server (or filtered
-        subset), ordered as returned by the server.
-
-    Raises
-    ------
-    ImportError
-        When ``fastmcp`` is not installed (``pip install fastmcp``).
-    RuntimeError
-        On connection failure.
-
-    Examples
-    --------
-    ::
-
-        tools = MCPTools("https://api.example.com/mcp", filter=["search_web"])
-        # what MCP("https://api.example.com/mcp", filter=["search_web"]).tools returns
-    """
-
-    return _run_sync(
-        _discover_tools(
-            server    = server,
-            filter    = filter,
-            headers   = headers,
-            env       = env,
-            cwd       = cwd,
-            transport = transport,
-            call_timeout = call_timeout,
-        ),
-        timeout = timeout,
-    )
+    return _run_sync(_discover(server, filter), timeout=timeout)
 
 
-async def _discover_tools(
-    server:    "str | dict | Any",
-    *,
-    filter:    "list[str] | None",
-    headers:   "dict | None",
-    env:       "dict | None",
-    cwd:       "str | None",
-    transport: "str | None",
-    call_timeout: "float | None" = None,
-) -> "list[MCPTool]":
-    """Async implementation — open connection, fetch tool list, close."""
-    client = _build_client(
-        server,
-        headers   = headers,
-        env       = env,
-        cwd       = cwd,
-        transport = transport,
-    )
-    async with client:
-        mcp_tools = await client.list_tools()
-
-    result: list[MCPTool] = []
-    for t in mcp_tools:
-        if filter is not None and t.name not in filter:
-            continue
-        result.append(MCPTool(
-            name        = t.name,
-            description = getattr(t, "description", "") or "",
-            server      = server,
-            # `input_schema` since MCP SDK v2; `inputSchema` before it, and
-            # deprecated now — read only when the new field is absent.
-            parameters  = getattr(t, "input_schema", None) or getattr(t, "inputSchema", None),
-            headers     = headers,
-            env         = env,
-            cwd         = cwd,
-            transport   = transport,
-            call_timeout = call_timeout,
-            risk        = risk_from_annotations(getattr(t, "annotations", None)),
-        ))
-    return result
+async def _discover(server: _Server, filter: "list[str] | None") -> "list[MCPTool]":
+    async with _build_client(server) as client:
+        listed = await client.list_tools()
+    if filter is not None:
+        missing = sorted(set(filter) - {t.name for t in listed})
+        if missing:
+            raise KeyError(f"filter= names {missing}, which the server does not have; "
+                           f"it has {[t.name for t in listed]}")
+    return [MCPTool(
+        name        = t.name,
+        description = getattr(t, "description", "") or "",
+        server      = server,
+        # `input_schema` since MCP SDK v2; `inputSchema` before it, and
+        # deprecated now — read only when the new field is absent.
+        parameters  = getattr(t, "input_schema", None) or getattr(t, "inputSchema", None),
+        risk        = risk_from_annotations(getattr(t, "annotations", None)),
+    ) for t in listed if filter is None or t.name in filter]
 
 
 def _hint(annotations: Any, snake: str, camel: str) -> "bool | None":

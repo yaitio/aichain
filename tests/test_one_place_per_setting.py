@@ -156,18 +156,16 @@ class TestREST(unittest.TestCase):
 class TestMCP(unittest.TestCase):
 
     def test_headers_env_cwd_and_transport_have_one_source(self):
-        from yait_aichain.utilities.mcp._tools import _build_client
+        from yait_aichain.utilities.mcp._tools import _Server
         with self.assertRaisesRegex(ValueError, "MCP headers given twice"):
-            _build_client({"url": "https://example.com/mcp", "headers": {"A": "1"}}, headers={"B": "2"},
-                          env=None, cwd=None, transport=None)
+            _Server({"url": "https://example.com/mcp", "headers": {"A": "1"}}, headers={"B": "2"})
         with self.assertRaisesRegex(ValueError, "MCP env given twice"):
-            _build_client({"command": "server", "env": {"A": "1"}}, headers=None, env={"B": "2"},
-                          cwd=None, transport=None)
+            _Server({"command": "server", "env": {"A": "1"}}, env={"B": "2"})
 
     def test_the_utility_names_its_two_timeouts(self):
         from yait_aichain.utilities import MCP
         m = MCP("https://example.com/mcp", connect_timeout=10, call_timeout=30)
-        self.assertEqual((m._settings["timeout"], m._settings["call_timeout"]), (10, 30))
+        self.assertEqual((m._connect_timeout, m._conn.call_timeout), (10, 30))
 
 
 if __name__ == "__main__":
