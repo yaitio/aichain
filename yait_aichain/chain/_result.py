@@ -7,7 +7,7 @@ What ``Chain.run()`` and ``Chain.resume()`` return, in the same shape as
 ``history``, ``usage``, ``tokens_used``, ``cost``.
 
 A chain names its steps, so a step's output is read by its name:
-``result["tweet"]``. Measured 2026-09-13 (``evals/agent_builds``): given the
+``result["tweet"]``. Measured 2026-09-13: given the
 documentation, a model reached for exactly that in twenty of forty-seven
 failed attempts.
 """

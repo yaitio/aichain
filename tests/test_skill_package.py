@@ -10,9 +10,11 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "evals" / "agent_builds"))
+EVALS = ROOT / "evals" / "agent_builds"
+sys.path.insert(0, str(EVALS))
+needs_evals = unittest.skipUnless(EVALS.is_dir(), "the agent-build evals are not part of this checkout")
 
-_spec = importlib.util.spec_from_file_location("skill_script", ROOT / "scripts" / "skill.py")
+_spec = importlib.util.spec_from_file_location("skill_script", ROOT / ".github" / "scripts" / "skill.py")
 skill = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(skill)
 
@@ -22,7 +24,7 @@ import yait_aichain  # noqa: E402
 class TestThePlugin(unittest.TestCase):
 
     def test_every_generated_file_is_current(self):
-        self.assertEqual(skill.main(["--check"]), 0, "run python scripts/skill.py")
+        self.assertEqual(skill.main(["--check"]), 0, "run python .github/scripts/skill.py")
 
     def test_the_plugin_carries_the_librarys_version(self):
         manifest = json.loads((skill.PLUGIN / ".claude-plugin" / "plugin.json").read_text())
@@ -59,6 +61,7 @@ class TestThePlugin(unittest.TestCase):
                 self.assertIn(f"`{name}`", text)
                 self.assertTrue((skill.SKILL_DIR / name).exists())
 
+    @needs_evals
     def test_no_held_out_task_reaches_the_plugin(self):
         from holdout import HOLDOUT
         from holdout2 import HOLDOUT2
@@ -70,6 +73,7 @@ class TestThePlugin(unittest.TestCase):
                 self.assertNotIn(t.text, bundle)
                 self.assertNotIn(t.reference.strip(), bundle)
 
+    @needs_evals
     def test_every_tuning_reference_is_a_recipe(self):
         from tasks import TASKS
         recipes = (skill.SKILL_DIR / "recipes.md").read_text()

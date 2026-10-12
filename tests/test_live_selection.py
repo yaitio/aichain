@@ -24,7 +24,7 @@ def _load(name, path):
 
 
 conftest = _load("_conftest_under_test", ROOT / "tests" / "conftest.py")
-summary = _load("live_summary", ROOT / "scripts" / "live_summary.py")
+summary = _load("live_summary", ROOT / ".github" / "scripts" / "live_summary.py")
 
 
 class TestTheMarkerFollowsTheClassName(unittest.TestCase):

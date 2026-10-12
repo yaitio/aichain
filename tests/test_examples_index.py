@@ -6,7 +6,7 @@ line; none of them could construct their agent. Two things let that stand: the
 table was typed by hand, and nothing ever ran an example. This file holds both:
 
 * the committed index — and the table in the root README — equal what
-  `scripts/examples_index.py` produces from the scripts' own docstrings;
+  `.github/scripts/examples_index.py` produces from the scripts' own docstrings;
 * every example that needs no key and no network is executed, and its output
   checked for the thing it exists to show.
 
@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 _spec = importlib.util.spec_from_file_location(
-    "examples_index", ROOT / "scripts" / "examples_index.py")
+    "examples_index", ROOT / ".github" / "scripts" / "examples_index.py")
 examples_index = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(examples_index)
 
@@ -36,7 +36,7 @@ class TestTheIndexIsGenerated(unittest.TestCase):
             with self.subTest(page=path.relative_to(ROOT).as_posix()):
                 self.assertEqual(
                     path.read_text(), text,
-                    "stale — run: python scripts/examples_index.py")
+                    "stale — run: python .github/scripts/examples_index.py")
 
     def test_every_example_has_a_row(self):
         index = examples_index.render_index()

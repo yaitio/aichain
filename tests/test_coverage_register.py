@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("coverage_register", ROOT / "scripts" / "coverage_register.py")
+_spec = importlib.util.spec_from_file_location("coverage_register", ROOT / ".github" / "scripts" / "coverage_register.py")
 reg = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(reg)
 
@@ -17,14 +17,7 @@ def _report(total, **files):
 
 class TestRegister(unittest.TestCase):
 
-    ROWS = reg.register("""
-| Module | Kind | Reason |
-|---|---|---|
-| `yait_aichain/tools/search/brave.py` | external | the request path needs Brave's API |
-""")
-
-    def test_rows_parse(self):
-        self.assertEqual(self.ROWS["yait_aichain/tools/search/brave.py"][0], "external")
+    ROWS = {"yait_aichain/tools/search/brave.py": ("external", "the request path needs Brave's API")}
 
     def test_a_gap_without_a_reason_fails(self):
         found = reg.problems(_report(80, **{"yait_aichain/tools/search/brave.py": 30,
@@ -49,8 +42,8 @@ class TestRegister(unittest.TestCase):
         self.assertGreaterEqual(reg.fail_under(), 77)
 
     def test_the_committed_register_is_well_formed(self):
-        rows = reg.register((ROOT / "COVERAGE.md").read_text())
-        self.assertTrue(rows, "COVERAGE.md has no register rows")
+        rows = reg.register()
+        self.assertTrue(rows, "[tool.coverage.register] in pyproject.toml has no rows")
         for module, (kind, reason) in rows.items():
             self.assertIn(kind, reg.KINDS, module)
             self.assertTrue(reason, module)

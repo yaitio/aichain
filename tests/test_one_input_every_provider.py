@@ -16,7 +16,7 @@ a table asks whether they agree with each other.
 
 Nothing here talks to a network: a request is built and inspected. What a
 provider *does* with what it receives is the parameter matrix's job
-(`scripts/parameters.py`), established by effect against the live APIs.
+(`.github/scripts/parameters.py`), established by effect against the live APIs.
 """
 
 import os

@@ -1,7 +1,7 @@
 """
 The API reference is the code's own account of itself, and covers all of it.
 
-`docs/api/` is rendered by `scripts/docs.py` from signatures and docstrings,
+`docs/api/` is rendered by `.github/scripts/docs.py` from signatures and docstrings,
 so an API page cannot drift from the code — but it can be silent. Held here:
 every public name is on a page (or exempt, with the reason), and the number
 of parameters a docstring does not describe only goes down.
@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / ".github" / "scripts"))
 import _apidoc  # noqa: E402
 import docs  # noqa: E402
 
@@ -117,7 +117,7 @@ class TestTheApiReference(unittest.TestCase):
                     continue
                 with self.subTest(module=module, name=name):
                     self.fail(f"{module}.{name} is public and on no API page — add it to "
-                              "API_PAGES in scripts/docs.py, or to EXEMPT here with the reason")
+                              "API_PAGES in .github/scripts/docs.py, or to EXEMPT here with the reason")
 
     def test_undocumented_parameters_only_go_down(self):
         missing = undocumented()

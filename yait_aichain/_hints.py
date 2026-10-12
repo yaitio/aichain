@@ -1,7 +1,7 @@
 """
 The names a program reaches for that this library does not have, and the one to use.
 
-The tables are measured rather than imagined. `evals/agent_builds` ran a model
+The tables are measured rather than imagined. An eval ran a model
 on twenty tasks with nothing but `SKILL.md` and `llms.txt`, and most of its
 failures were not wrong ideas but familiar names: `messages` written with
 `content`, `from yait_aichain.hooks import Tracer`, `result.variables` on a

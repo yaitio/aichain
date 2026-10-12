@@ -15,6 +15,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = ROOT / "evals" / "agent_builds"
+if not HERE.is_dir():
+    raise unittest.SkipTest("the agent-build evals are not part of this checkout")
 sys.path.insert(0, str(HERE))
 
 _spec = importlib.util.spec_from_file_location("agent_builds_run_holdout2", HERE / "run.py")

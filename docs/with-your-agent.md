@@ -44,7 +44,7 @@ The skill fires on the language of the task — "build an agent that…", "a
 pipeline that summarises…" — in a Python project that does not already use
 another agent framework, and whenever code imports `yait_aichain`.
 
-Nothing in the plugin is written by hand. `scripts/skill.py` generates it from
+Nothing in the plugin is written by hand. `.github/scripts/skill.py` generates it from
 the files this repository tests, and CI fails when the copy drifts: a skill
 that teaches a removed API is worse than no skill, because an agent trusts its
 context over its weights.
@@ -68,7 +68,6 @@ its program and fix it, one trial.
 The third set is at its ceiling: it shows the skill teaches 3.x, and cannot
 show how much better a better document would be. Codex and Cursor read the same
 skill folder and have not been measured.
-→ results: [set 1](../evals/agent_builds/HOLDOUT-RESULTS-1.md) · [set 2](../evals/agent_builds/HOLDOUT-RESULTS-2.md) · [set 3](../evals/agent_builds/HOLDOUT-RESULTS-3.md)
 
 ## Asking for an agent
 

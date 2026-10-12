@@ -43,3 +43,12 @@ htmlcov/
 
 # mutation testing
 mutants/
+
+# Kept on the owner's machine, not published: design notes, the agent-build
+# evals and their raw runs, the local release and build scripts, and the old
+# coverage register (now [tool.coverage.register] in pyproject.toml).
+/design/
+/docs/design/
+/evals/
+/scripts/
+/COVERAGE.md

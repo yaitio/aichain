@@ -6,7 +6,7 @@ registry page listed 67 of 90 models and a provider tuple of seven; the
 environment page named four keys the library does not read and missed four it
 does; the tools reference covered seven of thirty-two tools and documented a
 `query=` keyword none of them accept. `parameters.md` was the exception,
-because a run produces it. `scripts/docs.py` gives every other data table the
+because a run produces it. `.github/scripts/docs.py` gives every other data table the
 same property, and this test is what makes it a property rather than a habit.
 """
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-_spec = importlib.util.spec_from_file_location("docs_generator", ROOT / "scripts" / "docs.py")
+_spec = importlib.util.spec_from_file_location("docs_generator", ROOT / ".github" / "scripts" / "docs.py")
 docs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(docs)
 
@@ -26,9 +26,9 @@ class TestGeneratedPagesAreCurrent(unittest.TestCase):
     def test_every_page_equals_its_regeneration(self):
         for path, text in docs.targets().items():
             with self.subTest(page=path.relative_to(ROOT).as_posix()):
-                self.assertTrue(path.exists(), "page missing — run python scripts/docs.py")
+                self.assertTrue(path.exists(), "page missing — run python .github/scripts/docs.py")
                 self.assertEqual(path.read_text(), text,
-                                 "stale — run python scripts/docs.py")
+                                 "stale — run python .github/scripts/docs.py")
 
     def test_every_exported_tool_has_a_page(self):
         docs._check_paging()                    # raises SystemExit when one is missing

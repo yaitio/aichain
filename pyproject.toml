@@ -51,8 +51,29 @@ source = ["yait_aichain"]
 [tool.coverage.report]
 # The floor. Measured 2026-09-13 at 77.07%, raised to 77.9 the same day when
 # the Pool and Chain contract tests brought it to 77.93% on 3.10 and 3.14
-# alike. It only rises. What is under it, and why, is in COVERAGE.md.
+# alike. It only rises. What is under it, and why, is the register below.
 fail_under = 78.0
+
+[tool.coverage.register]
+# Every module under 60% coverage, with a kind and a reason. The number is what
+# is left after these decisions; .github/scripts/coverage_register.py checks
+# the list both ways in CI — a gap with no entry fails, and so does an entry
+# whose module has climbed past the line. Kinds: external (the uncovered lines
+# are a vendor's request path), optional-dependency, legacy, debt (testable
+# offline and not yet tested — the list to shrink).
+"yait_aichain/tools/transcribe/_stt.py" = { kind = "external", reason = "transcription paths call four vendors' speech APIs" }
+"yait_aichain/tools/speech/_tts.py" = { kind = "external", reason = "synthesis paths call four vendors' speech APIs" }
+"yait_aichain/tools/embed/_openai.py" = { kind = "external", reason = "request shaping for the OpenAI embeddings API" }
+"yait_aichain/tools/embed/_cohere.py" = { kind = "external", reason = "request shaping for the Cohere embeddings API" }
+"yait_aichain/tools/embed/_voyage.py" = { kind = "external", reason = "request shaping for the Voyage embeddings API" }
+"yait_aichain/tools/rerank/_voyage.py" = { kind = "external", reason = "request shaping for the Voyage rerank API" }
+"yait_aichain/utilities/vectors/providers/_chroma.py" = { kind = "external", reason = "every operation needs a running Chroma server" }
+"yait_aichain/utilities/vectors/providers/_pinecone.py" = { kind = "external", reason = "every operation needs a Pinecone index" }
+"yait_aichain/utilities/vectors/__init__.py" = { kind = "external", reason = "`VectorDB` connects to a provider on construction" }
+"yait_aichain/agent/_memory.py" = { kind = "legacy", reason = "`AgentMemory` is exported but no 2.x primitive uses it — the agent's state is its conversation; a removal candidate, which is a breaking change and needs its own release" }
+"yait_aichain/utilities/shell/_browse.py" = { kind = "debt", reason = "sandboxed and filesystem-only; a temporary directory is all a test needs" }
+"yait_aichain/utilities/shell/_write.py" = { kind = "debt", reason = "sandboxed and filesystem-only" }
+"yait_aichain/utilities/shell/_run.py" = { kind = "debt", reason = "runs a subprocess inside the sandbox; testable with `echo`" }
 
 [tool.mutmut]
 # Which tests actually catch a broken line. A mutant is a one-token change to
@@ -64,8 +85,8 @@ tests_dir = ["tests/"]
 pytest_add_cli_args = ["-m", "not live", "-p", "no:warnings",
                        "--deselect", "tests/test_changelog.py::TestTheChangelogCoversWhatShipped::test_it_is_tracked_by_git"]
 # The whole package, so the files not being mutated still import.
-also_copy = ["yait_aichain", "scripts", "examples", "docs", "evals", "README.md", "CHANGELOG.md",
-             "COVERAGE.md", "llms.txt", "SKILL.md", ".github"]
+also_copy = ["yait_aichain", "examples", "docs", "evals", "README.md", "CHANGELOG.md",
+             "llms.txt", "SKILL.md", ".github"]
 
 [tool.ruff]
 line-length = 100

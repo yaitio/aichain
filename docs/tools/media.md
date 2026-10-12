@@ -72,9 +72,6 @@ model the registry has no price for. → [Cost and budget](../control/cost-and-b
 A `Skill` asked for an image output raises, naming `image(...)`: a Skill makes
 text.
 
-Which model for what, with prices and speeds, measured:
-[`design/image-edit.md`](../../design/image-edit.md).
-
 ---
 
 ▶ [`examples/03_skill_multimodal.py`](../../examples/03_skill_multimodal.py) ·

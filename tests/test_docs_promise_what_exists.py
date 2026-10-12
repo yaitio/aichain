@@ -39,7 +39,7 @@ EXEMPT = {"design"}
 #: `instructions`, folded `max_steps` / `max_tokens` / `max_attempts` /
 #: `done_when` into `stop_when`, dropped `memory`, `store`, `executors` and
 #: the `goal` mode, and turned `allow_spawn` into `team`. Every one of those
-#: decisions is written down in `design/default-agent.md`, with reasons —
+#: decisions is written down in the design notes, with reasons —
 #: the design record was kept and the pages that teach the API were not
 #: touched, so for four minor versions a reader copying the README's agent
 #: example got a TypeError on line one.

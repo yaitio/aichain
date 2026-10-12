@@ -44,4 +44,4 @@ jobs:
           --deselect tests/tools/test_mcp_tool.py::TestMCPToolFliLive
       - name: Summary
         if: always()
-        run: python scripts/live_summary.py live.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python .github/scripts/live_summary.py live.xml >> "$GITHUB_STEP_SUMMARY"

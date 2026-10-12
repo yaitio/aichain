@@ -2,7 +2,7 @@
 
 Every public class, function and method, with its signature, every parameter,
 what it returns and what it raises. Generated from the code's own signatures
-and docstrings by `scripts/docs.py`, and checked in CI: a page that differs
+and docstrings by `.github/scripts/docs.py`, and checked in CI: a page that differs
 from the code fails the build, and a public name with no page fails a test.
 What a thing is for, and how to use it well, is in the guides.
 

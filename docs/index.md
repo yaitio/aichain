@@ -100,8 +100,3 @@ is a [tool](tools/media.md).
 | **[API](api/index.md)** | every class, function and parameter — generated from the code, so it cannot drift from it |
 | **[Reference](reference/index.md)** | data: the model registry, what each provider does with each option, environment variables, the YAML schema |
 
-Why it is built this way, in the design notes:
-[the default agent](../design/default-agent.md) ·
-[the tool convention](../design/tool-convention.md) ·
-[streaming to a UI](../design/streaming-to-a-ui.md) ·
-[image editing](../design/image-edit.md).
