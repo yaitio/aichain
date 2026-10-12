@@ -238,7 +238,8 @@ say what they risk: `Shell.run` is `privileged`, a REST endpoint follows its met
 server's annotations — `privileged` when there are none. With
 `permissions=PermissionPolicy()` the shipped rules allow `read`/`draft`/`write`, ask
 `approve=` for `external`/`financial`/`privileged`, and deny `destructive`; with no
-policy every tool runs. A tool may keep state on its instance and define its own `__init__`.
+policy every tool runs. In 4.0.0 the policy is consulted in the agent's own loop only —
+the `pool` tool, `execute()`, `resume()` and `Chain`/`Pool` steps do not consult it. A tool may keep state on its instance and define its own `__init__`.
 
 **Search, fetch and decide — a tool made by its provider's name.** `search("exa")`,
 `fetch("firecrawl")`, `decide("openai", questions=…)`. `run()` returns a `Record`: a

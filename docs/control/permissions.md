@@ -71,6 +71,12 @@ denied.
 refused** — a rule whose whole content is "ask a person" cannot mean "go
 ahead" when there is no one to ask.
 
+**Where the policy holds, in 4.0.** It is consulted in the agent's own loop.
+The built-in `pool` tool, `Agent.execute()`, `resume()`, and tools run as
+steps of a `Chain` or items of a `Pool` do not consult it yet — so a tool that
+must never run without a person should not be reachable through them. This is
+a known issue of 4.0.0, to be closed in 4.0.x.
+
 ## The approver
 
 `approve=` gets an `ApprovalRequest` — the tool's name, its risk class, the

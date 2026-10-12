@@ -156,6 +156,31 @@ file and never published, and everything they record is in 4.0.0.
   tampered file could otherwise point a key from your environment at any
   address, or let a `DELETE` past a permission policy as `read`.
 
+### Known issues
+
+Found by an audit of this release, and to be fixed in 4.0.x. Each is a reason
+to keep a pattern out of production until then, not a reason to wait for it.
+
+- **A permission policy is checked in the agent's own loop only.** The
+  built-in `pool` tool, `Agent.execute()`, `resume()`, and tools run as steps
+  of a `Chain` or items of a `Pool` do not consult it: a tool the policy
+  denies runs when the model calls it through `pool`.
+- **`Chain.load()` without `trusted=True` still builds any tool class of the
+  library from the file,** `Shell`'s `run` among them. Load only chain files
+  you wrote.
+- **An `Agent` holds the state of its run.** One instance must not serve
+  concurrent runs or several tenants: approvals, events and the run id are
+  shared. A numeric `max_cost` is spent over the object's life, not per run,
+  and `pool(prompt=…)` spends outside it.
+- **`gate()` approves any truthy decision,** the string `"false"` included.
+- **A REST path parameter equal to `..`** reaches a different endpoint.
+- **`Shell`'s `run` prefixes any command ending in `.py` with the
+  interpreter,** so `python script.py` fails.
+- **`Model(options=…)` removes `extra` from the dict it is given;** a second
+  model built from the same dict goes without it.
+- **Claude with `reasoning` and tools fails on the second step,** and Gemini
+  rejects the results of parallel tool calls.
+
 ## [3.10.0] — 2026-10-10
 
 **The registry, brought to what providers sell and charge on 2026-10-10.**
