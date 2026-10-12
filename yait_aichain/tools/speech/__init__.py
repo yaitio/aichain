@@ -22,13 +22,14 @@ SERVICES = {"openai": ttsOpenAI, "google": ttsGoogle, "xai": ttsXAI, "qwen": tts
 
 def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = None,
            region: "str | None" = None, name: "str | None" = None,
-           description: "str | None" = None) -> Speech:
+           description: "str | None" = None, output_dir: "str | None" = None) -> Speech:
     """
     A text-to-speech tool for *service* — one of ``SERVICES``.
 
     ``model`` defaults to the provider's (Google's has one and takes none);
     ``region`` is Qwen's alone; ``name`` and ``description`` default to the
-    provider's; ``api_key`` to its environment variable.
+    provider's; ``api_key`` to its environment variable. ``output_dir`` is
+    where the audio files go — the system's temporary directory by default.
 
     ::
 
@@ -41,7 +42,7 @@ def speech(service: str, *, model: "str | None" = None, api_key: "str | None" = 
     extra = {"region": region} if region is not None else {}
     if model is not None:
         extra["model"] = model
-    tool = cls(api_key=api_key, **extra)
+    tool = cls(api_key=api_key, output_dir=output_dir, **extra)
     return named(tool, name, description)
 
 

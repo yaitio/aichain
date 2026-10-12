@@ -14,6 +14,7 @@ speech(
     region: str | None = None,
     name: str | None = None,
     description: str | None = None,
+    output_dir: str | None = None,
 ) -> yait_aichain.tools.speech._tts.Speech
 ```
 
@@ -21,7 +22,8 @@ A text-to-speech tool for *service* — one of `SERVICES`.
 
 `model` defaults to the provider's (Google's has one and takes none);
 `region` is Qwen's alone; `name` and `description` default to the
-provider's; `api_key` to its environment variable.
+provider's; `api_key` to its environment variable. `output_dir` is
+where the audio files go — the system's temporary directory by default.
 
 ```python
 speech("openai").run("Hello!", {"voice": "nova"})    # the path of the audio file
@@ -63,13 +65,15 @@ Text-to-speech via the OpenAI TTS API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import ttsOpenAI` |
-| Risk class | `write` |
+| Risk class | `draft` |
 | Key | `OPENAI_API_KEY` |
 
 ```python
 ttsOpenAI(
     api_key: str | None = None,
     model: str | None = None,
+    *,
+    output_dir: str | None = None,
 )
 ```
 
@@ -79,7 +83,6 @@ ttsOpenAI(
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
 | `options.speed` | `number` |  | Playback speed multiplier. 0.25–4.0, default 1.0. |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
-| `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
 
 ```python
 result = ttsOpenAI()(
@@ -95,13 +98,15 @@ Text-to-speech via Google Cloud Text-to-Speech.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import ttsGoogle` |
-| Risk class | `write` |
+| Risk class | `draft` |
 | Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` |
 
 ```python
 ttsGoogle(
     api_key: str | None = None,
     model: str | None = None,
+    *,
+    output_dir: str | None = None,
 )
 ```
 
@@ -112,7 +117,6 @@ ttsGoogle(
 | `options.speed` | `number` |  | Playback speed multiplier. 0.25–4.0, default 1.0. |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
 | `options.language` | `string` |  | BCP-47 language code, e.g. 'en-US'. Google only — it is required there and the other endpoints have no such field, so they do not declare this option at all. |
-| `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
 
 ```python
 result = ttsGoogle()(
@@ -128,13 +132,15 @@ Text-to-speech via the xAI TTS API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import ttsXAI` |
-| Risk class | `write` |
+| Risk class | `draft` |
 | Key | `XAI_API_KEY` |
 
 ```python
 ttsXAI(
     api_key: str | None = None,
     model: str | None = None,
+    *,
+    output_dir: str | None = None,
 )
 ```
 
@@ -144,7 +150,6 @@ ttsXAI(
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
 | `options.speed` | `number` |  | Playback speed multiplier. 0.25–4.0, default 1.0. |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
-| `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
 
 ```python
 result = ttsXAI()(
@@ -160,7 +165,7 @@ Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import ttsQwen` |
-| Risk class | `write` |
+| Risk class | `draft` |
 | Key | `DASHSCOPE_API_KEY` |
 
 ```python
@@ -168,6 +173,8 @@ ttsQwen(
     api_key: str | None = None,
     region: str | None = None,
     model: str | None = None,
+    *,
+    output_dir: str | None = None,
 )
 ```
 
@@ -176,7 +183,6 @@ ttsQwen(
 | `input` | `string` | ✓ | Text to synthesise into speech. |
 | `options.voice` | `string` |  | Voice name or ID (provider-specific). |
 | `options.format` | `string` |  | Audio output format. Default: mp3. One of `mp3`, `wav`, `opus`, `flac`, `pcm`. |
-| `options.output_path` | `string` |  | Destination file path. Auto-generated inside ./audio/ when omitted. |
 
 ```python
 result = ttsQwen()(

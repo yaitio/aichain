@@ -36,9 +36,9 @@ from __future__ import annotations
 
 from ..._require import require
 
-import datetime
 import json
 import os
+import tempfile
 import urllib3
 from yait_aichain.clients._base import make_http
 
@@ -68,12 +68,14 @@ def _no_model_option(tool, opts: dict) -> None:
         raise ValueError(f"{tool.name}: model is a setting of the tool, not of a call — "
                          f"make it with model=… ({type(tool).__name__}(model=…), or the factory)")
 
-def _auto_path(fmt: str) -> str:
-    """Return a timestamped output path inside ``./audio/`` (relative to cwd)."""
-    stamp   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = os.path.join(os.getcwd(), "audio")
-    os.makedirs(out_dir, exist_ok=True)
-    return os.path.join(out_dir, f"speech_{stamp}.{fmt}")
+def _output_folder(output_dir: str | None) -> str:
+    """Where audio is written: the tool's ``output_dir``, else
+    ``AICHAIN_OUTPUT_ROOT``, else the system's temporary directory — which is
+    writable on Lambda, where the working directory is not."""
+    folder = output_dir or os.environ.get("AICHAIN_OUTPUT_ROOT", "").strip() or tempfile.gettempdir()
+    folder = confine_output_path(folder)
+    os.makedirs(folder, exist_ok=True)
+    return folder
 
 
 # ── Base class ────────────────────────────────────────────────────────────────
@@ -165,13 +167,6 @@ class Speech(Tool):
                             "do not declare this option at all."
                         ),
                     },
-                    "output_path": {
-                        "type":        "string",
-                        "description": (
-                            "Destination file path.  "
-                            "Auto-generated inside ./audio/ when omitted."
-                        ),
-                    },
                 },
             },
         },
@@ -185,10 +180,48 @@ class Speech(Tool):
             out["model"] = self.model
         if getattr(self, "_region", None):
             out["region"] = self._region
+        if self.output_dir:
+            out["output_dir"] = self.output_dir
         return out
+
+    #: `draft`: it makes a file of its own in a folder the code chose, and
+    #: overwrites nothing. A model never names the path.
+    risk = "draft"
+    output_dir: str | None = None
 
     def run(self, input: str, options: dict | None = None) -> str:
         raise NotImplementedError(f"{type(self).__name__} must implement run()")
+
+    def _save(self, opts: dict, fmt: str, produce) -> str:
+        """Make the file, then pay for what goes in it; return its path.
+
+        The path is settled — and refused, if it must be — before the paid
+        call. Each file is created new and exclusively, so parallel calls in
+        a Pool never share one, which a timestamp to the second did. A file
+        the call never filled is removed. The path is the code's choice:
+        ``output_dir`` on the tool, never an option a model can set — the
+        model choosing it overwrote ``~/.zshrc`` with an MP3.
+        """
+        if "output_path" in opts:
+            import warnings
+            warnings.warn(f"{self.name}: output_path is going in 5.0 — set the folder with "
+                          "output_dir= on the tool; files are named for you",
+                          DeprecationWarning, stacklevel=3)
+            path = confine_output_path(opts["output_path"])
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        else:
+            fd, path = tempfile.mkstemp(dir=_output_folder(self.output_dir),
+                                        prefix="speech-", suffix=f".{fmt}")
+            os.close(fd)
+        try:
+            data = produce()
+        except BaseException:
+            if "output_path" not in opts:
+                os.unlink(path)
+            raise
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return path
 
     def stream(self, input: str, options: dict | None = None):
         """Real-time streaming synthesis — reserved for a future release."""
@@ -215,8 +248,10 @@ class _OpenAISpeech(Speech):
     _ENV_KEY:  str = ""
     _LABEL:    str = ""
 
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None, *,
+                 output_dir: str | None = None) -> None:
         self.model = _model_setting(self, model)
+        self.output_dir = output_dir
         self._api_key = api_key or os.environ.get(self._ENV_KEY)
         if not self._api_key:
             raise ValueError(f"No {self._LABEL} API key found.  "
@@ -228,25 +263,20 @@ class _OpenAISpeech(Speech):
         """
         Synthesise *input* and save it as an audio file; return its path.
 
-        options: ``voice``, ``speed`` (0.25–4.0, default 1.0), ``format``
-        (``"mp3"`` default, ``"wav"``, ``"opus"``, ``"flac"``, ``"pcm"``) and
-        ``output_path`` (generated when omitted). The path is checked before
-        the request, so a refused one costs nothing.
+        options: ``voice``, ``speed`` (0.25–4.0, default 1.0) and ``format``
+        (``"mp3"`` default, ``"wav"``, ``"opus"``, ``"flac"``, ``"pcm"``). The
+        file goes in the tool's ``output_dir``, made before the request.
         """
         _no_model_option(self, options or {})
         opts = options or {}
         fmt  = opts.get("format", _DEFAULT_FORMAT)
-        output_path = confine_output_path(opts.get("output_path") or _auto_path(fmt))
-        audio = request(self._http, "POST", f"{self._BASE_URL}/audio/speech",
-                        json={"model": self.model, "voice": opts.get("voice", self._DEFAULT_VOICE),
-                              "input": input, "response_format": fmt,
-                              "speed": float(opts.get("speed", _DEFAULT_SPEED))},
-                        headers={"Authorization": f"Bearer {self._api_key}"},
-                        what=f"{self._LABEL} speech API").data
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "wb") as fh:
-            fh.write(audio)
-        return output_path
+        return self._save(opts, fmt, lambda: request(
+            self._http, "POST", f"{self._BASE_URL}/audio/speech",
+            json={"model": self.model, "voice": opts.get("voice", self._DEFAULT_VOICE),
+                  "input": input, "response_format": fmt,
+                  "speed": float(opts.get("speed", _DEFAULT_SPEED))},
+            headers={"Authorization": f"Bearer {self._api_key}"},
+            what=f"{self._LABEL} speech API").data)
 
 
 class ttsOpenAI(_OpenAISpeech):
@@ -278,12 +308,12 @@ class ttsOpenAI(_OpenAISpeech):
 
         from yait_aichain.tools import speech
 
-        tool = speech("openai", model="tts-1-hd")
+        tool = speech("openai", model="tts-1-hd", output_dir="audio/")
 
         # Call-style — returns ToolResult, never raises
         result = tool(
             input="Hello, world!",
-            options={"voice": "nova", "output_path": "hello.mp3"},
+            options={"voice": "nova"},
         )
         if result:
             print("Saved to:", result.output)
@@ -336,7 +366,6 @@ class ttsGoogle(Speech):
                 "voice":    "en-US-Neural2-C",
                 "language": "en-US",
                 "format":   "mp3",
-                "output_path": "hello.mp3",
             },
         )
     """
@@ -356,8 +385,10 @@ class ttsGoogle(Speech):
         "flac": ("FLAC",     "flac"),
     }
 
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None, *,
+                 output_dir: str | None = None) -> None:
         self.model = _model_setting(self, model)
+        self.output_dir = output_dir
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
         # the older spelling. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
@@ -380,7 +411,6 @@ class ttsGoogle(Speech):
             ``speed``       — speaking rate.  0.25–4.0, default 1.0.
             ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``,
                               ``"flac"``.
-            ``output_path`` — destination path.  Auto-generated if omitted.
 
         Returns
         -------
@@ -394,11 +424,7 @@ class ttsGoogle(Speech):
         language    = opts.get("language",  self._DEFAULT_LANGUAGE)
         speed       = float(opts.get("speed", _DEFAULT_SPEED))
         fmt         = opts.get("format",    _DEFAULT_FORMAT)
-        output_path = opts.get("output_path")
-
         g_encoding, ext = self._FORMAT_MAP.get(fmt, ("MP3", "mp3"))
-        if not output_path:
-            output_path = _auto_path(ext)
 
         synthesis_input = texttospeech.SynthesisInput(text=input)
 
@@ -419,18 +445,11 @@ class ttsGoogle(Speech):
         else:
             client = texttospeech.TextToSpeechClient()
 
-        response    = client.synthesize_speech(
+        return self._save(opts, ext, lambda: client.synthesize_speech(
             input        = synthesis_input,
             voice        = voice_params,
             audio_config = audio_config,
-        )
-
-        output_path = confine_output_path(output_path)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "wb") as fh:
-            fh.write(response.audio_content)
-
-        return output_path
+        ).audio_content)
 
 
 # ── ttsXAI ────────────────────────────────────────────────────────────────────
@@ -459,7 +478,7 @@ class ttsXAI(_OpenAISpeech):
         tool = speech("xai")
         path = tool.run(
             input="Hello from xAI!",
-            options={"output_path": "hello_xai.mp3"},
+            options={"format": "mp3"},
         )
     """
 
@@ -520,7 +539,7 @@ class ttsQwen(Speech):
 
         path = tool.run(
             input="Hello from Qwen TTS!",
-            options={"voice": "longxiaochun", "output_path": "hello.wav"},
+            options={"voice": "longxiaochun", "format": "wav"},
         )
     """
 
@@ -547,8 +566,11 @@ class ttsQwen(Speech):
         api_key: str | None = None,
         region:  str | None = None,
         model:   str | None = None,
+        *,
+        output_dir: str | None = None,
     ) -> None:
         self.model = _model_setting(self, model)
+        self.output_dir = output_dir
         self._api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
         if not self._api_key:
             raise ValueError(
@@ -579,7 +601,6 @@ class ttsQwen(Speech):
             ``voice``       — voice name.  Default: ``"longxiaochun"``.
             ``format``      — ``"mp3"`` (default), ``"wav"``, ``"pcm"``,
                               ``"flac"``.
-            ``output_path`` — destination path.  Auto-generated if omitted.
 
         Returns
         -------
@@ -591,7 +612,6 @@ class ttsQwen(Speech):
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
         model       = self.model
         fmt         = opts.get("format",      _DEFAULT_FORMAT)
-        output_path = opts.get("output_path") or _auto_path(fmt)
         if "region" in opts:
             raise ValueError(f"{self.name}: region is a setting of the tool, not of a call — "
                              "speech('qwen', region=…)")
@@ -608,6 +628,9 @@ class ttsQwen(Speech):
             },
         }
 
+        return self._save(opts, fmt, lambda: self._synthesise(url, body))
+
+    def _synthesise(self, url: str, body: dict) -> bytes:
         data = request_json(self._http, "POST", url, json=body, what="DashScope TTS",
                             headers={"Authorization": f"Bearer {self._api_key}",
                                      "X-DashScope-SSE": "disable"})
@@ -626,11 +649,5 @@ class ttsQwen(Speech):
         # The URL comes from the provider response — guard it (SSRF) and do not
         # follow redirects to an unvalidated host.
         assert_safe_url(audio_url)
-        dl = request(self._http, "GET", audio_url, redirect=False, what="DashScope TTS audio download")
-
-        output_path = confine_output_path(output_path)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "wb") as fh:
-            fh.write(dl.data)
-
-        return output_path
+        return request(self._http, "GET", audio_url, redirect=False,
+                       what="DashScope TTS audio download").data

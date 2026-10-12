@@ -110,11 +110,23 @@ where a fix is named below.
 - **`fetch*().fetch()`** — it is `run()`, kept from 3.2 when `run()`
   returned text; `search()` went in 4.0 and this goes in 5.0, so both
   families have one method. It warns now.
+- **`speech(...).run(text, {"output_path": …})`** — the folder is the tool's
+  setting, `output_dir=`, and files are named for you. It warns and goes in
+  5.0.
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
   a list. It warns now and goes in 5.0.
 
 ### Fixed
 
+- **Security: a model chose where speech was written.** `output_path` was in
+  the schema a model sees and nothing confined it without
+  `AICHAIN_OUTPUT_ROOT`, so an injected instruction replaced `~/.zshrc` with
+  an MP3 — and a permission policy passed it as `write`. The folder is now a
+  setting, `speech(..., output_dir=…)`, defaulting to the system's temporary
+  directory, which Lambda can write where `./audio` it could not. Each file is
+  created new and exclusively before the paid call, so parallel calls no
+  longer write one file and all report it, and a call that failed leaves no
+  file. The tools are `draft`.
 - **Security: two runs of one agent crossed.** The run id, the parked
   document, the pending approval, the stream flag and the hook a stream
   collects through all lived on the `Agent`, and one agent serves many runs —
