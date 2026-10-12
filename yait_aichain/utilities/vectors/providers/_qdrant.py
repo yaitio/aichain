@@ -45,17 +45,14 @@ from __future__ import annotations
 import os
 import uuid
 
-from .._base import VectorBackend, VectorRecord, normalise_score
-
-# Payload key that preserves the caller's original record ID.  Qdrant only
-# accepts unsigned integers or UUIDs as point IDs, so arbitrary string IDs
-# ("doc_1") are deterministically mapped to UUIDv5 — the original is kept in
-# the payload and restored on every read.
-_ORIGINAL_ID_KEY = "_aichain_id"
-
+from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, record_from_payload
 
 def _point_id(rec_id: "str | int") -> "int | str":
-    """Map an arbitrary record ID onto a Qdrant-acceptable point ID."""
+    """Map an arbitrary record ID onto a Qdrant-acceptable point ID.
+
+    Qdrant accepts only unsigned integers and UUIDs, so a string id ("doc_1")
+    becomes a UUIDv5; the original is kept in the payload under
+    ``_ORIGINAL_ID_KEY`` and restored on every read."""
     s = str(rec_id)
     if s.isdigit():
         return int(s)
@@ -117,6 +114,8 @@ class QdrantBackend(VectorBackend):
     """
 
     provider     = "qdrant"
+    FILTER       = ('Qdrant filter: {"must": [{"key": "source", "match": {"value": "arxiv"}}]}, '
+                    '{"must": [{"key": "year", "range": {"gte": 2020}}]}')
     _DEFAULT_URL = "http://localhost:6333"
 
     def __init__(
@@ -178,25 +177,8 @@ class QdrantBackend(VectorBackend):
             body["filter"] = filter
         data = self._post(f"/collections/{collection}/points/search", body)
 
-        records: list[VectorRecord] = []
-        for point in data.get("result", []):
-            payload = dict(point.get("payload") or {})
-            # NB: not payload.pop("text", payload.pop("document", "")) —
-            # Python evaluates the default eagerly, which would silently
-            # strip a user's own "document" key even when "text" exists.
-            text = payload.pop("text", None)
-            if text is None:
-                text = payload.pop("document", "")
-            original_id = payload.pop(_ORIGINAL_ID_KEY, None)
-            raw = point.get("score")
-            records.append(VectorRecord(
-                id        = original_id or str(point["id"]),
-                text      = text,
-                score     = normalise_score(raw, self._metric),
-                raw_score = raw,
-                metadata  = payload,
-            ))
-        return records
+        return [record_from_payload(p["id"], p.get("payload"), p.get("score"), self._metric)
+                for p in data.get("result", [])]
 
     #: The metric this store was created with. Declared, not discovered.
     #:
@@ -238,17 +220,7 @@ class QdrantBackend(VectorBackend):
         body = {"ids": [_point_id(i) for i in ids], "with_payload": True}
         data = self._post(f"/collections/{collection}/points", body)
 
-        records: list[VectorRecord] = []
-        for point in data.get("result", []):
-            payload     = dict(point.get("payload") or {})
-            text        = payload.pop("text", "")
-            original_id = payload.pop(_ORIGINAL_ID_KEY, None)
-            records.append(VectorRecord(
-                id       = original_id or str(point["id"]),
-                text     = text,
-                metadata = payload,
-            ))
-        return records
+        return [record_from_payload(p["id"], p.get("payload")) for p in data.get("result", [])]
 
     def delete(
         self,

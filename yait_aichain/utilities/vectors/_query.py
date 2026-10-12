@@ -31,11 +31,16 @@ Usage
 
 from __future__ import annotations
 
-from ...tools._base import Tool
-from ._base   import VectorStore, VectorRecord
+from ._tool   import _VectorTool
 
 
-class VectorQueryTool(Tool):
+#: The most results one query returns to a model: enough for any context
+#: window worth filling, few enough that a model asking for 10,000 does not
+#: pull a collection into its prompt.
+MAX_N = 100
+
+
+class VectorQueryTool(_VectorTool):
     """
     Semantic similarity search over a :class:`VectorStore`.
 
@@ -79,6 +84,8 @@ class VectorQueryTool(Tool):
                 "properties": {
                     "n": {
                         "type":        "integer",
+                        "minimum":     1,
+                        "maximum":     MAX_N,
                         "description": "Number of results to return (default 5).",
                     },
                     "filter": {
@@ -91,28 +98,12 @@ class VectorQueryTool(Tool):
         "required": ["input"],
     }
 
-    def __init__(self, store: VectorStore) -> None:
-        self._store = store
 
     def run(self, input: str, options: dict | None = None) -> list[dict]:
         opts   = options or {}
         n      = int(opts.get("n", 5))
+        if not 1 <= n <= MAX_N:
+            raise ValueError(f"{self.name}: n is between 1 and {MAX_N}, not {n}")
         filter = opts.get("filter")
         store  = self._with_collection(opts)
         return [r.to_dict() for r in store.query(input, n=n, filter=filter)]
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
-    def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting, not a call's: a
-        ``collection`` option is refused, so a model cannot read or write
-        another collection than the one the code chose."""
-        if "collection" in opts:
-            raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
-                             "VectorDB(…, collection=…) or Vectors(…, collection=…)")
-        return self._store
-
-    def __repr__(self) -> str:
-        return f"VectorQueryTool(store={self._store!r})"
-
-

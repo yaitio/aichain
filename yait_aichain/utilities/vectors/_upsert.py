@@ -34,11 +34,10 @@ Usage
 
 from __future__ import annotations
 
-from ...tools._base import Tool
-from ._base  import VectorStore
+from ._tool  import _VectorTool
 
 
-class VectorUpsertTool(Tool):
+class VectorUpsertTool(_VectorTool):
     """
     Insert or update records in a :class:`VectorStore`.
 
@@ -116,27 +115,9 @@ class VectorUpsertTool(Tool):
         "required": ["input"],
     }
 
-    def __init__(self, store: VectorStore) -> None:
-        self._store = store
 
     def run(self, input: list[dict], options: dict | None = None) -> dict:
         opts  = options or {}
         store = self._with_collection(opts)
         n     = store.upsert(input)
         return {"upserted": n}
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
-    def _with_collection(self, opts: dict) -> VectorStore:
-        """The store. Its collection is a setting, not a call's: a
-        ``collection`` option is refused, so a model cannot read or write
-        another collection than the one the code chose."""
-        if "collection" in opts:
-            raise ValueError(f"{self.name}: collection is the store's setting, not a call's — "
-                             "VectorDB(…, collection=…) or Vectors(…, collection=…)")
-        return self._store
-
-    def __repr__(self) -> str:
-        return f"VectorUpsertTool(store={self._store!r})"
-
-

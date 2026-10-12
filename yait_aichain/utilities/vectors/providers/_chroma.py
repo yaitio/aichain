@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import os
 
+from ....clients._errors import APIError
 from .._base import VectorBackend, VectorRecord
 
 
@@ -55,6 +56,12 @@ _METRIC_MAP: dict[str, str] = {
     "euclidean": "l2",
     "dot":       "ip",
 }
+
+
+def _columns(ids: list, *columns: list):
+    """Chroma answers in parallel columns; one row per id, a short or absent
+    column read as empty rather than shifting the rest."""
+    return zip(ids, *(list(c) + [None] * (len(ids) - len(c)) for c in columns))
 
 
 def _normalise_score(distance: float, space: str) -> float:
@@ -114,6 +121,8 @@ class ChromaBackend(VectorBackend):
     """
 
     provider    = "chroma"
+    FILTER      = ('Chroma "where": {"source": "arxiv"}, {"year": {"$gte": 2020}}, '
+                   '{"$and": [{...}, {...}]}')
     _DEFAULT_URL = "http://localhost:8000"
 
     def __init__(
@@ -147,6 +156,20 @@ class ChromaBackend(VectorBackend):
         self._collection_cache[name] = (cid, space)
         return cid, space
 
+    def _on(self, name: str, verb: str, body: "dict | None" = None):
+        """One request to collection *name*'s *verb*, and its space. A cached
+        id that answers 404 — the collection was recreated under the same
+        name elsewhere — is dropped and looked up once more."""
+        for attempt in (0, 1):
+            cid, space = self._resolve(name)
+            try:
+                return self._call("GET" if body is None else "POST",
+                                  f"{self._prefix}/collections/{cid}/{verb}", body), space
+            except APIError as exc:
+                if exc.status != 404 or attempt:
+                    raise
+                self._collection_cache.pop(name, None)
+
     # ── Abstract method implementations ───────────────────────────────────────
 
     def create_collection(
@@ -174,7 +197,6 @@ class ChromaBackend(VectorBackend):
         n:          int = 5,
         filter:     dict | None = None,
     ) -> list[VectorRecord]:
-        cid, space = self._resolve(collection)
         body: dict = {
             "query_embeddings": [vector],
             "n_results":        n,
@@ -182,24 +204,16 @@ class ChromaBackend(VectorBackend):
         }
         if filter:
             body["where"] = filter
-        data = self._post(f"{self._prefix}/collections/{cid}/query", body)
+        data, space = self._on(collection, "query", body)
 
         ids       = (data.get("ids")       or [[]])[0]
         docs      = (data.get("documents") or [[]])[0]
         metas     = (data.get("metadatas") or [[]])[0]
         distances = (data.get("distances") or [[]])[0]
 
-        records: list[VectorRecord] = []
-        for i, rid in enumerate(ids):
-            dist  = distances[i] if i < len(distances) else None
-            score = _normalise_score(dist, space) if dist is not None else None
-            records.append(VectorRecord(
-                id       = rid,
-                text     = docs[i]  if i < len(docs)  else "",
-                score    = score,
-                metadata = metas[i] if i < len(metas) else {},
-            ))
-        return records
+        return [VectorRecord(id=rid, text=doc or "", metadata=meta or {},
+                             score=_normalise_score(dist, space) if dist is not None else None)
+                for rid, doc, meta, dist in _columns(ids, docs, metas, distances)]
 
     def upsert(
         self,
@@ -207,36 +221,27 @@ class ChromaBackend(VectorBackend):
         records:    list[VectorRecord],
         vectors:    list[list[float]],
     ) -> None:
-        cid, _ = self._resolve(collection)
         body   = {
             "ids":        [r.id       for r in records],
             "embeddings": vectors,
             "documents":  [r.text     for r in records],
             "metadatas":  [r.metadata for r in records],
         }
-        self._post(f"{self._prefix}/collections/{cid}/upsert", body)
+        self._on(collection, "upsert", body)
 
     def fetch(
         self,
         collection: str,
         ids:        list[str],
     ) -> list[VectorRecord]:
-        cid, _ = self._resolve(collection)
-        body   = {"ids": ids, "include": ["documents", "metadatas"]}
-        data   = self._post(f"{self._prefix}/collections/{cid}/get", body)
+        data, _ = self._on(collection, "get", {"ids": ids, "include": ["documents", "metadatas"]})
 
         ret_ids = data.get("ids")       or []
         docs    = data.get("documents") or []
         metas   = data.get("metadatas") or []
 
-        return [
-            VectorRecord(
-                id       = ret_ids[i],
-                text     = docs[i]  if i < len(docs)  else "",
-                metadata = metas[i] if i < len(metas) else {},
-            )
-            for i in range(len(ret_ids))
-        ]
+        return [VectorRecord(id=rid, text=doc or "", metadata=meta or {})
+                for rid, doc, meta in _columns(ret_ids, docs, metas)]
 
     def delete(
         self,
@@ -251,17 +256,15 @@ class ChromaBackend(VectorBackend):
                 "delete() requires ids or a filter; refusing to delete the "
                 "entire collection."
             )
-        cid, _ = self._resolve(collection)
         body: dict = {}
         if ids:
             body["ids"] = ids
         if filter:
             body["where"] = filter
-        self._post(f"{self._prefix}/collections/{cid}/delete", body)
+        self._on(collection, "delete", body)
 
     def count(self, collection: str) -> int:
-        cid, _ = self._resolve(collection)
-        data   = self._get(f"{self._prefix}/collections/{cid}/count")
+        data, _ = self._on(collection, "count")
         # Chroma returns a bare integer (not wrapped in an object)
         if isinstance(data, (int, float)):
             return int(data)

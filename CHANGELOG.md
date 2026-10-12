@@ -44,6 +44,17 @@ where a fix is named below.
   have raises `KeyError` listing the ones it has, where it was skipped in
   silence; a string raises `TypeError`, where it matched substrings.
 
+- **A record's metadata may not use `text` or `_aichain_id`.** The store
+  keeps the record's text and original id under those names in the same
+  payload, so such a key overwrote one or the other on Qdrant and Pinecone.
+  It raises `ValueError` on upsert now.
+- **`vector_query` takes `n` from 1 to 100**, declared in its schema, and
+  the `filter` option of `vector_query` and `vector_delete` tells a model the
+  backend's dialect — Chroma `where`, Qdrant `must`, Pinecone `$eq` — where it
+  said "provider-native" and left the model to guess.
+- **`VectorBackend` is an `abc.ABC`.** A backend missing a method fails at
+  construction, not on its first call.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -56,6 +67,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **A vector record reads back as it was written.** Fetch now reads a
+  `document` key as the text when `text` is absent, as query did; a Chroma
+  document of None is empty text rather than a broken record; and a Chroma
+  collection recreated under the same name is looked up again on a 404
+  instead of failing for the life of the process. Each backend reads a
+  payload in one place, and the four vector tools share one base.
 - **MCP servers are reached as written.** `MCP("./server.py")` runs the
   script under the current interpreter (and `.js` under `node`) instead of
   executing it as a binary; a URL ending in `/sse` is SSE with a query string

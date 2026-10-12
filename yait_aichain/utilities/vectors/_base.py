@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -89,15 +90,11 @@ class VectorRecord:
     raw_score: float | None   — what the backend returned, unconverted
     metadata : dict           — arbitrary key-value payload / metadata
 
-    **``score`` means one thing on every backend**, which it did not until
-    2026-09-13. Chroma normalised its distances to [0, 1] and Qdrant and
-    Pinecone handed their raw numbers through, so the same field carried a
-    cosine similarity in [-1, 1] on one, a normalised score on another, and —
-    for the euclidean metric — a *distance*, where **lower** is more similar.
-    The docstring on `query()` promised "highest score = most similar" and it
-    was false for two backends on one metric. Anyone comparing retrievers, or
-    setting a threshold and moving a collection, was reading three scales as
-    one.
+    **``score`` means one thing on every backend**: a similarity in [0, 1],
+    higher is closer, whatever the backend's metric. The backends answer on
+    three scales — a cosine in [-1, 1], a normalised score, a euclidean
+    *distance* where lower is closer — and a threshold or a comparison of
+    retrievers read across them would be reading three scales as one.
 
     ``raw_score`` keeps whatever the backend said. Normalising is a
     conversion, and a conversion that throws the original away cannot be
@@ -131,14 +128,38 @@ class VectorRecord:
 # VectorBackend — abstract
 # ---------------------------------------------------------------------------
 
-class VectorBackend:
+#: Keys a backend keeps beside the metadata in the same payload; a record's
+#: own metadata may not use them, or it would overwrite the text or the id.
+ID_KEY   = "_aichain_id"
+RESERVED = ("text", ID_KEY)
+
+
+def record_from_payload(rid: str, payload: "dict | None", raw: "float | None" = None,
+                        metric: str = "cosine") -> "VectorRecord":
+    """A record from a backend that keeps text and metadata in one payload.
+
+    The text is under ``text``; ``document`` is read when ``text`` is absent,
+    for collections written by other tools. A string id that a backend could
+    not store as its own sits under ``ID_KEY``.
+    """
+    meta = dict(payload or {})
+    text = meta.pop("text", None)
+    if text is None:
+        text = meta.pop("document", "")
+    rid = meta.pop(ID_KEY, None) or rid
+    return VectorRecord(id=str(rid), text=text or "", metadata=meta,
+                        score=normalise_score(raw, metric), raw_score=raw)
+
+
+class VectorBackend(ABC):
     """
     Abstract base class for vector DB provider REST adapters.
 
     Subclasses must:
       1. Set ``provider`` (class attribute).
       2. Call ``super().__init__(url=..., api_key=...)`` in their ``__init__``.
-      3. Implement all six abstract methods.
+      3. Implement the six abstract methods, and name the dialect its
+         ``filter`` is written in as ``FILTER``.
 
     Shared HTTP helpers (_get, _post, _put, _delete_req) handle JSON
     encoding/decoding and error checking so subclasses stay concise.
@@ -151,6 +172,8 @@ class VectorBackend:
     """
 
     provider: str = ""
+    #: How a ``filter`` is written for this backend, shown to a model.
+    FILTER: str = ""
 
     # ── Construction ──────────────────────────────────────────────────────────
 
@@ -168,8 +191,9 @@ class VectorBackend:
             retries = DEFAULT_RETRIES,
         )
 
-    # ── Abstract methods — must be implemented by every subclass ──────────────
+    # ── What every backend implements ─────────────────────────────────────────
 
+    @abstractmethod
     def create_collection(
         self,
         collection: str,
@@ -177,10 +201,8 @@ class VectorBackend:
         metric:     str = "cosine",
     ) -> None:
         """Create a new collection / index with the given vector dimension."""
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement create_collection()"
-        )
 
+    @abstractmethod
     def query(
         self,
         collection: str,
@@ -189,8 +211,8 @@ class VectorBackend:
         filter:     dict | None = None,
     ) -> list[VectorRecord]:
         """Return the *n* most similar records to *vector*."""
-        raise NotImplementedError(f"{type(self).__name__} must implement query()")
 
+    @abstractmethod
     def upsert(
         self,
         collection: str,
@@ -198,16 +220,16 @@ class VectorBackend:
         vectors:    list[list[float]],
     ) -> None:
         """Insert or update *records* together with their *vectors*."""
-        raise NotImplementedError(f"{type(self).__name__} must implement upsert()")
 
+    @abstractmethod
     def fetch(
         self,
         collection: str,
         ids:        list[str],
     ) -> list[VectorRecord]:
         """Return records matching *ids* (no score populated)."""
-        raise NotImplementedError(f"{type(self).__name__} must implement fetch()")
 
+    @abstractmethod
     def delete(
         self,
         collection: str,
@@ -215,11 +237,10 @@ class VectorBackend:
         filter:     dict | None      = None,
     ) -> None:
         """Delete records by *ids* or metadata *filter* (at least one required)."""
-        raise NotImplementedError(f"{type(self).__name__} must implement delete()")
 
+    @abstractmethod
     def count(self, collection: str) -> int:
         """Return the number of records in *collection*."""
-        raise NotImplementedError(f"{type(self).__name__} must implement count()")
 
     # ── Shared HTTP helpers ───────────────────────────────────────────────────
 
@@ -475,10 +496,14 @@ class VectorStore:
             embeds = iter(())
 
         for r in raw:
+            clash = sorted(set(r.get("metadata") or {}) & set(RESERVED))
+            if clash:
+                raise ValueError(f"record {r['id']!r}: metadata may not use {clash} — the store "
+                                 "keeps the record's text and id under those names")
             rec = VectorRecord(
                 id       = str(r["id"]),
                 text     = r["text"],
-                metadata = r.get("metadata", {}),
+                metadata = r.get("metadata") or {},
             )
             vec = r["vector"] if "vector" in r else next(embeds)
             recs.append(rec)

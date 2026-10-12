@@ -44,7 +44,7 @@ import os
 from urllib.parse import urlencode
 
 from ....clients._errors import APIError
-from .._base import VectorBackend, VectorRecord, normalise_score
+from .._base import VectorBackend, VectorRecord, record_from_payload
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -101,6 +101,8 @@ class PineconeBackend(VectorBackend):
     _metric = "cosine"
 
     provider = "pinecone"
+    FILTER   = ('Pinecone metadata filter: {"source": {"$eq": "arxiv"}}, '
+                '{"year": {"$gte": 2020}}, {"$and": [{...}, {...}]}')
 
     def __init__(
         self,
@@ -212,30 +214,14 @@ class PineconeBackend(VectorBackend):
 
         data = self._call("POST", f"{host}/query", body)
 
-        records: list[VectorRecord] = []
-        for match in data.get("matches", []):
-            meta = dict(match.get("metadata") or {})
-            # NB: not meta.pop("text", meta.pop("document", "")) — Python
-            # evaluates the default eagerly, which would silently strip a
-            # user's own "document" metadata key even when "text" exists.
-            text = meta.pop("text", None)
-            if text is None:
-                text = meta.pop("document", "")
-            raw = match.get("score")
-            records.append(VectorRecord(
-                id        = match["id"],
-                text      = text,
-                # Pinecone's metric is a property of the index and lives on
-                # the control plane, which this data-plane host cannot ask.
-                # It is taken at construction (`metric=`) and defaults to the
-                # same cosine everything else defaults to; `raw_score` keeps
-                # the original either way, so a caller who set a different
-                # metric and did not say so can still see what came back.
-                score     = normalise_score(raw, self._metric),
-                raw_score = raw,
-                metadata  = meta,
-            ))
-        return records
+        # Pinecone's metric is a property of the index and lives on the
+        # control plane, which this data-plane host cannot ask. It is taken at
+        # construction (`metric=`) and defaults to the same cosine everything
+        # else defaults to; `raw_score` keeps the original either way, so a
+        # caller who set a different metric and did not say so can still see
+        # what came back.
+        return [record_from_payload(m["id"], m.get("metadata"), m.get("score"), self._metric)
+                for m in data.get("matches", [])]
 
     def upsert(
         self,
@@ -261,12 +247,8 @@ class PineconeBackend(VectorBackend):
         params = urlencode([("ids", i) for i in ids] + [("namespace", collection)])
         data = self._call("GET", f"{host}/vectors/fetch?{params}")
 
-        records: list[VectorRecord] = []
-        for rid, vec_data in (data.get("vectors") or {}).items():
-            meta = dict((vec_data.get("metadata") or {}))
-            text = meta.pop("text", "")
-            records.append(VectorRecord(id=rid, text=text, metadata=meta))
-        return records
+        return [record_from_payload(rid, v.get("metadata"))
+                for rid, v in (data.get("vectors") or {}).items()]
 
     def delete(
         self,
