@@ -87,10 +87,11 @@ All worker threads call `run()` on the **same** runner instance.
 Skill, Tool, and Chain runners are safe: their `run()` keeps state
 local (Chain's `history`/`accumulated` attributes reflect the most
 recently finished item — use the Pool results as the source of truth).
-An **Agent** runner, however, shares its `memory` across items: every
-item resets and writes the same `AgentMemory`.  Do not rely on agent
-memory contents when running agents through a Pool; give each run its
-own Agent instance if isolated memory matters.
+An **Agent** runner keeps the run in flight on the instance — the run id
+its events are stamped with, `last_result`, a parked run's document — so
+concurrent items overwrite each other's. Each item's result is its own;
+for events and parking that can be told apart, give each item its own
+Agent.
 
 ### `Pool.run()`
 

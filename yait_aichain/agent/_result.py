@@ -47,7 +47,7 @@ class AgentResult:
         Empty for an agent, kept so every result has the same fields; an
         agent's record is ``journal``.
     memory : dict
-        Empty; the agent has had no memory store since 2.0.
+        Always empty; the agent keeps no memory store. Removed in 5.0.
     error : str | None
         Why it failed, when it did.
     journal : list[dict]

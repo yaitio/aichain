@@ -315,7 +315,7 @@ cost. `bool(result)` is `result.success`.
   each an `Adaptation`; empty when nothing was.
 - `history` (*list[dict]*, default `<factory>`) — Empty for an agent, kept so every result has the same fields; an
   agent's record is `journal`.
-- `memory` (*dict*, default `<factory>`) — Empty; the agent has had no memory store since 2.0.
+- `memory` (*dict*, default `<factory>`) — Always empty; the agent keeps no memory store. Removed in 5.0.
 - `error` (*str | None*, default `None`) — Why it failed, when it did.
 - `journal` (*list[dict]*, default `<factory>`) — What was attempted, in order, each entry with its outcome and the
   evidence behind it — `check` for a fact the code verified,

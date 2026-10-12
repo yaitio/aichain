@@ -31,6 +31,11 @@ where a fix is named below.
 
 ### Deprecated
 
+- **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
+  `AgentResult.memory`.** Nothing in the library reads or writes them; the
+  agent's state is its conversation, and the field is always empty. A dict
+  does the in-process half and `state.FileStore` the on-disk half. They warn
+  now and go in 5.0.
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
   a list. It warns now and goes in 5.0.
 

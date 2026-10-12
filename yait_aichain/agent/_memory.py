@@ -4,6 +4,9 @@ agent._memory
 
 ``AgentMemory`` — a key-value store with a pluggable backend.
 
+**Deprecated, removed in 5.0.** A dict does the in-process half and
+``state.FileStore`` the on-disk half.
+
 **The Agent does not use it.** An agent's state is its conversation; nothing
 in the loop reads or writes this store, and ``AgentResult.memory`` is a field
 that is never written. It is yours to use — from inside your own tools,
@@ -33,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +44,12 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # Backend base class
 # ---------------------------------------------------------------------------
+
+def _deprecated(name: str) -> None:
+    warnings.warn(f"{name} is deprecated and goes in 5.0: the agent never read it. "
+                  "Use a dict in process, or yait_aichain.state.FileStore on disk.",
+                  DeprecationWarning, stacklevel=3)
+
 
 class MemoryBackend:
     """
@@ -124,6 +134,7 @@ class FileBackend(MemoryBackend):
     """
 
     def __init__(self, path: str) -> None:
+        _deprecated("FileBackend")
         self._path = Path(path).expanduser()
 
     def load(self) -> dict:
@@ -209,6 +220,7 @@ class AgentMemory:
         initial: dict | None        = None,
         backend: MemoryBackend | None = None,
     ) -> None:
+        _deprecated("AgentMemory")
         self._backend: MemoryBackend  = backend or InMemoryBackend()
         loaded: dict[str, Any]        = dict(self._backend.load())
         if initial:
