@@ -99,10 +99,58 @@ class ToolCallRequest:
 MEDIA_PARTS = frozenset({"image", "audio", "video", "document"})
 
 
+#: The sources a tool result may carry media in: the bytes, or a URL. Not a
+#: local path — any server's JSON shaped like ``{"kind": "file", "path": …}``
+#: had the library read that path on the next turn and send it to the model,
+#: ``/proc/self/environ`` included. A tool that has a file reads it once, with
+#: `media_part`, and hands over the bytes.
+TOOL_MEDIA_SOURCES = frozenset({"base64", "url"})
+
+
 def _is_part(value) -> bool:
     return (isinstance(value, dict)
             and value.get("type") in MEDIA_PARTS
-            and isinstance(value.get("source"), dict))
+            and isinstance(value.get("source"), dict)
+            and value["source"].get("kind") in TOOL_MEDIA_SOURCES)
+
+
+#: The largest file `media_part` reads: past it a model would refuse the
+#: part anyway, and reading it is how a tool exhausts a Lambda's memory.
+MEDIA_PART_MAX_BYTES = 20 * 1024 * 1024
+
+
+def media_part(path: str, mime: str | None = None) -> dict:
+    """A file as a media part a tool can return: read once, now, as base64.
+
+    The type follows the MIME type — ``image``, ``audio``, ``video``, else
+    ``document``. Self-contained, so the history it enters means the same
+    thing in another process and after the file changes.
+
+    Parameters
+    ----------
+    path : str
+        The file.
+    mime : str | None, optional
+        Its MIME type; guessed from the name and the first bytes when omitted.
+    """
+    import base64
+    import pathlib
+
+    from ..skills._adapters import _guess_mime
+
+    file = pathlib.Path(path)
+    if not file.is_file():
+        raise ValueError(f"media_part needs a regular file; {path!r} is not one")
+    size = file.stat().st_size
+    if size > MEDIA_PART_MAX_BYTES:
+        raise ValueError(f"{path!r} is {size:,} bytes; a media part takes at most "
+                         f"{MEDIA_PART_MAX_BYTES:,}")
+    raw = file.read_bytes()
+    mime = mime or _guess_mime(file, raw[:16])
+    kind = mime.split("/", 1)[0]
+    return {"type": kind if kind in ("image", "audio", "video") else "document",
+            "source": {"kind": "base64", "mime": mime,
+                       "data": base64.b64encode(raw).decode("ascii")}}
 
 
 def carries_media(result) -> bool:

@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../../tools/index.md).
 
 <!-- g:api -->
-[`tool`](#tool) · [`Tool`](#tool) · [`FunctionTool`](#functiontool) · [`ToolResult`](#toolresult) · [`Record`](#record)
+[`tool`](#tool) · [`Tool`](#tool) · [`FunctionTool`](#functiontool) · [`ToolResult`](#toolresult) · [`Record`](#record) · [`media_part`](#media_part)
 
 ---
 
@@ -365,4 +365,23 @@ back is a plain dict.
 
 - `data` (*dict*) — The fields, for code.
 - `render` (*callable*) — Turns them into the text a model is shown; `str(record)` calls it.
+
+---
+
+## `media_part()`
+
+```python
+media_part(path: str, mime: str | None = None) -> dict
+```
+
+A file as a media part a tool can return: read once, now, as base64.
+
+The type follows the MIME type — `image`, `audio`, `video`, else
+`document`. Self-contained, so the history it enters means the same
+thing in another process and after the file changes.
+
+**Parameters**
+
+- `path` (*str*) — The file.
+- `mime` (*str | None, optional*, default `None`) — Its MIME type; guessed from the name and the first bytes when omitted.
 <!-- /g:api -->

@@ -115,6 +115,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: a tool result could make the agent read any local file.** Any
+  dict shaped as a media part with `"source": {"kind": "file", "path": …}` —
+  from any tool, an MCP or REST server's raw JSON included — was carried as
+  media, and on each later turn the path was read from disk with no limit and
+  sent to the model: `/proc/self/environ` on Lambda holds the AWS keys,
+  `/dev/zero` exhausts memory. Media in a tool result is now bytes or a URL
+  only; a file-backed part stays text. `yait_aichain.tools.media_part(path)`
+  reads a file once, up to 20 MB, into a self-contained part. `document`
+  parts, which every family already renders, now pass `validate_input`.
 - **The tenant in force stays in force.** `Chain.run()` with no `context=`
   set the ambient context to None for the run, so `with using(ctx):
   chain.run()`, a chain inside a chain step and a chain in a `Pool` all lost

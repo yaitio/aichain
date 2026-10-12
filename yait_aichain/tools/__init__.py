@@ -27,6 +27,7 @@ The classes behind each factory — ``searchExa``, ``fetchLocal``,
 """
 
 from ._base           import Tool, ToolResult, Record, FunctionTool, tool
+from ..models._calls  import media_part
 from .general         import Wait, Gate, wait, gate
 from ._permissions    import (
     PermissionPolicy, ApprovalRequest, ApprovalDecision,
@@ -73,7 +74,7 @@ else:
 
 __all__ = [
     # making and calling a tool
-    "tool", "Tool", "FunctionTool", "ToolResult", "Record",
+    "tool", "media_part", "Tool", "FunctionTool", "ToolResult", "Record",
     # the factories
     "search", "fetch", "decide", "chunk", "embed", "rerank", "speech", "transcribe", "image",
     "wait", "gate",

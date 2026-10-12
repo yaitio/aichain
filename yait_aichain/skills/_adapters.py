@@ -391,10 +391,10 @@ def validate_input(input_: dict) -> None:
             if not isinstance(part, dict):
                 raise ValueError(f"messages[{i}]['parts'][{j}] must be a dict")
             ptype = part.get("type")
-            if ptype not in ("text", "image", "video", "audio"):
+            if ptype not in ("text", "image", "video", "audio", "document"):
                 raise ValueError(
                     f"messages[{i}]['parts'][{j}]['type'] must be "
-                    "'text', 'image', 'video', or 'audio'"
+                    "'text', 'image', 'video', 'audio' or 'document'"
                 )
             if ptype == "text":
                 if not isinstance(part.get("text"), str):
