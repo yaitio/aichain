@@ -13,6 +13,8 @@ requires-python = ">=3.10"
 
 dependencies = [
     "urllib3>=2.0",
+    # Provider data is TOML; tomllib is in the standard library from 3.11.
+    "tomli>=1.1; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]

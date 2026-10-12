@@ -5,7 +5,8 @@ pip install yait-aichain
 ```
 
 One dependency comes with it, `urllib3`, which most Python environments
-already have. Nothing else is installed until you use what needs it — a
+already have — and on Python 3.10 `tomli`, since the standard library reads
+TOML only from 3.11. Nothing else is installed until you use what needs it — a
 library meant to run in a serverless function cannot bring a hundred
 megabytes it might not use.
 

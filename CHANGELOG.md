@@ -140,6 +140,12 @@ file and never published, and everything they record is in 4.0.0.
 
 ### Fixed
 
+- **`import yait_aichain` works on a bare Python 3.10.** Provider data is TOML,
+  which the standard library reads only from 3.11; on 3.10 the package needs
+  `tomli`, and since 1.2.3 nothing declared it — every install on 3.10,
+  Lambda's python3.10 among them, failed at import. The test suite never saw
+  it, because pytest brings `tomli` with it. It is a dependency now, for
+  Python below 3.11 only.
 - **A chain with a REST endpoint loads.** It saved, and nothing of the
   endpoint reached the file, so `Chain.load()` called its constructor with
   no arguments and raised `TypeError`. The URL, method, fields, headers,

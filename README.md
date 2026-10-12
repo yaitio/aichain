@@ -50,8 +50,9 @@ you to find out from the output.
 
 - **Small enough to read in one go.** `llms.txt` is 26 KB, the skill 4 KB, the
   whole library about 29,000 lines of Python.
-- **One required dependency**, `urllib3`. YAML, MCP and local page fetching
-  are extras you install when you use them.
+- **One required dependency**, `urllib3` — and `tomli` on Python 3.10, which
+  has no TOML reader of its own. YAML, MCP and local page fetching are extras
+  you install when you use them.
 - **The price of every call.** Usage and cost come from the registry on every
   result, and `max_cost` is one budget in dollars shared by a Skill, a Chain,
   a Pool and an Agent.
@@ -81,7 +82,7 @@ you to find out from the output.
 pip install yait-aichain
 ```
 
-One required dependency, `urllib3`. Extras when you use what needs them:
+One required dependency, `urllib3` (and `tomli` on Python 3.10). Extras when you use what needs them:
 `[yaml]` to save and load, `[mcp]` for MCP servers, `[fetch]` to read pages
 locally — [Installation](docs/start/installation.md). Keys, only for the
 providers you use:
