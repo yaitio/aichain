@@ -156,7 +156,7 @@ class ChromaBackend(VectorBackend):
         self._collection_cache[name] = (cid, space)
         return cid, space
 
-    def _on(self, name: str, verb: str, body: "dict | None" = None):
+    def _on(self, name: str, verb: str, body: dict | None = None):
         """One request to collection *name*'s *verb*, and its space. A cached
         id that answers 404 — the collection was recreated under the same
         name elsewhere — is dropped and looked up once more."""

@@ -10,7 +10,7 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 ## `RunContext`
 
 ```python
-RunContext(tenant: 'str | None' = None, metadata: dict = <factory>)
+RunContext(tenant: str | None = None, metadata: dict = <factory>)
 ```
 
 Per-request context for one `run()` / `resume()`.
@@ -69,12 +69,7 @@ with using(RunContext(tenant="acme")):
 ## `Suspend`
 
 ```python
-Suspend(
-    reason: str = '',
-    resume_with: 'dict | None' = None,
-    *,
-    hint: 'dict | None' = None,
-)
+Suspend(reason: str = '', resume_with: dict | None = None, *, hint: dict | None = None)
 ```
 
 Raised by a suspend tool to pause the current run.
@@ -122,7 +117,7 @@ Abstract persistence for run documents, keyed by `run_id`.
 ### `StateStore.load()`
 
 ```python
-StateStore.load(run_id: str) -> 'dict | None'
+StateStore.load(run_id: str) -> dict | None
 ```
 
 Return the stored document, or `None` if there is none.
@@ -142,7 +137,7 @@ process** only; for cross-process / serverless use a shared store
 ### `InMemoryStore.load()`
 
 ```python
-InMemoryStore.load(run_id: str) -> 'dict | None'
+InMemoryStore.load(run_id: str) -> dict | None
 ```
 
 Return the stored document, or `None` if there is none.
@@ -166,7 +161,7 @@ when the directory is on shared storage (EFS, a mounted volume, …).
 ### `FileStore.load()`
 
 ```python
-FileStore.load(run_id: str) -> 'dict | None'
+FileStore.load(run_id: str) -> dict | None
 ```
 
 Return the stored document, or `None` if there is none.
@@ -182,8 +177,8 @@ RunDocument(
     variables: dict = <factory>,
     steps: list[dict] = <factory>,
     usage: dict = <factory>,
-    definition: 'dict | None' = None,
-    context: 'dict | None' = None,
+    definition: dict | None = None,
+    context: dict | None = None,
 )
 ```
 
@@ -196,9 +191,9 @@ RunDocument.new(
     kind: str,
     step_names: list[str],
     *,
-    variables: 'dict | None' = None,
-    definition: 'dict | None' = None,
-) -> 'RunDocument'
+    variables: dict | None = None,
+    definition: dict | None = None,
+) -> RunDocument
 ```
 
 Start a fresh document: all steps `pending`, seeded variables.
@@ -210,7 +205,7 @@ Aggregate run status, derived from the step statuses.
 ### `RunDocument.first_pending()`
 
 ```python
-RunDocument.first_pending() -> 'int | None'
+RunDocument.first_pending() -> int | None
 ```
 
 Index of the first non-terminal step (the resume cursor).

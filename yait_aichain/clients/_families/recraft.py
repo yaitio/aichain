@@ -197,7 +197,7 @@ class RecraftClient(OpenAIClient):
         self._vectorize_path = data["provider"].get(
             "images_vectorize_path", "/v1/images/vectorize")
 
-    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         # The parameter exists to keep the signature substitutable for the
         # parent's; `supports_tools = False` means the gate above refuses
         # first, so reaching here with tools would be a library defect.

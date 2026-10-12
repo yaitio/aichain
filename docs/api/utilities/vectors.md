@@ -12,8 +12,8 @@ Vectors(
     *,
     description: str,
     embedder=None,
-    url: 'str | None' = None,
-    api_key: 'str | None' = None,
+    url: str | None = None,
+    api_key: str | None = None,
     **settings,
 )
 ```
@@ -52,7 +52,7 @@ Create the collection, *dimension* long, if it does not exist.
 ### `Vectors.upsert()`
 
 ```python
-Vectors.upsert(records: list, batch_size: 'int | None' = None) -> int
+Vectors.upsert(records: list, batch_size: int | None = None) -> int
 ```
 
 Insert or replace records — each `{"id", "text", …}`; returns how many.
@@ -68,7 +68,7 @@ The records with these ids.
 ### `Vectors.delete()`
 
 ```python
-Vectors.delete(ids: 'list | None' = None, filter: 'dict | None' = None)
+Vectors.delete(ids: list | None = None, filter: dict | None = None)
 ```
 
 Remove records by id or by a metadata filter.

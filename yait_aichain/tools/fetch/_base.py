@@ -78,7 +78,7 @@ class Fetch(Tool):
     risk        = "read"
     max_batch: int = 1
     extra_options: dict = {}
-    _ENV_KEY: "str | tuple" = ()
+    _ENV_KEY: str | tuple = ()
     _PROVIDER: str = ""
     _LIST_PRICE: float = 0.0
     _PRICE_SOURCE: str = ""
@@ -104,8 +104,8 @@ class Fetch(Tool):
             "required": ["url"],
         }
 
-    def __init__(self, api_key: "str | None" = None, *, name: "str | None" = None,
-                 description: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, *, name: str | None = None,
+                 description: str | None = None) -> None:
         key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
         if not key:
             raise ValueError(f"No {self._PROVIDER} API key found. Pass api_key= or set the "
@@ -127,7 +127,7 @@ class Fetch(Tool):
 
     # ------------------------------------------------------------------
 
-    def run(self, url, options: "dict | None" = None) -> Record:  # type: ignore[override]
+    def run(self, url, options: dict | None = None) -> Record:  # type: ignore[override]
         """
         Fetch *url* — one URL or a list of them. Every URL comes back as a
         page; one that failed carries its reason in ``error`` instead of text.
@@ -163,7 +163,7 @@ class Fetch(Tool):
         return Record({"pages": pages, "notices": notices, "cost": round(total["usd"], 6),
                        "cost_basis": total["basis"], "usage": total["usage"]}, self.render)
 
-    def fetch(self, urls, options: "dict | None" = None) -> Record:
+    def fetch(self, urls, options: dict | None = None) -> Record:
         """The same as :meth:`run` — kept from 3.2, when ``run()`` returned the text."""
         return self.run(urls, options)
 

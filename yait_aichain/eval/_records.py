@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, asdict
-from typing import Any, Iterable, Iterator
+from typing import Any
+from collections.abc import Iterable, Iterator
 
 
 @dataclass
@@ -134,7 +135,7 @@ def write(records: Iterable[Record], path) -> int:
     return n
 
 
-def read(path) -> "list[Record]":
+def read(path) -> list[Record]:
     """Read back what ``write`` produced, skipping lines a crash left broken."""
     out: list[Record] = []
     with open(path, encoding="utf-8") as fh:
@@ -149,7 +150,7 @@ def read(path) -> "list[Record]":
     return out
 
 
-def adapt(rows: Iterable[dict], **keys) -> "Iterator[Record]":
+def adapt(rows: Iterable[dict], **keys) -> Iterator[Record]:
     """
     Map someone else's rows onto ``Record``.
 

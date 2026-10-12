@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[all]" pytest pytest-asyncio
+      - run: pip install -e ".[all]" pytest
       - name: Live tests
         run: >
           pytest -m live -p no:cacheprovider --junitxml=live.xml

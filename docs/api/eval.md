@@ -11,12 +11,12 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 
 ```python
 Eval(
-    cases: 'Iterable[Case]',
-    arms: 'dict[str, Callable[[Case], Any]]',
+    cases: Iterable[Case],
+    arms: dict[str, Callable[[Case], Any]],
     score: Scorer,
     *,
     trials: int = 1,
-    out: 'str | Path | None' = None,
+    out: str | Path | None = None,
     name: str = 'eval',
     verbose: bool = True,
 )
@@ -46,7 +46,7 @@ a couple of cases first. `run()` returns a `Report`.
 ### `Eval.smoke()`
 
 ```python
-Eval.smoke(n: int = 2) -> 'Report'
+Eval.smoke(n: int = 2) -> Report
 ```
 
 Run the first `n` cases through every arm, once, and report.
@@ -62,7 +62,7 @@ results taken under different conditions.
 ### `Eval.run()`
 
 ```python
-Eval.run(*, concurrency: int = 1) -> 'Report'
+Eval.run(*, concurrency: int = 1) -> Report
 ```
 
 Execute every `(arm, case, trial)` not already on disk.
@@ -165,7 +165,7 @@ cell with too many of them is rejected rather than reported.
 ## `Report`
 
 ```python
-Report(records: 'Iterable[Record]')
+Report(records: Iterable[Record])
 ```
 
 Read-only view over a set of records, grouped by arm and case.
@@ -177,7 +177,7 @@ Read-only view over a set of records, grouped by arm and case.
 ### `Report.of()`
 
 ```python
-Report.of(source, **keys) -> 'Report'
+Report.of(source, **keys) -> Report
 ```
 
 Build from records, a JSON-lines path, or someone else's dicts.
@@ -200,7 +200,7 @@ Report.reject(
     max_empty: int = 2,
     max_errors: int = 5,
     max_abstained: float = 0.2,
-) -> 'dict[str, str]'
+) -> dict[str, str]
 ```
 
 Mark cells whose data is not worth reporting, and say why.
@@ -247,7 +247,7 @@ Share of *attempts* that passed — pooled over cases, not averaged.
 ### `Report.pass_k()`
 
 ```python
-Report.pass_k(arm: str, k: 'int | None' = None, group: str = '') -> float
+Report.pass_k(arm: str, k: int | None = None, group: str = '') -> float
 ```
 
 Share of *cases* an arm solved on **every** one of k trials.
@@ -313,8 +313,8 @@ function says so in `enough`.
 
 ```python
 Report.controls(
-    oracle: 'Report',
-    noise: 'Report',
+    oracle: Report,
+    noise: Report,
     *,
     arm: str = '',
     floor: float = 0.95,
@@ -344,7 +344,7 @@ the numbers themselves are worthless.
 ### `Report.table()`
 
 ```python
-Report.table(group: str = '', k: 'int | None' = None) -> str
+Report.table(group: str = '', k: int | None = None) -> str
 ```
 
 One row per arm: accuracy, reliability, and what it cost.
@@ -357,7 +357,7 @@ One row per arm: accuracy, reliability, and what it cost.
 ### `Report.by_group()`
 
 ```python
-Report.by_group(k: 'int | None' = None) -> str
+Report.by_group(k: int | None = None) -> str
 ```
 
 The same table, once per group. Aggregate hides stratified effects.
@@ -533,7 +533,7 @@ Passes when every scorer passes; the score is the mean of theirs.
 ## `adapt()`
 
 ```python
-adapt(rows: Iterable[dict], **keys) -> 'Iterator[Record]'
+adapt(rows: Iterable[dict], **keys) -> Iterator[Record]
 ```
 
 Map someone else's rows onto `Record`.
@@ -552,7 +552,7 @@ reporting is where the mistakes were.
 ## `read()`
 
 ```python
-read(path) -> 'list[Record]'
+read(path) -> list[Record]
 ```
 
 Read back what `write` produced, skipping lines a crash left broken.
@@ -578,7 +578,7 @@ process.
 ## `normalise()`
 
 ```python
-normalise(verdict: Any) -> 'tuple[bool, float, dict]'
+normalise(verdict: Any) -> tuple[bool, float, dict]
 ```
 
 Whatever a scorer returned, as `(ok, score, extra)`.

@@ -36,7 +36,6 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any
 
 # ── Outcomes ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +85,7 @@ def _normalise_intent(text: str) -> str:
                             for ch in str(text).lower()).split())
 
 
-def _action_signature(action: "dict | None") -> str:
+def _action_signature(action: dict | None) -> str:
     """Stable identity of an action, for spotting a call re-issued verbatim."""
     if not action:
         return ""
@@ -96,7 +95,7 @@ def _action_signature(action: "dict | None") -> str:
         return str(action)
 
 
-def _action_excerpt(action: "dict | None") -> str:
+def _action_excerpt(action: dict | None) -> str:
     """
     One-line, bounded rendering of what an action actually did.
 
@@ -170,12 +169,12 @@ class JournalEntry:
     intent:   str            = ""
     action:   dict           = field(default_factory=dict)
     outcome:  str            = DONE
-    evidence: "dict | None"  = None
+    evidence: dict | None  = None
     reason:   str            = ""
-    artifact: "str | None"   = None
+    artifact: str | None   = None
     observation: str        = ""
-    step:     "int | None"   = None
-    attempt:  "int | None"   = None
+    step:     int | None   = None
+    attempt:  int | None   = None
     tokens:   int            = 0
     ts:       float          = field(default_factory=time.time)
 
@@ -183,7 +182,7 @@ class JournalEntry:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "JournalEntry":
+    def from_dict(cls, d: dict) -> JournalEntry:
         known = {f: d.get(f) for f in cls.__dataclass_fields__ if f in d}
         return cls(**known)
 
@@ -193,7 +192,7 @@ class JournalEntry:
 class Journal:
     """Append-only log of attempts, with the three views the loop needs."""
 
-    def __init__(self, entries: "list[JournalEntry] | None" = None) -> None:
+    def __init__(self, entries: list[JournalEntry] | None = None) -> None:
         self._entries: list[JournalEntry] = list(entries or [])
 
     # ── write ────────────────────────────────────────────────────────
@@ -201,14 +200,14 @@ class Journal:
         self,
         intent:   str = "",
         *,
-        action:   "dict | None" = None,
+        action:   dict | None = None,
         outcome:  str  = DONE,
-        evidence: "dict | None" = None,
+        evidence: dict | None = None,
         reason:   str  = "",
-        artifact: "str | None" = None,
+        artifact: str | None = None,
         observation: str = "",
-        step:     "int | None" = None,
-        attempt:  "int | None" = None,
+        step:     int | None = None,
+        attempt:  int | None = None,
         tokens:   int  = 0,
     ) -> JournalEntry:
         """Record one attempt and return the stored entry."""
@@ -359,7 +358,7 @@ class Journal:
         return [e.to_dict() for e in self._entries]
 
     @classmethod
-    def from_list(cls, data: "list[dict] | None") -> "Journal":
+    def from_list(cls, data: list[dict] | None) -> Journal:
         return cls([JournalEntry.from_dict(d) for d in (data or [])])
 
 

@@ -97,6 +97,11 @@ After each ``run()`` call, ``chain.history`` holds one record per step::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..state import SuspendedResult
+
 from .._require import require
 
 import importlib
@@ -381,7 +386,7 @@ class Chain:
         from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
 
-        self.last_usage: "Usage | None" = None
+        self.last_usage: Usage | None = None
         # Per-request RunContext for the current run() / resume() (tenant +
         # metadata); set while a run is in flight, restored on resume.
         self.context = None
@@ -401,7 +406,7 @@ class Chain:
         on_step_error: str  | None = None,
         *,
         context=None,
-    ) -> "ChainResult":
+    ) -> ChainResult:
         """
         Execute all steps in order and return a :class:`ChainResult`.
 
@@ -452,9 +457,9 @@ class Chain:
                                   usage_in=None, on_error=_on_error,
                                   context=context)
 
-    def arm(self, reason: str = "", resume_with: "dict | None" = None, *,
-            hint: "dict | None" = None, variables: "dict | None" = None,
-            context=None) -> "SuspendedResult":
+    def arm(self, reason: str = "", resume_with: dict | None = None, *,
+            hint: dict | None = None, variables: dict | None = None,
+            context=None) -> SuspendedResult:
         """
         Create the run **without starting it**, and return it parked.
 
@@ -513,7 +518,7 @@ class Chain:
         *,
         on_step_error: str | None = None,
         context=None,
-    ) -> "ChainResult | None":
+    ) -> ChainResult | None:
         """
         Resume a previously suspended run.
 
@@ -632,7 +637,7 @@ class Chain:
                                document=doc.to_dict())
 
     def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
-                  on_error, context) -> "ChainResult":
+                  on_error, context) -> ChainResult:
         """
         Shared step loop for ``run()`` (from step 0) and ``resume()`` (from the
         suspended step). On ``resume``, *signal* is delivered to the step at
@@ -646,8 +651,8 @@ class Chain:
         doc.context  = context.to_dict() if context is not None else None
 
         history:     list[dict] = []
-        last_output: "str | dict | None" = None
-        usage_total: "Usage | None" = usage_in
+        last_output: str | dict | None = None
+        usage_total: Usage | None = usage_in
 
         for idx in range(start_idx, len(self._steps)):
             runner, output_key, input_map, kind, options = self._steps[idx]
@@ -828,7 +833,7 @@ class Chain:
         return self._result(doc, history, accumulated, usage_total, last_output)
 
     @staticmethod
-    def _result(doc, history, accumulated, usage_total, last_output) -> "ChainResult":
+    def _result(doc, history, accumulated, usage_total, last_output) -> ChainResult:
         failed = [r for r in history if r.get("error")]
         error = (f"step {failed[0]['step']} ({failed[0]['name']}): {failed[0]['error']}"
                  if failed else None)
@@ -1043,10 +1048,10 @@ class Chain:
     def load(
         cls,
         path: str,
-        api_key: "str | None" = None,
+        api_key: str | None = None,
         *,
         trusted: bool = False,
-    ) -> "Chain":
+    ) -> Chain:
         """
         Load a chain from a YAML file previously created by :meth:`save`.
 
@@ -1131,7 +1136,7 @@ class Chain:
                     name        = sd.get("name"),
                     description = sd.get("description"),
                 )
-                entry: "tuple | object" = (skill, output_key, input_map, options)
+                entry: tuple | object = (skill, output_key, input_map, options)
 
             elif kind == "agent":
                 from ..agent._agent import Agent as _Agent
@@ -1151,7 +1156,7 @@ class Chain:
                         ) from exc
                     tool_instances.append(getattr(t_module, t_cls)())
 
-                from ..agent import check, cost_budget, step_count, token_budget
+                from ..agent import cost_budget, step_count, token_budget
                 _BUILDERS = {"step_count": step_count,
                              "token_budget": token_budget,
                              "cost_budget": cost_budget}

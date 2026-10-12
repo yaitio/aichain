@@ -46,31 +46,31 @@ _install_module_hints()
 
 # ── Convenience re-exports ─────────────────────────────────────────────────────
 
-from .models import Model                                          # noqa: F401
+from .models import Model
 # Schema portability, public because every caller was writing it by hand:
 # the two provider families demand opposite forms of the same schema.
-from .models import portable_schema, check_structure               # noqa: F401
+from .models import portable_schema, check_structure
 # What the library had to change about a request to fit a provider. Reachable
 # so a caller can log it, not only read the warning.
-from .models._adaptation import Adaptation, UnsupportedOption      # noqa: F401
-from ._budget import Budget, BudgetExceeded                        # noqa: F401
-from .models._usage import Usage                                   # noqa: F401
-from .skills import Skill                                          # noqa: F401
-from .chain  import Chain                                          # noqa: F401
-from .pool   import Pool, PENDING, RUNNING, DONE, FAILED          # noqa: F401
-from .chain  import ChainResult                                    # noqa: F401
-from .pool   import PoolResult                                     # noqa: F401
-from .agent  import Agent                                          # noqa: F401
+from .models._adaptation import Adaptation, UnsupportedOption
+from ._budget import Budget, BudgetExceeded
+from .models._usage import Usage
+from .skills import Skill
+from .chain  import Chain
+from .pool   import Pool, PENDING, RUNNING, DONE, FAILED
+from .chain  import ChainResult
+from .pool   import PoolResult
+from .agent  import Agent, AgentResult
 
 # Observability events & lifecycle hooks (1.4.4).
-from ._events import Event, Hook, Tracer, LoggingTracer            # noqa: F401
+from ._events import Event, Hook, Tracer, LoggingTracer
 # Permission matrix for tool governance (1.4.4).
-from .tools._permissions import (PermissionPolicy, ApprovalRequest,   # noqa: F401
-                                 ApprovalDecision)                    # noqa: F401
+from .tools._permissions import (PermissionPolicy, ApprovalRequest,
+                                 ApprovalDecision)
 
 # Exception hierarchy — catch APIError for everything, or a subclass for a
 # specific failure mode (rate limit, auth, server error, …).
-from .clients import (                                             # noqa: F401
+from .clients import (
     APIError,
     NetworkError,
     RateLimitError,
@@ -83,3 +83,17 @@ from .clients import (                                             # noqa: F401
     ServerError,
     TaskFailedError,
 )
+
+#: What `from yait_aichain import *` brings: the names above, and not the
+#: subpackages their imports load along the way.
+__all__ = [
+    "Model", "portable_schema", "check_structure", "Adaptation", "UnsupportedOption",
+    "Budget", "BudgetExceeded", "Usage",
+    "Skill", "Chain", "ChainResult", "Pool", "PoolResult", "PENDING", "RUNNING", "DONE", "FAILED",
+    "Agent", "AgentResult",
+    "Event", "Hook", "Tracer", "LoggingTracer",
+    "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
+    "APIError", "NetworkError", "RateLimitError", "AuthenticationError",
+    "InsufficientCreditsError", "InvalidRequestError", "TruncatedResponseError",
+    "InvalidStructuredOutputError", "NotFoundError", "ServerError", "TaskFailedError",
+]

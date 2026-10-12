@@ -61,8 +61,8 @@ class TestTheFactoryIsThePackage(unittest.TestCase):
     def test_mock_patch_reaches_inside(self):
         with patch("yait_aichain.tools.fetch.local.assert_safe_url") as p:
             self.assertIs(sys.modules["yait_aichain.tools.fetch.local"].assert_safe_url, p)
-        with patch("yait_aichain.tools.search.exa.json") as p:
-            self.assertIs(sys.modules["yait_aichain.tools.search.exa"].json, p)
+        with patch("yait_aichain.tools.search.exa.request_json") as p:
+            self.assertIs(sys.modules["yait_aichain.tools.search.exa"].request_json, p)
 
 
 if __name__ == "__main__":

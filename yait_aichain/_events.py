@@ -29,10 +29,9 @@ in the application (or the product).
 from __future__ import annotations
 
 import logging
-import warnings
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
 
 _log = logging.getLogger("yait_aichain.events")
 
@@ -84,14 +83,14 @@ class Event:
     """
 
     type:     str
-    run_id:   "str | None"  = None
-    step:     "int | None"  = None
-    name:     "str | None"  = None
+    run_id:   str | None  = None
+    step:     int | None  = None
+    name:     str | None  = None
     payload:  dict          = field(default_factory=dict)
-    usage:    "int | None"  = None
-    cost:     "float | None" = None
-    duration: "float | None" = None
-    error:    "str | None"  = None
+    usage:    int | None  = None
+    cost:     float | None = None
+    duration: float | None = None
+    error:    str | None  = None
     ts:       float         = field(default_factory=time.time)
 
     def __repr__(self) -> str:                       # compact, log-friendly
@@ -116,7 +115,7 @@ class Hook:
     only ergonomics.
     """
 
-    def __call__(self, event: "Event") -> None:
+    def __call__(self, event: Event) -> None:
         wanted = event.type.replace(".", "_")
         method = getattr(self, wanted, None)
         if callable(method):
@@ -130,7 +129,7 @@ class Tracer(Hook):
     def __init__(self) -> None:
         self.events: list[Event] = []
 
-    def __call__(self, event: "Event") -> None:
+    def __call__(self, event: Event) -> None:
         self.events.append(event)
 
 
@@ -145,18 +144,18 @@ class LoggingTracer(Hook):
         The level each event is logged at; ``INFO`` by default.
     """
 
-    def __init__(self, logger: "logging.Logger | None" = None,
+    def __init__(self, logger: logging.Logger | None = None,
                  level: int = logging.INFO) -> None:
         self._logger = logger or logging.getLogger("yait_aichain.trace")
         self._level  = level
 
-    def __call__(self, event: "Event") -> None:
+    def __call__(self, event: Event) -> None:
         self._logger.log(self._level, "%r", event)
 
 
 # ── Dispatch ───────────────────────────────────────────────────────────────────
 
-def emit(hooks: "Iterable[Callable[[Event], None]] | None", event: "Event") -> None:
+def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
     """
     Dispatch *event* to every hook, swallowing hook errors.
 

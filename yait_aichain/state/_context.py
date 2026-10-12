@@ -29,7 +29,7 @@ class RunContext:
         routing.
     """
 
-    tenant:   "str | None" = None
+    tenant:   str | None = None
     metadata: dict          = field(default_factory=dict)
 
     def get(self, key: str, default=None):
@@ -48,7 +48,7 @@ class RunContext:
         return {"tenant": self.tenant, "metadata": dict(self.metadata)}
 
     @classmethod
-    def from_dict(cls, data: "dict | None") -> "RunContext":
+    def from_dict(cls, data: dict | None) -> RunContext:
         if not data:
             return cls()
         return cls(tenant=data.get("tenant"),

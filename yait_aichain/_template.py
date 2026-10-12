@@ -37,7 +37,7 @@ def substitute_placeholders(text: str, variables: dict) -> str:
     if not variables or "{" not in text:
         return text
 
-    def _replace(match: "re.Match[str]") -> str:
+    def _replace(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in variables:
             return str(variables[key])

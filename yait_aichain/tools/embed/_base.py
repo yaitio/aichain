@@ -47,12 +47,10 @@ To cap the slice size for rate-limiting purposes:
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from typing import Any
 
-import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
@@ -195,7 +193,7 @@ class Embedder(Tool):
     _ENV_KEY:   str = ""
     _MAX_BATCH: int = 100
     #: Models that take a ``dimensions``; ``None`` means every model does.
-    _DIMENSION_MODELS: "frozenset | None" = None
+    _DIMENSION_MODELS: frozenset | None = None
 
     # A tool: code, a chain and an agent call it alike. An agent
     # reads a summary, never the vectors (see EmbeddingResult.__str__).
@@ -222,10 +220,10 @@ class Embedder(Tool):
         model:   str,
         *,
         api_key: str | None = None,
-        name:        "str | None" = None,
-        description: "str | None" = None,
-        dimensions:  "int | None" = None,
-        batch_size:  "int | None" = None,
+        name:        str | None = None,
+        description: str | None = None,
+        dimensions:  int | None = None,
+        batch_size:  int | None = None,
     ) -> None:
         # _ENV_KEY may be a single name or several accepted names (the first
         # set one wins) — e.g. Google embeddings accept GOOGLE_AI_API_KEY or
@@ -276,9 +274,9 @@ class Embedder(Tool):
 
     def embed(
         self,
-        texts: "str | list[str]",
+        texts: str | list[str],
         *,
-        input_type:  "str | None"  = None,
+        input_type:  str | None  = None,
         **refused: Any,
     ) -> EmbeddingResult:
         """
@@ -342,7 +340,7 @@ class Embedder(Tool):
         _refuse_settings(type(self).__name__, refused)
         limit = max(1, min(self.batch_size or self._MAX_BATCH, self._MAX_BATCH))
         vectors: list[list[float]] = []
-        tokens: "list[int]" = []
+        tokens: list[int] = []
         metadata: dict = {}
         for i in range(0, len(texts), limit):
             vecs, tok, metadata = self._embed_chunk(
@@ -359,7 +357,7 @@ class Embedder(Tool):
             metadata     = metadata,
         )
 
-    def run(self, input: "str | list[str]", options: "dict | None" = None) -> "EmbeddingResult":
+    def run(self, input: str | list[str], options: dict | None = None) -> EmbeddingResult:
         """
         Embed one text (or a short list) and return an EmbeddingResult.
 
@@ -384,7 +382,7 @@ class Embedder(Tool):
         _refuse_settings(self.name, opts)
         return self.embed(input, input_type=input_type)
 
-    def batch(self, input: "list[str]", options: "dict | None" = None) -> "EmbeddingResult":
+    def batch(self, input: list[str], options: dict | None = None) -> EmbeddingResult:
         """Deprecated: the same as :meth:`run`, which takes a list. Removed in 5.0."""
         import warnings
         warnings.warn("Embedder.batch() is run() — call run(); batch() goes in 5.0",
@@ -399,10 +397,10 @@ class Embedder(Tool):
         self,
         texts:      list[str],
         *,
-        input_type: "str | None",
-        dimensions: "int | None",
+        input_type: str | None,
+        dimensions: int | None,
         **options:  Any,
-    ) -> "tuple[list[list[float]], int | None, dict]":
+    ) -> tuple[list[list[float]], int | None, dict]:
         """
         Embed a single chunk of texts.
 

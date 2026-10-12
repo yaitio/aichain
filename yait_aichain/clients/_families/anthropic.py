@@ -12,7 +12,6 @@ a forced ``tool_use``; extended thinking maps to ``budget_tokens``.
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
 from .._base import BaseClient
 
@@ -47,7 +46,7 @@ def _extract_first_json(t: str) -> str:
 _API_VERSION = "2023-06-01"
 
 
-def _part_to_anthropic(part: dict) -> "dict | None":
+def _part_to_anthropic(part: dict) -> dict | None:
     """
     Convert one universal part dict to an Anthropic content block.
 
@@ -125,7 +124,7 @@ class AnthropicClient(BaseClient):
         body["stream"] = True
         return path, body
 
-    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+    def parse_stream_event(self, event: dict, output: dict) -> str | None:
         # Anthropic names its event types rather than sending one shape with
         # empty fields, so the filter is exact: only a text delta is text.
         # A thinking delta arrives under the same event type with a different
@@ -139,7 +138,7 @@ class AnthropicClient(BaseClient):
         text = delta.get("text")
         return text if isinstance(text, str) and text else None
 
-    def stream_tool_fragments(self, event: dict) -> "list | None":
+    def stream_tool_fragments(self, event: dict) -> list | None:
         """Anthropic opens a content block for the call and then streams its
         arguments into it, so the name arrives in one event type and the
         arguments in another — under `partial_json`, not `text`, which is why
@@ -160,7 +159,7 @@ class AnthropicClient(BaseClient):
                      "arguments": delta.get("partial_json") or ""}]
         return []
 
-    def stream_usage(self, event: dict) -> "dict | None":
+    def stream_usage(self, event: dict) -> dict | None:
         """
         Anthropic reports usage **twice**, and the halves are different.
 
@@ -182,7 +181,7 @@ class AnthropicClient(BaseClient):
             return {"usage": dict(usage)} if usage else None
         return None
 
-    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         prov = self._data["provider"]
         from ...models._adaptation import (Adaptation, ADAPTED, DECLINED,
                                             record)
@@ -444,7 +443,7 @@ class AnthropicClient(BaseClient):
 
         return "/v1/messages", body
 
-    def parse_response(self, response, output) -> "str | dict":
+    def parse_response(self, response, output) -> str | dict:
         ftype   = output.get("format", {}).get("type", "text")
         content = response.get("content", [])
         if ftype == "json_schema":

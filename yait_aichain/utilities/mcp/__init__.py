@@ -37,10 +37,10 @@ class MCP(Utility):
     first use, not here, so making the utility costs nothing.
     """
 
-    def __init__(self, server, *, filter: "list | None" = None, headers: "dict | None" = None,
-                 env: "dict | None" = None, cwd: "str | None" = None, transport: "str | None" = None,
-                 connect_timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT,
-                 call_timeout: "float | None" = None, risk: "dict | None" = None) -> None:
+    def __init__(self, server, *, filter: list | None = None, headers: dict | None = None,
+                 env: dict | None = None, cwd: str | None = None, transport: str | None = None,
+                 connect_timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT,
+                 call_timeout: float | None = None, risk: dict | None = None) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool.
         self.server = server
@@ -50,7 +50,7 @@ class MCP(Utility):
             raise TypeError(f"MCP filter is a list of tool names, not {filter!r}")
         self._filter = None if filter is None else list(filter)
         self._connect_timeout = connect_timeout
-        self._tools: "list | None" = None
+        self._tools: list | None = None
         from ...tools._permissions import RISK_CLASSES
         bad = {n: r for n, r in (risk or {}).items() if r not in RISK_CLASSES}
         if bad:

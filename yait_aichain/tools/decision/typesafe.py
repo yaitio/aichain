@@ -23,7 +23,6 @@ Environment variable
 
 from __future__ import annotations
 
-import json
 
 from ...clients._constants import DEFAULT_RETRIES
 from ._base import Decision, _level

@@ -7,7 +7,7 @@ wordings.
 from __future__ import annotations
 
 
-def require(module: str, *, package: str, who: str, extra: "str | None" = None):
+def require(module: str, *, package: str, who: str, extra: str | None = None):
     """Import *module* and return it, or raise ImportError saying what to install.
 
     *package* is the name on PyPI, *who* the part of the library that needs

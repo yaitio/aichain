@@ -10,9 +10,9 @@ REST(
     base_url: str,
     *,
     description: str,
-    auth: 'dict | None' = None,
-    headers: 'dict | None' = None,
-    timeout: 'float | None' = None,
+    auth: dict | None = None,
+    headers: dict | None = None,
+    timeout: float | None = None,
 )
 ```
 
@@ -37,8 +37,8 @@ REST.endpoint(
     body_params=(),
     required_params=(),
     content_type: str = 'application/json',
-    response_field: 'str | None' = None,
-    risk: 'str | None' = None,
+    response_field: str | None = None,
+    risk: str | None = None,
 ) -> RestApiTool
 ```
 

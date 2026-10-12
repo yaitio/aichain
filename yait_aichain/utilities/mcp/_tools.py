@@ -69,7 +69,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
-from ...tools._base import Tool
+from ...tools._base import Tool, ToolResult
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ class _AsyncBridge:
     A single background loop handles all concurrent MCPTool calls safely.
     """
 
-    _instance: "_AsyncBridge | None" = None
+    _instance: _AsyncBridge | None = None
     _lock = threading.Lock()
 
     def __init__(self) -> None:
@@ -109,7 +109,7 @@ class _AsyncBridge:
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
-    def run(self, coro: Any, timeout: "float | None" = None) -> Any:
+    def run(self, coro: Any, timeout: float | None = None) -> Any:
         """
         Submit *coro* to the background loop and block until it completes.
 
@@ -130,7 +130,7 @@ class _AsyncBridge:
             ) from None
 
     @classmethod
-    def get(cls) -> "_AsyncBridge":
+    def get(cls) -> _AsyncBridge:
         """Return (or create) the shared singleton bridge."""
         with cls._lock:
             if cls._instance is None:
@@ -144,7 +144,7 @@ class _AsyncBridge:
 DEFAULT_MCP_SETUP_TIMEOUT = 60.0
 
 
-def _run_sync(coro: Any, timeout: "float | None" = None) -> Any:
+def _run_sync(coro: Any, timeout: float | None = None) -> Any:
     """Run *coro* synchronously from any context (sync or async)."""
     return _AsyncBridge.get().run(coro, timeout=timeout)
 
@@ -156,7 +156,7 @@ def _run_sync(coro: Any, timeout: "float | None" = None) -> Any:
 _TRANSPORTS = ("http", "streamable", "sse", "stdio")
 
 
-def _is_sse(url: str, transport_hint: "str | None") -> bool:
+def _is_sse(url: str, transport_hint: str | None) -> bool:
     """Return True when the SSE transport should be preferred."""
     if transport_hint == "sse":
         return True
@@ -182,11 +182,11 @@ class _Server:
     here once, instead of five keywords threaded through every signature."""
 
     spec:         Any
-    headers:      "dict | None"  = None
-    env:          "dict | None"  = None
-    cwd:          "str | None"   = None
-    transport:    "str | None"   = None
-    call_timeout: "float | None" = None
+    headers:      dict | None  = None
+    env:          dict | None  = None
+    cwd:          str | None   = None
+    transport:    str | None   = None
+    call_timeout: float | None = None
 
     def __post_init__(self) -> None:
         if self.spec is None or (isinstance(self.spec, str) and not self.spec.strip()):
@@ -372,14 +372,14 @@ class MCPTool(Tool):
         self,
         name:        str,
         description: str,
-        server:      "str | dict | Any",
+        server:      str | dict | Any,
         *,
-        parameters:  "dict | None" = None,
-        headers:     "dict | None" = None,
-        env:         "dict | None" = None,
-        cwd:         "str | None"  = None,
-        transport:   "str | None"  = None,
-        call_timeout: "float | None" = None,
+        parameters:  dict | None = None,
+        headers:     dict | None = None,
+        env:         dict | None = None,
+        cwd:         str | None  = None,
+        transport:   str | None  = None,
+        call_timeout: float | None = None,
         risk:        str           = "privileged",
     ) -> None:
         from ...tools._permissions import RISK_CLASSES
@@ -406,8 +406,8 @@ class MCPTool(Tool):
 
     def run(
         self,
-        input:   "dict | str | None" = None,
-        options: "dict | None"        = None,
+        input:   dict | str | None = None,
+        options: dict | None        = None,
         **kwargs: Any,
     ) -> Any:
         """
@@ -461,10 +461,10 @@ class MCPTool(Tool):
 
     def __call__(
         self,
-        input:   "dict | str | None" = None,
-        options: "dict | None"        = None,
+        input:   dict | str | None = None,
+        options: dict | None        = None,
         **kwargs: Any,
-    ) -> "ToolResult":
+    ) -> ToolResult:
         """
         Safe wrapper around :meth:`run` — never raises.
 
@@ -478,8 +478,6 @@ class MCPTool(Tool):
             ``success=True`` + raw output on success; ``success=False``
             + error string on any exception.
         """
-        from ...tools._base import ToolResult  # local import avoids circular at module level
-
         try:
             output = self.run(input, options, **kwargs)
             return ToolResult(success=True, output=output)
@@ -527,8 +525,8 @@ class MCPTool(Tool):
 # Discovery (internal; MCP calls it)
 # ---------------------------------------------------------------------------
 
-def discover(server: _Server, *, filter: "list[str] | None" = None,
-             timeout: "float | None" = DEFAULT_MCP_SETUP_TIMEOUT) -> "list[MCPTool]":
+def discover(server: _Server, *, filter: list[str] | None = None,
+             timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT) -> list[MCPTool]:
     """Ask *server* for its tools, one :class:`MCPTool` each, in its order.
 
     *filter* keeps the tools it names, and a name the server does not have is
@@ -539,7 +537,7 @@ def discover(server: _Server, *, filter: "list[str] | None" = None,
     return _run_sync(_discover(server, filter), timeout=timeout)
 
 
-async def _discover(server: _Server, filter: "list[str] | None") -> "list[MCPTool]":
+async def _discover(server: _Server, filter: list[str] | None) -> list[MCPTool]:
     async with _build_client(server) as client:
         listed = await client.list_tools()
     if filter is not None:
@@ -558,7 +556,7 @@ async def _discover(server: _Server, filter: "list[str] | None") -> "list[MCPToo
     ) for t in listed if filter is None or t.name in filter]
 
 
-def _hint(annotations: Any, snake: str, camel: str) -> "bool | None":
+def _hint(annotations: Any, snake: str, camel: str) -> bool | None:
     """One hint, under its MCP SDK v2 name or the camelCase one before it."""
     value = getattr(annotations, snake, None)
     if value is None:

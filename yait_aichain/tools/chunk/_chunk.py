@@ -88,7 +88,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 from .._base import Tool
 
@@ -447,7 +446,7 @@ class Chunk(Tool):
     def __init__(
         self,
         max_chars:     int  = 1500,
-        overlap_chars: "int | None" = None,
+        overlap_chars: int | None = None,
         merge_peers:   bool = True,
     ) -> None:
         # A tenth of a piece unless given: 150 at the default 1 500. A fixed

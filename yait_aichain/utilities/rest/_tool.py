@@ -247,8 +247,8 @@ class RestApiTool(Tool):
         auth:            dict | None = None,
         content_type:    str         = "application/json",
         response_field:  str | None  = None,
-        timeout:         "float | None" = None,
-        risk:            "str | None"  = None,
+        timeout:         float | None = None,
+        risk:            str | None  = None,
     ) -> None:
         # ── Public identity (Tool class attributes) ────────────────────
         self.name        = name
@@ -307,10 +307,10 @@ class RestApiTool(Tool):
 
     def run(
         self,
-        input:   "dict | str | None" = None,
-        options: "dict | None"        = None,
+        input:   dict | str | None = None,
+        options: dict | None        = None,
         **kwargs: Any,
-    ) -> "dict | list | str":
+    ) -> dict | list | str:
         """
         Execute the configured REST endpoint and return the response.
 
@@ -550,7 +550,7 @@ class RestApiTool(Tool):
         return {k: v for k, v in args.items() if v not in (None, [], ())}
 
     @staticmethod
-    def _untrusted_load_refusal(init_args: dict) -> "str | None":
+    def _untrusted_load_refusal(init_args: dict) -> str | None:
         """Why a file nobody vouched for may not make this endpoint, or None.
 
         The URL and the name of the token's variable both come from the file.
@@ -585,7 +585,7 @@ class RestApiTool(Tool):
         out["function"] = {**out["function"], "parameters": params}
         return out
 
-    def check_args(self, kwargs: dict) -> "str | None":
+    def check_args(self, kwargs: dict) -> str | None:
         if given := sorted(set(kwargs) & self._hidden):
             return (f"Invalid call to tool '{self.name}': {given} is the API's credential and is "
                     "not an argument of the call.")

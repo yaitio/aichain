@@ -77,7 +77,7 @@ class _Board:
     that kept its beacons to itself would be a record, not a channel.
     """
 
-    def __init__(self, parent: "_Board | None" = None) -> None:
+    def __init__(self, parent: _Board | None = None) -> None:
         self._items: list = []
         self._lock = threading.Lock()
         self._parent = parent
@@ -208,7 +208,7 @@ class Acceptance:
             return False
         return acceptance_from(journal).fingerprint == self.fingerprint
 
-    def supersede(self, reason: str) -> "Acceptance":
+    def supersede(self, reason: str) -> Acceptance:
         """The caller intervened; the acceptance must be re-earned.
 
         Parameters

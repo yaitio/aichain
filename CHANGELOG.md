@@ -63,6 +63,18 @@ where a fix is named below.
 - **A `Report` counts each `(arm, case, trial)` once.** A ledger holding the
   same attempt twice weighed that case double; the later line wins.
 
+- **The package is typed (PEP 561).** `py.typed` ships, so mypy and an
+  editor's language server read the annotations instead of treating the whole
+  package as `Any`; `Agent`'s constructor annotates `model`, `team`,
+  `planner_model`, `permissions`, `approve`, `store` and `max_cost`, and its
+  internal delegation depth is no longer a parameter. Quoted annotations are
+  unquoted throughout — every module has `from __future__ import annotations`.
+- **`from yait_aichain import AgentResult`** works, and `import *` brings the
+  public names in `__all__` rather than the subpackages loaded on the way.
+- **`yait-aichain[mcp]` needs `fastmcp>=2.10,<5`**, `[yaml]` `pyyaml>=5.1`,
+  and `[all]` is the three extras rather than a copy of their lists. The sdist
+  no longer carries the test suite, which cannot run outside the repository.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and

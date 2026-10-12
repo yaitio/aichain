@@ -21,7 +21,7 @@ class Shell(Utility):
 
     TOOLS = ("browse", "read", "write", "run")
 
-    def __init__(self, folder: "str | None" = None) -> None:
+    def __init__(self, folder: str | None = None) -> None:
         from . import LocalBrowseTool, LocalReadTool, LocalRunTool, LocalWriteTool
         self.browse = LocalBrowseTool(folder)
         self.read = LocalReadTool(folder)

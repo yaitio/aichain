@@ -48,7 +48,7 @@ def _load() -> dict:
 PROVIDERS: dict[str, dict] = _load()
 
 
-def provider_of(model_name: str) -> "str | None":
+def provider_of(model_name: str) -> str | None:
     """Return the provider key that owns *model_name*, or None."""
     for key, data in PROVIDERS.items():
         if model_name in data.get("models", {}):

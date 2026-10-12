@@ -30,7 +30,8 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 from ._records import Record
 
@@ -44,24 +45,24 @@ class Report:
         The attempts, usually read back from a ledger.
     """
 
-    def __init__(self, records: "Iterable[Record]") -> None:
+    def __init__(self, records: Iterable[Record]) -> None:
         # One attempt is one (arm, case, trial). A ledger written twice for the
         # same attempt — a retried run, two writers — holds both lines, and
         # counting both would weigh that case double; the later line wins.
         latest = {(r.arm, r.case, r.trial): r for r in records}
         self.records = list(latest.values())
-        self._rejected: "dict[str, str]" = {}
+        self._rejected: dict[str, str] = {}
         # Indexed once: every figure below reads an arm's scored rows by case,
         # and rescanning every record for each one made `paired` and `table`
         # quadratic in the size of the run.
-        self._scored: "dict[str, dict[str, list[Record]]]" = defaultdict(lambda: defaultdict(list))
+        self._scored: dict[str, dict[str, list[Record]]] = defaultdict(lambda: defaultdict(list))
         for r in self.records:
             if not self._abstained(r):
                 self._scored[r.arm][r.case].append(r)
 
     # ── construction ─────────────────────────────────────────────────────
     @classmethod
-    def of(cls, source, **keys) -> "Report":
+    def of(cls, source, **keys) -> Report:
         """
         Build from records, a JSON-lines path, or someone else's dicts.
 
@@ -87,7 +88,7 @@ class Report:
 
     # ── validity ─────────────────────────────────────────────────────────
     def reject(self, *, max_empty: int = 2, max_errors: int = 5,
-               max_abstained: float = 0.2) -> "dict[str, str]":
+               max_abstained: float = 0.2) -> dict[str, str]:
         """
         Mark cells whose data is not worth reporting, and say why.
 
@@ -124,22 +125,22 @@ class Report:
         return dict(self._rejected)
 
     @property
-    def rejected(self) -> "dict[str, str]":
+    def rejected(self) -> dict[str, str]:
         return dict(self._rejected)
 
-    def _live(self) -> "list[Record]":
+    def _live(self) -> list[Record]:
         return [r for r in self.records if r.arm not in self._rejected]
 
-    def _by_arm(self) -> "dict[str, list[Record]]":
-        out: "dict[str, list[Record]]" = defaultdict(list)
+    def _by_arm(self) -> dict[str, list[Record]]:
+        out: dict[str, list[Record]] = defaultdict(list)
         for r in self.records:
             out[r.arm].append(r)
         return dict(out)
 
-    def arms(self) -> "list[str]":
+    def arms(self) -> list[str]:
         return sorted({r.arm for r in self._live()})
 
-    def groups(self) -> "list[str]":
+    def groups(self) -> list[str]:
         return sorted({r.group for r in self._live() if r.group})
 
     # ── the numbers ──────────────────────────────────────────────────────
@@ -170,7 +171,7 @@ class Report:
                    if r.arm == arm and (not group or r.group == group)
                    and self._abstained(r))
 
-    def _cases(self, arm: str, group: str = "") -> "dict[str, list[Record]]":
+    def _cases(self, arm: str, group: str = "") -> dict[str, list[Record]]:
         if arm in self._rejected or arm not in self._scored:
             return {}
         by_case = self._scored[arm]
@@ -192,7 +193,7 @@ class Report:
         rows = [r for c in self._cases(arm, group).values() for r in c]
         return sum(1 for r in rows if r.ok) / len(rows) if rows else 0.0
 
-    def pass_k(self, arm: str, k: "int | None" = None, group: str = "") -> float:
+    def pass_k(self, arm: str, k: int | None = None, group: str = "") -> float:
         """
         Share of *cases* an arm solved on **every** one of k trials.
 
@@ -246,7 +247,7 @@ class Report:
                        if len({bool(r.ok) for r in rows}) > 1)
         return unstable / len(cases)
 
-    def spend(self, arm: str, group: str = "") -> "dict[str, float]":
+    def spend(self, arm: str, group: str = "") -> dict[str, float]:
         cases = self._cases(arm, group)
         rows = [r for c in cases.values() for r in c]
         return {"cost":    sum(r.cost   for r in rows),
@@ -299,7 +300,7 @@ class Report:
 
     # ── controls ─────────────────────────────────────────────────────────
     @staticmethod
-    def controls(oracle: "Report", noise: "Report", *,
+    def controls(oracle: Report, noise: Report, *,
                  arm: str = "", floor: float = 0.95,
                  ceiling: float = 0.05) -> dict:
         """
@@ -337,7 +338,7 @@ class Report:
                         f"noise {got_lo:.3f} (want ≤{ceiling})")}
 
     # ── output ───────────────────────────────────────────────────────────
-    def table(self, group: str = "", k: "int | None" = None) -> str:
+    def table(self, group: str = "", k: int | None = None) -> str:
         """One row per arm: accuracy, reliability, and what it cost.
 
         Parameters
@@ -368,7 +369,7 @@ class Report:
                            "in how they differed)")
         return "\n".join(lines)
 
-    def by_group(self, k: "int | None" = None) -> str:
+    def by_group(self, k: int | None = None) -> str:
         """The same table, once per group. Aggregate hides stratified effects.
 
         Parameters

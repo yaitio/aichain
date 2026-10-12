@@ -64,7 +64,7 @@ def portable_schema(schema: object, target: str) -> object:
     raise ValueError(f"unknown target {target!r}; expected 'openai' or 'google'")
 
 
-def check_structure(value: object, schema: object, path: str = "$") -> "list[str]":
+def check_structure(value: object, schema: object, path: str = "$") -> list[str]:
     """
     Compare *value* against *schema*, returning one message per violation.
 

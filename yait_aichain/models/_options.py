@@ -192,7 +192,7 @@ def is_universal(option: str) -> bool:
     return option in UNIVERSAL_OPTIONS or option in UNIVERSAL_FORMAT
 
 
-def accepted_by(provider: str) -> "frozenset[str] | None":
+def accepted_by(provider: str) -> frozenset[str] | None:
     """
     The options *provider* has a control for, or ``None`` when it declares
     nothing.
@@ -264,7 +264,7 @@ def why_absent(option: str, provider: str, model: str = "") -> str:
 # by gpt-image-1.5, measured 2026-09-09.
 
 
-def allowed_values(option: str, provider: str, model: str) -> "list | None":
+def allowed_values(option: str, provider: str, model: str) -> list | None:
     """The values *model* accepts for *option*, or ``None`` when unconstrained.
 
     A per-model entry wins over the provider-wide one, because within one
@@ -326,7 +326,7 @@ def check_value(option: str, value, provider: str, model: str):
 # writing them into a client keeps the translation where it can be read.
 
 
-def value_map(option: str, provider: str) -> "dict | None":
+def value_map(option: str, provider: str) -> dict | None:
     """
     How *provider* spells each universal value of *option*.
 

@@ -45,7 +45,7 @@ class Usage:
     input_tokens:  int = 0
     output_tokens: int = 0
     total_tokens:  int = 0
-    cost:          "float | None" = None
+    cost:          float | None = None
     # Prompt-cache accounting (1.6.1). A provider bills a reused prefix at a
     # fraction of the fresh rate, so a report that folds cached tokens into
     # ``input_tokens`` overstates what a long conversation actually costs —
@@ -59,7 +59,7 @@ class Usage:
     # under-states the input line by 37% and the whole call by 22%.
     image_input_tokens: int = 0
 
-    def __add__(self, other: "Usage") -> "Usage":
+    def __add__(self, other: Usage) -> Usage:
         if not isinstance(other, Usage):
             return NotImplemented
         a = self.cost
@@ -98,7 +98,7 @@ class Spend:
         return (self.usage.total_tokens or 0) if self.usage is not None else 0
 
     @property
-    def cost(self) -> "float | None":
+    def cost(self) -> float | None:
         return self.usage.cost if self.usage is not None else None
 
 
@@ -202,7 +202,7 @@ def extract_usage(response: dict) -> Usage:
 # every primitive does for ``.last_usage``) stays light and never triggers the
 # provider-data load.
 
-def _price_of(model_name: str) -> "dict | None":
+def _price_of(model_name: str) -> dict | None:
     from ._data import PROVIDERS
     for data in PROVIDERS.values():
         mdl = data.get("models", {}).get(model_name)
@@ -221,7 +221,7 @@ CACHE_READ_MULTIPLIER   = 0.10
 
 
 def estimate_cost(usage: Usage, model_name: str,
-                  cache_ttl: str = "5m") -> "float | None":
+                  cache_ttl: str = "5m") -> float | None:
     """
     Estimate USD cost of *usage* for *model_name*, or ``None`` if the model
     has no price per token in the provider data.
@@ -276,7 +276,7 @@ def estimate_cost(usage: Usage, model_name: str,
     )
 
 
-def price_per_image(model_name: str) -> "float | None":
+def price_per_image(model_name: str) -> float | None:
     """USD per picture for a model the provider prices by the image, else ``None``."""
     price = _price_of(model_name)
     value = price.get("per_image") if price else None

@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[all]" pytest pytest-asyncio
+      - run: pip install -e ".[all]" pytest
       # *Live* tests hit real provider APIs (keys + network) — skipped in CI.
       - run: pip install pytest-cov
       - run: pytest -m "not live" --cov=yait_aichain --cov-report=term --cov-report=json:coverage.json
@@ -29,6 +29,10 @@ jobs:
       - run: python .github/scripts/coverage_register.py coverage.json
       # Generated pages: the tests hold them too, but a named step says which
       # page went stale and how to regenerate it, instead of a diff in a log.
+      # Names that do not exist, imports nobody uses, quoted annotations — the
+      # rules are in pyproject.toml, the version is pinned so a ruff release
+      # cannot turn the build red on its own.
+      - run: pip install ruff==0.16.0 && ruff check yait_aichain
       - run: python .github/scripts/docs.py --check
       - run: python .github/scripts/examples_index.py --check
       # The Claude Code plugin is generated from SKILL.md, llms.txt and the

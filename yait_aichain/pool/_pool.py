@@ -46,7 +46,10 @@ import time
 import warnings
 import contextvars
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ._result import PoolResult
 
 # ---------------------------------------------------------------------------
 # Status constants
@@ -235,7 +238,7 @@ class Pool:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def run(self, variables: dict | None = None) -> "PoolResult":
+    def run(self, variables: dict | None = None) -> PoolResult:
         """
         Execute the runner for every item in parallel.
 
@@ -453,7 +456,7 @@ class Pool:
                 })
             raise
 
-    def _dispatch(self, variables: dict) -> "tuple[Any, Any]":
+    def _dispatch(self, variables: dict) -> tuple[Any, Any]:
         """Route the call to the correct runner interface.
 
         Returns ``(output, usage)``. Usage is per item because that is the

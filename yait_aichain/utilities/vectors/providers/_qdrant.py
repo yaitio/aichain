@@ -47,7 +47,7 @@ import uuid
 
 from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, record_from_payload
 
-def _point_id(rec_id: "str | int") -> "int | str":
+def _point_id(rec_id: str | int) -> int | str:
     """Map an arbitrary record ID onto a Qdrant-acceptable point ID.
 
     Qdrant accepts only unsigned integers and UUIDs, so a string id ("doc_1")

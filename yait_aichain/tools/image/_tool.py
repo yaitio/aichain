@@ -60,8 +60,8 @@ class Image(Tool):
         "required": ["input"],
     }
 
-    def __init__(self, model: str, *, api_key: "str | None" = None, output_dir: "str | None" = None,
-                 name: "str | None" = None, description: "str | None" = None) -> None:
+    def __init__(self, model: str, *, api_key: str | None = None, output_dir: str | None = None,
+                 name: str | None = None, description: str | None = None) -> None:
         from ...models import Model
         self.model = model
         self._model = Model(model, api_key=api_key)
@@ -72,7 +72,7 @@ class Image(Tool):
             f"Make an image with {self.service}'s {model} — from a prompt, or by editing the images "
             "given. Returns where the image was saved, or that it went back to the code.")
 
-    def run(self, input: str, images: "list | None" = None, options: "dict | None" = None) -> Record:  # type: ignore[override]
+    def run(self, input: str, images: list | None = None, options: dict | None = None) -> Record:  # type: ignore[override]
         from ...skills import Skill
         if not isinstance(input, str) or not input.strip():
             raise ValueError(f"{self.name} needs a prompt — what to draw or what to change")

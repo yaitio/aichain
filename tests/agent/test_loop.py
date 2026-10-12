@@ -348,7 +348,9 @@ class TestDelegate(unittest.TestCase):
         m = _model(_calls(("d", "delegate", {"task": "sub",
                                              "instructions": "deeper"})),
                    _ANSWER)
-        res = Agent(m, tools=[], team="auto", _depth=5).run("do it")
+        agent = Agent(m, tools=[], team="auto")
+        agent._depth = 5
+        res = agent.run("do it")
         self.assertTrue(res.success)
         self.assertIn("maximum delegation depth",
                       json.dumps(m.sent[-1]["messages"]))

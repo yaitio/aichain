@@ -27,12 +27,10 @@ Neither needs VectorStore + backend constructed by hand.
 from __future__ import annotations
 
 import json
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._http import request
@@ -54,7 +52,7 @@ from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
 METRICS = ("cosine", "euclidean", "dot")
 
 
-def normalise_score(raw: "float | None", metric: str) -> "float | None":
+def normalise_score(raw: float | None, metric: str) -> float | None:
     """A backend's raw number as a similarity in [0, 1], higher is better.
 
     * **cosine** — a similarity in [-1, 1]; mapped linearly onto [0, 1].
@@ -134,8 +132,8 @@ ID_KEY   = "_aichain_id"
 RESERVED = ("text", ID_KEY)
 
 
-def record_from_payload(rid: str, payload: "dict | None", raw: "float | None" = None,
-                        metric: str = "cosine") -> "VectorRecord":
+def record_from_payload(rid: str, payload: dict | None, raw: float | None = None,
+                        metric: str = "cosine") -> VectorRecord:
     """A record from a backend that keeps text and metadata in one payload.
 
     The text is under ``text``; ``document`` is read when ``text`` is absent,
@@ -254,7 +252,7 @@ class VectorBackend(ABC):
             h["Authorization"] = f"Bearer {self._api_key}"
         return h
 
-    def _call(self, method: str, path: str, body: "dict | None" = None) -> Any:
+    def _call(self, method: str, path: str, body: dict | None = None) -> Any:
         """One request to the backend — *path* under its URL, or a full URL — and
         its JSON, ``{}`` for an empty body, or a typed `APIError` naming the backend."""
         url = path if path.startswith(("http://", "https://")) else self._url + path
@@ -386,7 +384,7 @@ class VectorStore:
     # 1536-dim JSON-encoded floats stay safely under both.
     _UPSERT_BATCH_SIZE: int = 50
 
-    def upsert(self, records: list[dict], batch_size: "int | None" = None) -> int:
+    def upsert(self, records: list[dict], batch_size: int | None = None) -> int:
         """
         Insert or update records.
 

@@ -46,12 +46,10 @@ This makes the reranker a drop-in Chain step after a vector search::
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from typing import Any
 
-import urllib3
 from yait_aichain.clients._base import make_http
 
 from ...clients._constants import DEFAULT_TIMEOUT, DEFAULT_RETRIES
@@ -171,8 +169,8 @@ class RerankBase(Tool):
         model:   str,
         *,
         api_key: str | None = None,
-        name:        "str | None" = None,
-        description: "str | None" = None,
+        name:        str | None = None,
+        description: str | None = None,
         **kwargs: Any,
     ) -> None:
         if kwargs:

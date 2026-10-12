@@ -428,7 +428,7 @@ class Tool:
         return (f"Invalid call to tool '{self.name}': unknown "
                 f"argument(s) {unknown}. Accepted: {known}.")
 
-    def check_args(self, kwargs: dict) -> "str | None":
+    def check_args(self, kwargs: dict) -> str | None:
         """
         Validate keyword arguments against ``parameters`` (1.4.4 tool-call
         repair). Returns a model-readable remediation message when a required
@@ -538,7 +538,7 @@ class FunctionTool(Tool):
         The risk class; ``"write"`` by default.
     """
 
-    def __init__(self, fn, *, name: "str | None" = None, description: "str | None" = None,
+    def __init__(self, fn, *, name: str | None = None, description: str | None = None,
                  risk: str = "write") -> None:
         from ._permissions import RISK_CLASSES
         if not callable(fn):
@@ -585,7 +585,7 @@ class FunctionTool(Tool):
         return self.__wrapped__(*args, **kwargs)
 
 
-def tool(fn=None, *, name: "str | None" = None, description: "str | None" = None,
+def tool(fn=None, *, name: str | None = None, description: str | None = None,
          risk: str = "write"):
     """
     Make any function a tool — code, a chain and an agent call it alike.

@@ -42,7 +42,8 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
+from collections.abc import Callable, Iterable
 
 from .._console import install_console_handler
 from ._records import Case, Record, read, write
@@ -85,12 +86,12 @@ class Eval:
 
     def __init__(
         self,
-        cases:   "Iterable[Case]",
-        arms:    "dict[str, Callable[[Case], Any]]",
+        cases:   Iterable[Case],
+        arms:    dict[str, Callable[[Case], Any]],
         score:   Scorer,
         *,
         trials:  int = 1,
-        out:     "str | Path | None" = None,
+        out:     str | Path | None = None,
         name:    str = "eval",
         verbose: bool = True,
     ) -> None:
@@ -120,7 +121,7 @@ class Eval:
                                                  if ids.count(i) > 1})))
 
     # ── running ──────────────────────────────────────────────────────────
-    def smoke(self, n: int = 2) -> "Report":
+    def smoke(self, n: int = 2) -> Report:
         """
         Run the first ``n`` cases through every arm, once, and report.
 
@@ -144,7 +145,7 @@ class Eval:
                       "all arms answered" if not bad else "TROUBLE in " + ", ".join(bad))
         return report
 
-    def run(self, *, concurrency: int = 1) -> "Report":
+    def run(self, *, concurrency: int = 1) -> Report:
         """
         Execute every ``(arm, case, trial)`` not already on disk.
 
@@ -238,5 +239,5 @@ class Eval:
             _log.info("  %s %-18s %-28s t%d %5.1fs%s",
                       mark, rec.arm, rec.case, rec.trial, rec.seconds, note)
 
-    def _existing(self) -> "list[Record]":
+    def _existing(self) -> list[Record]:
         return read(self.out) if self.out.exists() else []

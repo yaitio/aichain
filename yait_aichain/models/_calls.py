@@ -72,7 +72,7 @@ class ToolCallRequest:
         Prose the model sent beside them, if any.
     """
 
-    calls: "tuple[ToolCall, ...]"
+    calls: tuple[ToolCall, ...]
     text:  str = ""
 
     def __bool__(self) -> bool:
@@ -109,7 +109,7 @@ def carries_media(result) -> bool:
                                 and any(_is_part(v) for v in result))
 
 
-def split_media_result(msg: dict) -> "tuple[dict, dict | None]":
+def split_media_result(msg: dict) -> tuple[dict, dict | None]:
     """
     Split a tool turn into the part a text-only provider accepts and the rest.
 

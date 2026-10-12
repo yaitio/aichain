@@ -202,7 +202,7 @@ class _OpenAICompatSTT(Transcription):
     _OVERLAP_SECONDS: int          = 3      # overlap to avoid clipping words
     _MAX_FILE_MB:     float        = 24.0   # stay under the 25 MB API limit
 
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get(self._ENV_KEY)
         if not self._api_key:
@@ -253,8 +253,8 @@ class _OpenAICompatSTT(Transcription):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _transcribe_single(self, path: str, model: str, language: "str | None",
-                           prompt: "str | None", timestamps: bool, fmt: str) -> str:
+    def _transcribe_single(self, path: str, model: str, language: str | None,
+                           prompt: str | None, timestamps: bool, fmt: str) -> str:
         """Send one file to the transcription endpoint and return the result."""
         verbose = timestamps or fmt == "json"
         with open(path, "rb") as fh:
@@ -282,8 +282,8 @@ class _OpenAICompatSTT(Transcription):
         self,
         path:       str,
         model:      str,
-        language:   "str | None",
-        prompt:     "str | None",
+        language:   str | None,
+        prompt:     str | None,
         timestamps: bool,
         fmt:        str,
     ) -> str:
@@ -440,7 +440,7 @@ class sttGoogle(Transcription):
         ".opus": "OGG_OPUS",
     }
 
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
         # accepted too. Embeddings accept both, and so does this.
@@ -521,7 +521,7 @@ class sttGoogle(Transcription):
         return self._transcribe_chunked(client, config, input, timestamps, fmt)
 
     @staticmethod
-    def _probe_duration_seconds(path: str) -> "float | None":
+    def _probe_duration_seconds(path: str) -> float | None:
         """Return the audio duration in seconds, or None if unprobeable."""
         try:
             from pydub import AudioSegment
@@ -728,7 +728,7 @@ class sttQwen(_OpenAICompatSTT):
     _OVERLAP_SECONDS = 3
     _MAX_FILE_MB     = 24.0
 
-    def __init__(self, api_key: "str | None" = None, model: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
         # Resolve the region-aware base URL before calling the parent __init__
         # (which reads self._BASE_URL for its requests).

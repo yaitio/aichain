@@ -287,7 +287,7 @@ class Skill:
         from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
 
-        self.last_usage: "Usage | None" = None
+        self.last_usage: Usage | None = None
         #: What the library had to change about the last call to fit the
         #: provider — empty when it went out as asked. A warning is easy to
         #: miss in a log; this is what a run record can keep, so a comparison
@@ -296,11 +296,11 @@ class Skill:
         # Generated replies of the most recent run(), in order (multi-turn
         # directed reasoning); ``history[-1]`` is the returned value. A single-
         # shot run leaves a one-element list. ``None`` until the first call.
-        self.history: "list | None" = None
+        self.history: list | None = None
 
         #: The whole answer from the last :meth:`stream`, assembled and
         #: parsed. None until a stream completes.
-        self.last_result: "str | dict | None" = None
+        self.last_result: str | dict | None = None
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch an observability :class:`Event` to registered hooks."""
@@ -564,7 +564,7 @@ class Skill:
         running: list = []
         history: list = []
         self.history, self.last_usage = history, None
-        final: "str | dict | None" = None
+        final: str | dict | None = None
         for k, item in enumerate(seq):
             if item[0] == "msg":
                 running.append(item[1])

@@ -46,8 +46,8 @@ class Wait(Tool):
 
     suspends = True
 
-    def __init__(self, reason: str = "", resume_with: "dict | None" = None,
-                 *, name: str = "wait", hint: "dict | None" = None) -> None:
+    def __init__(self, reason: str = "", resume_with: dict | None = None,
+                 *, name: str = "wait", hint: dict | None = None) -> None:
         self.name        = name
         self.description  = reason or "Pause the run until an external signal arrives."
         self.parameters   = _EMPTY_PARAMS
@@ -89,10 +89,10 @@ class Gate(Tool):
     suspends = True
 
     def __init__(self, tool: Tool, *, reason: str = "",
-                 resume_with: "dict | None" = None,
+                 resume_with: dict | None = None,
                  decision_key: str = "approved",
-                 name: "str | None" = None,
-                 hint: "dict | None" = None) -> None:
+                 name: str | None = None,
+                 hint: dict | None = None) -> None:
         tool_name = getattr(tool, "name", "tool")
         self._tool         = tool
         self._decision_key = decision_key

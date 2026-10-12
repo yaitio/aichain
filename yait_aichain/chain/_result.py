@@ -49,7 +49,7 @@ class ChainResult(Spend):
 
     output:    Any
     success:   bool
-    error:     "str | None" = None
+    error:     str | None = None
     history:   list = field(default_factory=list)
     variables: dict = field(default_factory=dict)
     usage:     Any = None

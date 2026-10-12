@@ -24,7 +24,8 @@ mistake feels natural.
 from __future__ import annotations
 
 import re as _re
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 Scorer = Callable[[Any, Any], Any]
 
@@ -128,7 +129,7 @@ _JUDGE_PROMPT = (
     "QUESTION:\n{question}\n\nREFERENCE:\n{expect}\n\nANSWER:\n{answer}"
 )
 
-def _ask(model, text: str, words: "tuple[str, str]"):
+def _ask(model, text: str, words: tuple[str, str]):
     """Put *text* to the judge *model* and read the first of *words* it opens
     with. Returns ``(word or None, reply, tokens, cost)`` — the grading is
     billed to the instrument, never to the arm, so a cost table cannot quietly
@@ -288,7 +289,7 @@ def all_of(*scorers: Scorer) -> Scorer:
     return _score
 
 
-def normalise(verdict: Any) -> "tuple[bool, float, dict]":
+def normalise(verdict: Any) -> tuple[bool, float, dict]:
     """
     Whatever a scorer returned, as ``(ok, score, extra)``.
 

@@ -44,7 +44,7 @@ Refuse to begin another call when there is nothing left.
 ### `Budget.charge()`
 
 ```python
-Budget.charge(amount: 'float | None')
+Budget.charge(amount: float | None)
 ```
 
 Record what a call cost. `None` is free — a provider that does
@@ -82,7 +82,7 @@ caller who wants the partial output can catch this and read
 ## `PermissionPolicy`
 
 ```python
-PermissionPolicy(rules: 'dict | None' = None, *, default: str = 'approve')
+PermissionPolicy(rules: dict | None = None, *, default: str = 'approve')
 ```
 
 Maps a tool's risk class to a runtime decision (`allow`/`approve`/
@@ -185,14 +185,14 @@ clicked no.
 ```python
 Event(
     type: str,
-    run_id: 'str | None' = None,
-    step: 'int | None' = None,
-    name: 'str | None' = None,
+    run_id: str | None = None,
+    step: int | None = None,
+    name: str | None = None,
     payload: dict = <factory>,
-    usage: 'int | None' = None,
-    cost: 'float | None' = None,
-    duration: 'float | None' = None,
-    error: 'str | None' = None,
+    usage: int | None = None,
+    cost: float | None = None,
+    duration: float | None = None,
+    error: str | None = None,
     ts: float = <factory>,
 )
 ```
@@ -245,7 +245,7 @@ only ergonomics.
 ### `Hook()`
 
 ```python
-Hook(event: 'Event')
+Hook(event: Event)
 ```
 
 Call self as a function.
@@ -263,7 +263,7 @@ A hook that records every event into `.events` for later inspection.
 ### `Tracer()`
 
 ```python
-Tracer(event: 'Event')
+Tracer(event: Event)
 ```
 
 Call self as a function.
@@ -273,7 +273,7 @@ Call self as a function.
 ## `LoggingTracer`
 
 ```python
-LoggingTracer(logger: 'logging.Logger | None' = None, level: int = 20)
+LoggingTracer(logger: logging.Logger | None = None, level: int = 20)
 ```
 
 A hook that logs every event to a `logging` logger (default INFO).
@@ -286,7 +286,7 @@ A hook that logs every event to a `logging` logger (default INFO).
 ### `LoggingTracer()`
 
 ```python
-LoggingTracer(event: 'Event')
+LoggingTracer(event: Event)
 ```
 
 Call self as a function.

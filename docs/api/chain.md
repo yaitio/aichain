@@ -79,7 +79,7 @@ Chain.run(
     on_step_error: str | None = None,
     *,
     context=None,
-) -> 'ChainResult'
+) -> ChainResult
 ```
 
 Execute all steps in order and return a `ChainResult`.
@@ -112,12 +112,12 @@ Execute all steps in order and return a `ChainResult`.
 ```python
 Chain.arm(
     reason: str = '',
-    resume_with: 'dict | None' = None,
+    resume_with: dict | None = None,
     *,
-    hint: 'dict | None' = None,
-    variables: 'dict | None' = None,
+    hint: dict | None = None,
+    variables: dict | None = None,
     context=None,
-) -> 'SuspendedResult'
+) -> SuspendedResult
 ```
 
 Create the run **without starting it**, and return it parked.
@@ -154,7 +154,7 @@ Chain.resume(
     *,
     on_step_error: str | None = None,
     context=None,
-) -> 'ChainResult | None'
+) -> ChainResult | None
 ```
 
 Resume a previously suspended run.
@@ -246,7 +246,7 @@ chain.save("chains/analyse_and_translate.yaml")
 ### `Chain.load()`
 
 ```python
-Chain.load(path: str, api_key: 'str | None' = None, *, trusted: bool = False) -> 'Chain'
+Chain.load(path: str, api_key: str | None = None, *, trusted: bool = False) -> Chain
 ```
 
 Load a chain from a YAML file previously created by `save`.
@@ -308,7 +308,7 @@ result = chain.run(variables={"topic": "AI safety",
 ChainResult(
     output: Any,
     success: bool,
-    error: 'str | None' = None,
+    error: str | None = None,
     history: list = <factory>,
     variables: dict = <factory>,
     usage: Any = None,

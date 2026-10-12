@@ -6,7 +6,7 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 ## `Shell`
 
 ```python
-Shell(folder: 'str | None' = None)
+Shell(folder: str | None = None)
 ```
 
 A folder: `browse`, `read`, `write` and `run` are its tools, each

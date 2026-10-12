@@ -43,10 +43,10 @@ rather than the system, and every comparison built on it is biased in a
 direction nothing in the output will reveal.
 """
 
-from ._records import Case, Record, adapt, read, write          # noqa: F401
-from ._report import Report, se                                 # noqa: F401
-from ._eval import Eval                                         # noqa: F401
-from ._scorers import (                                         # noqa: F401
+from ._records import Case, Record, adapt, read, write
+from ._report import Report, se
+from ._eval import Eval
+from ._scorers import (
     Scorer, abstain, all_of, contains, exact, judge, normalise, numeric,
     pairwise, regex,
 )

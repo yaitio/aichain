@@ -33,7 +33,7 @@ def assert_url_scheme(url: str) -> None:
         )
 
 
-def assert_safe_url(url: str, *, allow_private: "bool | None" = None) -> None:
+def assert_safe_url(url: str, *, allow_private: bool | None = None) -> None:
     """
     Raise ``ValueError`` unless *url* is a safe outbound target.
 

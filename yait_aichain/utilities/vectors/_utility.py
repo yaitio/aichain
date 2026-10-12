@@ -34,7 +34,7 @@ class Vectors(Utility):
     TOOLS = ("query",)
 
     def __init__(self, backend: str, collection: str, *, description: str, embedder=None,
-                 url: "str | None" = None, api_key: "str | None" = None, **settings) -> None:
+                 url: str | None = None, api_key: str | None = None, **settings) -> None:
         from . import VectorDB, VectorQueryTool
         if not isinstance(description, str) or not description.strip():
             raise ValueError("Vectors needs a description of what the database holds — an agent's "
@@ -49,7 +49,7 @@ class Vectors(Utility):
         """Create the collection, *dimension* long, if it does not exist."""
         return self.store.create(dimension, metric)
 
-    def upsert(self, records: list, batch_size: "int | None" = None) -> int:
+    def upsert(self, records: list, batch_size: int | None = None) -> int:
         """Insert or replace records — each ``{"id", "text", …}``; returns how many."""
         return self.store.upsert(records, batch_size)
 
@@ -57,7 +57,7 @@ class Vectors(Utility):
         """The records with these ids."""
         return self.store.fetch(ids)
 
-    def delete(self, ids: "list | None" = None, filter: "dict | None" = None) -> None:
+    def delete(self, ids: list | None = None, filter: dict | None = None) -> None:
         """Remove records by id or by a metadata filter."""
         return self.store.delete(ids, filter)
 

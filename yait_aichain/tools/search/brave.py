@@ -25,7 +25,6 @@ Environment variable
 from __future__ import annotations
 
 import html
-import json
 import re
 from datetime import date
 
@@ -122,6 +121,6 @@ class searchBrave(Search):
         return out
 
 
-def _plain(s: "str | None") -> str:
+def _plain(s: str | None) -> str:
     """Brave marks the query's words with <strong> and escapes entities."""
     return html.unescape(re.sub(r"<[^>]+>", "", s or ""))

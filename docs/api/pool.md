@@ -96,7 +96,7 @@ Agent.
 ### `Pool.run()`
 
 ```python
-Pool.run(variables: dict | None = None) -> 'PoolResult'
+Pool.run(variables: dict | None = None) -> PoolResult
 ```
 
 Execute the runner for every item in parallel.
@@ -164,7 +164,7 @@ PoolResult(
     success: bool,
     history: list,
     usage: Any = None,
-    beacons: 'list | None' = None,
+    beacons: list | None = None,
 )
 ```
 

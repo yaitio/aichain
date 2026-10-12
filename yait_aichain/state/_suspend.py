@@ -33,8 +33,8 @@ class Suspend(Exception):
         records the hint; it never schedules anything itself.
     """
 
-    def __init__(self, reason: str = "", resume_with: "dict | None" = None,
-                 *, hint: "dict | None" = None) -> None:
+    def __init__(self, reason: str = "", resume_with: dict | None = None,
+                 *, hint: dict | None = None) -> None:
         super().__init__(reason)
         self.reason      = reason
         self.resume_with = resume_with or {}

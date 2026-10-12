@@ -1,0 +1,3 @@
+# The sdist is the package and what describes it; the tests need the
+# repository (docs, examples, plugin) and cannot be collected from here.
+prune tests

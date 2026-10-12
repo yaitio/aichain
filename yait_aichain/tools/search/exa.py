@@ -39,7 +39,6 @@ Environment variable
 
 from __future__ import annotations
 
-import json
 
 from ...clients._http import request_json
 from ._base import Search

@@ -54,7 +54,7 @@ def system_message(instructions: str, mode: str,
     return "\n\n".join(parts)
 
 
-def result_message(result, error: "str | None" = None):
+def result_message(result, error: str | None = None):
     """
     One call's result, rendered for its ``tool`` turn. Untruncated.
 
@@ -76,7 +76,7 @@ def result_message(result, error: "str | None" = None):
     return str(result)
 
 
-def observation_text(result, error: "str | None" = None) -> str:
+def observation_text(result, error: str | None = None) -> str:
     """Always a string: what the journal records about one call's result."""
     from ..models._calls import carries_media, MEDIA_PARTS
     if not error and carries_media(result):

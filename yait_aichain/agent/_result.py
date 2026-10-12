@@ -78,13 +78,13 @@ class AgentResult:
     mode:        str
     steps_taken: int
     tokens_used: int
-    cost:        "float | None" = None
+    cost:        float | None = None
     #: What ended the run — ``"answered"``, ``"check:<name>"``, ``"step_count"``,
     #: ``"token_budget"``, ``"cost_budget"``, or an error name. Without it a run
     #: that finished and a run that ran out of budget look identical from the
     #: outside, which is exactly how a benchmark came to score four zeroes it
     #: could not tell apart.
-    stopped_by:  "str | None" = None
+    stopped_by:  str | None = None
     plan:        list[dict]     = field(default_factory=list)
     #: Everything the library changed about this run's requests to fit the
     #: provider — reasoning expressed as a thinking budget, sampling a
@@ -106,7 +106,7 @@ class AgentResult:
     #: delegated worker's report is the common case — and ``unsupported``
     #: when nothing does. Reported, not enforced: an unsupported answer is
     #: still returned, and the caller can see that it is one.
-    acceptance:  "object | None" = None
+    acceptance:  object | None = None
 
     #: Beacons raised during the run, including by delegated workers — a
     #: blocker, a question, a contract that changed under the task.

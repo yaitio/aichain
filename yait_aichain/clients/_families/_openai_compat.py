@@ -9,6 +9,11 @@ kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...models._calls import ToolCallRequest
+
 from ._shape import ratio_of, size_from_ratio
 import base64
 import json
@@ -49,7 +54,7 @@ def _drop_rejected(model, fmt: dict) -> dict:
     return {k: v for k, v in fmt.items() if k not in dropped}
 
 
-def _part_to_openai(part: dict) -> "dict | None":
+def _part_to_openai(part: dict) -> dict | None:
     """
     Convert one universal part dict to an OpenAI content item.
 
@@ -97,7 +102,7 @@ def _part_to_openai(part: dict) -> "dict | None":
     return None
 
 
-def _part_to_responses(part: dict, role: str = "user") -> "dict | None":
+def _part_to_responses(part: dict, role: str = "user") -> dict | None:
     """
     Convert one universal part to a **Responses API** content item.
 
@@ -171,8 +176,8 @@ def _build_openai_compat_request(
     output:   dict,
     path:     str,
     max_tokens_field: str = "max_completion_tokens",
-    tools:    "list | None" = None,
-) -> "tuple[str, dict]":
+    tools:    list | None = None,
+) -> tuple[str, dict]:
     """
     Build an OpenAI-compatible ``(path, body)`` pair.
 
@@ -376,7 +381,7 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
     return result
 
 
-def _tool_call_request(triples, text: str = "") -> "ToolCallRequest":
+def _tool_call_request(triples, text: str = "") -> ToolCallRequest:
     """
     Build a :class:`ToolCallRequest` from ``(name, arguments, id)`` triples.
 
@@ -470,7 +475,7 @@ def _parse_harmony(text: str):
 
 
 def _parse_openai_compat_response(response: dict, output: dict, *,
-                                  strip_fences: bool = False) -> "str | dict":
+                                  strip_fences: bool = False) -> str | dict:
     """
     Extract the clean result from an OpenAI-compatible chat completion
     response.
@@ -585,7 +590,7 @@ def _build_image_generations_request(
     messages: list,
     output:   dict,
     path:     str = "/v1/images/generations",
-) -> "tuple[str, dict]":
+) -> tuple[str, dict]:
     """
     Build an OpenAI ``/v1/images/generations`` ``(path, body)`` pair.
 
@@ -663,7 +668,7 @@ def _build_image_generations_request(
     return path, body
 
 
-def _detect_image_mime(b64_data: "str | None") -> str:
+def _detect_image_mime(b64_data: str | None) -> str:
     """
     Return the MIME type of a base64-encoded image by inspecting its magic bytes.
 
@@ -779,7 +784,7 @@ def _build_image_edits_request(
     messages: list,
     output:   dict,
     path:     str = "/v1/images/edits",
-) -> "tuple[str, dict]":
+) -> tuple[str, dict]:
     """
     Build an OpenAI ``/v1/images/edits`` **multipart** ``(path, body)`` pair.
 
@@ -837,7 +842,7 @@ def _build_xai_image_edit_request(
     messages: list,
     output:   dict,
     path:     str = "/v1/images/edits",
-) -> "tuple[str, dict]":
+) -> tuple[str, dict]:
     """
     Build an xAI ``/v1/images/edits`` **JSON** ``(path, body)`` pair.
 
@@ -910,8 +915,8 @@ def _build_responses_api_request(
     model,
     messages: list,
     output:   dict,
-    tools:    "list | None" = None,
-) -> "tuple[str, dict]":
+    tools:    list | None = None,
+) -> tuple[str, dict]:
     """
     Build an OpenAI ``/v1/responses`` ``(path, body)`` pair.
 
@@ -1013,7 +1018,7 @@ def _build_responses_api_request(
     return "/v1/responses", body
 
 
-def _parse_responses_api_response(response: dict, output: dict) -> "str | dict":
+def _parse_responses_api_response(response: dict, output: dict) -> str | dict:
     """
     Extract the result from an OpenAI Responses API response.
 

@@ -204,7 +204,7 @@ Usage(
     input_tokens: int = 0,
     output_tokens: int = 0,
     total_tokens: int = 0,
-    cost: 'float | None' = None,
+    cost: float | None = None,
     cache_write_tokens: int = 0,
     cache_read_tokens: int = 0,
     image_input_tokens: int = 0,
@@ -293,7 +293,7 @@ format instead of at the schema the caller wrote.
 ## `check_structure()`
 
 ```python
-check_structure(value: object, schema: object, path: str = '$') -> 'list[str]'
+check_structure(value: object, schema: object, path: str = '$') -> list[str]
 ```
 
 Compare *value* against *schema*, returning one message per violation.
@@ -331,7 +331,7 @@ One requested call: which tool, with which arguments.
 ## `ToolCallRequest`
 
 ```python
-ToolCallRequest(calls: 'tuple[ToolCall, ...]', text: str = '')
+ToolCallRequest(calls: tuple[ToolCall, ...], text: str = '')
 ```
 
 A model reply that asks for tool calls.

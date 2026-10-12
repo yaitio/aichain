@@ -21,9 +21,9 @@ from ...models._schema import check_structure
 _CEILING = {"length", "max_tokens", "MAX_TOKENS"}
 
 
-def parse_structured(text: str, schema: "dict | None", *,
+def parse_structured(text: str, schema: dict | None, *,
                      finish_reason: str = "",
-                     output_tokens: "int | None" = None,
+                     output_tokens: int | None = None,
                      strip_fences: bool = False) -> object:
     """
     Parse *text* as the JSON *schema* describes, or raise a typed error.

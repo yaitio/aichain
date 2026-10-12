@@ -11,23 +11,21 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 
 ```python
 Agent(
-    model,
-    tools: 'list | None' = None,
+    model: Model,
+    tools: list | None = None,
     instructions: str = '',
     mode: str = 'agile',
-    team=None,
-    planner_model=None,
-    stop_when: 'list | None' = None,
-    hooks: 'list | None' = None,
-    permissions=None,
-    approve=None,
-    store=None,
-    max_cost=None,
-    name: 'str | None' = None,
-    description: 'str | None' = None,
+    team: list[Agent] | str | None = None,
+    planner_model: Model | None = None,
+    stop_when: list | None = None,
+    hooks: list | None = None,
+    permissions: PermissionPolicy | None = None,
+    approve: Callable[[ApprovalRequest], Any] | None = None,
+    store: StateStore | None = None,
+    max_cost: float | Budget | None = None,
+    name: str | None = None,
+    description: str | None = None,
     verbose: int = 0,
-    _depth: int = 0,
-    _max_depth: int = 5,
 )
 ```
 
@@ -72,7 +70,7 @@ A loop that holds one growing conversation and acts on the world.
 ### `Agent.run()`
 
 ```python
-Agent.run(task: str, variables: 'dict | None' = None) -> AgentResult
+Agent.run(task: str, variables: dict | None = None) -> AgentResult
 ```
 
 Execute *task* and return an `AgentResult`.
@@ -89,7 +87,7 @@ down. There is one place state lives, and it is the conversation.
 ### `Agent.stream()`
 
 ```python
-Agent.stream(task: str, variables: 'dict | None' = None)
+Agent.stream(task: str, variables: dict | None = None)
 ```
 
 Run *task* and yield each `Event` as it happens.
@@ -123,11 +121,11 @@ worth knowing before reaching for it:
 ```python
 Agent.arm(
     reason: str = '',
-    resume_with: 'dict | None' = None,
+    resume_with: dict | None = None,
     *,
-    hint: 'dict | None' = None,
-    variables: 'dict | None' = None,
-) -> 'SuspendedResult'
+    hint: dict | None = None,
+    variables: dict | None = None,
+) -> SuspendedResult
 ```
 
 Create the run **without starting it**, and return it parked.
@@ -156,7 +154,7 @@ under `"task"` and every other key seeds the conversation the way
 ### `Agent.resume()`
 
 ```python
-Agent.resume(run_id: str, signal=None) -> 'AgentResult | SuspendedResult'
+Agent.resume(run_id: str, signal=None) -> AgentResult | SuspendedResult
 ```
 
 Continue a run this agent parked, delivering *signal* as the answer.
@@ -196,7 +194,7 @@ Fresh run state — the counters `stop_when` conditions read.
 ```python
 Agent.opening(
     task: str,
-    variables: 'dict | None' = None,
+    variables: dict | None = None,
     *,
     ground_rules: bool = False,
 ) -> list
@@ -221,7 +219,7 @@ states its own framing.
 ### `Agent.step()`
 
 ```python
-Agent.step(messages: list, state: 'dict | None' = None)
+Agent.step(messages: list, state: dict | None = None)
 ```
 
 Ask for the next decision and return it **without executing it**.
@@ -257,7 +255,7 @@ for reliability, not for accuracy.
 ### `Agent.execute()`
 
 ```python
-Agent.execute(call, state: 'dict | None' = None)
+Agent.execute(call, state: dict | None = None)
 ```
 
 Run one `ToolCall`. Returns `(result, error)`: a tool that
@@ -281,15 +279,15 @@ AgentResult(
     mode: str,
     steps_taken: int,
     tokens_used: int,
-    cost: 'float | None' = None,
-    stopped_by: 'str | None' = None,
+    cost: float | None = None,
+    stopped_by: str | None = None,
     plan: list[dict] = <factory>,
     adaptations: list = <factory>,
     history: list[dict] = <factory>,
     memory: dict = <factory>,
     error: str | None = None,
     journal: list[dict] = <factory>,
-    acceptance: 'object | None' = None,
+    acceptance: object | None = None,
     beacons: list = <factory>,
 )
 ```
@@ -518,7 +516,7 @@ result was accepted on facts that are no longer true.
 ### `Acceptance.supersede()`
 
 ```python
-Acceptance.supersede(reason: str) -> 'Acceptance'
+Acceptance.supersede(reason: str) -> Acceptance
 ```
 
 The caller intervened; the acceptance must be re-earned.
@@ -595,7 +593,7 @@ One signal from a child to whoever is waiting on it.
 ## `Journal`
 
 ```python
-Journal(entries: 'list[JournalEntry] | None' = None)
+Journal(entries: list[JournalEntry] | None = None)
 ```
 
 Append-only log of attempts, with the three views the loop needs.
@@ -606,14 +604,14 @@ Append-only log of attempts, with the three views the loop needs.
 Journal.append(
     intent: str = '',
     *,
-    action: 'dict | None' = None,
+    action: dict | None = None,
     outcome: str = 'done',
-    evidence: 'dict | None' = None,
+    evidence: dict | None = None,
     reason: str = '',
-    artifact: 'str | None' = None,
+    artifact: str | None = None,
     observation: str = '',
-    step: 'int | None' = None,
-    attempt: 'int | None' = None,
+    step: int | None = None,
+    attempt: int | None = None,
     tokens: int = 0,
 ) -> JournalEntry
 ```
@@ -732,12 +730,12 @@ JournalEntry(
     intent: str = '',
     action: dict = <factory>,
     outcome: str = 'done',
-    evidence: 'dict | None' = None,
+    evidence: dict | None = None,
     reason: str = '',
-    artifact: 'str | None' = None,
+    artifact: str | None = None,
     observation: str = '',
-    step: 'int | None' = None,
-    attempt: 'int | None' = None,
+    step: int | None = None,
+    attempt: int | None = None,
     tokens: int = 0,
     ts: float = <factory>,
 )

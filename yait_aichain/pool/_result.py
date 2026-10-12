@@ -53,7 +53,7 @@ class PoolResult(Spend, Sequence):
     """
 
     def __init__(self, outputs: list, *, success: bool, history: list,
-                 usage: Any = None, beacons: "list | None" = None) -> None:
+                 usage: Any = None, beacons: list | None = None) -> None:
         self._outputs = list(outputs)
         self.success = success
         self.history = list(history)
@@ -69,7 +69,7 @@ class PoolResult(Spend, Sequence):
         return [r.get("error") for r in self.history]
 
     @property
-    def error(self) -> "str | None":
+    def error(self) -> str | None:
         for r in self.history:
             if r.get("error"):
                 return f"item {r['index']}: {r['error']}"

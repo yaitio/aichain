@@ -9,14 +9,14 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 MCP(
     server,
     *,
-    filter: 'list | None' = None,
-    headers: 'dict | None' = None,
-    env: 'dict | None' = None,
-    cwd: 'str | None' = None,
-    transport: 'str | None' = None,
-    connect_timeout: 'float | None' = 60.0,
-    call_timeout: 'float | None' = None,
-    risk: 'dict | None' = None,
+    filter: list | None = None,
+    headers: dict | None = None,
+    env: dict | None = None,
+    cwd: str | None = None,
+    transport: str | None = None,
+    connect_timeout: float | None = 60.0,
+    call_timeout: float | None = None,
+    risk: dict | None = None,
 )
 ```
 

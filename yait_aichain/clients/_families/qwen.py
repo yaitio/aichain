@@ -53,7 +53,7 @@ def _is_qwen_image_edit(name: str) -> bool:
     return "image-edit" in name.lower()   # qwen-image-edit / -plus / -max
 
 
-def resolve_qwen_base_url(region: "str | None" = None) -> str:
+def resolve_qwen_base_url(region: str | None = None) -> str:
     r = (region or os.environ.get("DASHSCOPE_REGION") or _DEFAULT_REGION).lower().strip()
     if r not in REGION_URLS:
         raise ValueError(
@@ -63,7 +63,7 @@ def resolve_qwen_base_url(region: "str | None" = None) -> str:
     return REGION_URLS[r]
 
 
-def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str, dict]":
+def _build_qwen_image_request(model, messages: list, output: dict) -> tuple[str, dict]:
     """
     Build the DashScope native text2image *submit* ``(path, body)`` pair.
 
@@ -105,7 +105,7 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> "tuple[str
     return _IMAGE_SYNTHESIS_PATH, body
 
 
-def _build_qwen_image_edit_request(model, messages: list, output: dict) -> "tuple[str, dict]":
+def _build_qwen_image_edit_request(model, messages: list, output: dict) -> tuple[str, dict]:
     """
     Build the DashScope multimodal-generation (image-edit) *(path, body)* pair.
 
@@ -148,7 +148,7 @@ class QwenClient(OpenAIClient):
         super().__init__(api_key, data=data, **client_opts)
 
     # ── format ───────────────────────────────────────────────────────
-    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         """Text and vision defer to the OpenAI-compatible builder, tools included.
 
         DashScope's compatible mode speaks the chat-completions tool format —

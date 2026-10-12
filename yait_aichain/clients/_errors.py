@@ -48,7 +48,7 @@ class APIError(RuntimeError):
         self,
         status: int,
         message: str,
-        retry_after: "float | None" = None,
+        retry_after: float | None = None,
     ) -> None:
         self.status = status
         self.message = message
@@ -125,7 +125,7 @@ class TruncatedResponseError(APIError, ValueError):
     """
 
     def __init__(self, message: str, finish_reason: str = "",
-                 output_tokens: "int | None" = None) -> None:
+                 output_tokens: int | None = None) -> None:
         self.finish_reason = finish_reason
         self.output_tokens = output_tokens
         super().__init__(200, message)
@@ -157,7 +157,7 @@ class InvalidStructuredOutputError(APIError, ValueError):
         What came back.
     """
 
-    def __init__(self, message: str, problems: "list[str] | None" = None,
+    def __init__(self, message: str, problems: list[str] | None = None,
                  value: object = None) -> None:
         self.problems = list(problems or [])
         self.value = value
@@ -176,7 +176,7 @@ class TaskFailedError(APIError):
     """
 
 
-def _parse_retry_after(headers) -> "float | None":
+def _parse_retry_after(headers) -> float | None:
     """Extract a numeric ``Retry-After`` (seconds) from response headers."""
     if not headers:
         return None

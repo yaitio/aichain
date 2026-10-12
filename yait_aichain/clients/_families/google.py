@@ -90,7 +90,7 @@ def _sanitize_google_schema(schema: object) -> object:
     return result
 
 
-def _part_to_google(part: dict) -> "dict | None":
+def _part_to_google(part: dict) -> dict | None:
     """
     Convert one universal part dict to a Google AI part object.
 
@@ -205,7 +205,7 @@ class GoogleClient(BaseClient):
         sep = "&" if "?" in path else "?"
         return f"{path}{sep}alt=sse", body
 
-    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+    def parse_stream_event(self, event: dict, output: dict) -> str | None:
         for candidate in (event.get("candidates") or []):
             parts = ((candidate.get("content") or {}).get("parts")) or []
             text = "".join(p["text"] for p in parts
@@ -214,7 +214,7 @@ class GoogleClient(BaseClient):
                 return text
         return None
 
-    def stream_tool_fragments(self, event: dict) -> "list | None":
+    def stream_tool_fragments(self, event: dict) -> list | None:
         """Google does not fragment a call at all: `functionCall` arrives
         whole, with `args` already an object rather than a JSON string. The
         assembler concatenates argument *strings*, so the object is dumped
@@ -235,12 +235,12 @@ class GoogleClient(BaseClient):
                 })
         return out
 
-    def stream_usage(self, event: dict) -> "dict | None":
+    def stream_usage(self, event: dict) -> dict | None:
         usage = event.get("usageMetadata")
         return ({"usageMetadata": dict(usage)}
                 if isinstance(usage, dict) and usage else None)
 
-    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         prov = self._data["provider"]
         rmap = prov.get("reasoning_map", {})
         name = params["name"]
@@ -359,7 +359,7 @@ class GoogleClient(BaseClient):
             body["system_instruction"] = {"parts": system_parts}
         return f"/models/{name}:generateContent", body
 
-    def parse_response(self, response, output) -> "str | dict":
+    def parse_response(self, response, output) -> str | dict:
         ftype = output.get("format", {}).get("type", "text")
         cands = response.get("candidates", [])
         if not cands:

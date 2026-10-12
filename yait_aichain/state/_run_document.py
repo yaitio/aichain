@@ -43,14 +43,14 @@ class RunDocument:
     variables:  dict           = field(default_factory=dict)
     steps:      list[dict]     = field(default_factory=list)
     usage:      dict           = field(default_factory=dict)
-    definition: "dict | None"  = None
-    context:    "dict | None"  = None     # serialised RunContext (tenant, metadata)
+    definition: dict | None  = None
+    context:    dict | None  = None     # serialised RunContext (tenant, metadata)
 
     # ── construction ─────────────────────────────────────────────────
     @classmethod
     def new(cls, kind: str, step_names: list[str], *,
-            variables: "dict | None" = None,
-            definition: "dict | None" = None) -> "RunDocument":
+            variables: dict | None = None,
+            definition: dict | None = None) -> RunDocument:
         """Start a fresh document: all steps ``pending``, seeded variables."""
         steps = [{"id": i, "name": name, "status": StepStatus.PENDING}
                  for i, name in enumerate(step_names)]
@@ -75,7 +75,7 @@ class RunDocument:
             return StepStatus.DONE
         return StepStatus.RUNNING
 
-    def first_pending(self) -> "int | None":
+    def first_pending(self) -> int | None:
         """
         Index of the first non-terminal step (the resume cursor).
 
@@ -91,7 +91,7 @@ class RunDocument:
     def step(self, idx: int) -> dict:
         return self.steps[idx]
 
-    def suspended_step(self) -> "dict | None":
+    def suspended_step(self) -> dict | None:
         return next((s for s in self.steps
                      if s["status"] == StepStatus.SUSPENDED), None)
 
@@ -109,7 +109,7 @@ class RunDocument:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RunDocument":
+    def from_dict(cls, data: dict) -> RunDocument:
         return cls(
             run_id     = data["run_id"],
             kind       = data.get("kind", "chain"),

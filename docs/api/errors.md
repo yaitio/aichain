@@ -10,7 +10,7 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 ## `APIError`
 
 ```python
-APIError(status: int, message: str, retry_after: 'float | None' = None)
+APIError(status: int, message: str, retry_after: float | None = None)
 ```
 
 Base class for all provider API failures. A `RuntimeError`, so code that
@@ -83,7 +83,7 @@ not add funds, so it is never retried.
 TruncatedResponseError(
     message: str,
     finish_reason: str = '',
-    output_tokens: 'int | None' = None,
+    output_tokens: int | None = None,
 )
 ```
 
@@ -117,7 +117,7 @@ raised as one, and code catching `ValueError` must keep working.
 ```python
 InvalidStructuredOutputError(
     message: str,
-    problems: 'list[str] | None' = None,
+    problems: list[str] | None = None,
     value: object = None,
 )
 ```

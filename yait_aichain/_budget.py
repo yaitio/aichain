@@ -106,7 +106,7 @@ class Budget:
         if self.exhausted:
             raise BudgetExceeded(self._spent, self.limit, what)
 
-    def charge(self, amount: "float | None") -> None:
+    def charge(self, amount: float | None) -> None:
         """Record what a call cost. ``None`` is free — a provider that does
         not price its answers cannot be billed against a ceiling, and
         inventing a number would be worse than admitting it.
@@ -126,7 +126,7 @@ class Budget:
                 f"remaining={self.remaining:.4f})")
 
 
-def as_budget(value) -> "Budget | None":
+def as_budget(value) -> Budget | None:
     """Accept a `Budget`, a number, or None — so `max_cost=0.5` works and a
     shared object works, without two parameters that mean one thing."""
     if value is None or isinstance(value, Budget):

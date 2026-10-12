@@ -98,8 +98,8 @@ class EmbeddingQwen(_OpenAIShaped):
         self,
         model:   str,
         *,
-        api_key: "str | None" = None,
-        region:  "str | None" = None,
+        api_key: str | None = None,
+        region:  str | None = None,
         **defaults,
     ) -> None:
         self._region = region

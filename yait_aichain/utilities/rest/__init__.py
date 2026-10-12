@@ -38,8 +38,8 @@ class REST(Utility):
     own: "Restful Booker, a hotel booking API — One booking by its id."
     """
 
-    def __init__(self, base_url: str, *, description: str, auth: "dict | None" = None,
-                 headers: "dict | None" = None, timeout: "float | None" = None) -> None:
+    def __init__(self, base_url: str, *, description: str, auth: dict | None = None,
+                 headers: dict | None = None, timeout: float | None = None) -> None:
         if not isinstance(base_url, str) or not base_url.lower().startswith(("http://", "https://")):
             raise ValueError(f"REST needs an http or https base URL; got {base_url!r}")
         if not isinstance(description, str) or not description.strip():
@@ -54,8 +54,8 @@ class REST(Utility):
 
     def endpoint(self, name: str, method: str, path: str, *, description: str,
                  path_params=(), query_params=(), body_params=(), required_params=(),
-                 content_type: str = "application/json", response_field: "str | None" = None,
-                 risk: "str | None" = None) -> RestApiTool:
+                 content_type: str = "application/json", response_field: str | None = None,
+                 risk: str | None = None) -> RestApiTool:
         """
         A tool for one endpoint: *method* on the base URL plus *path* —
         ``"/booking/{id}"`` with ``path_params=["id"]``. Its fields are its

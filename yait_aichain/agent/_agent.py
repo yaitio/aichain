@@ -41,7 +41,13 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any
+
+from .._budget import Budget
+from ..models import Model
+from ..state import StateStore
+from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
 from .._console import install_console_handler
 from .. import _hints
@@ -424,23 +430,21 @@ class Agent:
     @_hints.refuse("Agent")
     def __init__(
         self,
-        model,
-        tools:        "list | None" = None,
-        instructions: str           = "",
-        mode:         str           = "agile",
-        team                        = None,
-        planner_model               = None,
-        stop_when:    "list | None" = None,
-        hooks:        "list | None" = None,
-        permissions                 = None,
-        approve                     = None,
-        store                       = None,
-        max_cost                    = None,
-        name:         "str | None"  = None,
-        description:  "str | None"  = None,
-        verbose:      int           = 0,
-        _depth:       int           = 0,
-        _max_depth:   int           = 5,
+        model:         Model,
+        tools:         list | None = None,
+        instructions:  str = "",
+        mode:          str = "agile",
+        team:          list[Agent] | str | None = None,
+        planner_model: Model | None = None,
+        stop_when:     list | None = None,
+        hooks:         list | None = None,
+        permissions:   PermissionPolicy | None = None,
+        approve:       Callable[[ApprovalRequest], Any] | None = None,
+        store:         StateStore | None = None,
+        max_cost:      float | Budget | None = None,
+        name:          str | None = None,
+        description:   str | None = None,
+        verbose:       int = 0,
     ) -> None:
         if mode not in self.MODES:
             raise ValueError(f"mode must be one of {self.MODES}; got {mode!r}")
@@ -466,13 +470,13 @@ class Agent:
         #: The result of the last :meth:`stream`, once the generator has run
         #: to the end. `run()` returns its result; a generator cannot, so it
         #: is left here rather than mixed into a stream of events.
-        self.last_result: "AgentResult | None" = None
+        self.last_result: AgentResult | None = None
 
         # `Event.run_id` has been a declared field since M3 and the agent
         # never filled it. Without it two concurrent invocations — which is
         # the ordinary case for the serverless target — write into one stream
         # that cannot be demultiplexed afterwards.
-        self._run_id: "str | None" = None
+        self._run_id: str | None = None
 
         # Whether a consumer is walking this run. Set for the duration of
         # `stream()` and never by `run()`: streaming costs the fallback chain,
@@ -505,7 +509,7 @@ class Agent:
                 "hold the wait, so the run has to outlive it.")
         #: The document id while a parked run is carried, so a second pause
         #: overwrites the first instead of leaking a second run id.
-        self._doc_id: "str | None" = None
+        self._doc_id: str | None = None
         # A ceiling in money for everything this agent spends, shared with the
         # Skills it builds and with any worker it delegates to. `cost_budget`
         # in `stop_when` stops the loop between turns; this stops a call from
@@ -516,8 +520,10 @@ class Agent:
         self.name         = name
         self.description  = description
         self.verbose      = verbose
-        self._depth       = _depth
-        self._max_depth   = _max_depth
+        # How deep in a delegation this agent sits, and how deep it may go.
+        # Not parameters: only `delegate` sets them, on the worker it makes.
+        self._depth       = 0
+        self._max_depth   = 5
 
         self._tool_map   = {t.name: t for t in self.tools}
         self._worker_map = ({(getattr(w, "name", None) or f"worker{i}"): w
@@ -531,7 +537,7 @@ class Agent:
     def __getattr__(self, name):
         raise _hints.missing(self, name)
 
-    def run(self, task: str, variables: "dict | None" = None) -> AgentResult:
+    def run(self, task: str, variables: dict | None = None) -> AgentResult:
         """
         Execute *task* and return an :class:`AgentResult`.
 
@@ -552,7 +558,7 @@ class Agent:
             result = self._loop(messages, state, journal)
         return self._finished(result, journal, board)
 
-    def stream(self, task: str, variables: "dict | None" = None):
+    def stream(self, task: str, variables: dict | None = None):
         """
         Run *task* and yield each :class:`~.._events.Event` as it happens.
 
@@ -609,9 +615,9 @@ class Agent:
             except ValueError:                       # already gone; fine
                 pass
 
-    def arm(self, reason: str = "", resume_with: "dict | None" = None, *,
-            hint: "dict | None" = None,
-            variables: "dict | None" = None) -> "SuspendedResult":
+    def arm(self, reason: str = "", resume_with: dict | None = None, *,
+            hint: dict | None = None,
+            variables: dict | None = None) -> SuspendedResult:
         """
         Create the run **without starting it**, and return it parked.
 
@@ -658,7 +664,7 @@ class Agent:
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
 
-    def resume(self, run_id: str, signal=None) -> "AgentResult | SuspendedResult":
+    def resume(self, run_id: str, signal=None) -> AgentResult | SuspendedResult:
         """
         Continue a run this agent parked, delivering *signal* as the answer.
 
@@ -766,7 +772,7 @@ class Agent:
         return {"steps": 0, "tokens": 0, "cost": None, "plan": None,
                 "adaptations": []}
 
-    def opening(self, task: str, variables: "dict | None" = None,
+    def opening(self, task: str, variables: dict | None = None,
                 *, ground_rules: bool = False) -> list:
         """
         The two messages a run starts from: the stable prefix and the task.
@@ -800,7 +806,7 @@ class Agent:
             {"role": "user", "parts": [opening]},
         ]
 
-    def step(self, messages: list, state: "dict | None" = None):
+    def step(self, messages: list, state: dict | None = None):
         """
         Ask for the next decision and return it **without executing it**.
 
@@ -844,7 +850,7 @@ class Agent:
                 "for you; an external driver owns it.")
         return self._ask(messages, state if state is not None else self.new_state())
 
-    def execute(self, call, state: "dict | None" = None):
+    def execute(self, call, state: dict | None = None):
         """Run one :class:`ToolCall`. Returns ``(result, error)``: a tool that
         fails is an error, not an exception. The one exception that passes is
         ``Suspend`` — a ``wait()`` or ``gate()`` asking the run to park, which
@@ -861,7 +867,7 @@ class Agent:
 
     # ── The loop ─────────────────────────────────────────────────────────
 
-    def _begin(self, task: str, variables: "dict | None"):
+    def _begin(self, task: str, variables: dict | None):
         """A run's first moments, for `run()` and `stream()` alike: a fresh
         journal, the opening messages, working state, a new run id — and no
         document of an earlier run, which a finishing run would otherwise
@@ -888,7 +894,7 @@ class Agent:
             return done.value
 
     def _loop_events(self, messages: list, state: dict, journal: Journal,
-                     sink: "list | None" = None):
+                     sink: list | None = None):
         """The loop itself, yielding what it has emitted as it goes.
 
         Events are not produced twice. They go out through ``_emit`` exactly
@@ -1108,7 +1114,7 @@ class Agent:
 
     # ── Executing one call ───────────────────────────────────────────────
 
-    def _execute(self, call, state: dict) -> "tuple[Any, str | None]":
+    def _execute(self, call, state: dict) -> tuple[Any, str | None]:
         """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
         try:
             if call.name == "pool":
@@ -1127,7 +1133,7 @@ class Agent:
         except Exception as exc:
             return None, f"{type(exc).__name__}: {exc}"
 
-    def _do_tool(self, call, state: "dict | None" = None) -> Any:
+    def _do_tool(self, call, state: dict | None = None) -> Any:
         tool = self._tool_map.get(call.name)
         if tool is None:
             raise ValueError(f"no tool named {call.name!r}. "
@@ -1140,7 +1146,7 @@ class Agent:
         self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
 
-    def _ask_permission(self, call, state: "dict | None" = None):
+    def _ask_permission(self, call, state: dict | None = None):
         """Consult the policy before a tool runs. Returns a denial, or None.
 
         **At the loop boundary, not inside the call**, and split from the
@@ -1178,7 +1184,7 @@ class Agent:
                             "agent": self.name or ""})
         return _AWAITING
 
-    def _resolve_permission(self, state: "dict | None" = None):
+    def _resolve_permission(self, state: dict | None = None):
         """Ask, then say what the answer was. Returns a denial, or None."""
         request = self._pending
         self._pending = None
@@ -1298,8 +1304,8 @@ class Agent:
                 permissions=self.permissions, approve=self.approve,
                 max_cost=self.max_cost,
                 verbose=self.verbose,
-                _depth=self._depth + 1, _max_depth=self._max_depth,
             )
+            worker._depth, worker._max_depth = self._depth + 1, self._max_depth
 
         self._log(1, f"  ▽  delegate → {getattr(worker, 'name', None) or 'worker'}")
         child = worker.run(task)
@@ -1537,7 +1543,7 @@ class _MappedSkill(Tool):
     parameters  = {"type": "object", "properties": {"item": {}}}
     risk        = "read"
 
-    def __init__(self, agent: "Agent", prompt: str) -> None:
+    def __init__(self, agent: Agent, prompt: str) -> None:
         self._agent  = agent
         self._prompt = prompt
 

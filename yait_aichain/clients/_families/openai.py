@@ -158,7 +158,7 @@ class OpenAIClient(BaseClient):
         body["stream_options"] = {"include_usage": True}
         return path, body
 
-    def parse_stream_event(self, event: dict, output: dict) -> "str | None":
+    def parse_stream_event(self, event: dict, output: dict) -> str | None:
         choices = event.get("choices") or []
         if not choices:
             return None
@@ -169,7 +169,7 @@ class OpenAIClient(BaseClient):
         text = content_text(delta.get("content"))
         return text or None
 
-    def stream_tool_fragments(self, event: dict) -> "list | None":
+    def stream_tool_fragments(self, event: dict) -> list | None:
         choices = event.get("choices") or []
         if not choices:
             return []
@@ -190,11 +190,11 @@ class OpenAIClient(BaseClient):
             })
         return out
 
-    def stream_usage(self, event: dict) -> "dict | None":
+    def stream_usage(self, event: dict) -> dict | None:
         usage = event.get("usage")
         return {"usage": usage} if isinstance(usage, dict) and usage else None
 
-    def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
+    def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         m   = self._wrap(params)
         p   = self._provider
 
@@ -404,7 +404,7 @@ class OpenAIClient(BaseClient):
         return path, body
 
     # ── format: provider response → our result ───────────────────────
-    def parse_response(self, response, output) -> "str | dict":
+    def parse_response(self, response, output) -> str | dict:
         p = self._provider
         if "data" in response:
             return _parse_image_generations_response(response)

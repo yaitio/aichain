@@ -169,15 +169,15 @@ class Search(Tool):
     #: Standard options this provider cannot honour → why.
     declines: dict = {}
     #: The provider's key variable; a tuple here so the base names none.
-    _ENV_KEY: "str | tuple" = ()
+    _ENV_KEY: str | tuple = ()
     _PROVIDER: str = ""
     #: USD a call at the published rate, for a provider whose answer reports no cost.
     _LIST_PRICE: float = 0.0
     #: Where that rate was read, and when.
     _PRICE_SOURCE: str = ""
 
-    def __init__(self, api_key: "str | None" = None, *, name: "str | None" = None,
-                 description: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, *, name: str | None = None,
+                 description: str | None = None) -> None:
         key = api_key or (os.environ.get(self._ENV_KEY) if isinstance(self._ENV_KEY, str) else None)
         if not key:
             raise ValueError(f"No {self._PROVIDER} API key found. Pass api_key= or set the "
@@ -224,7 +224,7 @@ class Search(Tool):
 
     # ------------------------------------------------------------------
 
-    def run(self, input: str, options: "dict | None" = None) -> Record:  # type: ignore[override]
+    def run(self, input: str, options: dict | None = None) -> Record:  # type: ignore[override]
         """
         Search for *input*. The result is a :class:`Record`: the fields below
         for code, and the numbered list of :meth:`render` for a model or a
@@ -286,7 +286,7 @@ class Search(Tool):
                 "snippets": [s for s in snippets if isinstance(s, str) and s.strip()],
                 "text": text or ""}
 
-    def _window(self, opts: dict, now: "datetime | None" = None) -> tuple:
+    def _window(self, opts: dict, now: datetime | None = None) -> tuple:
         """The (start, end) days the options ask for; the later start wins."""
         start = _check_day("start_date", opts["start_date"]) if opts.get("start_date") else ""
         end = _check_day("end_date", opts["end_date"]) if opts.get("end_date") else ""

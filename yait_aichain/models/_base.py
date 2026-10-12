@@ -486,7 +486,7 @@ class Model:
         #: Token counts from the last :meth:`stream`, when the provider sent
         #: them. None rather than a guess: counting the text we happened to
         #: see would be a number with no provider behind it.
-        self.last_stream_usage: "dict | None" = None
+        self.last_stream_usage: dict | None = None
 
         #: The last :meth:`stream`'s answer as an object, when the provider
         #: could not stream and it came back whole. None on a real stream,

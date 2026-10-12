@@ -25,7 +25,7 @@ class StateStore:
     def save(self, run_id: str, document: dict) -> None:
         raise NotImplementedError
 
-    def load(self, run_id: str) -> "dict | None":
+    def load(self, run_id: str) -> dict | None:
         """Return the stored document, or ``None`` if there is none."""
         raise NotImplementedError
 
@@ -46,7 +46,7 @@ class InMemoryStore(StateStore):
     def save(self, run_id: str, document: dict) -> None:
         self._runs[run_id] = copy.deepcopy(document)
 
-    def load(self, run_id: str) -> "dict | None":
+    def load(self, run_id: str) -> dict | None:
         doc = self._runs.get(run_id)
         return copy.deepcopy(doc) if doc is not None else None
 
@@ -102,7 +102,7 @@ class FileStore(StateStore):
                 pass
             raise
 
-    def load(self, run_id: str) -> "dict | None":
+    def load(self, run_id: str) -> dict | None:
         try:
             with open(self._path(run_id), encoding="utf-8") as fh:
                 return json.load(fh)

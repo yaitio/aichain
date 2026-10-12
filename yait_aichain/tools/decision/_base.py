@@ -69,7 +69,7 @@ MAX_CHOICES = 255
 SCORE_LEVELS = (2, 10)
 
 
-def _level(level) -> tuple[str, "str | None"]:
+def _level(level) -> tuple[str, str | None]:
     """A level as (label, description)."""
     if isinstance(level, str):
         return level, None
@@ -201,7 +201,7 @@ class Decision(Tool):
     }
 
     #: The provider's key variable; a tuple here so the base names none.
-    _ENV_KEY: "str | tuple" = ()
+    _ENV_KEY: str | tuple = ()
     _PROVIDER: str = ""
     _RETRIES = DEFAULT_RETRIES
     _DEFAULT_MODEL: str = ""
@@ -211,9 +211,9 @@ class Decision(Tool):
     #: Whether the provider takes images beside the text.
     images: bool = False
 
-    def __init__(self, questions: dict, *, name: "str | None" = None,
-                 description: "str | None" = None, model: "str | None" = None,
-                 api_key: "str | None" = None) -> None:
+    def __init__(self, questions: dict, *, name: str | None = None,
+                 description: str | None = None, model: str | None = None,
+                 api_key: str | None = None) -> None:
         check_questions(questions, type(self).__name__)
         key = api_key or os.environ.get(self._ENV_KEY)
         if not key:

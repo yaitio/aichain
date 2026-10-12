@@ -13,8 +13,8 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 tool(
     fn=None,
     *,
-    name: 'str | None' = None,
-    description: 'str | None' = None,
+    name: str | None = None,
+    description: str | None = None,
     risk: str = 'write',
 )
 ```
@@ -241,7 +241,7 @@ left alone.
 ### `Tool.check_args()`
 
 ```python
-Tool.check_args(kwargs: dict) -> 'str | None'
+Tool.check_args(kwargs: dict) -> str | None
 ```
 
 Validate keyword arguments against `parameters` (1.4.4 tool-call
@@ -265,8 +265,8 @@ can correct the call within the step's attempt budget.
 FunctionTool(
     fn,
     *,
-    name: 'str | None' = None,
-    description: 'str | None' = None,
+    name: str | None = None,
+    description: str | None = None,
     risk: str = 'write',
 )
 ```

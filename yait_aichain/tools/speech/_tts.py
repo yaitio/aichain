@@ -215,7 +215,7 @@ class _OpenAISpeech(Speech):
     _ENV_KEY:  str = ""
     _LABEL:    str = ""
 
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get(self._ENV_KEY)
         if not self._api_key:
@@ -356,7 +356,7 @@ class ttsGoogle(Speech):
         "flac": ("FLAC",     "flac"),
     }
 
-    def __init__(self, api_key: str | None = None, model: "str | None" = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
         # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
         # the older spelling. Embeddings accept both, and so does this.
@@ -544,9 +544,9 @@ class ttsQwen(Speech):
 
     def __init__(
         self,
-        api_key: "str | None" = None,
-        region:  "str | None" = None,
-        model:   "str | None" = None,
+        api_key: str | None = None,
+        region:  str | None = None,
+        model:   str | None = None,
     ) -> None:
         self.model = _model_setting(self, model)
         self._api_key = api_key or os.environ.get("DASHSCOPE_API_KEY")

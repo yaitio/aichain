@@ -144,7 +144,7 @@ class PermissionPolicy:
     'approve'
     """
 
-    def __init__(self, rules: "dict | None" = None, *, default: str = APPROVE) -> None:
+    def __init__(self, rules: dict | None = None, *, default: str = APPROVE) -> None:
         merged = {**_DEFAULT_RULES, **(rules or {})}
         bad = {d for d in merged.values() if d not in DECISIONS} | (
             {default} if default not in DECISIONS else set()

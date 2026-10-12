@@ -70,9 +70,9 @@ class fetchLocal(Fetch):
     _LIST_PRICE   = 0.0
     _PRICE_SOURCE = "runs locally"
 
-    def __init__(self, timeout=DEFAULT_TIMEOUT, headers: "dict | None" = None,
+    def __init__(self, timeout=DEFAULT_TIMEOUT, headers: dict | None = None,
                  respect_robots: bool = True, robots_agents=ROBOTS_AGENTS, *,
-                 name: "str | None" = None, description: "str | None" = None) -> None:
+                 name: str | None = None, description: str | None = None) -> None:
         MarkItDown = require("markitdown", package="markitdown", who="fetchLocal", extra="fetch").MarkItDown
         if isinstance(timeout, list):            # as YAML gives it back after Chain.save
             timeout = tuple(timeout)
