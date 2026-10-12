@@ -45,7 +45,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from .._budget import Budget
+from .._budget import Budget, as_budget, start_run
 from ..models import Model
 from ..skills import Skill
 from ..utilities._base import Utility
@@ -63,7 +63,7 @@ from .._events import Event, emit
 from ..models._calls import (ToolCallRequest, dangling_calls,
                              tool_result_turn)
 from ..pool    import Pool
-from ..state   import Suspend, SuspendedResult
+from ..state   import RunContext, Suspend, SuspendedResult, current, using
 
 _logger = logging.getLogger("yait_aichain.agent")
 
@@ -522,8 +522,8 @@ class Agent:
         # in `stop_when` stops the loop between turns; this stops a call from
         # beginning, and the two compose — one is a decision, the other a
         # limit.
-        from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
+        self._own_budget = self.max_cost        # see _budget.start_run
         self.name         = name
         self.description  = description
         self.verbose      = verbose
@@ -708,7 +708,15 @@ class Agent:
                 f"no suspended run {run_id!r} in the store — it has already "
                 "been resumed to completion, or it was never parked here.")
 
-        doc      = RunDocument.from_dict(raw)
+        doc = RunDocument.from_dict(raw)
+        # The tenant the run was parked under, restored: the signal may arrive
+        # in another process, and a key resolved from the context there must
+        # be the parked run's tenant's, not whoever happens to be current.
+        context = RunContext.from_dict(doc.context) if doc.context else None
+        with using(context):
+            return self._resume_doc(doc, run_id, signal)
+
+    def _resume_doc(self, doc, run_id: str, signal):
         parked   = doc.steps[0].get("suspend") or {}
 
         if parked.get("at") == "start":
@@ -728,6 +736,7 @@ class Agent:
         journal  = Journal.from_list(doc.variables.get("journal"))
         state    = self.new_state()
         state.update(doc.variables.get("state") or {})
+        start_run(self, spent=state.get("cost") or 0.0)  # the parked part was spent already
 
         self._run_id = doc.variables.get("run_id") or uuid.uuid4().hex
         self._doc_id = run_id
@@ -888,6 +897,7 @@ class Agent:
         delete or overwrite."""
         self._run_id = uuid.uuid4().hex
         self._doc_id = None
+        start_run(self)
         return Journal(), self.opening(task, variables, ground_rules=True), self.new_state()
 
     def _loop(self, messages: list, state: dict, journal: Journal) -> AgentResult:
@@ -1444,6 +1454,8 @@ class Agent:
         doc = RunDocument.new("agent", [self.name or "agent"], variables=variables)
         if run_id is not None:
             doc.run_id = run_id
+        if (context := current()) is not None:
+            doc.context = context.to_dict()
         doc.steps[0]["status"]  = StepStatus.SUSPENDED
         doc.steps[0]["suspend"] = suspend
         self.store.save(doc.run_id, doc.to_dict())

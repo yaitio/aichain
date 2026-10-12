@@ -49,6 +49,12 @@ search and embeddings are billed by their services, outside these numbers.
 model call once that much is spent. It bounds beginning, not exceeding: the
 call in flight when the line is crossed finishes and is counted.
 
+A number is a ceiling **per run**: each `run()` starts a fresh one, so an
+agent built once — at module level, in a warm Lambda — gives every request the
+whole amount, and a run picked up with `resume()` starts from what it had
+already spent before the pause. A `Budget` object, below, is the one that
+spends down across runs.
+
 | | Over budget |
 |---|---|
 | `Skill` | raises `BudgetExceeded` — what was spent and the limit |

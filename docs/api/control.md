@@ -10,7 +10,7 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 ## `Budget`
 
 ```python
-Budget(limit: float)
+Budget(limit: float, *, spent: float = 0.0)
 ```
 
 A ceiling in dollars, and what has been spent against it.
@@ -25,9 +25,16 @@ budget.spent        # what it cost
 budget.remaining    # what is left
 ```
 
+A `Budget` passed to a primitive is shared, and spends down across every
+run that holds it. A number — `max_cost=0.5` — is a ceiling **per run**:
+each `run()` starts a fresh one, so an agent built once at module level
+in a warm Lambda does not refuse every request after the first expensive
+ones, and a resumed run starts from what the parked one had spent.
+
 **Parameters**
 
 - `limit` (*float*) — The ceiling, in dollars; must be positive.
+- `spent` (*float, optional*, default `0.0`) — What has already been spent against it.
 
 ### `Budget.check()`
 

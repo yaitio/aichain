@@ -20,6 +20,7 @@ the :meth:`Skill.load` class method.
 """
 
 
+from .._budget import as_budget, start_run
 from .._require import require
 import json
 import os
@@ -284,8 +285,8 @@ class Skill:
         # chain hands the same object to every step: separate copies would let
         # each level spend the full amount, which is the failure this exists
         # to prevent.
-        from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
+        self._own_budget = self.max_cost        # see _budget.start_run
 
         self.last_usage: Usage | None = None
         #: What the library had to change about the last call to fit the
@@ -379,6 +380,7 @@ class Skill:
         _retry_delay = self.retry_delay if retry_delay is None else retry_delay
 
         # Merge variables: instance defaults ← call-time overrides
+        start_run(self)
         merged = {**self.variables, **(variables or {})}
 
         # Substitute {placeholders} in a deep copy of the messages list, then
@@ -451,6 +453,7 @@ class Skill:
         variables : dict | None, optional
             Variables for this call, merged over the Skill's own.
         """
+        start_run(self)
         merged = {**self.variables, **(variables or {})}
         messages = adapters.substitute(self._input["messages"], merged)
         messages = adapters.resolve_media(messages)

@@ -82,10 +82,34 @@ class TestItBoundsBeginningNotExceeding(unittest.TestCase):
         self.assertEqual(skill.run(), "ANSWER")
 
     def test_the_next_one_does_not(self):
-        skill = _skill(max_cost=0.000_001)
+        """A shared `Budget` spends down across runs; once gone, it is gone."""
+        skill = _skill(max_cost=Budget(0.000_001))
         skill.run()
         with self.assertRaises(BudgetExceeded):
             skill.run()
+
+    def test_a_number_is_a_ceiling_per_run(self):
+        """A skill, chain or agent built once — at module level in a warm
+        Lambda — must not refuse every request after the first expensive ones.
+        A number is each run's ceiling; a `Budget` object is the shared one."""
+        skill = _skill(max_cost=0.000_001)
+        for _ in range(3):
+            skill.run()                            # each run starts a fresh ceiling
+        self.assertLessEqual(skill.max_cost.spent, skill.last_usage.cost)
+
+    def test_a_resumed_run_starts_from_what_it_spent(self):
+        from yait_aichain._budget import as_budget, start_run
+
+        class Owner:
+            pass
+        owner = Owner()
+        owner.max_cost = owner._own_budget = as_budget(0.5)
+        start_run(owner, spent=0.4)
+        self.assertAlmostEqual(owner.max_cost.remaining, 0.1)
+        lent = Budget(1.0)
+        owner.max_cost = lent                      # a Chain lending its own
+        start_run(owner)
+        self.assertIs(owner.max_cost, lent)
 
     def test_a_generous_ceiling_never_fires(self):
         skill = _skill(max_cost=100.0)
@@ -94,7 +118,7 @@ class TestItBoundsBeginningNotExceeding(unittest.TestCase):
         self.assertLess(skill.max_cost.spent, 100.0)
 
     def test_the_error_says_what_to_do(self):
-        skill = _skill(max_cost=0.000_001)
+        skill = _skill(max_cost=Budget(0.000_001))
         skill.run()
         with self.assertRaises(BudgetExceeded) as caught:
             skill.run()

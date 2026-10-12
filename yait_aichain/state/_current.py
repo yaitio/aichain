@@ -48,9 +48,14 @@ def using(context):
 
     Parameters
     ----------
-    context : RunContext
-        The context every call inside the block sees.
+    context : RunContext | None
+        The context every call inside the block sees. ``None`` changes
+        nothing: the context already in force stays, so a primitive given no
+        context of its own never takes away its caller's tenant.
     """
+    if context is None:
+        yield current()
+        return
     token = _CURRENT.set(context)
     try:
         yield context

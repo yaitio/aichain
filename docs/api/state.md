@@ -62,7 +62,9 @@ with using(RunContext(tenant="acme")):
 
 **Parameters**
 
-- `context` (*RunContext*) — The context every call inside the block sees.
+- `context` (*RunContext | None*) — The context every call inside the block sees. `None` changes
+  nothing: the context already in force stays, so a primitive given no
+  context of its own never takes away its caller's tenant.
 
 ---
 

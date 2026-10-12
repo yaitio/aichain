@@ -73,18 +73,29 @@ class Budget:
         budget.spent        # what it cost
         budget.remaining    # what is left
 
+    A `Budget` passed to a primitive is shared, and spends down across every
+    run that holds it. A number — ``max_cost=0.5`` — is a ceiling **per run**:
+    each ``run()`` starts a fresh one, so an agent built once at module level
+    in a warm Lambda does not refuse every request after the first expensive
+    ones, and a resumed run starts from what the parked one had spent.
+
     Parameters
     ----------
     limit : float
         The ceiling, in dollars; must be positive.
+    spent : float, optional
+        What has already been spent against it.
     """
 
-    def __init__(self, limit: float) -> None:
+    def __init__(self, limit: float, *, spent: float = 0.0) -> None:
         if limit <= 0:
             raise ValueError(f"a budget must be positive; got {limit!r}")
         self.limit = float(limit)
-        self._spent = 0.0
+        self._spent = float(spent)
         self._lock = threading.Lock()
+        # True when the library made this budget from a number; such a budget
+        # belongs to one run of its owner, and the next run replaces it.
+        self._per_run = False
 
     @property
     def spent(self) -> float:
@@ -134,4 +145,21 @@ def as_budget(value) -> Budget | None:
     shared object works, without two parameters that mean one thing."""
     if value is None or isinstance(value, Budget):
         return value
-    return Budget(float(value))
+    budget = Budget(float(value))
+    budget._per_run = True
+    return budget
+
+
+def start_run(owner, spent: float = 0.0) -> None:
+    """Give *owner* a fresh budget for this run, when its ceiling is a number.
+
+    Only the budget *owner* made itself from a number is replaced. One it was
+    handed — a shared `Budget`, or the one a Chain or Pool lends its steps for
+    the duration of a run — is left alone, so a lent ceiling stays shared.
+    *spent* seeds the new one: a resumed run has already spent that much.
+    """
+    current = getattr(owner, "max_cost", None)
+    if current is not None and current._per_run and current is getattr(owner, "_own_budget", None):
+        fresh = Budget(current.limit, spent=spent)
+        fresh._per_run = True
+        owner.max_cost = owner._own_budget = fresh

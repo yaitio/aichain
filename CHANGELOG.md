@@ -91,6 +91,15 @@ where a fix is named below.
   array of strings in the schema, so a model asking for three pages makes one
   call rather than three; `run()` still takes a single string.
 
+- **A number for `max_cost` is a ceiling per run.** It was made into one
+  `Budget` when the object was built and spent down for its whole life, so an
+  agent or chain built once — at module level in a warm Lambda — refused every
+  request after the first expensive ones, and a parked run resumed in a new
+  process got the whole amount again. Each `run()` now starts a fresh one,
+  and `resume()` starts it from what the run had spent. A `Budget` object is
+  unchanged: shared, and spent down across every run that holds it.
+  `Budget(limit, spent=…)` takes what is already spent.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -106,6 +115,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **The tenant in force stays in force.** `Chain.run()` with no `context=`
+  set the ambient context to None for the run, so `with using(ctx):
+  chain.run()`, a chain inside a chain step and a chain in a `Pool` all lost
+  their tenant, and `Model(api_key=callable)` asked for the key of tenant
+  None. `using(None)` now leaves the context alone, a chain takes the current
+  one when given none, and an agent keeps it in a parked run's document and
+  restores it on `resume()`, in whatever process the signal arrives.
 - **Security: the agent's `pool` tool went around the permission policy.**
   The gate looked a call up by its own name, `pool` is in no tool map, and
   the fan-out then ran the named tool directly — so

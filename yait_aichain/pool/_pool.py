@@ -64,6 +64,7 @@ FAILED  = 3
 # means "start no more items", which is what a fan-out can offer where a
 # sequence stops running steps. The difference between the two is the
 # difference between a sequence and a fan-out, not between two vocabularies.
+from .._budget import as_budget, start_run
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 from .. import _hints
 from ..state import Suspend
@@ -225,8 +226,8 @@ class Pool:
         # its keep: items run concurrently, so a per-item copy of a number
         # would let every worker spend the full amount. `Budget` takes a lock
         # for exactly this.
-        from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
+        self._own_budget = self.max_cost        # see _budget.start_run
         self._items     = list(items)
         self._max_flows = max_flows
         self._on_error  = on_error
@@ -260,6 +261,7 @@ class Pool:
         Exception
             The first task exception when ``on_error="raise"``.
         """
+        start_run(self)
         shared = variables or {}
 
         # Pre-flight, in this thread: a runner that cannot be handed what the

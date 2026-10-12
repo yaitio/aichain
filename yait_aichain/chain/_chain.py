@@ -102,6 +102,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..state import SuspendedResult
 
+from .._budget import as_budget, start_run
 from .._require import require
 
 import importlib
@@ -383,8 +384,8 @@ class Chain:
         # of a run — see `_lend_budget`. Shared rather than divided: a step
         # cannot be given "its share" when nobody knows in advance which step
         # will be the expensive one.
-        from .._budget import as_budget
         self.max_cost = as_budget(max_cost)
+        self._own_budget = self.max_cost        # see _budget.start_run
 
         self.last_usage: Usage | None = None
         # Per-request RunContext for the current run() / resume() (tenant +
@@ -447,11 +448,16 @@ class Chain:
             )
 
         from ..state import RunDocument
+        start_run(self)
         accumulated = {**self.variables, **(variables or {})}
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
         doc = RunDocument.new("chain", step_names, variables=accumulated)
-        from ..state import using
+        from ..state import current, using
+        # No context given is the one already in force — `with using(ctx):
+        # chain.run()`, a chain inside a chain step, a chain in a Pool — and
+        # the run document keeps it, so a resume in another process has it.
+        context = context if context is not None else current()
         with using(context), self._lend_budget():
             return self._run_from(doc, accumulated, start_idx=0, signal=None,
                                   usage_in=None, on_error=_on_error,
@@ -563,6 +569,9 @@ class Chain:
         # Restore the run's context unless the caller supplied a new one.
         if context is None and doc.context is not None:
             context = RunContext.from_dict(doc.context)
+        if context is None:
+            from ..state import current
+            context = current()
         start = doc.first_pending()
         if start is None or doc.suspended_step() is None:
             return None   # not actually suspended → idempotent no-op
@@ -586,6 +595,7 @@ class Chain:
             total_tokens  = u.get("total_tokens", 0),
             cost          = u.get("cost"),
         ) if u else None
+        start_run(self, spent=u.get("cost") or 0.0)     # the parked part was spent already
         from ..state import using
         with using(context), self._lend_budget():
             return self._run_from(doc, accumulated, start_idx=start,

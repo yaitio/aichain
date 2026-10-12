@@ -505,7 +505,9 @@ Google cache on their own; the saving shows in `usage.cache_read_tokens`.
 ## Money and observability
 
 `max_cost=0.50` on Skill, Chain, Pool or Agent refuses to *begin* a call once
-that much is spent; one `Budget(0.50)` passed to several primitives is shared.
+that much is spent in this run — each run starts the number afresh; one
+`Budget(0.50)` passed to several primitives is shared and spends down across
+runs.
 A Skill over budget raises `BudgetExceeded`; an Agent ends the run with
 `success=False`, `stopped_by="llm_error"` and the reason in `.error`.
 
