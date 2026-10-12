@@ -260,7 +260,10 @@ for reliability, not for accuracy.
 Agent.execute(call, state: 'dict | None' = None)
 ```
 
-Run one `ToolCall`. Returns `(result, error)` — never raises.
+Run one `ToolCall`. Returns `(result, error)`: a tool that
+fails is an error, not an exception. The one exception that passes is
+`Suspend` — a `wait()` or `gate()` asking the run to park, which
+the driver handles as a pause, not a failure.
 
 **Parameters**
 

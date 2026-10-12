@@ -14,12 +14,6 @@ Factory usage (recommended)
     model = Model("gemini-2.0-flash", api_key="AIza...")
     model = Model("grok-3", client_options={"proxy": {"url": "http://proxy:3128"}})
 
-Direct subclass usage (also valid)
------------------------------------
-::
-
-    model = OpenAIModel("gpt-4o", options={"max_tokens": 4096})
-
 Provider detection is based on well-known model-name prefixes:
 
   ============  ============================================
@@ -259,38 +253,14 @@ class Model:
         ``reasoning``     str|None  Universal reasoning depth (see below).
         ================  ========  =======================================
 
-        **reasoning** accepts ``None``, ``"low"``, ``"medium"``, or
-        ``"high"``.  Each provider's family client translates the universal
-        level to its own native format via the provider's ``reasoning_map``
-        data:
-
-        * **Anthropic**  — maps to ``{"type": "enabled", "budget_tokens": N}``
-          (``low`` → 4 000, ``medium`` → 10 000, ``high`` → 20 000 tokens).
-          Temperature is automatically forced to 1.0 when reasoning is active.
-
-        * **Google AI**  — maps to ``{"thinkingBudget": N}`` inside
-          ``generationConfig.thinkingConfig``
-          (``low`` → 2 048, ``medium`` → 8 192, ``high`` → 24 576 tokens).
-
-        * **OpenAI**     — maps to ``reasoning_effort`` on o-series models
-          (``"low"`` / ``"medium"`` / ``"high"``).  GPT models ignore it.
-
-        * **xAI**        — maps to ``reasoning_effort`` for grok-3-mini /
-          grok-3-mini-fast (``low`` → ``"low"``, ``medium`` / ``high`` →
-          ``"high"``).  Other grok models ignore it.
-
-        * **Perplexity** — no reasoning parameter; value is silently ignored.
-
-        * **Kimi**       — maps to ``thinking: {"type": "enabled"}`` when any
-          level is set.  Kimi has no token-budget granularity; all three levels
-          activate thinking mode.  Temperature is automatically forced to 1.0
-          when thinking is active (API constraint).
-
-        * **DeepSeek**   — maps to a model-name switch rather than an API
-          parameter: ``"high"`` routes to ``deepseek-reasoner`` (always-on
-          CoT); ``"low"`` / ``"medium"`` route to ``deepseek-chat`` (standard).
-          For the reasoner, ``temperature`` / ``top_p`` are omitted from the
-          request (ignored by the API).
+        **reasoning** takes ``None``, ``"none"``, ``"low"``, ``"medium"`` or
+        ``"high"`` — the levels a provider's ``reasoning_map`` declares, and a
+        level it lacks is refused here, naming the ones it has. Each family
+        translates the level to its own wire: a token budget, an effort word,
+        a thinking switch, or a different model. What each provider does with
+        it, and with every other option, is the generated table in
+        ``docs/reference/parameters.md``; what this request did is in
+        ``last_adaptations``.
 
     client_options : dict | None, optional
         Override settings for the underlying HTTP client.
@@ -405,9 +375,8 @@ class Model:
         self._asked = {k: v for k, v in opts.items() if k != "extra"}
 
         # An option this library has no word for is a mistake, not a request,
-        # and the place to say so is here — where it was written — rather than
-        # at the wire or, as before, nowhere at all. A misspelt `temperatur`
-        # used to be accepted, ignored, and cost a whole run to notice.
+        # and the place to say so is here, where it was written: a misspelt
+        # `temperatur` accepted and ignored would cost a whole run to notice.
         from ._options import UNIVERSAL_OPTIONS
         # `extra` is the escape hatch a closed vocabulary needs, and refusing
         # to have one is how a library that promises portability starts
@@ -450,9 +419,8 @@ class Model:
         # True marks the second-to-last message; an int names the message the
         # stable prefix ends at, for callers that know where that is.
         # ``"last"`` marks the newest block, for agent loops (see the
-        # Anthropic client). Any other string is refused: until 2026-10-01 a
-        # string went through ``bool()`` and became ``True``, so a misspelt
-        # placement silently chose a different one.
+        # Anthropic client). Any other string is refused: read as ``bool()`` it
+        # would become ``True``, and a misspelt placement would choose another.
         cc = opts.get("cache_control", defaults.get("cache_control", False))
         if isinstance(cc, str):
             if cc != "last":

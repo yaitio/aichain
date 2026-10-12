@@ -24,15 +24,12 @@ as before. With a policy attached, the shipped default lets ``read``/``draft``/
 and denies ``destructive`` — so existing (unmarked, ``write``) tools keep
 working and you opt risky tools into gating by tagging their ``risk``.
 
-**What this module promised and did not do, until 2026-09-11.** Everything
-above was written when the module was; the Agent consulted it for ``deny`` and
-for nothing else, so ``approve`` fell through to running the tool. A policy
-left at its defaults — and the default for an unclassified risk is
-``approve`` — therefore gated nothing at all, including ``financial``, while
-reading in every docstring and every test as protection. The tests are part of
-the story: they asserted what :meth:`PermissionPolicy.decide` *returns* and
-never once that the returned decision *happened*. An opinion nobody acts on is
-not a policy, and this is the shape that defect takes in a permission layer.
+**A decision is a policy only where something acts on it.** The agent's loop
+asks before every tool call and acts on each answer — ``deny`` refuses,
+``approve`` waits for ``approve=`` — and the tests assert that the decision
+*happened*, not only what :meth:`PermissionPolicy.decide` returns. In 4.0 the
+loop is the only place that asks: the ``pool`` tool, ``Agent.execute()``,
+``resume()`` and ``Chain``/``Pool`` steps do not yet.
 """
 
 from __future__ import annotations

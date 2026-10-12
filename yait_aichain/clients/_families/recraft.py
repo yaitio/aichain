@@ -186,10 +186,10 @@ class RecraftClient(OpenAIClient):
     #: class hierarchy instead of through the data.
     supports_streaming = False
 
-    #: And it takes no tools, for the same reason and by the same accident:
-    #: `OpenAIClient.supports_tools` is `True`, so this image-only client
-    #: claimed native tool calling until 2026-10-01 and then failed inside
-    #: `build_request` rather than at the gate in `Model.to_request`.
+    #: And it takes no tools, for the same reason: `OpenAIClient.supports_tools`
+    #: is `True`, and an image-only client inheriting it would claim tool
+    #: calling and then fail inside `build_request`, not at the gate in
+    #: `Model.to_request`.
     supports_tools = False
 
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:

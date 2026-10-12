@@ -151,16 +151,12 @@ class QwenClient(OpenAIClient):
     def build_request(self, messages, output, params, tools=None) -> "tuple[str, dict]":
         """Text and vision defer to the OpenAI-compatible builder, tools included.
 
-        `tools=` was missing from this override until 2026-10-01, and the
-        parameter is the whole feature: DashScope's compatible mode speaks the
-        chat-completions tool format — `tools`, `tool_calls`, `role: "tool"` —
-        so the format was already implemented one class up and reachable for
-        every other provider in the family. Here an `Agent` with tools on a
-        Qwen model died with `TypeError: build_request() got an unexpected
-        keyword argument 'tools'`, and `supports_tools` inherited `True` from
-        `OpenAIClient` said the opposite. A capability claimed by inheritance
-        and refused by a signature is the same defect as an option accepted
-        and dropped: the library knew and did not say.
+        DashScope's compatible mode speaks the chat-completions tool format —
+        `tools`, `tool_calls`, `role: "tool"` — so `tools=` is passed straight
+        to the builder one class up. `supports_tools` is inherited as `True`,
+        and this signature has to honour it: a capability claimed by
+        inheritance and refused by a signature is an option accepted and
+        dropped.
         """
         m = self._wrap(params)
         if _is_qwen_image_edit(m.name) or _is_qwen_image(m.name):

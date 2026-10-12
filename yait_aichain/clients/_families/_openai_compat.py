@@ -35,10 +35,9 @@ def _drop_rejected(model, fmt: dict) -> dict:
     dropped = [k for k in rejects if fmt.get(k) is not None]
     if not dropped:
         return fmt
-    # Reported through the adaptation channel rather than warned here: this
-    # site used to raise its own warning while note_absent added a second for
-    # the same option, so one dropped parameter was announced twice and only
-    # one of the two reached the run record.
+    # Reported through the adaptation channel, not warned here: a warning of
+    # its own would announce the same dropped parameter twice, and only the
+    # channel reaches the run record.
     from ...models._adaptation import Adaptation, DECLINED, record
     for key in dropped:
         record(Adaptation(
@@ -963,25 +962,17 @@ def _build_responses_api_request(
 
         if role == "system":
             # Responses API takes the system prompt as a top-level field —
-            # one string, so several system messages have to be joined here.
-            #
-            # This was an assignment until 2026-09-12, inside this loop, so a
-            # second system message **replaced** the first and only the last
-            # survived. Parts within one message were joined, which is why it
-            # looked right: the common shape is a single system message, and
-            # the defect needed two to appear. Every other family concatenates
-            # them, so the same conversation carried different instructions
-            # depending on which model it was sent to, silently — and the plan
-            # had this recorded as "Responses overwrites", a property of the
-            # provider. It was ours.
+            # one string, so several system messages are joined here, as every
+            # other family joins them. Assigning instead would keep only the
+            # last, and the same conversation would carry different
+            # instructions depending on the model it went to.
             text_parts = [it["text"] for it in items
                           if it["type"] in ("input_text", "output_text")]
             system_texts.extend(text_parts)
         else:
-            # No collapsing a lone text part to a bare string. It is the
-            # commonest shape by far, and while it took that shortcut every
-            # single-part run passed while every multi-part one failed — the
-            # defect hid behind the case nobody could miss.
+            # No collapsing a lone text part to a bare string: one shape for
+            # one part and many, so the common single-part case cannot hide
+            # a defect in the multi-part one.
             input_messages.append({"role": role, "content": items})
 
     # gpt-5-family models are reasoning models: the Responses API rejects

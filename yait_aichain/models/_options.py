@@ -13,10 +13,9 @@ be wired.
 Which of these a provider has a control for at all is declared in its data
 (``[provider.options] accepts``). That answers a question the request diff
 cannot: whether an option that did not arrive is one this provider has no
-control for, or a name the library has never heard of. Both used to be
-reported identically — ``top_k`` on OpenAI and a mistyped ``temperatur``
-both came back "this provider has no such control" — and they call for
-opposite reactions from the reader.
+control for, or a name the library has never heard of — ``top_k`` on OpenAI
+against a mistyped ``temperatur``, which call for opposite reactions from the
+reader and so are reported differently.
 
 Narrowing *within* a provider stays a runtime matter and is not declared:
 OpenAI has a temperature control, and a reasoning model of theirs refuses it

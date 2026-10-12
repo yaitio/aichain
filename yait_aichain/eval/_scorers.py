@@ -172,14 +172,11 @@ def judge(model, *, rubric: str = "The answer is correct if it states the same "
         found = _VERDICT.match(reply.strip())
         if not found:
             # Fail-closed accounting: excluded from the count, never recorded
-            # as a clean verdict. Raising — which this did until 2026-09-12 —
-            # was right about the important half (guessing "pass" raises every
-            # arm at once and reads as a good result) and wrong about the
-            # rest: it ends the whole run over one row a judge could not read.
-            # The arm that a judge abstained on twenty times has not scored
-            # 0.95 out of the eighty it could read; it has an instrument that
-            # does not work, and that is only visible if the abstentions are
-            # counted and shown.
+            # as a clean verdict — guessing "pass" would lift every arm at once
+            # and read as a good result — and not raised either, which would
+            # end the run over one row. An arm a judge abstained on twenty
+            # times has an instrument that does not work, and that shows only
+            # if the abstentions are counted.
             return abstain(f"no verdict for case {case.id!r}: "
                            f"{reply.strip()[:120]!r}")
         passed = found.group(1).upper() == "PASS"

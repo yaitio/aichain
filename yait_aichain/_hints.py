@@ -227,8 +227,8 @@ def tool_name(name: str) -> ImportError:
 
 #: What a model client reads from ``Model(client_options=...)``. Every family
 #: passes ``url`` to the transport and ``timeout``, ``retries`` and ``proxy``
-#: through; anything else used to be accepted and dropped in silence — a
-#: ``base_url`` sent every request to the provider's default address.
+#: through. Anything else is refused, naming the right key: dropped in
+#: silence, a ``base_url`` would send every request to the default address.
 CLIENT_OPTIONS = ("url", "timeout", "retries", "proxy")
 FAMILY_CLIENT_OPTIONS = {"qwen": ("region",)}
 CLIENT_OPTION_HINTS = {

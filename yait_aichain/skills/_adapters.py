@@ -332,8 +332,8 @@ def validate_input(input_: dict) -> None:
     for i, msg in enumerate(messages):
         if not isinstance(msg, dict):
             raise ValueError(f"messages[{i}] must be a dict")
-        # `content` is every other API's word. An assistant turn written that
-        # way used to be read as the "generate here" marker, silently.
+        # `content` is every other API's word. Accepted, an assistant turn
+        # written that way would read as the "generate here" marker.
         if "content" in msg and "parts" not in msg:
             raise ValueError(
                 f"messages[{i}] has 'content'; messages here carry 'parts': "

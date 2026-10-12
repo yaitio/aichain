@@ -2,8 +2,8 @@
 yait-aichain
 ============
 
-One interface. 11 providers. 82 models.
-Text, image generation & editing, vision, RAG, agents, parallel pipelines.
+The provider-agnostic AI toolkit for Python: one interface over every provider
+in the registry, for skills, chains, pools, agents and their tools.
 
     pip install yait-aichain
 
@@ -12,7 +12,7 @@ Quick start::
     from yait_aichain import Model, Skill
 
     skill = Skill(
-        model = Model("claude-sonnet-4-6"),
+        model = Model("claude-haiku-5-5"),
         input = {"messages": [{"role": "user", "parts": ["What is {topic}?"]}]},
     )
     result = skill.run(variables={"topic": "machine learning"})

@@ -146,12 +146,9 @@ class OpenAIClient(BaseClient):
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         if fmt == "image":
             raise NotImplementedError("an image is not delivered progressively")
-        # Forwarded unconditionally since 2026-10-01. Before that the two
-        # subclasses that override `build_request` — Qwen and Recraft — did so
-        # without the parameter, and passing it raised TypeError instead of
-        # the NotImplementedError the fallback catches, so a Qwen stream with
-        # tools crashed rather than degraded. The workaround lived here; the
-        # cause was one class down, and that is where it was fixed.
+        # Forwarded unconditionally: every override of `build_request` takes
+        # `tools`, so a stream with tools degrades through NotImplementedError
+        # where it must, instead of crashing on a signature.
         path, body = self.build_request(messages, output, params, tools=tools)
         # `include_usage` is what makes the provider send a final event with
         # the token counts in it. Without it a streamed call reports no usage

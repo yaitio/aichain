@@ -871,7 +871,10 @@ class Agent:
         return self._ask(messages, state if state is not None else self.new_state())
 
     def execute(self, call, state: "dict | None" = None):
-        """Run one :class:`ToolCall`. Returns ``(result, error)`` — never raises.
+        """Run one :class:`ToolCall`. Returns ``(result, error)``: a tool that
+        fails is an error, not an exception. The one exception that passes is
+        ``Suspend`` — a ``wait()`` or ``gate()`` asking the run to park, which
+        the driver handles as a pause, not a failure.
 
         Parameters
         ----------
@@ -980,14 +983,10 @@ class Agent:
                 yield from drain()
 
                 journal.append(
-                    # No intent. An intent is what an attempt was *for* — a
-                    # plan step's goal — and this loop has none to record.
-                    # It used to pass the tool's name here, which made every
-                    # call to one tool share an "intent", so the journal's
-                    # repetition check read ten different searches as one
-                    # search repeated ten times. Nothing called that check
-                    # until `repeating()` did, and it fired on genuinely
-                    # varied work. The action carries the tool name already.
+                    # No intent: an intent is what an attempt was *for* — a plan
+                    # step's goal — and this loop has none. The tool's name
+                    # here would make ten different searches read as one
+                    # search repeated to `repeating()`; the action carries it.
                     "",
                     action      = _safe({"name": call.name,
                                          "arguments": call.arguments}),
@@ -1127,7 +1126,7 @@ class Agent:
     # ── Executing one call ───────────────────────────────────────────────
 
     def _execute(self, call, state: dict) -> "tuple[Any, str | None]":
-        """Run one call. Returns ``(result, error)`` — never raises."""
+        """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
         try:
             if call.name == "pool":
                 return self._do_pool(call.arguments), None
@@ -1139,9 +1138,8 @@ class Agent:
         except Suspend:
             # Not a failure, and the one exception this must not flatten: the
             # tool is saying the world has to answer before the run goes on.
-            # Caught here until 2026-09-18, it reached the model as the string
-            # "Suspend: ..." in a tool result — the request for a pause became
-            # a puzzling error and the run carried on as if nothing was owed.
+            # Flattened into a tool result, the pause would read to the model
+            # as an error and the run would carry on as if nothing was owed.
             raise
         except Exception as exc:
             return None, f"{type(exc).__name__}: {exc}"
@@ -1162,15 +1160,11 @@ class Agent:
     def _ask_permission(self, call, state: "dict | None" = None):
         """Consult the policy before a tool runs. Returns a denial, or None.
 
-        **At the loop boundary, not inside the call.** It lived in
-        `_do_tool` until 2026-09-11, which put the approver's question and the
-        approver's answer in the same instant as far as anyone outside could
-        tell: a streaming consumer received `approval.requested` only after
-        the decision had already been made, because the events it produced
-        were drained at the next boundary — after `tool_call.ended`. The
-        record read correctly and was useless for the one thing R5 exists
-        for, which is showing a person the prompt. Split in two here so the
-        loop can hand the request over *before* asking.
+        **At the loop boundary, not inside the call**, and split from the
+        answer: the loop hands `approval.requested` to a streaming consumer
+        *before* the approver is asked, which is what lets a UI show a person
+        the question. Inside the call, the request and the decision would
+        arrive together, after the fact.
 
         Emitted even when there is nobody to ask. A consumer needs to see
         that a decision was required, and the refusing case is where that

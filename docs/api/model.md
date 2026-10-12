@@ -53,38 +53,14 @@ available as `model._provider`.
   `reasoning`     str|None  Universal reasoning depth (see below).
   ================  ========  =======================================
 
-  **reasoning** accepts `None`, `"low"`, `"medium"`, or
-  `"high"`.  Each provider's family client translates the universal
-  level to its own native format via the provider's `reasoning_map`
-  data:
-
-  * **Anthropic**  — maps to `{"type": "enabled", "budget_tokens": N}`
-    (`low` → 4 000, `medium` → 10 000, `high` → 20 000 tokens).
-    Temperature is automatically forced to 1.0 when reasoning is active.
-
-  * **Google AI**  — maps to `{"thinkingBudget": N}` inside
-    `generationConfig.thinkingConfig`
-    (`low` → 2 048, `medium` → 8 192, `high` → 24 576 tokens).
-
-  * **OpenAI**     — maps to `reasoning_effort` on o-series models
-    (`"low"` / `"medium"` / `"high"`).  GPT models ignore it.
-
-  * **xAI**        — maps to `reasoning_effort` for grok-3-mini /
-    grok-3-mini-fast (`low` → `"low"`, `medium` / `high` →
-    `"high"`).  Other grok models ignore it.
-
-  * **Perplexity** — no reasoning parameter; value is silently ignored.
-
-  * **Kimi**       — maps to `thinking: {"type": "enabled"}` when any
-    level is set.  Kimi has no token-budget granularity; all three levels
-    activate thinking mode.  Temperature is automatically forced to 1.0
-    when thinking is active (API constraint).
-
-  * **DeepSeek**   — maps to a model-name switch rather than an API
-    parameter: `"high"` routes to `deepseek-reasoner` (always-on
-    CoT); `"low"` / `"medium"` route to `deepseek-chat` (standard).
-    For the reasoner, `temperature` / `top_p` are omitted from the
-    request (ignored by the API).
+  **reasoning** takes `None`, `"none"`, `"low"`, `"medium"` or
+  `"high"` — the levels a provider's `reasoning_map` declares, and a
+  level it lacks is refused here, naming the ones it has. Each family
+  translates the level to its own wire: a token budget, an effort word,
+  a thinking switch, or a different model. What each provider does with
+  it, and with every other option, is the generated table in
+  `docs/reference/parameters.md`; what this request did is in
+  `last_adaptations`.
 - `client_options` (*dict | None, optional*, default `None`) — Override settings for the underlying HTTP client.
   Supported keys (all optional):
 
