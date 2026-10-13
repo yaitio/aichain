@@ -1153,6 +1153,14 @@ class Agent:
             # Text is the answer — one exit, not two spellings of it — unless
             # a `verified()` gate holds it once for a check.
             if not isinstance(reply, ToolCallRequest):
+                if state.get("truncated"):
+                    # Cut at max_tokens: kept as the output, because half an
+                    # answer can be worth reading, but not called an answer.
+                    # It ended the run as `answered`, `success=True`.
+                    self._log(1, "\n[Done] ✗ the answer was cut at max_tokens")
+                    return self._result(state, False, str(reply), "truncated",
+                                        error="the answer was cut at max_tokens; raise max_tokens "
+                                              "for the whole of it")
                 held = self._verify_gate(state)
                 if held is None:
                     self._log(1, f"\n[Done] ✓ answered · {state['steps']} step(s)")
@@ -1417,6 +1425,9 @@ class Agent:
             max_retries = 2,
         )
         reply = yield from self._reply(skill)
+        # In the state, where both exits read it: `run()` ends on it, and a
+        # driver of `step()` gets a string back and needs to know it is half.
+        state["truncated"] = bool(getattr(skill, "last_truncated", False))
         # Kept per run, deduplicated: a loop asks the same thing of the same
         # model every turn, so without this the list grows by a copy a step.
         for a in skill.last_adaptations:

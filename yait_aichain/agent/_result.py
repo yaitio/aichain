@@ -37,7 +37,8 @@ class AgentResult:
     stopped_by : str | None
         What ended the run: ``"answered"``, ``"check:<name>"``,
         ``"step_count"``, ``"token_budget"``, ``"cost_budget"``,
-        ``"truncated"`` (a reply cut at ``max_tokens`` — raise it),
+        ``"truncated"`` (a reply cut at ``max_tokens`` — raise it; an answer
+        cut there is kept as ``output`` and is not a success),
         ``"context_overflow"`` (the history is past the model's window),
         ``"park_failed"`` (the store refused the parked run),
         ``"llm_error"`` (the model call failed otherwise),

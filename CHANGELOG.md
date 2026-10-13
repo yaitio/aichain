@@ -4,6 +4,10 @@
 
 ### Added
 
+- `Skill.last_truncated` — whether the last answer was cut at `max_tokens`.
+  Prose cut short was returned as if it were whole, with nothing said; it is
+  still returned, and now marked, with a warning once per model. Read from
+  every family's own word for the ceiling, buffered and streamed.
 - A model name the registry does not know, routed to a provider by its
   prefix alone, is said once, with the closest listed names:
   `Model("grok-imagine-image-pro")` went to xAI, which had no such model, and
@@ -20,6 +24,13 @@
   `GOOGLE_AI_API_KEY` and `GOOGLE_API_KEY`. Speech is a Cloud API, and an AI
   Studio key restricted to Gemini answers `API_KEY_SERVICE_BLOCKED` there, so
   a project can now keep one key for each without passing `api_key=`.
+
+### Changed
+
+- An agent whose answer is cut at `max_tokens` stops with
+  `stopped_by="truncated"` and `success=False`, the partial text kept as
+  `output`. It ended as `answered`, `success=True`, on half a sentence. A
+  driver of `step()` reads the same fact in `state["truncated"]`.
 
 ## [4.0.1] — 2026-10-13
 

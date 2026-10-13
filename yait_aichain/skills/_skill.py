@@ -24,6 +24,7 @@ from .._budget import as_budget, in_force, start_run
 import json
 import random
 import time
+import warnings
 from typing import TYPE_CHECKING
 
 from .. import _hints
@@ -36,10 +37,13 @@ from ..models._adaptation import SWAPPED, Adaptation
 from ..models._base import Model, StreamOutcome
 from ..models._calls import ToolCallRequest
 from ..models._schema import check_structure
-from ..clients._families._structured import parse_structured
+from ..clients._families._structured import hit_ceiling, parse_structured
 from ..models._usage import Usage, extract_usage, attach_cost
 from .._events import Event, emit
 from . import _adapters as adapters
+
+#: Models already warned about a cut-off answer, so a loop says it once.
+_CUT_SAID: set = set()
 
 if TYPE_CHECKING:
     from .._budget import Budget
@@ -333,6 +337,10 @@ class Skill:
         #: miss in a log; this is what a run record can keep, so a comparison
         #: between two models can state what its arms actually sent.
         self.last_adaptations: list = []
+        #: Whether the last answer was cut at ``max_tokens``. Prose cut short
+        #: is still returned — half an answer can be worth having — but as
+        #: what it is: this says so, and a warning says it once per model.
+        self.last_truncated: bool = False
         # Generated replies of the most recent run(), in order (multi-turn
         # directed reasoning); ``history[-1]`` is the returned value. A single-
         # shot run leaves a one-element list. ``None`` until the first call.
@@ -432,6 +440,7 @@ class Skill:
         # than a stale value left over from a previous successful run().
         self.last_usage = None
         self.last_adaptations = []
+        self.last_truncated = False
         self.history    = None
 
         # Try each model in the fallback chain.  Transient failures
@@ -505,6 +514,7 @@ class Skill:
 
         self.last_usage = None
         self.last_adaptations = []
+        self.last_truncated = False
         self.history = None
         self.last_result = None
 
@@ -552,6 +562,8 @@ class Skill:
                                     getattr(model, "last_stream_usage", None),
                                     list(getattr(model, "last_adaptations", []) or []))
         self.last_adaptations = list(outcome.adaptations)
+        if getattr(outcome, "truncated", False) and not isinstance(outcome.result, ToolCallRequest):
+            self._cut_short(model)
         raw_usage = outcome.usage
         if raw_usage:
             # `raw_usage` is already response-shaped — see
@@ -593,6 +605,18 @@ class Skill:
             raise
         self.history = [self.last_result]
         self._ended(model, t0, self.last_usage)
+
+    def _cut_short(self, model) -> None:
+        """Mark the answer as cut at ``max_tokens``, and say so once per model."""
+        self.last_truncated = True
+        name = getattr(model, "name", str(model))
+        if name in _CUT_SAID:
+            return
+        _CUT_SAID.add(name)
+        warnings.warn(
+            f"{name}: the answer was cut at max_tokens and is returned as far as it got "
+            "(Skill.last_truncated is True); raise max_tokens for the whole of it.",
+            stacklevel=4)
 
     @staticmethod
     def _structured_call(request, fmt: dict):
@@ -730,6 +754,8 @@ class Skill:
                     exc._aichain_usage = usage
                     raise
                 self._ended(model, t0, usage)
+                if isinstance(result, str) and hit_ceiling(response):
+                    self._cut_short(model)
                 return result, usage, made
             except APIError as exc:
                 if hasattr(exc, "_aichain_usage"):

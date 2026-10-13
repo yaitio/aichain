@@ -187,11 +187,13 @@ def _resolve_provider(name: str) -> str:
 class StreamOutcome:
     """What a finished `Model.stream` returns: the whole result — text, a
     parsed object, or a `ToolCallRequest` — the usage envelope the provider
-    reported (None when it reported none), and the adaptations made."""
+    reported (None when it reported none), the adaptations made, and whether
+    the output budget cut the answer short."""
 
     result: object
     usage: dict | None
     adaptations: list
+    truncated: bool = False
 
 
 def _merge_usage(into: "dict | None", incoming: dict) -> dict:
@@ -873,6 +875,8 @@ class Model:
             # is how a streamed tool-calling turn came to look like a model
             # that answered nothing.
             self.last_stream_usage, self.last_stream_result = usage_seen, result
+            from ..clients._families._structured import hit_ceiling
+            cut = hit_ceiling(response)
             if isinstance(result, str):
                 yield result
             elif isinstance(result, dict):
@@ -885,12 +889,15 @@ class Model:
                 text = getattr(result, "text", "") or ""
                 if text:
                     yield text
-            return StreamOutcome(result, usage_seen, notes)
+            return StreamOutcome(result, usage_seen, notes, cut)
 
+        from ..clients._families._structured import hit_ceiling
         assembly = _ToolCallAssembly()
         spoken: list = []
+        cut = False
         for event in self.client._post_sse(
                 path, body, self.client._auth_headers()):
+            cut = cut or hit_ceiling(event)
             assembly.add(self.client.stream_tool_fragments(event))
             usage = self.client.stream_usage(event)
             if usage:
@@ -911,7 +918,7 @@ class Model:
         # `text`, so nothing is shown twice and nothing is lost.
         result = assembly.request("".join(spoken))
         self.last_stream_usage, self.last_stream_result = usage_seen, result
-        return StreamOutcome(result, usage_seen, list(made))
+        return StreamOutcome(result, usage_seen, list(made), cut)
 
     def from_response(self, response: dict, output: dict, *,
                       tools_sent: bool | None = None) -> "str | dict":

@@ -21,6 +21,35 @@ from ...models._schema import check_structure
 _CEILING = {"length", "max_tokens", "MAX_TOKENS"}
 
 
+def hit_ceiling(obj) -> bool:
+    """Whether *obj* — a whole response or one stream event, any family —
+    says the output budget ran out.
+
+    The cases `refuse_cut_off` lets through are prose, and prose cut short was
+    returned as if it were whole: `Skill.run` gave half a sentence and an
+    agent reported it as its answer, `success=True`. This is what lets the
+    caller be told. Read from the response itself, so a buffered call and a
+    stream answer the same question the same way.
+    """
+    if not isinstance(obj, dict):
+        return False
+    for choice in obj.get("choices") or ():                 # OpenAI chat
+        if isinstance(choice, dict) and choice.get("finish_reason") in _CEILING:
+            return True
+    for cand in obj.get("candidates") or ():                # Google
+        if isinstance(cand, dict) and cand.get("finishReason") in _CEILING:
+            return True
+    if obj.get("stop_reason") in _CEILING:                  # Anthropic, whole
+        return True
+    delta = obj.get("delta")
+    if isinstance(delta, dict) and delta.get("stop_reason") in _CEILING:   # Anthropic, event
+        return True
+    whole = obj.get("response") if isinstance(obj.get("response"), dict) else obj
+    details = whole.get("incomplete_details")                # Responses API
+    return (whole.get("status") == "incomplete" and isinstance(details, dict)
+            and details.get("reason") == "max_output_tokens")
+
+
 def refuse_cut_off(finish_reason: str, output_tokens: int | None, *,
                    calls: bool, text: str) -> None:
     """Raise `TruncatedResponseError` when the ceiling cut a reply that cannot
