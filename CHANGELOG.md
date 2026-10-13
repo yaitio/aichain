@@ -133,6 +133,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **A streamed request is built as a buffered one is.** `Model.stream()` had
+  its own copy of the request's tail and dropped `extra` while
+  `effective_options` said it was sent; both paths share one tail now, and one
+  gate refuses tools on a family that has none. The stream docstring promised
+  that `on_unsupported="requirements"` raises when a provider cannot stream;
+  it is `"raise"` that does, and the docstring says so.
+
 - **DeepSeek's reasoning swap is the chat/reasoner pair's.** `reasoning` on
   `deepseek-v4-pro` or `deepseek-flash` is declined and said, where even
   `"low"` sent `deepseek-chat` — another, retiring generation. A swapped call

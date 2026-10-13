@@ -615,6 +615,12 @@ class Model:
         """
         # A mirror for a caller reading it afterwards; the library passes
         # `tools_sent` to `from_response` instead.
+        self._gate_tools(tools)
+        return self._built(messages, output, tools=tools or None)
+
+    def _gate_tools(self, tools) -> None:
+        """One gate for both paths: a stream given tools on a family that has
+        none reached the family's builder and failed there, or not at all."""
         self._sent_tools = bool(tools)
         if tools and not self.client.supports_tools:
             raise ValueError(
@@ -622,7 +628,31 @@ class Model:
                 f"support native tool calling yet; model {self.name!r} "
                 "cannot be given tools"
             )
-        return self._built(messages, output, tools=tools or None)
+
+    def _finish(self, made: list, output: dict, body) -> None:
+        """The tail every request passes through, buffered or streamed:
+        `extra` on top, what was asked and not sent noted, the adaptations
+        announced and stored, then enforced. The stream had its own copy,
+        which dropped `extra` while `effective_options` said it was sent."""
+        from ._adaptation import announce, enforce, note_absent
+        asked = {**self._asked,
+                 **{k: v for k, v in (output.get("format") or {}).items()
+                    if k not in ("type", "schema", "name", "strict")}}
+        if self.extra and isinstance(body, dict):
+            # Last, and on top: a caller reaching for `extra` is overriding,
+            # and a merge that lost to the library's own field would be an
+            # escape hatch that does not escape. Multipart bodies are a list
+            # of pairs, not a mapping, and are left alone rather than
+            # corrupted.
+            body.update(self.extra)
+        if body is not None:
+            note_absent(made, asked, body, self.name, provider=self._provider)
+        announce(made)
+        self.last_adaptations = list(made)
+        # After the record is stored, not before: a caller catching this needs
+        # `last_adaptations` to say what happened, and a raise that leaves the
+        # evidence unwritten is the silence this whole channel exists against.
+        enforce(made, self.on_unsupported)
 
     def _canonical_format(self, output: dict) -> dict:
         """Resolve a value's shorthand to the vocabulary's one type —
@@ -674,32 +704,13 @@ class Model:
         ``models._adaptation``: the library may adapt a request, it may not do
         so in silence.
         """
-        from ._adaptation import announce, collect, enforce, note_absent
+        from ._adaptation import collect
 
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
             path, body = self.client.build_request(messages, output, self._params(), tools=tools)
 
-        # Options set in the output format travel beside the model's own, and
-        # are asked for per call rather than per model.
-        asked = {**self._asked,
-                 **{k: v for k, v in (output.get("format") or {}).items()
-                    if k not in ("type", "schema", "name", "strict")}}
-        if self.extra:
-            # Last, and on top: a caller reaching for `extra` is overriding,
-            # and a merge that lost to the library's own field would be an
-            # escape hatch that does not escape. Multipart bodies are a list
-            # of pairs, not a mapping, and are left alone rather than
-            # corrupted.
-            if isinstance(body, dict):
-                body.update(self.extra)
-        note_absent(made, asked, body, self.name, provider=self._provider)
-        announce(made)
-        self.last_adaptations = list(made)
-        # After the record is stored, not before: a caller catching this needs
-        # `last_adaptations` to say what happened, and a raise that leaves the
-        # evidence unwritten is the silence this whole channel exists against.
-        enforce(made, self.on_unsupported)
+        self._finish(made, output, body)
         return path, body, list(made)
 
     # ------------------------------------------------------------------
@@ -718,9 +729,9 @@ class Model:
         for options: **the request still goes, and the caller is told.** So a
         provider that cannot stream returns the whole answer as one piece and
         records a ``declined`` — because a caller who asked to stream and got
-        one chunk at the end has something that looks like it worked, and
-        that is precisely the class of loss `on_unsupported="requirements"`
-        exists to raise on.
+        one chunk at the end has something that looks like it worked.
+        ``on_unsupported="raise"`` raises on it; ``"requirements"`` does not,
+        since the answer itself is whole.
 
         When the stream ends, the generator returns a :class:`StreamOutcome`
         — the whole result, the usage the provider reported, and what was
@@ -739,9 +750,9 @@ class Model:
         tools : list | None, optional
             Function-calling schemas, as ``Tool.schema()`` returns them.
         """
-        from ._adaptation import (Adaptation, DECLINED, announce, collect,
-                                  enforce, note_absent)
+        from ._adaptation import Adaptation, DECLINED, collect
 
+        self._gate_tools(tools)
         usage_seen: dict | None = None
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
@@ -755,14 +766,7 @@ class Model:
                     why=f"{why}; the answer arrives in one piece at the end"))
                 path = body = None
 
-        asked = {**self._asked,
-                 **{k: v for k, v in (output.get("format") or {}).items()
-                    if k not in ("type", "schema", "name", "strict")}}
-        if body is not None:
-            note_absent(made, asked, body, self.name, provider=self._provider)
-        announce(made)
-        self.last_adaptations = list(made)
-        enforce(made, self.on_unsupported)
+        self._finish(made, output, body)
 
         if body is None:
             # `_built` reports on its own build, which would drop the

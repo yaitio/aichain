@@ -187,9 +187,9 @@ design is what to do then, and it is the same question 2.3.0 answered
 for options: **the request still goes, and the caller is told.** So a
 provider that cannot stream returns the whole answer as one piece and
 records a `declined` — because a caller who asked to stream and got
-one chunk at the end has something that looks like it worked, and
-that is precisely the class of loss `on_unsupported="requirements"`
-exists to raise on.
+one chunk at the end has something that looks like it worked.
+`on_unsupported="raise"` raises on it; `"requirements"` does not,
+since the answer itself is whole.
 
 When the stream ends, the generator returns a `StreamOutcome`
 — the whole result, the usage the provider reported, and what was
