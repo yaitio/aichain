@@ -249,10 +249,15 @@ class TestUsageAccounting(unittest.TestCase):
                 (anthropic.input_tokens, anthropic.output_tokens,
                  anthropic.cache_read_tokens))
 
-    def test_a_read_costs_a_tenth_of_a_fresh_token(self):
+    def test_a_read_costs_a_tenth_of_a_fresh_token_where_no_rate_is_given(self):
+        fresh = estimate_cost(Usage(input_tokens=1_000_000), "gpt-5.4-mini")
+        cached = estimate_cost(Usage(cache_read_tokens=1_000_000), "gpt-5.4-mini")
+        self.assertAlmostEqual(cached / fresh, CACHE_READ_MULTIPLIER, places=6)
+
+    def test_gpt_4o_reads_its_cache_at_half(self):
         fresh = estimate_cost(Usage(input_tokens=1_000_000), "gpt-4o")
         cached = estimate_cost(Usage(cache_read_tokens=1_000_000), "gpt-4o")
-        self.assertAlmostEqual(cached / fresh, CACHE_READ_MULTIPLIER, places=6)
+        self.assertAlmostEqual(cached / fresh, 0.5, places=6)
 
     def test_the_hour_long_write_is_priced_above_the_five_minute_one(self):
         w = Usage(cache_write_tokens=1_000_000)

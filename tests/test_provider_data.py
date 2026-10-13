@@ -77,7 +77,8 @@ class TestProviderDataConsistency(unittest.TestCase):
         # Every priced model carries numeric input/output USD-per-1M rates, or
         # — an image model the provider bills by the picture — a per_image
         # price and nothing else. Every key is one estimate_cost reads.
-        known = {"input", "output", "image_input", "cache_read", "long_context", "per_image"}
+        known = {"input", "output", "image_input", "cache_read", "long_context", "per_image",
+                 "per_request"}
         priced = 0
         for prov, data in PROVIDERS.items():
             for name, mdl in data.get("models", {}).items():

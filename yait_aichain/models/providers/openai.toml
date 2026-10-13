@@ -145,17 +145,20 @@ price = { input = 0.25, output = 2.0 }
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.05, output = 0.40 }
 
+# cache_read on the gpt-4.1 and gpt-4o lines is OpenAI's published rate: a
+# quarter of input for gpt-4.1, a half for gpt-4o. The library's default of a
+# tenth is Anthropic's, and priced at a tenth these read up to five times low.
 [models."gpt-4.1"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 2.0, output = 8.0 }
+price = { input = 2.0, output = 8.0, cache_read = 0.50 }
 
 [models."gpt-4o"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 2.5, output = 10.0 }
+price = { input = 2.5, output = 10.0, cache_read = 1.25 }
 
 [models."gpt-4o-mini"]
 caps  = ["image-to-text", "text-to-text"]
-price = { input = 0.15, output = 0.6 }
+price = { input = 0.15, output = 0.6, cache_read = 0.075 }
 
 # Image-generation models. Token-priced: input = text prompt tokens,
 # output = generated image tokens (USD per 1M tokens).

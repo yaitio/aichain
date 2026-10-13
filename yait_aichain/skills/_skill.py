@@ -517,7 +517,8 @@ class Skill:
             # `extract_usage` a buffered response does, per provider.
             self.last_usage = attach_cost(
                 extract_usage(raw_usage), model.name,
-                getattr(model, "cache_ttl", "5m"))
+                getattr(model, "cache_ttl", "5m"),
+                getattr(model, "_provider", None))
             for budget in in_force(self.max_cost):
                 budget.charge(getattr(self.last_usage, "cost", None))
 
@@ -643,7 +644,8 @@ class Skill:
                 # A cost estimate is the last thing that should abort a call
                 # that already succeeded.
                 usage    = attach_cost(extract_usage(response), model.name,
-                                       getattr(model, "cache_ttl", "5m"))
+                                       getattr(model, "cache_ttl", "5m"),
+                getattr(model, "_provider", None))
                 for budget in in_force(self.max_cost):
                     budget.charge(getattr(usage, "cost", None))
                 result   = (model.from_response(response, output, tools_sent=bool(_tools)) if own

@@ -125,6 +125,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **Cost estimates that were low, and a total that did not say it was
+  partial.** A cache read was priced at a tenth of the input rate for every
+  model, where gpt-4o reads at a half and gpt-4.1 at a quarter — an agent
+  loop on them up to five times low; those rates are in the data now.
+  Perplexity's per-request fee was left out (about eight times low); it is
+  added at the low-context rate, the floor of a call. Past a long-context
+  threshold the cache and image rates scale with the input rate. A price is
+  looked up by provider, where `private/qwen3-32b` on one's own server was
+  priced at DashScope's rate. And `Usage.unpriced_calls` counts the calls a
+  total leaves out.
 - **A chain reports what its steps spent.** An agent step added its tokens
   and not its cost, so `ChainResult.cost` was None or short; a Skill shared
   by a Pool's copies of one chain had its usage read after another thread

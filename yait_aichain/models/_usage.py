@@ -40,6 +40,8 @@ class Usage:
         Prompt prefix reused from an earlier call, billed well below it.
     image_input_tokens : int
         Images sent in, kept apart because they are billed at their own rate.
+    unpriced_calls : int
+        Calls the registry had no price for; ``cost`` leaves them out.
     """
 
     input_tokens:  int = 0
@@ -58,6 +60,9 @@ class Usage:
     # edit call — 1024 image tokens beside 19 of text — folding them together
     # under-states the input line by 37% and the whole call by 22%.
     image_input_tokens: int = 0
+    #: Calls among these that had no price — their cost is not in ``cost``,
+    #: which is then the floor of the bill rather than the bill.
+    unpriced_calls: int = 0
 
     def __add__(self, other: Usage) -> Usage:
         if not isinstance(other, Usage):
@@ -196,9 +201,13 @@ def extract_usage(response: dict) -> Usage:
 # every primitive does for ``.last_usage``) stays light and never triggers the
 # provider-data load.
 
-def _price_of(model_name: str) -> dict | None:
+def _price_of(model_name: str, provider: str | None = None) -> dict | None:
+    """The price of *model_name* — from *provider*'s data when it is known.
+    By the bare name alone, `private/qwen3-32b` on one's own server was
+    priced at DashScope's rate."""
     from ._data import PROVIDERS
-    for data in PROVIDERS.values():
+    sources = [PROVIDERS[provider]] if provider in PROVIDERS else PROVIDERS.values()
+    for data in sources:
         mdl = data.get("models", {}).get(model_name)
         if mdl is not None and "price" in mdl:
             return mdl["price"]
@@ -215,7 +224,7 @@ CACHE_READ_MULTIPLIER   = 0.10
 
 
 def estimate_cost(usage: Usage, model_name: str,
-                  cache_ttl: str = "5m") -> float | None:
+                  cache_ttl: str = "5m", provider: str | None = None) -> float | None:
     """
     Estimate USD cost of *usage* for *model_name*, or ``None`` if the model
     has no price per token in the provider data.
@@ -244,20 +253,25 @@ def estimate_cost(usage: Usage, model_name: str,
     A model priced only ``per_image`` has no token rate and returns ``None``
     here; the image tool prices it by the picture.
     """
-    price = _price_of(model_name)
+    price = _price_of(model_name, provider)
     if price is None or "input" not in price or "output" not in price:
         return None
     rate_in, rate_out = price["input"], price["output"]
     tier = price.get("long_context")
     prompt = (usage.input_tokens + usage.image_input_tokens
               + usage.cache_write_tokens + usage.cache_read_tokens)
+    # Past the threshold every input-side rate scales with the input rate —
+    # the cache and image rates too, which were left at the short-context
+    # price while input and output went up.
+    scale = 1.0
     if isinstance(tier, dict) and prompt > tier.get("above", float("inf")):
+        scale = tier.get("input", rate_in) / rate_in if rate_in else 1.0
         rate_in, rate_out = tier.get("input", rate_in), tier.get("output", rate_out)
     rate_in /= 1_000_000
     # Falls back to the text rate: most models bill an image input at the
     # same price, and only those that do not carry the field.
-    rate_img   = price.get("image_input", price["input"]) / 1_000_000
-    rate_read  = (price["cache_read"] / 1_000_000 if "cache_read" in price
+    rate_img   = price.get("image_input", price["input"]) / 1_000_000 * scale
+    rate_read  = (price["cache_read"] / 1_000_000 * scale if "cache_read" in price
                   else rate_in * CACHE_READ_MULTIPLIER)
     write_mult = CACHE_WRITE_MULTIPLIERS.get(cache_ttl,
                                              CACHE_WRITE_MULTIPLIERS["5m"])
@@ -267,6 +281,7 @@ def estimate_cost(usage: Usage, model_name: str,
         + usage.cache_write_tokens * rate_in * write_mult
         + usage.cache_read_tokens  * rate_read
         + usage.output_tokens / 1_000_000 * rate_out
+        + float(price.get("per_request", 0.0))
     )
 
 
@@ -277,9 +292,13 @@ def price_per_image(model_name: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
-def attach_cost(usage: Usage, model_name: str, cache_ttl: str = "5m") -> Usage:
+def attach_cost(usage: Usage, model_name: str, cache_ttl: str = "5m",
+                provider: str | None = None) -> Usage:
     """Return *usage* with its ``cost`` filled in: what the provider reported
-    when it reported one, else the registry's estimate, else ``None``."""
+    when it reported one, else the registry's estimate, else ``None`` — and
+    ``unpriced_calls`` counting it, so a sum over calls some of which had no
+    price says it is a floor, not the whole bill."""
     if usage.cost is not None:
         return usage
-    return replace(usage, cost=estimate_cost(usage, model_name, cache_ttl))
+    cost = estimate_cost(usage, model_name, cache_ttl, provider)
+    return replace(usage, cost=cost, unpriced_calls=usage.unpriced_calls + (cost is None))

@@ -240,6 +240,7 @@ Usage(
     cache_write_tokens: int = 0,
     cache_read_tokens: int = 0,
     image_input_tokens: int = 0,
+    unpriced_calls: int = 0,
 )
 ```
 
@@ -254,6 +255,7 @@ Token counts for one or more LLM calls.
 - `cache_write_tokens` (*int*, default `0`) — Prompt prefix stored for reuse this call, billed above fresh input.
 - `cache_read_tokens` (*int*, default `0`) — Prompt prefix reused from an earlier call, billed well below it.
 - `image_input_tokens` (*int*, default `0`) — Images sent in, kept apart because they are billed at their own rate.
+- `unpriced_calls` (*int*, default `0`) — Calls the registry had no price for; `cost` leaves them out.
 
 ---
 

@@ -39,19 +39,20 @@ max_tokens  = "ours · practical across the Sonar family; sonar-deep-research re
 # sonar-reasoning was removed 2026-10-10: the API answers "has been
 # deprecated" to it. sonar-reasoning-pro is its replacement. Token prices
 # below; Perplexity also charges per request by search context size
-# ($5/$8/$12 per 1000 on sonar, $6/$10/$14 on pro and reasoning-pro), which the
-# cost estimate does not include.
+# ($5/$8/$12 per 1000 on sonar, $6/$10/$14 on pro and reasoning-pro). The
+# estimate adds `per_request` at the low-context rate — the floor of what a
+# call costs, where it added nothing and read about eight times low.
 [models."sonar"]
 caps  = ["text-to-text"]
-price = { input = 1.0, output = 1.0 }
+price = { input = 1.0, output = 1.0, per_request = 0.005 }
 
 [models."sonar-pro"]
 caps  = ["text-to-text"]
-price = { input = 3.0, output = 15.0 }
+price = { input = 3.0, output = 15.0, per_request = 0.006 }
 
 [models."sonar-reasoning-pro"]
 caps  = ["text-to-text"]
-price = { input = 2.0, output = 8.0 }
+price = { input = 2.0, output = 8.0, per_request = 0.006 }
 
 [models."sonar-deep-research"]
 caps  = ["text-to-text"]
