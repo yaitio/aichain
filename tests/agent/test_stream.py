@@ -129,8 +129,6 @@ class TestTheHookChannelIsLeftAsItWasFound(unittest.TestCase):
         self.assertIsNone(agent.last_result)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestTheAnswerArrivesAsItIsWritten(unittest.TestCase):
@@ -200,3 +198,44 @@ class TestTheAnswerArrivesAsItIsWritten(unittest.TestCase):
                       hooks=[seen.append])
         agent.run("do it")
         self.assertEqual([e for e in seen if e.type.startswith("text.")], [])
+
+
+class TestDeltasArriveBeforeTheModelEnds(unittest.TestCase):
+    """The deltas were emitted inside a synchronous call and handed over in
+    one batch when it returned: a `for ev in stream()` consumer saw all of
+    them at the end, which is what the streaming was for."""
+
+    def test_the_first_delta_reaches_the_consumer_while_the_model_is_still_writing(self):
+        from unittest.mock import MagicMock
+        agent = _agent(_text("unused"))
+        progress = []
+
+        def sse(path, body, headers, *a, **k):
+            for word in ("one ", "two ", "three"):
+                progress.append(word)
+                yield {"choices": [{"delta": {"content": word}}]}
+            yield {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 1,
+                                            "total_tokens": 2}}
+
+        agent.model.client._post_sse = MagicMock(side_effect=sse)
+        for ev in agent.stream("go"):
+            if ev.type == "text.delta":
+                self.assertEqual(progress, ["one "])
+                break
+
+    def test_a_failed_stream_still_closes_its_block(self):
+        from unittest.mock import MagicMock
+        agent = _agent(_text("unused"))
+
+        def sse(path, body, headers, *a, **k):
+            yield {"choices": [{"delta": {"content": "partial"}}]}
+            raise ConnectionError("dropped")
+
+        agent.model.client._post_sse = MagicMock(side_effect=sse)
+        types = [e.type for e in agent.stream("go")]
+        self.assertIn("text.started", types)
+        self.assertIn("text.ended", types)
+
+
+if __name__ == "__main__":
+    unittest.main()

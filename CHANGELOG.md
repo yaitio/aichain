@@ -125,6 +125,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **`Agent.stream()` hands each text delta over as it arrives.** The deltas
+  were emitted inside a synchronous model call and drained when it returned,
+  so hooks saw them at 0.31, 0.61 and 0.91 s and a `for ev in stream()`
+  consumer saw all three at 0.91 s — the streaming R2 shipped did not reach the
+  stream. The model turn is walked now, and a block opened is closed with
+  `text.ended` even when the stream fails part way.
+
 - **Four Skill traps closed.** `Skill(options=…)` is refused with the place
   options go — `Model(name, options={…})` — where it was stored and never
   applied, so `Skill(options={"temperature": 0})` ran at 1.0; a saved Skill

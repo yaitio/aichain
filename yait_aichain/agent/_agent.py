@@ -1020,7 +1020,17 @@ class Agent:
 
         while True:
             try:
-                reply = self._ask(messages, state)
+                # Walked, not called: the text deltas of a streamed turn reach
+                # the consumer as they arrive, where they were handed over in
+                # one batch after the model finished.
+                asking = self._ask_events(messages, state)
+                while True:
+                    try:
+                        next(asking)
+                    except StopIteration as done:
+                        reply = done.value
+                        break
+                    yield from drain()
             except Exception as exc:
                 yield from drain()
                 # A reply cut at the token ceiling is its own stop: the fix is
@@ -1173,8 +1183,18 @@ class Agent:
         return schemas
 
     def _ask(self, messages: list, state: dict):
+        """One turn, to its end — for ``step()``, which has nobody to stream to."""
+        asking = self._ask_events(messages, state)
+        while True:
+            try:
+                next(asking)
+            except StopIteration as done:
+                return done.value
+
+    def _ask_events(self, messages: list, state: dict):
         """
-        One turn of the conversation, through ``Skill``.
+        One turn of the conversation, through ``Skill``, yielding after each
+        event it emits so a stream can hand it on.
 
         Delegating instead of hand-rolling the call is what makes cost,
         caching and native tool calling arrive at all: they were added to the
@@ -1204,7 +1224,7 @@ class Agent:
             # loop that doesn't pays for each blip with a lost decision.
             max_retries = 2,
         )
-        reply = self._reply(skill)
+        reply = yield from self._reply(skill)
         # Kept per run, deduplicated: a loop asks the same thing of the same
         # model every turn, so without this the list grows by a copy a step.
         for a in skill.last_adaptations:
@@ -1629,14 +1649,19 @@ class Agent:
 
         message_id = uuid.uuid4().hex[:12]
         opened = False
-        for piece in skill.stream():
-            if not opened:
-                self._emit("text.started", payload={"id": message_id})
-                opened = True
-            self._emit("text.delta",
-                       payload={"id": message_id, "text": piece})
-        if opened:
-            self._emit("text.ended", payload={"id": message_id})
+        try:
+            for piece in skill.stream():
+                if not opened:
+                    self._emit("text.started", payload={"id": message_id})
+                    opened = True
+                self._emit("text.delta",
+                           payload={"id": message_id, "text": piece})
+                yield
+        finally:
+            # A block opened is closed, whatever ended it: a consumer left with
+            # `text.started` and no `text.ended` keeps a block open for ever.
+            if opened:
+                self._emit("text.ended", payload={"id": message_id})
         # `stream()` assembles as well as yields, so the decision this turn
         # reached is the same object `run()` would have returned — a
         # ToolCallRequest when the model asked to act, the text otherwise.
