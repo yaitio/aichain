@@ -102,10 +102,34 @@ class TestTheTransportReassembles(unittest.TestCase):
         _, skill = self._stream(events, output={"format": {"type": "json"}})
         self.assertEqual(skill.last_result, {"n": 1})
 
-    def test_unparseable_json_keeps_the_text_rather_than_none(self):
-        events = _sse(_delta("not json"))
+    def test_unparseable_json_raises_and_keeps_the_text(self):
+        # As run() does, where the stream handed back the text as if it were
+        # the value; the text is kept, not turned into None.
+        from yait_aichain.clients._errors import InvalidStructuredOutputError
+        m = Skill(model=Model("gpt-4o", api_key="k"),
+                  input={"messages": [{"role": "user", "parts": [{"type": "text", "text": "hi"}]}]},
+                  output={"format": {"type": "json"}})
+        with mock.patch("urllib3.PoolManager.request", return_value=_sse(_delta("not json"))):
+            with self.assertRaises(InvalidStructuredOutputError):
+                list(m.stream())
+        self.assertEqual(m.last_result, "not json")
+
+    def test_a_fenced_json_answer_is_parsed_as_run_parses_it(self):
+        events = _sse(_delta("```json\n"), _delta('{"n": 1}\n```'))
         _, skill = self._stream(events, output={"format": {"type": "json"}})
-        self.assertEqual(skill.last_result, "not json")
+        self.assertEqual(skill.last_result, {"n": 1})
+
+    def test_a_stream_the_caller_abandons_is_recorded(self):
+        ended = []
+        m = Skill(model=Model("gpt-4o", api_key="k"),
+                  input={"messages": [{"role": "user", "parts": [{"type": "text", "text": "hi"}]}]},
+                  hooks=[lambda ev: ended.append(ev) if ev.type == "llm_call.ended" else None])
+        with mock.patch("urllib3.PoolManager.request",
+                        return_value=_sse(_delta("a"), _delta("b"), _delta("c"))):
+            gen = m.stream()
+            next(gen)
+            gen.close()
+        self.assertEqual([e.error for e in ended], ["abandoned"])
 
 
 class TestTheRequestSaysStream(unittest.TestCase):

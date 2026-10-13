@@ -30,10 +30,13 @@ from .. import _hints
 from ..clients._base import APIError
 from ..clients._errors import (
     RateLimitError, ServerError, NetworkError, TaskFailedError,
-    InsufficientCreditsError,
+    InsufficientCreditsError, InvalidStructuredOutputError,
 )
 from ..models._adaptation import SWAPPED, Adaptation
 from ..models._base import Model, StreamOutcome
+from ..models._calls import ToolCallRequest
+from ..models._schema import check_structure
+from ..clients._families._structured import parse_structured
 from ..models._usage import Usage, extract_usage, attach_cost
 from .._events import Event, emit
 from . import _adapters as adapters
@@ -485,16 +488,32 @@ class Skill:
         model  = self.models[0]
         _tools = getattr(self, "_tools", None)
         pieces = []
+        finished = False
+        try:
+            yield from self._stream_on(model, messages, _tools, pieces)
+            finished = True
+        finally:
+            # A caller that stops reading — a closed connection, a `break` —
+            # ends the generator with GeneratorExit, which skipped the charge
+            # and the ended event: a cancelled stream was never recorded.
+            if not finished and self._open_call is not None:
+                self._ended(model, self._open_call, error="abandoned")
+            self._open_call = None
 
+    _open_call: "float | None" = None
+
+    def _stream_on(self, model, messages, _tools, pieces):
         outcome = None
         for attempt in _attempts(self.max_retries, self.retry_delay):
             t0 = self._started(model)
+            self._open_call = t0
             try:
                 # The outcome is this stream's own, returned when it ends — not
                 # read back off a model another stream may be using.
                 outcome = yield from _tee(model.stream(messages, self._output, tools=_tools), pieces)
                 break
             except Exception as exc:
+                self._open_call = None
                 self._ended(model, t0, error=exc)
                 # `pieces` is the whole condition that matters: once the
                 # caller has seen something, starting over would replay or
@@ -522,32 +541,48 @@ class Skill:
             for budget in in_force(self.max_cost):
                 budget.charge(getattr(self.last_usage, "cost", None))
 
+        self._open_call = None
+        fmt = (self._output or {}).get("format") or {}
+        kind = fmt.get("type", "text")
         whole = outcome.result
-        if whole is not None and not isinstance(whole, str):
-            # The provider could not stream and answered in one piece; the
-            # object it answered with is the result, not the text it renders
-            # to. A tool call rendered to text and parsed back is not a tool
-            # call any more.
-            self.last_result = whole
-            self.history = [whole]
-            self._ended(model, t0, self.last_usage)
-            return
-
-        text = "".join(pieces)
-        kind = ((self._output or {}).get("format") or {}).get("type", "text")
-        if kind in ("json", "json_schema"):
-            try:
-                self.last_result = json.loads(text)
-            except json.JSONDecodeError:
-                # The pieces are handed over as they came; a truncated or
-                # non-JSON answer is not silently turned into None, because
-                # the caller has already seen the text and can say what
-                # arrived better than a swallowed exception can.
-                self.last_result = text
-        else:
-            self.last_result = text
+        try:
+            if isinstance(whole, ToolCallRequest) and kind == "json_schema" and not _tools:
+                # Anthropic's structured output is a forced call of a tool the
+                # library made up; its arguments are the answer, as run() has it.
+                whole = self._structured_call(whole, fmt)
+            if whole is not None and not isinstance(whole, str):
+                # The provider could not stream and answered in one piece; the
+                # object it answered with is the result, not the text it renders
+                # to. A tool call rendered to text and parsed back is not a tool
+                # call any more.
+                self.last_result = whole
+            elif kind in ("json", "json_schema"):
+                # Parsed the way run() parses it — fences stripped, the schema
+                # checked — and a failure raised, where it handed back the text.
+                self.last_result = "".join(pieces)
+                self.last_result = parse_structured(
+                    self.last_result, fmt.get("schema") if kind == "json_schema" else None,
+                    strip_fences=True)
+            else:
+                self.last_result = "".join(pieces)
+        except Exception as exc:
+            self._ended(model, t0, self.last_usage, error=exc)
+            raise
         self.history = [self.last_result]
         self._ended(model, t0, self.last_usage)
+
+    @staticmethod
+    def _structured_call(request, fmt: dict):
+        name = fmt.get("name", "structured_output")
+        calls = [c for c in request.calls if c.name == name]
+        if len(calls) != 1:
+            return request
+        value = calls[0].arguments
+        if isinstance(fmt.get("schema"), dict) and (problems := check_structure(value, fmt["schema"])):
+            raise InvalidStructuredOutputError(
+                "Response does not match the requested schema: " + "; ".join(problems[:5]),
+                problems=problems, value=value)
+        return value
 
     def _run_on_model(
         self,
@@ -568,8 +603,12 @@ class Skill:
         ``last_usage`` is the sum across turns; ``history`` holds each reply.
         """
         if not any(adapters.is_generate_marker(m) for m in messages):
-            result, usage, made = self._call_once(
-                model, messages, self._output, max_retries, retry_delay)
+            try:
+                result, usage, made = self._call_once(
+                    model, messages, self._output, max_retries, retry_delay)
+            except Exception as exc:
+                self.last_usage = getattr(exc, "_aichain_usage", None)
+                raise
             self.last_usage = usage
             self.last_adaptations = made
             self.history    = [result]
@@ -595,8 +634,13 @@ class Skill:
                 running.append(item[1])
                 continue
             output = self._output if k == last_gen else _TEXT_OUTPUT
-            reply, usage, made = self._call_once(
-                model, running, output, max_retries, retry_delay)
+            try:
+                reply, usage, made = self._call_once(
+                    model, running, output, max_retries, retry_delay)
+            except Exception as exc:
+                if (paid := getattr(exc, "_aichain_usage", None)) is not None:
+                    self.last_usage = paid if self.last_usage is None else self.last_usage + paid
+                raise
             self.last_adaptations = made
             self.last_usage = usage if self.last_usage is None else self.last_usage + usage
             history.append(reply)
@@ -648,11 +692,20 @@ class Skill:
                 getattr(model, "_provider", None))
                 for budget in in_force(self.max_cost):
                     budget.charge(getattr(usage, "cost", None))
-                result   = (model.from_response(response, output, tools_sent=bool(_tools)) if own
-                            else model.from_response(response, output))
+                try:
+                    result = (model.from_response(response, output, tools_sent=bool(_tools)) if own
+                              else model.from_response(response, output))
+                except Exception as exc:
+                    # Paid for and unparseable: the usage was lost with the
+                    # exception, and no ended event said the call happened.
+                    self._ended(model, t0, usage, error=exc)
+                    exc._aichain_usage = usage
+                    raise
                 self._ended(model, t0, usage)
                 return result, usage, made
             except APIError as exc:
+                if hasattr(exc, "_aichain_usage"):
+                    raise                         # a parse failure, already recorded
                 self._ended(model, t0, error=exc)
                 if not _retryable(exc, attempt, max_retries):
                     raise

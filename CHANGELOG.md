@@ -125,6 +125,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **`Skill.stream()` parses structured output the way `run()` does.** Fences
+  are stripped and the schema is checked; an answer that does not parse
+  raises, where the stream handed back the text as the value (`last_result`
+  still holds the text). A streamed Anthropic `json_schema` answer is the
+  value, where `last_result` was the library's own synthetic tool call.
+- **A paid call is recorded.** A stream the caller stops reading emits
+  `llm_call.ended` with `error="abandoned"`, where it emitted nothing. A
+  response that fails to parse after it was billed keeps its usage on
+  `last_usage` and emits `llm_call.ended` with the error, where both were lost
+  with the exception.
+
 - **A placeholder is filled wherever it stands.** `{"summary": {text}}` was
   read as an escaped brace and the document never went in; the template is
   scanned left to right now, `{{` and `}}` taken as literals and anything else
