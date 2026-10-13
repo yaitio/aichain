@@ -182,22 +182,46 @@ class PermissionPolicy:
         """
         return self.rules.get(risk, self.default)
 
-    def decide(self, tool) -> str:
-        """Return the decision for *tool* based on its ``risk`` attribute.
+    def decide(self, tool, arguments: dict | None = None) -> str:
+        """Return the decision for one call of *tool*.
+
+        The class is the call's, when the tool can tell: a tool with
+        ``risk_for(arguments)`` names the class of this call — ``git status``
+        and ``git push`` through one shell were one decision, and an ungated
+        shell walked round a gated ``git`` tool. Otherwise the tool's own
+        ``risk``.
 
         Parameters
         ----------
         tool : Tool
-            The tool about to run; its ``risk`` is read.
+            The tool about to run.
+        arguments : dict | None, optional
+            The call's arguments.
         """
-        return self.decide_risk(getattr(tool, "risk", WRITE))
+        return self.decide_risk(risk_of(tool, arguments))
 
     def __repr__(self) -> str:
         return f"PermissionPolicy(rules={dict(self.rules)}, default={self.default!r})"
 
 
+
+def risk_of(tool, arguments: dict | None = None) -> str:
+    """The risk class of one call of *tool*: what its ``risk_for`` says of
+    these arguments, else its ``risk``. A class the tool names that is not a
+    class is its own ``risk`` — never a lower one."""
+    base = getattr(tool, "risk", WRITE)
+    judge = getattr(tool, "risk_for", None)
+    if callable(judge) and arguments is not None:
+        try:
+            risk = judge(arguments)
+        except Exception:
+            return base
+        if risk in RISK_CLASSES:
+            return risk
+    return base
+
 __all__ = [
-    "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
+    "PermissionPolicy", "ApprovalRequest", "ApprovalDecision", "risk_of",
     "RISK_CLASSES", "DECISIONS",
     "READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL", "DESTRUCTIVE", "PRIVILEGED",
     "ALLOW", "APPROVE", "DENY",

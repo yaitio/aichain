@@ -133,6 +133,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A permission decision can see the call it decides.**
+  `PermissionPolicy.decide(tool, arguments)` asks the tool, where it can tell,
+  for this call's class through `risk_for(arguments)`; `risk_of()` is the same
+  rule, exported. `local_run` is the first: a command that only looks — `ls`,
+  `cat`, `grep`, `git status`, `git log`, `git diff` — with nothing chained,
+  piped, redirected or substituted is `read`, and anything else is
+  `privileged`, so the default policy lets `git status` through and sends
+  `git push` to a person, where one shell was one decision. An approval
+  request names the call's class. A policy of another make that takes no
+  arguments is still asked the old way.
+
 - **A run document carries its format.** `RunDocument.to_dict()` writes
   `"format": 1`, and `from_dict()` brings an older document up through a
   migration step per version — one saved before 4.0 is format 0 and is read

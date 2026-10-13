@@ -125,14 +125,21 @@ Return the decision for a bare *risk* class string.
 ### `PermissionPolicy.decide()`
 
 ```python
-PermissionPolicy.decide(tool) -> str
+PermissionPolicy.decide(tool, arguments: dict | None = None) -> str
 ```
 
-Return the decision for *tool* based on its `risk` attribute.
+Return the decision for one call of *tool*.
+
+The class is the call's, when the tool can tell: a tool with
+`risk_for(arguments)` names the class of this call — `git status`
+and `git push` through one shell were one decision, and an ungated
+shell walked round a gated `git` tool. Otherwise the tool's own
+`risk`.
 
 **Parameters**
 
-- `tool` (*Tool*) — The tool about to run; its `risk` is read.
+- `tool` (*Tool*) — The tool about to run.
+- `arguments` (*dict | None, optional*, default `None`) — The call's arguments.
 
 ---
 

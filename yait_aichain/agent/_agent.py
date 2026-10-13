@@ -1439,10 +1439,17 @@ class Agent:
                     f"{MAX_ARGUMENT_DEPTH} levels deep; send a flatter structure")
         from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
 
-        decision = self.permissions.decide(tool)
+        # The call's arguments are the pool's own for `pool`: the policy is asked
+        # about the tool it fans out, which takes them one entry at a time.
+        arguments = None if call.name == "pool" else dict(call.arguments or {})
+        try:
+            decision = self.permissions.decide(tool, arguments)
+        except TypeError:
+            decision = self.permissions.decide(tool)          # a policy of another make
         if decision == ALLOW:
             return None
-        risk = getattr(tool, "risk", "write")
+        from ..tools._permissions import risk_of
+        risk = risk_of(tool, arguments)
         if decision == DENY:
             return f"tool {tool.name!r} denied by policy"
         if decision != APPROVE:

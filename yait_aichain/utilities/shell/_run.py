@@ -48,6 +48,15 @@ def _child_env() -> dict:
             if not _SECRET_NAME.search(k) and not k.startswith("AWS_")}
 
 
+
+#: Commands that only read, by name. Anything chained, piped or redirected,
+#: and anything not here, is privileged.
+_LOOKS = frozenset({"ls", "pwd", "cat", "head", "tail", "wc", "grep", "rg", "find", "file",
+                    "stat", "du", "df", "tree", "which", "echo", "date", "whoami", "uname"})
+_GIT_LOOKS = frozenset({"status", "log", "diff", "show", "branch", "rev-parse", "ls-files",
+                        "blame", "describe", "shortlog", "remote"})
+_LISTING = frozenset({"-a", "-r", "-v", "-vv", "--list", "--all", "--remotes", "--verbose"})
+
 class LocalRunTool(Tool, SandboxedTool):
     """
     Execute a shell command or Python file.
@@ -114,6 +123,35 @@ class LocalRunTool(Tool, SandboxedTool):
         },
         "required": ["input"],
     }
+
+    def risk_for(self, arguments: dict) -> str:
+        """``read`` for a command that only looks — ``ls``, ``cat``, ``git
+        status`` — with nothing chained, piped or redirected; ``privileged``
+        for anything else. A permission policy then gates ``git push`` and
+        lets ``git status`` through, where the whole tool was one decision.
+        Conservative: what this does not recognise is privileged."""
+        command = str((arguments or {}).get("input") or "").strip()
+        if not command or any(c in command for c in ";|&<>`$\n\\") or "(" in command:
+            return "privileged"
+        try:
+            words = shlex.split(command)
+        except ValueError:
+            return "privileged"
+        if not words:
+            return "privileged"
+        head, rest = words[0], words[1:]
+        if head in _LOOKS:
+            if head == "find" and any(w in ("-delete", "-exec", "-execdir", "-ok", "-fprint") for w in rest):
+                return "privileged"
+            return "read"
+        if head == "git" and rest and rest[0] in _GIT_LOOKS and not any(
+                w.startswith(("--output", "-o")) for w in rest[1:]):
+            # `branch` and `remote` list only when asked to list: `-D`, `add`
+            # and `set-url` change the repository.
+            if rest[0] in ("branch", "remote") and not all(w in _LISTING for w in rest[1:]):
+                return "privileged"
+            return "read"
+        return "privileged"
 
     def run(self, input: str, options: dict | None = None) -> dict:
         opts    = options or {}
