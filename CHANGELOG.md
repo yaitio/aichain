@@ -125,6 +125,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **The approval gate opens on a yes and nothing else.** An approver answers
+  `True`, `False` or `ApprovalDecision`; anything else is an error, where
+  `granted = bool(answer)` approved a call on `"denied"` and on
+  `{"approved": False}`. A policy answering a word that is not a decision is
+  a refusal, where it meant "allowed". `PermissionPolicy.rules` is read-only
+  after it is checked, and the approver is shown a deep copy of the arguments.
+- **A caller's callback that raises ends the run one way.** A check, a
+  ceiling, a nudge or an approver that raises stops the run with
+  `stopped_by="condition_error"`, the error naming which, and a warning with
+  the traceback — a check swallowed it at DEBUG, and the others raised out of
+  `run()` with no result and no `run.finished`. A failed tool's
+  `tool_call.ended` carries the exception's type and traceback.
+
 - **Stop conditions hold on both seams.** A `stop_when` with no ceiling gets
   `step_count(30)` and a warning, where `stop_when=[check(...)]` dropped the
   default and the loop had none. `cost_budget` on a model with no price warns

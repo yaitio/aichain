@@ -232,11 +232,9 @@ def check(fn, name: str = "check"):
         How the stop is reported: ``stopped_by="check:<name>"``.
     """
     def _c(state):
-        try:
-            return f"check:{name}" if fn(state) else None
-        except Exception as exc:                       # pragma: no cover
-            _logger.debug("stop check %s raised: %s", name, exc)
-            return None
+        # A raise is the loop's to report — as `condition_error`, the way a
+        # ceiling's or a nudge's is — where it was a DEBUG line and "not yet".
+        return f"check:{name}" if fn(state) else None
     _c.kind, _c.name = "check", name
     return _c
 
@@ -1114,7 +1112,13 @@ class Agent:
                     # The request reaches the consumer *here*, before anyone
                     # is asked — which is the whole point of splitting it.
                     yield from drain()
-                    denial = self._resolve_permission(state)
+                    try:
+                        denial = self._resolve_permission(state)
+                    except Exception as exc:
+                        messages.append(tool_result_turn(call.id, prompts.result_message(
+                            None, f"approval failed: {type(exc).__name__}: {exc}")))
+                        yield from drain()
+                        return self._callback_failed(state, "the approver", exc)
                     yield from drain()
 
                 try:
@@ -1125,10 +1129,14 @@ class Agent:
                                         state, journal)
                     yield from drain()
                     return parked
+                failure, self._failure = self._failure, None
                 self._emit("tool_call.ended", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "", "result": result,
-                                    "agent": self.name or ""},
+                                    "agent": self.name or "",
+                                    # The type and the traceback, which the
+                                    # error string had dropped.
+                                    **({"exception": failure} if failure else {})},
                            error=error)
                 yield from drain()
 
@@ -1162,7 +1170,12 @@ class Agent:
                     call.id, prompts.result_message(result, error)))
 
             state["journal"] = journal
-            if fired := self._fired(state):
+            try:
+                fired = self._fired(state)
+            except Exception as exc:
+                yield from drain()
+                return self._callback_failed(state, "a stop condition", exc)
+            if fired:
                 kind = getattr(fired[1], "kind", "ceiling")
                 if kind == "check":
                     self._log(1, f"\n[Done] ✓ {fired[0]} · {state['steps']} step(s)")
@@ -1177,10 +1190,26 @@ class Agent:
             # been reached ends the run whatever a nudge would have said, so a
             # nudge listed first in `stop_when` cannot talk the loop past its
             # own budget.
-            for note in self._nudges(state):
+            try:
+                notes = self._nudges(state)
+            except Exception as exc:
+                yield from drain()
+                return self._callback_failed(state, "a nudge", exc)
+            for note in notes:
                 messages.append({"role": "user",
                                  "parts": [{"type": "text", "text": note}]})
                 yield from drain()
+
+    _failure: dict | None = None
+
+    def _callback_failed(self, state: dict, where: str, exc: BaseException) -> AgentResult:
+        """One handling for every caller-supplied callback that raises — a check,
+        a ceiling, a nudge, an approver. They were handled three ways: a check
+        swallowed it, a ceiling and a nudge raised out of run(), and so did an
+        approver, with no result and no `run.finished`."""
+        _logger.warning("%s raised; the run stops", where, exc_info=exc)
+        return self._result(state, False, None, "condition_error",
+                            error=f"{where} raised {type(exc).__name__}: {exc}")
 
     def _fired(self, state: dict):
         """The first terminal condition that fired. Nudges are not terminal."""
@@ -1305,6 +1334,8 @@ class Agent:
             # as an error and the run would carry on as if nothing was owed.
             raise
         except Exception as exc:
+            from .._errors_policy import describe
+            self._failure = describe(exc)
             return None, f"{type(exc).__name__}: {exc}"
 
     def _do_tool(self, call, state: dict | None = None) -> Any:
@@ -1355,11 +1386,15 @@ class Agent:
         risk = getattr(tool, "risk", "write")
         if decision == DENY:
             return f"tool {tool.name!r} denied by policy"
-        if decision != APPROVE:                       # unreachable via the
-            return None                               # policy's own validation
+        if decision != APPROVE:
+            # A policy of another make answering a word this gate does not
+            # know: it was read as "allowed". Anything but yes is no.
+            return f"tool {tool.name!r}: the policy answered {decision!r}, which is not a decision"
 
         self._pending = ApprovalRequest(
-            tool=tool.name, risk=risk, arguments=dict(call.arguments or {}),
+            # A copy all the way down: an approver that edits what it was
+            # shown would change the call it approved.
+            tool=tool.name, risk=risk, arguments=copy.deepcopy(dict(call.arguments or {})),
             call_id=getattr(call, "id", "") or "", agent=self.name or "", run_id=self._run_id or "")
         self._emit("approval.requested", name=tool.name,
                    step=(state or {}).get("steps"),
@@ -1379,7 +1414,13 @@ class Agent:
                        f"{request.risk!r} to 'allow' if this class does not "
                        "need gating here.")
         else:
+            from ..tools._permissions import ApprovalDecision
             answer  = self.approve(request)
+            # Only a yes that says yes: `bool("denied")` and
+            # `bool({"approved": False})` both approved the call.
+            if not isinstance(answer, (bool, ApprovalDecision)):
+                raise TypeError(f"an approver answers True, False or ApprovalDecision(granted, "
+                                f"reason); it answered {type(answer).__name__} {answer!r}")
             granted = bool(answer)
             # An `ApprovalDecision` carries why; a bare False does not, and a
             # UI showing "not approved" and nothing else has thrown away the

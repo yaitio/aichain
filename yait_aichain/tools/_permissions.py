@@ -165,7 +165,11 @@ class PermissionPolicy:
                 f"Invalid permission decision(s) {sorted(bad)}; "
                 f"must be one of {sorted(DECISIONS)}."
             )
-        self.rules   = merged
+        # Read-only: the rules were checked here, and a change after the
+        # check — `policy.rules["destructive"] = "alow"` — was a decision no
+        # gate knew, which the agent then read as "allowed".
+        from types import MappingProxyType
+        self.rules   = MappingProxyType(merged)
         self.default = default
 
     def decide_risk(self, risk: str) -> str:
@@ -189,7 +193,7 @@ class PermissionPolicy:
         return self.decide_risk(getattr(tool, "risk", WRITE))
 
     def __repr__(self) -> str:
-        return f"PermissionPolicy(rules={self.rules}, default={self.default!r})"
+        return f"PermissionPolicy(rules={dict(self.rules)}, default={self.default!r})"
 
 
 __all__ = [

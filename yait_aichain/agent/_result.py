@@ -38,8 +38,9 @@ class AgentResult:
         What ended the run: ``"answered"``, ``"check:<name>"``,
         ``"step_count"``, ``"token_budget"``, ``"cost_budget"``,
         ``"truncated"`` (a reply cut at ``max_tokens`` — raise it),
-        ``"llm_error"`` (the model call failed otherwise), or the name of an
-        error.
+        ``"llm_error"`` (the model call failed otherwise),
+        ``"condition_error"`` (a check, ceiling, nudge or approver of the
+        caller's raised; ``error`` says which), or the name of an error.
     plan : list[dict]
         In ``waterfall`` mode, the plan it wrote — ``{"goal": …}`` per step.
     adaptations : list

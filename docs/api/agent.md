@@ -337,8 +337,9 @@ cost. `bool(result)` is `result.success`.
 - `stopped_by` (*str | None*, default `None`) — What ended the run: `"answered"`, `"check:<name>"`,
   `"step_count"`, `"token_budget"`, `"cost_budget"`,
   `"truncated"` (a reply cut at `max_tokens` — raise it),
-  `"llm_error"` (the model call failed otherwise), or the name of an
-  error.
+  `"llm_error"` (the model call failed otherwise),
+  `"condition_error"` (a check, ceiling, nudge or approver of the
+  caller's raised; `error` says which), or the name of an error.
 - `plan` (*list[dict]*, default `<factory>`) — In `waterfall` mode, the plan it wrote — `{"goal": …}` per step.
 - `adaptations` (*list*, default `<factory>`) — What the library changed in this run's requests to fit the provider,
   each an `Adaptation`; empty when nothing was.
