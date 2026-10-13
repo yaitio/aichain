@@ -132,6 +132,35 @@ def _split_provider_prefix(name: str) -> "tuple[str | None, str]":
     return None, name
 
 
+#: Names already reported as unlisted, so a loop that builds one model a call
+#: says it once.
+_UNLISTED_SAID: set = set()
+
+
+def _note_unlisted(name: str, provider: str) -> None:
+    """Say once that *name* was routed by its prefix alone.
+
+    `Model("grok-imagine-image-pro")` matched `grok-` and went to xAI, which
+    had no such model; nothing said the registry did not know it either. A
+    retired name and a typo look exactly like this, so the closest listed
+    names are offered. An explicit `provider/name` is the caller saying they
+    mean it, and is not reported.
+    """
+    if (provider, name) in _UNLISTED_SAID:
+        return
+    _UNLISTED_SAID.add((provider, name))
+    import difflib
+    import warnings
+    known = list(PROVIDERS[provider].get("models", {}))
+    close = difflib.get_close_matches(name, known, n=3, cutoff=0.6)
+    hint = f" Did you mean {', '.join(map(repr, close))}?" if close else ""
+    warnings.warn(
+        f"{name!r} is not in the {provider} registry; it was routed to {provider} by its "
+        f"prefix and is sent as written. Its price is unknown (cost is None) and its "
+        f"capabilities are the provider's defaults.{hint} Write {provider + '/' + name!r} "
+        "to say the name is meant.", stacklevel=3)
+
+
 def _resolve_provider(name: str) -> str:
     """Return the provider key for *name*, or raise ``ValueError``."""
     explicit, model_name = _split_provider_prefix(name)
@@ -363,7 +392,13 @@ class Model:
         # name has any "provider/" prefix stripped (it only steers selection).
         _check_name(name)
         self._provider = _resolve_provider(name)
-        self.name      = _split_provider_prefix(name)[1]
+        explicit, self.name = _split_provider_prefix(name)
+        #: Whether the registry knows this model. An unknown one still runs —
+        #: custom and new models have to — but its price is unknown and its
+        #: capabilities are the provider's defaults.
+        self.listed = self.name in PROVIDERS[self._provider].get("models", {})
+        if not self.listed and not explicit:
+            _note_unlisted(self.name, self._provider)
 
         prov     = PROVIDERS[self._provider]["provider"]
         defaults = prov["defaults"]

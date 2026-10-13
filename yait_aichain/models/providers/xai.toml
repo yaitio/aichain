@@ -86,31 +86,38 @@ price = { input = 1.0, output = 2.0 }
 # grok-4.3's rates (checked live 2026-10-10: every one answers), so they stay
 # for code that names them — at the price they now cost, not the one they had.
 [models."grok-4-0709"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.25, output = 2.5 }
 
 [models."grok-4-fast-reasoning"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.25, output = 2.5 }
 
 [models."grok-4-fast-non-reasoning"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.25, output = 2.5 }
 
 [models."grok-4-1-fast-reasoning"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.25, output = 2.5 }
 
 [models."grok-3"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.25, output = 2.5 }
 
 # grok-3-fast and grok-3-mini answer too; the page does not say what they are
 # billed, so grok-3-mini keeps its last listed price and grok-3-fast has none.
 [models."grok-3-fast"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 
 [models."grok-3-mini"]
+unlisted = "out of /v1/models; still answers (2026-10-13)"
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.3, output = 0.5 }
 

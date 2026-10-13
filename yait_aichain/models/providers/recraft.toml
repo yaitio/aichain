@@ -87,6 +87,7 @@ caps  = ["text-to-image"]
 price = { per_image = 0.21 }
 
 [models."recraftv4_1_utility_vector"]
+unlisted = "absent from /v1/models since 2026-10-10; not probed, a call bills a picture"
 caps  = ["text-to-image"]
 
 # Raster → vector conversion (trace), not generation. No prompt, no content
@@ -94,6 +95,7 @@ caps  = ["text-to-image"]
 # multipart {image}; response {"image": {"b64_json"|"url"}} → SVG. Lives under
 # image-to-image (input image in, image out); 10 credits/op (verified live).
 [models."recraft-vectorize"]
+unlisted = "an operation, not a model: POST /v1/images/vectorize"
 caps  = ["image-to-image"]
 price = { per_image = 0.01 }
 
@@ -102,5 +104,6 @@ caps  = ["text-to-image", "image-to-image"]
 price = { per_image = 0.04 }
 
 [models."recraftv3_vector"]
+unlisted = "absent from /v1/models (recraftv3 is listed); not probed, a call bills a picture"
 caps  = ["text-to-image", "image-to-image"]
 price = { per_image = 0.08 }

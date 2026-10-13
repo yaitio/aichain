@@ -59,9 +59,11 @@ price = { input = 1.32, output = 3.96 }
 # 2026-10-10) and are no longer in the model list. Kept at their last listed
 # prices for code that names them.
 [models."deepseek-chat"]
+unlisted = "announced for discontinuation 2026-07-24; still answers (2026-10-13)"
 caps  = ["text-to-text"]
 price = { input = 0.27, output = 1.1 }
 
 [models."deepseek-reasoner"]
+unlisted = "announced for discontinuation 2026-07-24; still answers (2026-10-13)"
 caps  = ["text-to-text"]
 price = { input = 0.55, output = 2.19 }

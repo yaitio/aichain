@@ -4,6 +4,18 @@
 
 ### Added
 
+- A model name the registry does not know, routed to a provider by its
+  prefix alone, is said once, with the closest listed names:
+  `Model("grok-imagine-image-pro")` went to xAI, which had no such model, and
+  nothing said the registry did not know it either. `Model.listed` reads the
+  same fact; an explicit `provider/name` is the caller meaning it and is not
+  reported.
+- A model the registry keeps although its provider no longer lists it carries
+  `unlisted = "why"` in its data — 28 of them, each checked by a call or
+  marked as not probed. A nightly test compares every listed model with the
+  provider's own list, so a retired model fails that run rather than a
+  user's first call, and a marker the provider has caught up with fails it
+  too.
 - `ttsGoogle` and `sttGoogle` read `GOOGLE_CLOUD_API_KEY` first, then
   `GOOGLE_AI_API_KEY` and `GOOGLE_API_KEY`. Speech is a Cloud API, and an AI
   Studio key restricted to Gemini answers `API_KEY_SERVICE_BLOCKED` there, so

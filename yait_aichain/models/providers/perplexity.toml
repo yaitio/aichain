@@ -47,13 +47,16 @@ caps  = ["text-to-text"]
 price = { input = 1.0, output = 1.0, per_request = 0.005 }
 
 [models."sonar-pro"]
+unlisted = "not in /v1/models; answers (2026-10-13)"
 caps  = ["text-to-text"]
 price = { input = 3.0, output = 15.0, per_request = 0.006 }
 
 [models."sonar-reasoning-pro"]
+unlisted = "not in /v1/models; answers (2026-10-13)"
 caps  = ["text-to-text"]
 price = { input = 2.0, output = 8.0, per_request = 0.006 }
 
 [models."sonar-deep-research"]
+unlisted = "not in /v1/models; not probed, a call runs paid searches"
 caps  = ["text-to-text"]
 price = { input = 2.0, output = 8.0 }
