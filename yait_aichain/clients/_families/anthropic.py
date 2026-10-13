@@ -92,6 +92,15 @@ def _part_to_anthropic(part: dict) -> dict | None:
 
 
 
+
+def _note_ttl(params: dict) -> None:
+    """The cache lifetime travels inside the conversation, where the check for
+    options that never arrived does not look; it is said here instead."""
+    from ...models._adaptation import TRANSLATED, Adaptation, record
+    if params.get("cache_ttl"):
+        record(Adaptation(kind=TRANSLATED, option="cache_ttl", asked=params["cache_ttl"],
+                          sent=f"cache_control ttl {params['cache_ttl']}", model=params["name"]))
+
 def _anthropic_id(call_id: str) -> str:
     """A call id as this API accepts one — letters, digits, ``_`` and ``-``.
     A history made with another model carries its ids (Kimi's
@@ -297,6 +306,7 @@ class AnthropicClient(BaseClient):
                     if isinstance(blk, dict) and blk.get("type") not in (
                             "thinking", "redacted_thinking"):
                         blk["cache_control"] = control
+                        _note_ttl(params)
                         record(Adaptation(
                             kind=ADAPTED, option="cache_control", asked=mark,
                             sent="cache_control breakpoint",
@@ -342,6 +352,7 @@ class AnthropicClient(BaseClient):
                 for blk in reversed(target):
                     if isinstance(blk, dict) and blk.get("type") == "text":
                         blk["cache_control"] = control
+                        _note_ttl(params)
                         record(Adaptation(
                             kind=ADAPTED, option="cache_control", asked=mark,
                             sent="cache_control breakpoint",

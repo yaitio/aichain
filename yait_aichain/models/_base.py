@@ -676,8 +676,10 @@ class Model:
             body.update(self.extra)
         if body is not None:
             note_absent(made, asked, body, self.name, provider=self._provider)
-        announce(made)
+        # Stored before it is announced: under `-W error` the warning raises,
+        # and the record has to be there to say what happened.
         self.last_adaptations = list(made)
+        announce(made)
         # After the record is stored, not before: a caller catching this needs
         # `last_adaptations` to say what happened, and a raise that leaves the
         # evidence unwritten is the silence this whole channel exists against.

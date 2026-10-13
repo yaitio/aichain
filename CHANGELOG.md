@@ -133,6 +133,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **The adaptation channel tells the truth under `-W error`.** The warning was
+  remembered before it was raised and the record stored after, so under
+  `filterwarnings=error` the first call raised with an empty
+  `last_adaptations` and every later call passed in silence. The record is
+  stored first and the warning is remembered only once given. The check for
+  options that never arrived no longer searches the conversation — a "1h" or a
+  4096 in a tool's arguments made a declined option read as delivered — and
+  stops before walking the body when nothing is left to look for; Anthropic,
+  which writes the cache lifetime into the content, says so explicitly.
+
 - **A model option's value is checked where it is written.** `temperature`,
   `top_p`, `top_k` and `max_tokens` are checked at construction — a number of
   the right kind, in range, not a bool, not `None` — where `"0.3"`, `-1` and

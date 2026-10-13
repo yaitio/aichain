@@ -142,8 +142,10 @@ def announce(made: list) -> None:
         mark = (a.model, a.option, a.kind)
         if mark in _WARNED:
             continue
-        _WARNED.add(mark)
+        # Warned, then remembered: under `-W error` the first call raised
+        # after the mark was set, and every later call passed in silence.
         warnings.warn(str(a), RuntimeWarning, stacklevel=4)
+        _WARNED.add(mark)
 
 
 def reset_warnings() -> None:
@@ -175,6 +177,11 @@ def _leaves(obj, path=()) -> dict:
     return {path: obj}
 
 
+#: Top-level request fields that carry the conversation, not options.
+_CONTENT_KEYS = frozenset({"messages", "input", "contents", "system", "instructions",
+                           "tools", "systemInstruction"})
+
+
 def note_absent(made: list, asked: dict, body, model_name: str,
                 why: str = "", provider: str = "") -> None:
     """
@@ -187,6 +194,15 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     what used to disappear quietly.
     """
     spoken = {a.option for a in made}
+    # Nothing left to look for: no walk of the body, which on an agent's turn
+    # is the whole conversation, every step.
+    if all(option in spoken or value is None for option, value in asked.items()):
+        return
+    # The conversation is not where an option goes: a "1h" or a 4096 in a
+    # tool's arguments made a declined option look delivered. A site that
+    # writes an option into the content records it explicitly.
+    if isinstance(body, dict):
+        body = {k: v for k, v in body.items() if k not in _CONTENT_KEYS}
     # Compared with the type, not just the value: `True == 1 == 1.0` in
     # Python, so a plain `in` found `cache_control=True` inside
     # `temperature=1.0` and reported five providers as honouring an option
