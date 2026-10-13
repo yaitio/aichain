@@ -304,7 +304,7 @@ class _OpenAICompatSTT(Transcription):
         fmt:        str,
     ) -> str:
         """Split oversized audio, transcribe each chunk, stitch results."""
-        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit").AudioSegment
+        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit", extra="audio").AudioSegment
 
         audio      = AudioSegment.from_file(path)
         chunk_ms   = self._CHUNK_SECONDS * 1000
@@ -475,7 +475,7 @@ class sttGoogle(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        speech = require("google.cloud.speech", package="google-cloud-speech", who="sttGoogle")
+        speech = require("google.cloud.speech", package="google-cloud-speech", who="sttGoogle", extra="google")
 
         input = check_input_file(input, "audio")
 
@@ -576,7 +576,7 @@ class sttGoogle(Transcription):
     def _transcribe_chunked(
         self, client, config, path: str, timestamps: bool, fmt: str
     ) -> str:
-        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit").AudioSegment
+        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit", extra="audio").AudioSegment
 
         from google.cloud import speech as _speech
 

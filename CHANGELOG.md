@@ -133,6 +133,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **What the speech and fetch tools import is declared.** New extras
+  `google` (Google's speech SDKs, for `speech("google")` and
+  `transcribe("google")`) and `audio` (`pydub`, with `audioop-lts` on 3.13+,
+  for splitting a recording over a provider's size limit); `fetch` declares
+  the `requests` it uses; `all` brings them all, and each tool's ImportError
+  names its extra. Not done here: Google's speech tools still use its SDKs
+  rather than plain HTTP, and `fetch` still brings `markitdown` and its
+  `onnxruntime`; the installation page says how large that is.
+
 - **Offline tests stay offline.** Fifteen `list_models` tests mocked
   `urllib3.PoolManager`, and under an `HTTPS_PROXY` the client built a
   `ProxyManager` instead, so the "offline" test asked the real API with the

@@ -16,8 +16,13 @@ megabytes it might not use.
 |---|---|---|
 | `Skill.save()` / `Chain.save()` and `load()` | `pip install "yait-aichain[yaml]"` | `pyyaml` |
 | the `MCP` utility | `pip install "yait-aichain[mcp]"` | `fastmcp` |
-| `fetch("local")` — reading a page on this machine | `pip install "yait-aichain[fetch]"` | `markitdown` |
-| all three | `pip install "yait-aichain[all]"` | |
+| `fetch("local")` — reading a page on this machine | `pip install "yait-aichain[fetch]"` | `markitdown`, `requests` |
+| `speech("google")`, `transcribe("google")` | `pip install "yait-aichain[google]"` | Google's speech SDKs |
+| transcribing a file over a provider's size limit | `pip install "yait-aichain[audio]"` | `pydub` (and `audioop-lts` on 3.13+) |
+| all of them | `pip install "yait-aichain[all]"` | |
+
+`fetch` brings `markitdown`, and through it `magika` and `onnxruntime` —
+tens of megabytes, which matters in a Lambda layer.
 
 A vector store's own client — Chroma, Pinecone, Qdrant — is installed only if
 you use that backend. Converting files to Markdown, HTML or PDF left the

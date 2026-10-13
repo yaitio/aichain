@@ -430,7 +430,7 @@ class ttsGoogle(Speech):
         str
             Absolute path to the saved audio file.
         """
-        texttospeech = require("google.cloud.texttospeech", package="google-cloud-texttospeech", who="ttsGoogle")
+        texttospeech = require("google.cloud.texttospeech", package="google-cloud-texttospeech", who="ttsGoogle", extra="google")
 
         opts        = _call_options(self, options)
         voice_name  = opts.get("voice")

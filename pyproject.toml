@@ -23,8 +23,14 @@ yaml    = ["pyyaml>=5.1"]
 # Bounded above: 5 is a major version nobody has run this against, and the
 # client API this package calls has changed between majors before.
 mcp     = ["fastmcp>=2.10,<5"]
-fetch   = ["markitdown"]
-all     = ["yait-aichain[yaml,mcp,fetch]"]
+# fetchLocal reads pages through a requests session of its own.
+fetch   = ["markitdown", "requests"]
+# Google's speech tools call its SDKs.
+google  = ["google-cloud-texttospeech", "google-cloud-speech"]
+# Splitting a long recording. pydub needs audioop, which left the standard
+# library in 3.13.
+audio   = ["pydub", "audioop-lts; python_version >= '3.13'"]
+all     = ["yait-aichain[yaml,mcp,fetch,google,audio]"]
 
 [project.urls]
 Homepage   = "https://github.com/yaitio/aichain"
