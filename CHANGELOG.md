@@ -133,6 +133,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A budget takes only money it can count.** A limit is a finite positive
+  number — `Budget(nan)` was never exhausted and `True` was a dollar — and a
+  charge is finite and not negative, where `charge(-10)` gave money back. A
+  cost a response reports that is NaN, negative or a bool is set aside with a
+  warning and the call estimated instead, where a NaN from a proxy turned the
+  budget off. The message shows six decimals, where a fraction of a cent read
+  $0.0000. The docs now say plainly what a budget bounds under concurrency:
+  up to one call per worker past the ceiling — a $0.10 budget was measured
+  spending $4.32 across sixteen workers — because the call in flight cannot be
+  made free.
+
 - **A hook observes and does not steer.** `tool_call.started` and
   `tool_call.ended` carry copies of the arguments and the result, where a hook
   that masked a token in `payload["arguments"]` changed the argument the tool

@@ -15,8 +15,9 @@ Budget(limit: float, *, spent: float = 0.0)
 
 A ceiling in dollars, and what has been spent against it.
 
-Thread-safe because `Pool` runs its items concurrently and a budget that
-can be overspent by a race is not a budget.
+Thread-safe: the sum is kept under a lock, because `Pool` runs its items
+concurrently. A call already in flight when the ceiling is reached still
+finishes, so concurrent work can overshoot by up to one call per worker.
 
 ```python
 budget = Budget(0.50)

@@ -22,6 +22,12 @@ paid for, so this bounds *do not begin another call* and not *never exceed by
 a cent*. The same caveat `cost_budget` carries, for the same reason, and it is
 worth saying twice: a budget that promised the second thing would be lying
 about the one number a caller checks.
+
+**Under concurrency the overshoot is up to one call per worker.** The check
+and the charge are separated by the request itself, so a `Pool` with sixteen
+workers can have sixteen calls in flight when the ceiling is reached: a $0.10
+budget was measured spending $4.32. The lock keeps the sum right; it cannot
+make a call that has begun cost nothing.
 """
 
 from __future__ import annotations
@@ -55,7 +61,7 @@ class BudgetExceeded(Picklable, RuntimeError):
     def __init__(self, spent: float, limit: float, what: str = "") -> None:
         super().__init__(
             f"budget exhausted{' on ' + what if what else ''}: "
-            f"${spent:.4f} spent of ${limit:.4f}. Raise max_cost, or catch "
+            f"${spent:.6f} spent of ${limit:.6f}. Raise max_cost, or catch "
             "BudgetExceeded and read what completed.")
         self.spent = spent
         self.limit = limit
@@ -65,8 +71,9 @@ class BudgetExceeded(Picklable, RuntimeError):
 class Budget:
     """A ceiling in dollars, and what has been spent against it.
 
-    Thread-safe because `Pool` runs its items concurrently and a budget that
-    can be overspent by a race is not a budget.
+    Thread-safe: the sum is kept under a lock, because `Pool` runs its items
+    concurrently. A call already in flight when the ceiling is reached still
+    finishes, so concurrent work can overshoot by up to one call per worker.
 
     ::
 
@@ -90,8 +97,12 @@ class Budget:
     """
 
     def __init__(self, limit: float, *, spent: float = 0.0) -> None:
-        if limit <= 0:
-            raise ValueError(f"a budget must be positive; got {limit!r}")
+        import math
+        if isinstance(limit, bool) or not isinstance(limit, (int, float)) \
+                or not math.isfinite(limit) or limit <= 0:
+            # NaN compares false with everything, so `Budget(nan)` was never
+            # exhausted; `True` was a dollar.
+            raise ValueError(f"a budget is a finite, positive number of dollars; got {limit!r}")
         self.limit = float(limit)
         self._spent = float(spent)
         self._lock = threading.Lock()
@@ -132,6 +143,14 @@ class Budget:
         amount : float | None
             What the call cost; ``None`` when it could not be priced.
         """
+        if amount is None:
+            return
+        import math
+        if isinstance(amount, bool) or not isinstance(amount, (int, float)) \
+                or not math.isfinite(amount) or amount < 0:
+            # A refund, a NaN from a proxy, a `True`: `charge(-10)` gave money
+            # back, and a NaN made every later comparison false.
+            raise ValueError(f"a charge is a finite amount of 0 or more; got {amount!r}")
         if not amount:
             return
         with self._lock:

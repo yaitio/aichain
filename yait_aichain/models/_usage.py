@@ -101,6 +101,23 @@ class Spend:
         return self.usage.cost if self.usage is not None else None
 
 
+def _reported_cost(value) -> float | None:
+    """A cost a response reports, or None when it is not one. A NaN, a
+    negative or a bool from a proxy turned a budget off or refunded it;
+    it is set aside, with a warning, and the registry's estimate is used."""
+    import math
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or not math.isfinite(value) or value < 0:
+        import warnings
+        warnings.warn(f"the response reported a cost of {value!r}, which is not a price; "
+                      "it is set aside and the call is estimated instead", RuntimeWarning,
+                      stacklevel=3)
+        return None
+    return float(value)
+
+
 def extract_usage(response: dict) -> Usage:
     """
     Build a ``Usage`` from a raw provider response dict.
@@ -157,9 +174,9 @@ def extract_usage(response: dict) -> Usage:
         # Some providers bill in the response itself — OpenRouter puts the
         # call's price in `usage.cost`. That is the bill, not an estimate, so
         # it is kept and wins over the registry's arithmetic.
-        reported = u.get("cost")
+        reported = _reported_cost(u.get("cost"))
         return Usage(input_tokens=inp, output_tokens=out, total_tokens=total,
-                     cost=float(reported) if isinstance(reported, (int, float)) else None,
+                     cost=reported,
                      cache_write_tokens=write, cache_read_tokens=read,
                      image_input_tokens=img_in)
 
