@@ -87,6 +87,22 @@ class InvalidRequestError(APIError):
     """HTTP 400 / 422 — malformed request (bad params, schema, etc.)."""
 
 
+class ContextWindowExceededError(InvalidRequestError):
+    """The conversation is longer than the model's context window.
+
+    A request error of its own, because what fixes it is not what fixes the
+    others: a shorter history or a model with a larger window — not a new key,
+    not a retry. It read as a bare 400, the same as a revoked key in a run's
+    record.
+    """
+
+
+#: How providers say a request is past the context window.
+_CONTEXT_SIGNALS = ("context_length_exceeded", "maximum context length", "context window",
+                    "prompt is too long", "input is too long", "too many tokens",
+                    "exceeds the maximum number of tokens", "input token count")
+
+
 class NotFoundError(APIError):
     """HTTP 404 — model or endpoint does not exist."""
 
@@ -241,7 +257,9 @@ def error_from_status(
         return RateLimitError(status, message, _parse_retry_after(headers))
     if status in (401, 403):
         return AuthenticationError(status, message)
-    if status in (400, 422):
+    if status in (400, 413, 422):
+        if any(sig in (message or "").lower() for sig in _CONTEXT_SIGNALS):
+            return ContextWindowExceededError(status, message)
         return InvalidRequestError(status, message)
     if status == 404:
         return NotFoundError(status, message)

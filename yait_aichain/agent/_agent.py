@@ -48,7 +48,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .._budget import Budget, as_budget, start_run
-from ..clients._errors import TruncatedResponseError
+from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models import Model
 from ..skills import Skill
 from ..utilities._base import Utility
@@ -1083,7 +1083,11 @@ class Agent:
                 # A reply cut at the token ceiling is its own stop: the fix is
                 # a larger max_tokens, not a retry or a different model.
                 cut = isinstance(exc, TruncatedResponseError)
-                return self._result(state, False, None, "truncated" if cut else "llm_error",
+                # Its own stop: the history is longer than the model can read,
+                # and that is not the same failure as a revoked key.
+                full = isinstance(exc, ContextWindowExceededError)
+                return self._result(state, False, None,
+                                    "truncated" if cut else "context_overflow" if full else "llm_error",
                                     error=f"{type(exc).__name__}: {exc}")
             yield from drain()
 
@@ -1131,8 +1135,18 @@ class Agent:
                     result, error = ((None, denial) if denial
                                      else self._execute(call, state))
                 except Suspend as susp:
-                    parked = self._park(susp, call, reply, messages,
-                                        state, journal)
+                    try:
+                        parked = self._park(susp, call, reply, messages,
+                                            state, journal)
+                    except Exception as exc:
+                        # The store refused the document — a DynamoDB item
+                        # over 400 KB after twenty calls. run() raised it raw
+                        # and the paid conversation was gone; it comes back
+                        # as a result, history and cost with it.
+                        yield from drain()
+                        return self._result(state, False, None, "park_failed",
+                                            error=f"the run could not be parked: "
+                                                  f"{type(exc).__name__}: {exc}")
                     yield from drain()
                     return parked
                 failure, self._failure = self._failure, None
@@ -1345,6 +1359,11 @@ class Agent:
             return None, f"{type(exc).__name__}: {exc}"
 
     def _do_tool(self, call, state: dict | None = None) -> Any:
+        if _depth(call.arguments) > MAX_ARGUMENT_DEPTH:
+            # Told to the model, which made it: 450 levels raised RecursionError
+            # copying the history on the next turn and ended the run unseen.
+            raise ValueError(f"the arguments are nested more than {MAX_ARGUMENT_DEPTH} levels deep; "
+                             "send a flatter structure")
         tool = self._tool_map.get(call.name)
         if tool is None:
             raise ValueError(f"no tool named {call.name!r}. "
@@ -1384,6 +1403,10 @@ class Agent:
         tool = self._gated_tool(call)
         if tool is None or not self.permissions:
             return None
+        if _depth(call.arguments) > MAX_ARGUMENT_DEPTH:
+            # Refused before the approver's deep copy would raise on it.
+            return (f"tool {tool.name!r}: the arguments are nested more than "
+                    f"{MAX_ARGUMENT_DEPTH} levels deep; send a flatter structure")
         from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
 
         decision = self.permissions.decide(tool)
@@ -1810,6 +1833,21 @@ def _interrupted(result) -> bool:
     """A run that stopped on the model rather than on its own: worth a retry."""
     return (isinstance(result, AgentResult) and not result.success
             and result.stopped_by in ("llm_error", "truncated"))
+
+
+#: The deepest a call's arguments may nest.
+MAX_ARGUMENT_DEPTH = 64
+
+
+def _depth(value, level: int = 0) -> int:
+    """How deep *value* nests, counted no further than one past the limit."""
+    if level > MAX_ARGUMENT_DEPTH:
+        return level
+    if isinstance(value, dict):
+        return max([_depth(v, level + 1) for v in value.values()] or [level + 1])
+    if isinstance(value, (list, tuple)):
+        return max([_depth(v, level + 1) for v in value] or [level + 1])
+    return level
 
 
 def _action(call) -> str:

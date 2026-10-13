@@ -133,6 +133,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **A run that cannot go on ends with a reason.** A request past the model's
+  context window is `ContextWindowExceededError` (an `InvalidRequestError`,
+  now exported) and stops an agent with `stopped_by="context_overflow"`, where
+  it read as `llm_error` like a revoked key. A store that refuses a parked run
+  — a DynamoDB item over 400 KB after twenty calls — ends it with
+  `stopped_by="park_failed"`, history and cost kept, where `run()` raised and
+  the paid conversation was lost. Arguments nested more than 64 levels are an
+  error the model is told, where 450 raised `RecursionError` on the next turn.
+
 - **OpenAI stores nothing it was not asked to.** A Responses API request sends
   `store: false`, where every conversation moved to that API was kept at
   OpenAI by default though nothing here reads `previous_response_id`;

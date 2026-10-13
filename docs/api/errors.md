@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../models/models.md).
 
 <!-- g:api -->
-[`APIError`](#apierror) · [`AuthenticationError`](#authenticationerror) · [`RateLimitError`](#ratelimiterror) · [`InvalidRequestError`](#invalidrequesterror) · [`NotFoundError`](#notfounderror) · [`ServerError`](#servererror) · [`NetworkError`](#networkerror) · [`InsufficientCreditsError`](#insufficientcreditserror) · [`TruncatedResponseError`](#truncatedresponseerror) · [`InvalidStructuredOutputError`](#invalidstructuredoutputerror) · [`TaskFailedError`](#taskfailederror)
+[`APIError`](#apierror) · [`AuthenticationError`](#authenticationerror) · [`RateLimitError`](#ratelimiterror) · [`InvalidRequestError`](#invalidrequesterror) · [`ContextWindowExceededError`](#contextwindowexceedederror) · [`NotFoundError`](#notfounderror) · [`ServerError`](#servererror) · [`NetworkError`](#networkerror) · [`InsufficientCreditsError`](#insufficientcreditserror) · [`TruncatedResponseError`](#truncatedresponseerror) · [`InvalidStructuredOutputError`](#invalidstructuredoutputerror) · [`TaskFailedError`](#taskfailederror)
 
 ---
 
@@ -43,6 +43,17 @@ HTTP 429 — too many requests.  `retry_after` may carry the delay.
 ## `InvalidRequestError`
 
 HTTP 400 / 422 — malformed request (bad params, schema, etc.).
+
+---
+
+## `ContextWindowExceededError`
+
+The conversation is longer than the model's context window.
+
+A request error of its own, because what fixes it is not what fixes the
+others: a shorter history or a model with a larger window — not a new key,
+not a retry. It read as a bare 400, the same as a revoked key in a run's
+record.
 
 ---
 

@@ -77,6 +77,7 @@ from .clients import (
     AuthenticationError,
     InsufficientCreditsError,
     InvalidRequestError,
+    ContextWindowExceededError,
     TruncatedResponseError,
     InvalidStructuredOutputError,
     NotFoundError,
@@ -94,6 +95,6 @@ __all__ = [
     "Event", "Hook", "Tracer", "LoggingTracer",
     "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
     "APIError", "NetworkError", "RateLimitError", "AuthenticationError",
-    "InsufficientCreditsError", "InvalidRequestError", "TruncatedResponseError",
+    "InsufficientCreditsError", "InvalidRequestError", "ContextWindowExceededError", "TruncatedResponseError",
     "InvalidStructuredOutputError", "NotFoundError", "ServerError", "TaskFailedError",
 ]

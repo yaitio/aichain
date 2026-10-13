@@ -569,7 +569,7 @@ API_PAGES = {
                                                        "regex", "numeric", "judge", "pairwise", "abstain",
                                                        "all_of", "adapt", "read", "write", "normalise", "se", "ci")],
     "api/errors.md": [("yait_aichain", n) for n in ("APIError", "AuthenticationError", "RateLimitError",
-                                                    "InvalidRequestError", "NotFoundError", "ServerError",
+                                                    "InvalidRequestError", "ContextWindowExceededError", "NotFoundError", "ServerError",
                                                     "NetworkError", "InsufficientCreditsError",
                                                     "TruncatedResponseError", "InvalidStructuredOutputError",
                                                     "TaskFailedError")],
