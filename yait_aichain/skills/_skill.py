@@ -483,6 +483,12 @@ class Skill:
         variables : dict | None, optional
             Variables for this call, merged over the Skill's own.
         """
+        # Bound to the context it is made in: a stream made inside `with
+        # using(ctx)` and read after it resolved its key with no tenant.
+        from .._bound import bound
+        return bound(self._stream(variables))
+
+    def _stream(self, variables: "dict | None" = None):
         start_run(self)
         merged = {**self.variables, **(variables or {})}
         messages = adapters.substitute(self._input["messages"], merged)

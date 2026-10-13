@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import json
 import contextlib
-import contextvars
 import copy
 import logging
 import time
@@ -628,23 +627,14 @@ class Agent:
         """
         run = self._fork()
         self.last_result = None
-        # Each step in a context of its own. A generator runs in whichever
-        # context advances it, so two streams advanced in turn in one thread
-        # set and reset the same context variables out of order — the beacon
-        # board, the tenant — and the second reset brought back the first
-        # stream's. A copied context per stream keeps them apart.
-        context = contextvars.copy_context()
-        steps = run._stream(task, variables)
-        try:
-            while True:
-                try:
-                    event = context.run(next, steps)
-                except StopIteration:
-                    break
-                yield event
-        finally:
-            context.run(steps.close)
-        self.last_result = run.last_result
+        # A context of its own, copied when the stream is made — not when it
+        # is first read. A generator runs in whichever context advances it:
+        # Starlette advances each step in a fresh copy, so the beacon board
+        # was gone from the second step on; and two streams advanced in turn
+        # in one thread set and reset the same variables out of order.
+        from .._bound import bound
+        return bound(run._stream(task, variables),
+                     on_end=lambda: setattr(self, "last_result", run.last_result))
 
     def _stream(self, task: str, variables: dict | None = None):
         journal, messages, state = self._begin(task, variables)

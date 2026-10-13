@@ -125,6 +125,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **A stream runs in the context it was made in.** `Skill.stream()` and
+  `Agent.stream()` capture the context when they are called and advance every
+  step inside it. A generator runs in whichever context advances it:
+  Starlette's `iterate_in_threadpool` advances each step in a fresh copy, so
+  an agent's beacon board was gone from its second step and every tool's
+  beacon was dropped; a `skill.stream()` made inside `with using(ctx)` and
+  read after it resolved its key with no tenant; and two streams advanced in
+  turn mixed their boards, so tenant B's beacons reached A's result.
+
 - **A Pool stops when it says it stops.** `on_error="raise"` raised only
   after the whole queue had run — a thousand paid calls after the first one
   failed — and so did Ctrl-C; the queue is cancelled now. Items a stop, a
