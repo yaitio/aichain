@@ -20,7 +20,10 @@ the server and listing its tools (60 s), ``call_timeout`` one call of a tool
 Each tool's risk class — what a permission policy reads — comes from the
 server's annotations, and is ``privileged`` where the server says nothing:
 another server's tool is unknown here, and the unknown goes to a person.
-``risk={"tool_name": "read"}`` puts your word over the server's::
+``prefix="wiki_"`` names its tools ``wiki_…`` for an agent holding two
+servers whose tools share names; ``tool()``, ``call()`` and ``risk=`` take
+the server's own names. ``risk={"tool_name": "read"}`` puts your word over
+the server's::
 
     MCP("https://mcp.deepwiki.com/mcp", risk={"ask_wiki_question": "read"})
 """
@@ -29,6 +32,10 @@ from __future__ import annotations
 
 from .._base import Utility
 from ._tools import DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted, _Server, discover, risk_from_annotations
+
+
+def _remote(tool) -> str:
+    return getattr(tool, "_remote", None) or tool.name
 
 
 class MCP(Utility):
@@ -41,7 +48,8 @@ class MCP(Utility):
     def __init__(self, server, *, filter: list | None = None, headers: dict | None = None,
                  env: dict | None = None, cwd: str | None = None, transport: str | None = None,
                  connect_timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT,
-                 call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT, risk: dict | None = None) -> None:
+                 call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT, risk: dict | None = None,
+                 prefix: str = "") -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool.
         self.server = server
@@ -57,17 +65,20 @@ class MCP(Utility):
         if bad:
             raise ValueError(f"MCP risk: {bad} — each must be one of {sorted(RISK_CLASSES)}")
         self._risk = dict(risk or {})
+        self._prefix = prefix
 
     @property
     def tools(self) -> list:
         if self._tools is None:
             tools = discover(self._conn, filter=self._filter, timeout=self._connect_timeout)
-            missing = sorted(set(self._risk) - {t.name for t in tools})
+            missing = sorted(set(self._risk) - {_remote(t) for t in tools})
             if missing:
                 raise KeyError(f"risk= names {missing}, which the server does not have; "
-                               f"it has {[t.name for t in tools]}")
+                               f"it has {[_remote(t) for t in tools]}")
             for t in tools:
-                t.risk = self._risk.get(t.name, t.risk)
+                t.risk = self._risk.get(_remote(t), t.risk)
+                if self._prefix:
+                    t.name = self._prefix + t.name
             self._tools = tools
         return list(self._tools)
 
@@ -83,7 +94,7 @@ class MCP(Utility):
     def tool(self, name: str) -> MCPTool:
         """The server's tool *name*, or a KeyError naming the ones it has."""
         for t in self.tools:
-            if t.name == name:
+            if name in (t.name, _remote(t)):
                 return t
         raise KeyError(f"the server has no tool {name!r}; it has {self.names}")
 

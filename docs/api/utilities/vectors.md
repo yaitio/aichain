@@ -14,6 +14,7 @@ Vectors(
     embedder=None,
     url: str | None = None,
     api_key: str | None = None,
+    name: str | None = None,
     **settings,
 )
 ```
@@ -35,6 +36,8 @@ Agent(model, tools=[kb.query])            # the agent searches, and can do nothi
 with two knowledge bases cannot tell them apart without it, and the search
 tool's own description — "semantic similarity search" — says nothing of
 what is searched. `query` reads "Search the product documentation — …".
+
+`name` names the search tool, for an agent with two databases.
 
 `backend` is `chroma`, `pinecone` or `qdrant`; `collection`,
 `embedder`, `url`, `api_key` and the backend's own settings

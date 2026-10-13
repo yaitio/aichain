@@ -6,7 +6,7 @@ Generated from the code's signatures and docstrings. What it is for and how to u
 ## `Shell`
 
 ```python
-Shell(folder: str | None = None)
+Shell(folder: str | None = None, *, prefix: str = '')
 ```
 
 A folder: `browse`, `read`, `write` and `run` are its tools, each
@@ -17,6 +17,7 @@ sh = Shell("projects/demo")
 sh.read.run("README.md", {"start_line": 1, "end_line": 40})
 Agent(model, tools=[sh.browse, sh.read])        # reads, and cannot write or run anything
 Agent(model, tools=sh.tools)                    # all four
+Agent(model, tools=[*Shell("a", prefix="a_").tools, *Shell("b", prefix="b_").tools])
 ```
 
 ---

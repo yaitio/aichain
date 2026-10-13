@@ -25,6 +25,8 @@ class Vectors(Utility):
     tool's own description — "semantic similarity search" — says nothing of
     what is searched. ``query`` reads "Search the product documentation — …".
 
+    ``name`` names the search tool, for an agent with two databases.
+
     ``backend`` is ``chroma``, ``pinecone`` or ``qdrant``; ``collection``,
     ``embedder``, ``url``, ``api_key`` and the backend's own settings
     (Pinecone's ``index``, ``cloud``, ``region``) are what ``VectorDB`` takes.
@@ -34,7 +36,8 @@ class Vectors(Utility):
     TOOLS = ("query",)
 
     def __init__(self, backend: str, collection: str, *, description: str, embedder=None,
-                 url: str | None = None, api_key: str | None = None, **settings) -> None:
+                 url: str | None = None, api_key: str | None = None, name: str | None = None,
+                 **settings) -> None:
         from . import VectorDB, VectorQueryTool
         if not isinstance(description, str) or not description.strip():
             raise ValueError("Vectors needs a description of what the database holds — an agent's "
@@ -44,6 +47,10 @@ class Vectors(Utility):
         self.query = VectorQueryTool(self.store)
         self.query.description = (f"Search {self.description.rstrip('.')} — the passages most relevant "
                                   "to a question, by meaning rather than by exact words.")
+        # Two databases in one agent need two names for their search.
+        if name:
+            from ...tools._callable import named
+            named(self.query, name)
 
     def create(self, dimension: int, metric: str = "cosine") -> None:
         """Create the collection, *dimension* long, if it does not exist."""

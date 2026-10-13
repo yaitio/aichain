@@ -17,6 +17,7 @@ MCP(
     connect_timeout: float | None = 60.0,
     call_timeout: float | None = 300.0,
     risk: dict | None = None,
+    prefix: str = '',
 )
 ```
 

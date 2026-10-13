@@ -372,11 +372,20 @@ def _check_tools(tools: list) -> None:
                     if isinstance(t, Skill) else "")
             raise TypeError(f"{kind} is not a tool: an Agent needs a name, schema() and run() — "
                             f"a Tool subclass, or a tool from a factory such as search('exa').{hint}")
+        if t.name in _RESERVED:
+            # The loop answers these names itself, so a tool of one never ran.
+            raise ValueError(f"{t.name!r} is a name the agent's own tools use "
+                             f"({', '.join(sorted(_RESERVED))}); give the tool another name")
         if t.name in seen:
             raise ValueError(f"two tools are named {t.name!r} ({type(seen[t.name]).__name__} and "
                              f"{type(t).__name__}); the model could call only one of them. Give one "
-                             f"of them name=… to tell them apart.")
+                             f"of them name=… to tell them apart — Vectors(name=…), "
+                             f"Shell(prefix=…) and MCP(prefix=…) for a utility's tools.")
         seen[t.name] = t
+
+
+#: Names the loop's synthetic tools hold.
+_RESERVED = frozenset({"pool", "delegate", "write_plan"})
 
 class Agent:
     """
@@ -551,6 +560,10 @@ class Agent:
         self._worker_map = ({(getattr(w, "name", None) or f"worker{i}"): w
                              for i, w in enumerate(self.team)}
                             if isinstance(self.team, list) else {})
+        if isinstance(self.team, list) and len(self._worker_map) != len(self.team):
+            names = [getattr(w, "name", None) or f"worker{i}" for i, w in enumerate(self.team)]
+            raise ValueError(f"two workers share a name in {names}; delegate picks a worker by "
+                             "name, and the model could reach only one of them")
         if verbose:
             install_console_handler(verbose)
 
@@ -1538,9 +1551,15 @@ class Agent:
             if worker is None:
                 raise ValueError(f"no worker named {args.get('worker')!r}. "
                                  f"Available: {sorted(self._worker_map)}")
+            # A run of its own, one level down: a listed worker sat at depth 0
+            # whatever delegated to it, and the depth guard never fired.
+            worker = worker._fork()
+            worker._depth, worker._max_depth = self._depth + 1, self._max_depth
         else:                                            # "auto"
             worker = Agent(
-                self.model, tools=self.tools,
+                # Without the tools that park a run: a worker's pause has
+                # nowhere to go — `delegate` waits for an answer, not a resume.
+                self.model, tools=[t for t in self.tools if not getattr(t, "suspends", False)],
                 instructions=args.get("instructions", ""),
                 stop_when=self.stop_when, hooks=self.hooks,
                 # The approver travels with the policy: a worker that
@@ -1565,6 +1584,7 @@ class Agent:
                 "stopped_by": child.stopped_by,
                 "success": child.success,
                 "output": child.output,
+                "error": child.error,
                 # The worker's board already forwarded these to ours, so a
                 # waiting Pool above has seen them. They are repeated here
                 # because the model that delegated is waiting too, and the

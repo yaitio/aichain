@@ -448,7 +448,11 @@ class MCPTool(Tool):
         if risk not in RISK_CLASSES:
             raise ValueError(f"MCPTool {name!r}: risk {risk!r} is not one of {sorted(RISK_CLASSES)}")
         self.risk        = risk
-        self.name        = name
+        # The server's name for the call; `name` is what the model sees, which
+        # a rename or a prefix changes — and a renamed tool sent its new name
+        # to a server that had never heard it.
+        self._remote     = name
+        self.name        = _model_name(name)
         self.description = description
         self._conn = server if isinstance(server, _Server) else _Server(
             server, headers=headers, env=env, cwd=cwd, transport=transport,
@@ -551,7 +555,7 @@ class MCPTool(Tool):
             call_kwargs: dict = {"raise_on_error": True}
             if self._conn.call_timeout is not None:
                 call_kwargs["timeout"] = self._conn.call_timeout
-            result = await client.call_tool(self.name, arguments, **call_kwargs)
+            result = await client.call_tool(self._remote, arguments, **call_kwargs)
         finally:
             await client.__aexit__(None, None, None)
         return _extract_result(result)
@@ -568,6 +572,13 @@ class MCPTool(Tool):
 # ---------------------------------------------------------------------------
 # Discovery (internal; MCP calls it)
 # ---------------------------------------------------------------------------
+
+def _model_name(name: str) -> str:
+    """A server's tool name as providers take one: letters, digits, ``_`` and
+    ``-``, at most 64. ``files.read`` and ``fs/list`` were a 400 from OpenAI."""
+    import re
+    return re.sub(r"[^A-Za-z0-9_-]", "_", name)[:64] or "tool"
+
 
 def discover(server: _Server, *, filter: list[str] | None = None,
              timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT) -> list[MCPTool]:

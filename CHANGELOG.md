@@ -125,6 +125,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **Tool names the model cannot tell apart are refused, and a rename
+  renames.** A tool named `pool`, `delegate` or `write_plan` is refused —
+  the loop's own tool answered it — and so are two workers of one name, which
+  were one entry in the `delegate` enum. `Vectors(name=…)`, `Shell(prefix=…)`
+  and `MCP(prefix=…)` name a utility's tools, so two of a kind fit in one
+  agent; the error's own advice did not work for them before. An MCP tool
+  calls the server by the server's name whatever it is called here, where a
+  renamed tool sent its new name; names with `.` or `/` become `_`, where they
+  were a 400 at OpenAI. A listed worker runs one level down, so the depth
+  guard can fire; an `auto` worker gets no tool that parks a run; and a
+  worker's `error` reaches the delegating model.
+
 - **The approval gate opens on a yes and nothing else.** An approver answers
   `True`, `False` or `ApprovalDecision`; anything else is an error, where
   `granted = bool(answer)` approved a call on `"denied"` and on
