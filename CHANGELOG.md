@@ -125,6 +125,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A saved Skill, agent or tool comes back as it was, or saving says why
+  not.** A Skill came back at temperature 1.0 from 0, with no fallback, no
+  retries and no budget; an agent came back without its permission policy —
+  a gate quietly lost — and its Shell tools moved to the loader's working
+  directory; a Gate or an MCP tool was saved and then failed to load; and
+  `!!python/tuple` in the file made it unloadable. `Skill.to_dict()` /
+  `from_dict()` carry the model's options, the fallback chain, retries and a
+  numeric budget; an agent's policy and its tools' settings are saved, and
+  its approver and hooks are named as left behind; a Gate or an MCP tool is
+  refused at save. Files are plain YAML, written atomically, and a file that
+  is not a saved chain or skill is refused by name.
 - **`NO_PROXY` is honoured, and each scheme gets its own proxy.** One proxy
   was chosen for the whole client, so a `private/` model on localhost, a
   Chroma or Qdrant in the VPC and an internal REST endpoint went through the

@@ -244,6 +244,32 @@ them from environment variables at load time.
 skill.save("skills/translation.yaml")
 ```
 
+### `Skill.to_dict()`
+
+```python
+Skill.to_dict() -> dict
+```
+
+What `save` writes, and a Chain's saved step holds.
+
+The model's own options, the fallback chain, the retries and a ceiling
+given as a number all come back: a saved Skill at temperature 0 came
+back at 1.0, with no fallback and no budget. A shared `Budget` cannot
+be written down — it is an object others hold — and saving one says so.
+
+### `Skill.from_dict()`
+
+```python
+Skill.from_dict(data: dict, api_key: str | None = None) -> Skill
+```
+
+A Skill from what `to_dict` wrote.
+
+**Parameters**
+
+- `data` (*dict*) — What `to_dict` returned.
+- `api_key` (*str | None, optional*, default `None`) — The key for the model; its environment variable when omitted.
+
 ### `Skill.load()`
 
 ```python

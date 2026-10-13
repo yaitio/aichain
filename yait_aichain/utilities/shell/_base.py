@@ -46,6 +46,11 @@ class SandboxedTool:
     def __init__(self, root_dir: str | None = None) -> None:
         self.root = os.path.realpath(root_dir or os.getcwd())
 
+    def _serialise_init_args(self) -> dict:
+        """The folder, which a saved chain kept nothing of: reloaded, the tool
+        moved to the loader's working directory."""
+        return {"root_dir": self.root}
+
     def _resolve(self, path: str) -> str:
         """
         Resolve *path* relative to the sandbox root and validate it.

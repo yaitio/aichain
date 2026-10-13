@@ -103,10 +103,8 @@ if TYPE_CHECKING:
     from ..state import SuspendedResult
 
 from .._budget import as_budget, lend, start_run
-from .._require import require
 
 import importlib
-import os
 import warnings
 
 from .. import _hints
@@ -187,6 +185,7 @@ def _usage_to_dict(usage) -> dict:
 
 
 from .._runners import is_tool as _is_tool, is_agent as _is_agent
+from ..tools._permissions import PermissionPolicy
 
 
 def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
@@ -256,6 +255,28 @@ def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> dict:
             raise ValueError(f"{where} needs {name!r}, and the chain has no variable of that name — "
                              f"map one: ({where}, key, {{{name!r}: 'variable'}}); it has {sorted(accumulated)}")
     return kwargs
+
+
+def _tool_spec(tool) -> dict:
+    """A tool as a file holds it: its class and its settings — or a refusal
+    naming why it cannot be, where a tool that could not come back was
+    written anyway and failed only on load."""
+    from ..tools.general._wait import Gate
+    from ..utilities.mcp._tools import MCPTool
+    _refuse_function_tool(tool)
+    if isinstance(tool, (Gate, MCPTool)):
+        raise TypeError(f"tool {tool.name!r} ({type(tool).__name__}) cannot be saved: "
+                        + ("it wraps another tool, which is an object, not a setting"
+                           if isinstance(tool, Gate) else
+                           "its server and headers may carry credentials")
+                        + ". Build this step in code.")
+    cls = type(tool)
+    spec = {"class": f"{cls.__module__}.{cls.__qualname__}",
+            "init_args": tool._serialise_init_args() if hasattr(tool, "_serialise_init_args") else {}}
+    for attr in ("name", "description"):
+        if getattr(tool, attr, None) and getattr(tool, attr) != getattr(cls, attr, None):
+            spec[attr] = getattr(tool, attr)
+    return spec
 
 
 def _refuse_function_tool(t) -> None:
@@ -1005,8 +1026,6 @@ class Chain:
 
             chain.save("chains/analyse_and_translate.yaml")
         """
-        yaml = require("yaml", package="pyyaml", who="Chain.save()", extra="yaml")
-
         steps_data = []
         for runner, output_key, input_map, kind, options in self._steps:
             if kind == "call":
@@ -1014,19 +1033,7 @@ class Chain:
                                 "cannot be saved — it is code, or a method of a live object, not "
                                 "configuration. Build this chain in code.")
             if kind == "skill":
-                skill_data: dict = {
-                    "model_name": runner.model.name,
-                }
-                if runner.name:
-                    skill_data["name"] = runner.name
-                if runner.description:
-                    skill_data["description"] = runner.description
-                skill_data["input"]  = runner._input
-                skill_data["output"] = runner._output
-                if runner.variables:
-                    skill_data["variables"] = runner.variables
-                if runner.options:
-                    skill_data["options"] = runner.options
+                skill_data = runner.to_dict()
 
                 step: dict = {
                     "kind":       "skill",
@@ -1073,12 +1080,20 @@ class Chain:
                         RuntimeWarning, stacklevel=2)
                 # Tool list — store class paths only (no API keys)
                 if getattr(runner, "tools", None):
-                    for t in runner.tools:
-                        _refuse_function_tool(t)
-                    agent_data["tools"] = [
-                        f"{type(t).__module__}.{type(t).__qualname__}"
-                        for t in runner.tools
-                    ]
+                    # Each with its settings: a class path alone rebuilt a
+                    # Shell tool in the loader's working directory.
+                    agent_data["tools"] = [_tool_spec(t) for t in runner.tools]
+                # The policy comes back with the agent — a reloaded agent with
+                # no gate was the quiet way to lose one. An approver is code and
+                # does not: reloaded, an `approve` rule refuses until one is given.
+                if runner.permissions is not None:
+                    agent_data["permissions"] = {"rules": dict(runner.permissions.rules),
+                                                 "default": runner.permissions.default}
+                if runner.approve is not None or runner.hooks:
+                    import warnings as _w
+                    _w.warn(f"Agent {runner.name or class_path!r}: its approver and hooks are code "
+                            "and are not saved; pass them again after Chain.load — until then an "
+                            "'approve' rule refuses.", RuntimeWarning, stacklevel=2)
 
                 step = {
                     "kind":       "agent",
@@ -1087,26 +1102,13 @@ class Chain:
                 }
 
             else:  # tool
-                _refuse_function_tool(runner)
-                cls       = type(runner)
-                class_path = f"{cls.__module__}.{cls.__qualname__}"
-                init_args  = runner._serialise_init_args() \
-                    if hasattr(runner, "_serialise_init_args") else {}
-
                 step = {
                     "kind":       "tool",
                     "output_key": output_key,
-                    "tool": {
-                        "class":     class_path,
-                        "init_args": init_args,
-                    },
+                    "tool":       _tool_spec(runner),
                 }
                 # A name or a description given to the factory, over the
                 # class's: kept for every tool, whatever its constructor takes.
-                for attr in ("name", "description"):
-                    value = getattr(runner, attr, None)
-                    if value and value != getattr(cls, attr, None):
-                        step["tool"][attr] = value
 
             if input_map:
                 step["input_map"] = input_map
@@ -1130,10 +1132,8 @@ class Chain:
             if k in data:
                 ordered[k] = data[k]
 
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            yaml.dump(ordered, fh, allow_unicode=True, sort_keys=False,
-                      default_flow_style=False)
+        from .. import _yaml
+        _yaml.write(path, ordered, "Chain.save()")
 
     @classmethod
     def load(
@@ -1199,10 +1199,8 @@ class Chain:
             result = chain.run(variables={"topic": "AI safety",
                                           "language": "French"})
         """
-        yaml = require("yaml", package="pyyaml", who="Chain.load()", extra="yaml")
-
-        with open(path, "r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh)
+        from .. import _yaml
+        data = _yaml.read(path, "Chain.load()", ("steps",))
 
         # Local imports to avoid circular references at module load time
         from ..models._base import Model as _Model
@@ -1216,17 +1214,7 @@ class Chain:
             options    = step_data.get("options", {})
 
             if kind == "skill":
-                sd    = step_data["skill"]
-                model = _Model(sd["model_name"], api_key=api_key)
-                skill = _Skill(
-                    model       = model,
-                    input       = sd["input"],
-                    output      = sd["output"],
-                    variables   = sd.get("variables"),
-                    options     = sd.get("options"),
-                    name        = sd.get("name"),
-                    description = sd.get("description"),
-                )
+                skill = _Skill.from_dict(step_data["skill"], api_key)
                 entry: tuple | object = (skill, output_key, input_map, options)
 
             elif kind == "agent":
@@ -1236,8 +1224,14 @@ class Chain:
 
                 # Reconstruct tools from class paths
                 tool_instances = []
-                for tool_path in ad.get("tools", []):
-                    tool_instances.append(_import_tool(tool_path, {}, trusted))
+                for spec in ad.get("tools", []):
+                    if isinstance(spec, str):            # written before tools kept their settings
+                        spec = {"class": spec}
+                    t = _import_tool(spec["class"], spec.get("init_args") or {}, trusted)
+                    for attr in ("name", "description"):
+                        if spec.get(attr):
+                            setattr(t, attr, spec[attr])
+                    tool_instances.append(t)
 
                 from ..agent import cost_budget, step_count, token_budget
                 _BUILDERS = {"step_count": step_count,
@@ -1265,6 +1259,9 @@ class Chain:
                     instructions = ad.get("instructions", ""),
                     name         = ad.get("name"),
                     description  = ad.get("description"),
+                    permissions  = (PermissionPolicy(ad["permissions"].get("rules"),
+                                                     default=ad["permissions"].get("default", "approve"))
+                                    if ad.get("permissions") else None),
                 )
                 entry = (agent, output_key, input_map, options)
 

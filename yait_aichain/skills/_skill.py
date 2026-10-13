@@ -21,9 +21,7 @@ the :meth:`Skill.load` class method.
 
 
 from .._budget import as_budget, in_force, start_run
-from .._require import require
 import json
-import os
 import random
 import time
 from typing import TYPE_CHECKING
@@ -683,24 +681,64 @@ class Skill:
 
             skill.save("skills/translation.yaml")
         """
-        yaml = require("yaml", package="pyyaml", who="Skill.save()", extra="yaml")
+        from .. import _yaml
+        _yaml.write(path, self.to_dict(), "Skill.save()")
 
+    def to_dict(self) -> dict:
+        """What `save` writes, and a Chain's saved step holds.
+
+        The model's own options, the fallback chain, the retries and a ceiling
+        given as a number all come back: a saved Skill at temperature 0 came
+        back at 1.0, with no fallback and no budget. A shared `Budget` cannot
+        be written down — it is an object others hold — and saving one says so.
+        """
+        from .._budget import Budget
+        if isinstance(self.max_cost, Budget) and self.max_cost is not self._own_budget:
+            raise TypeError("this Skill holds a shared Budget, which a file cannot carry; "
+                            "give it max_cost=<number> to save, or rebuild it in code")
         data = {
-            "model_name":  self.model.name,
-            "name":        self.name,
-            "description": self.description,
-            "input":       self._input,
-            "output":      self._output,
-            "variables":   self.variables if self.variables else None,
-            "options":     self.options   if self.options   else None,
+            "model_name":    self.model.name,
+            "model_options": dict(getattr(self.model, "_asked", {}) or {})
+                             | ({"extra": self.model.extra} if getattr(self.model, "extra", None) else {}),
+            "fallback":      [m.name for m in self.models[1:]],
+            "name":          self.name,
+            "description":   self.description,
+            "input":         self._input,
+            "output":        self._output,
+            "variables":     self.variables or None,
+            "options":       self.options or None,
+            "max_retries":   self.max_retries or None,
+            "retry_delay":   self.retry_delay if self.retry_delay != 2.0 else None,
+            "max_cost":      self.max_cost.limit if self.max_cost is not None else None,
         }
-        # Drop None values to keep the YAML tidy
-        data = {k: v for k, v in data.items() if v is not None}
+        return {k: v for k, v in data.items() if v not in (None, [], {})}
 
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            yaml.dump(data, fh, allow_unicode=True, sort_keys=False,
-                      default_flow_style=False)
+    @classmethod
+    def from_dict(cls, data: dict, api_key: str | None = None) -> "Skill":
+        """A Skill from what `to_dict` wrote.
+
+        Parameters
+        ----------
+        data : dict
+            What `to_dict` returned.
+        api_key : str | None, optional
+            The key for the model; its environment variable when omitted.
+        """
+        options = data.get("model_options") or None
+        models = [Model(data["model_name"], api_key=api_key, options=options)]
+        models += [Model(name, api_key=api_key) for name in data.get("fallback") or []]
+        return cls(
+            model       = models if len(models) > 1 else models[0],
+            input       = data["input"],
+            output      = data.get("output"),
+            variables   = data.get("variables"),
+            options     = data.get("options"),
+            name        = data.get("name"),
+            description = data.get("description"),
+            max_retries = data.get("max_retries", 0),
+            retry_delay = data.get("retry_delay", 2.0),
+            max_cost    = data.get("max_cost"),
+        )
 
     @classmethod
     def load(cls, path: str, api_key: "str | None" = None) -> "Skill":
@@ -744,23 +782,8 @@ class Skill:
             skill  = Skill.load("skills/translation.yaml")
             result = skill.run(variables={"text": "Hello, world!"})
         """
-        yaml = require("yaml", package="pyyaml", who="Skill.load()", extra="yaml")
-
-        with open(path, "r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh)
-
-        from ..models._base import Model as _Model
-        model = _Model(data["model_name"], api_key=api_key)
-
-        return cls(
-            model       = model,
-            input       = data["input"],
-            output      = data["output"],
-            variables   = data.get("variables"),
-            options     = data.get("options"),
-            name        = data.get("name"),
-            description = data.get("description"),
-        )
+        from .. import _yaml
+        return cls.from_dict(_yaml.read(path, "Skill.load()", ("model_name", "input")), api_key)
 
     # ------------------------------------------------------------------
     # Dunder helpers
