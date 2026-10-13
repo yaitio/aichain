@@ -42,7 +42,7 @@ class TestCallByName(unittest.TestCase):
     def test_an_error_comes_back_as_a_result(self):
         result = Domain()(email="not-an-email")
         self.assertFalse(result.success)
-        self.assertEqual(result.error, "invalid email")
+        self.assertEqual(result.error, "ValueError: invalid email")
 
     def test_a_missing_required_parameter_is_named(self):
         result = Domain()(other="x")

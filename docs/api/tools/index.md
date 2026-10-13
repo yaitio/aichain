@@ -166,6 +166,9 @@ Unlike `run`, this method **never raises**.  Any exception
 (including `ValueError` from validation) is caught and returned
 as `ToolResult(success=False, error=...)`.
 
+It does not park a run: a `Suspend` raised inside is a failed result
+here, and only an agent or a chain can wait for it.
+
 A tool with its own parameters — `def run(self, email, options=None)`
 — is called by name, `tool(email="a@b.c")`, the way an Agent or a
 Chain calls `run(**kwargs)`. Until this, only `input=` and

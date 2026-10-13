@@ -69,7 +69,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
-from ...tools._base import Tool, ToolResult
+from ...tools._base import Tool
 
 
 # ---------------------------------------------------------------------------
@@ -527,32 +527,6 @@ class MCPTool(Tool):
         limit = self._conn.call_timeout
         return _run_sync(self._acall(arguments),
                          timeout=None if limit is None else limit + DEFAULT_MCP_SETUP_TIMEOUT + 5)
-
-    def __call__(
-        self,
-        input:   dict | str | None = None,
-        options: dict | None        = None,
-        /,
-        **kwargs: Any,
-    ) -> ToolResult:
-        """
-        Safe wrapper around :meth:`run` — never raises.
-
-        Keyword arguments are forwarded to :meth:`run` exactly as with
-        the direct call form, so both ``tool({"k": v})`` and
-        ``tool(k=v)`` work identically.
-
-        Returns
-        -------
-        ToolResult
-            ``success=True`` + raw output on success; ``success=False``
-            + error string on any exception.
-        """
-        try:
-            output = self.run(input, options, **kwargs)
-            return ToolResult(success=True, output=output)
-        except Exception as exc:
-            return ToolResult(success=False, output=None, error=str(exc))
 
     # ------------------------------------------------------------------
     # Async implementation

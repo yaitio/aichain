@@ -125,6 +125,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **`tool(input, options)` calls `run` the way `run` declares.** Options
+  went positionally to whatever came second — `Image.run(input, images,
+  options)` took them as images — a `@tool` function with no parameters
+  could not be called, and `wc("a a b", {"unique": True})` ran with the dict
+  as `unique`. *input* is passed first, *options* by name, the rest by name,
+  bound against `run`'s signature; a function with no `options` refuses them
+  and says to pass the arguments by name. A failed call's error carries the
+  exception's type, `KeyError: 'x'` where it was `'x'`. The safe call does not
+  park a run; that is documented.
+
 - **An MCP server's `input`, `options` and `name` arguments are sent.**
   `MCPTool.run(input, options, /, **arguments)` and `MCP.call(name, /,
   **arguments)` take those positionally, so a server argument of the same

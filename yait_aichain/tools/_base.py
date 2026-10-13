@@ -295,6 +295,9 @@ class Tool:
         (including ``ValueError`` from validation) is caught and returned
         as ``ToolResult(success=False, error=...)``.
 
+        It does not park a run: a ``Suspend`` raised inside is a failed result
+        here, and only an agent or a chain can wait for it.
+
         A tool with its own parameters — ``def run(self, email, options=None)``
         — is called by name, ``tool(email="a@b.c")``, the way an Agent or a
         Chain calls ``run(**kwargs)``. Until this, only ``input=`` and
@@ -318,22 +321,50 @@ class Tool:
             ``success=False`` + error message on failure.
         """
         try:
-            if kwargs:
-                if input is not None:
-                    kwargs["input"] = input
-                if options is not None:
-                    kwargs["options"] = options
-                missing = [k for k in self.parameters.get("required", []) if k not in kwargs]
-                if missing:
-                    raise ValueError(f"Tool '{self.name}' missing required parameter(s): "
-                                     + ", ".join(repr(k) for k in missing))
-                output = self.run(**kwargs)
-            else:
-                self._validate(input, options)
-                output = self.run(input, options)
+            args, kw = self._arguments(input, options, kwargs)
+            output = self.run(*args, **kw)
             return ToolResult(success=True, output=output)
         except Exception as exc:
-            return ToolResult(success=False, output=None, error=str(exc))
+            return ToolResult(success=False, output=None, error=f"{type(exc).__name__}: {exc}")
+
+    def _signature(self) -> _inspect.Signature:
+        return _inspect.signature(self.run)
+
+    def _arguments(self, input, options, kwargs: dict) -> tuple[list, dict]:
+        """The call ``run`` receives: *input* in its first place, *options* by
+        name, the rest by name — checked against ``run``'s own signature.
+
+        Passing ``(input, options)`` positionally put the options in whatever
+        came second: ``Image.run(input, images, options)`` took them as its
+        images, and a function tool with no options took a dict where a
+        number belonged and ran.
+        """
+        params = self._signature().parameters
+        args: list = [] if input is None else [input]
+        kw = dict(kwargs)
+        if options is not None:
+            spec = params.get("options")
+            if spec is not None and spec.kind is spec.POSITIONAL_ONLY:
+                args = [input, options]
+            elif spec is not None:
+                kw["options"] = options
+            else:
+                raise TypeError(f"tool {self.name!r} takes no options; pass "
+                                + (", ".join(f"{k}=…" for k in options) if isinstance(options, dict)
+                                   else "its arguments") + " by name")
+        try:
+            bound = self._signature().bind(*args, **kw)
+        except TypeError as exc:
+            raise TypeError(f"tool {self.name!r}: {exc}") from None
+        given = set(bound.arguments) | set(kw)
+        if kwargs:
+            missing = [k for k in self.parameters.get("required", []) if k not in given]
+            if missing:
+                raise ValueError(f"Tool '{self.name}' missing required parameter(s): "
+                                 + ", ".join(repr(k) for k in missing))
+        else:
+            self._validate(input, options)
+        return args, kw
 
     def schema(self) -> dict:
         """
@@ -626,13 +657,11 @@ class FunctionTool(Tool):
         self.parameters = {"type": "object", "properties": props, "required": required}
         self.__wrapped__ = fn
         self.__doc__ = inner.__doc__
-        self._takes_options = "options" in sig.parameters
+
+    def _signature(self) -> _inspect.Signature:
+        return _inspect.signature(self.__wrapped__)
 
     def run(self, *args, **kwargs):  # type: ignore[override]
-        # Tool.__call__ passes (input, options) positionally when no keyword is
-        # given; a function without an `options` parameter does not take the None.
-        if len(args) == 2 and args[1] is None and not self._takes_options:
-            args = args[:1]
         return self.__wrapped__(*args, **kwargs)
 
 
