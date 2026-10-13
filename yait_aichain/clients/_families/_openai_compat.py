@@ -1136,7 +1136,7 @@ def _parse_responses_api_response(response: dict, output: dict) -> str | dict:
         if item.get("type") == "message":
             for part in item.get("content", []):
                 if part.get("type") == "output_text":
-                    text = part["text"]
+                    text += part["text"]           # accumulated, not the last one
     if response.get("status") == "failed":
         detail = (response.get("error") or {}).get("message", "no reason given")
         raise ValueError(f"The Responses API reports the response failed: {detail}")

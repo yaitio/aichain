@@ -133,6 +133,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **An answer in several text blocks is the whole answer.** Claude splits an
+  answer around citations and server tools, Gemini around code execution, and
+  the Responses API may send several `output_text` parts; `run()` returned
+  Claude's first block, Gemini's first part and the Responses API's last,
+  while `stream()` gave all of them. They are joined now, without Gemini's
+  thought parts.
+
 - **A schema keeps its meaning on the way to each provider.** In OpenAI
   strict mode an optional `$ref`, `anyOf` or untyped enum is now "it, or null",
   and an optional enum may be null — they became required and not nullable,

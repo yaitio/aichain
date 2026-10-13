@@ -515,10 +515,10 @@ class AnthropicClient(BaseClient):
                     "the structured answer does not match the schema: " + "; ".join(problems),
                     problems=problems, value=value)
             return value
-        text = ""
-        for block in content:
-            if block.get("type") == "text":
-                text = block["text"]; break
+        # Every text block, joined: Claude splits an answer around citations
+        # and server tools, and the first block alone was a fragment — while
+        # stream() gave the whole.
+        text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
         calls = [b for b in content if b.get("type") == "tool_use"]
         from ._structured import refuse_cut_off
         refuse_cut_off(response.get("stop_reason") or "",

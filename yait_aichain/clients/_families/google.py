@@ -438,10 +438,9 @@ class GoogleClient(BaseClient):
                 + (f" (finish_reason={finish})" if finish else ".")
             )
         calls = [p["functionCall"] for p in parts if "functionCall" in p]
-        try:
-            text = next(p["text"] for p in parts if "text" in p)
-        except StopIteration:
-            text = ""
+        # Every answer part, not the first: Gemini splits around code execution.
+        # Thought parts are the model's reasoning, not its answer.
+        text = "".join(p["text"] for p in parts if "text" in p and not p.get("thought"))
         from ._structured import refuse_cut_off
         refuse_cut_off(finish or "", (response.get("usageMetadata") or {}).get("candidatesTokenCount"),
                        calls=bool(calls), text=text)
