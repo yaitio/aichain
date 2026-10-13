@@ -168,7 +168,18 @@ def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
         try:
             hook(event)
         except Exception as exc:                     # observe-only: never propagate
-            _log.debug("hook %r failed on %s: %s", hook, event.type, exc)
+            # Said once per hook, with the traceback: a broken tracer logged a
+            # DEBUG line and nobody learned that their tracing had stopped.
+            key = id(getattr(hook, "__func__", hook))
+            if key not in _FAILED:
+                _FAILED.add(key)
+                _log.warning("hook %r failed on %s and is skipped for this event; "
+                             "later failures of it are not repeated", hook, event.type,
+                             exc_info=exc)
+
+
+#: Hooks whose failure was already reported.
+_FAILED: set = set()
 
 
 __all__ = ["Event", "Hook", "Tracer", "LoggingTracer", "emit"]

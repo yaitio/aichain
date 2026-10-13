@@ -44,7 +44,7 @@ from __future__ import annotations
 import copy
 import threading
 import time
-import warnings
+import logging
 import contextvars
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -56,6 +56,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Status constants
 # ---------------------------------------------------------------------------
+
+_skip_log = logging.getLogger("yait_aichain.pool")
 
 PENDING = 0
 RUNNING = 1
@@ -350,8 +352,10 @@ class Pool:
                             stop_starting(f"item {idx} failed and on_error='stop'")
                         if self._on_error == "skip":
                             name = getattr(self._runner, "name", None) or type(self._runner).__name__
-                            warnings.warn(f"Pool item {idx} ({name!r}) failed and was skipped: "
-                                          f"{type(exc).__name__}: {exc}", RuntimeWarning, stacklevel=2)
+                            # Logged, every time: a warning shows once per
+                            # place in the code, and the place was ours.
+                            _skip_log.warning(f"Pool item {idx} ({name!r}) failed and was skipped: "
+                                              f"{type(exc).__name__}: {exc}")
                         # "collect", "skip" and "stop" all leave results[idx] None
                 finished = True
             finally:

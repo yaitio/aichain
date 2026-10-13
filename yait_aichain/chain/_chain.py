@@ -106,7 +106,10 @@ from .._budget import as_budget, lend, start_run
 
 import copy
 import importlib
+import logging
 import warnings
+
+_skip_log = logging.getLogger("yait_aichain.chain")
 
 from .. import _hints
 from ..models._usage import Usage
@@ -916,13 +919,13 @@ class Chain:
                                      "message": str(exc)})
                 checkpoint()
                 if on_error == "skip":
-                    warnings.warn(
+                    # Logged, every time: a warning is shown once per place in
+                    # the code, and that place was inside the library.
+                    _skip_log.warning(
                         f"Chain step {idx} ({name!r}) failed and was skipped: "
                         f"{type(exc).__name__}: {exc}. Downstream steps that "
                         f"read {output_key!r} will receive a stale or absent "
-                        "value.",
-                        RuntimeWarning,
-                        stacklevel=2,
+                        "value."
                     )
                 continue
 

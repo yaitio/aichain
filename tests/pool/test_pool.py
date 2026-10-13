@@ -147,7 +147,7 @@ class TestErrorPolicy(unittest.TestCase):
         # adds a warning. Order is positional, so dropping a slot would
         # silently re-align every later result with the wrong item.
         items = [{"value": "a"}, {"value": "b"}]
-        with self.assertWarns(RuntimeWarning):
+        with self.assertLogs("yait_aichain.pool", "WARNING"):
             out = Pool(Explodes(), items=items, on_error="skip").run()
         self.assertEqual(out.output, [None, None])
 

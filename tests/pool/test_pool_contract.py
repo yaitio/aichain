@@ -198,10 +198,10 @@ class TestErrorPolicies(unittest.TestCase):
         self.assertIn("Traceback", failure["traceback"])
 
     def test_skip_names_the_item_in_the_warning(self):
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        # Logged every time, where a warning showed once per process.
+        with self.assertLogs("yait_aichain.pool", "WARNING") as logged:
             Pool(FailOn("b"), items("a", "b"), on_error="skip").run()
-        self.assertTrue(any("Pool item 1" in str(w.message) for w in caught))
+        self.assertTrue(any("Pool item 1" in line for line in logged.output))
 
     def test_collect_is_silent(self):
         with warnings.catch_warnings(record=True) as caught:

@@ -133,6 +133,21 @@ where a fix is named below.
 
 ### Fixed
 
+- **A hook observes and does not steer.** `tool_call.started` and
+  `tool_call.ended` carry copies of the arguments and the result, where a hook
+  that masked a token in `payload["arguments"]` changed the argument the tool
+  then ran with. A hook that raises is reported once, at WARNING with its
+  traceback, where a broken tracer logged a DEBUG line and nobody learned that
+  tracing had stopped.
+- **`verbose` is the agent's own.** Its lines go to a logger of its own,
+  `yait_aichain.console`, which has its handler and does not propagate, and
+  only for an agent asked to speak: one `Agent(verbose=1)` added a handler to
+  the package logger and lowered its level for good, after which every agent
+  in the process printed its tool arguments and lines appeared twice. `Eval`
+  progress goes there too. A step or item skipped by `on_error="skip"` is
+  logged on `yait_aichain.chain` or `yait_aichain.pool` every time, where a
+  warning showed once per process and pointed inside the library.
+
 - **The adaptation channel tells the truth under `-W error`.** The warning was
   remembered before it was raised and the record stored after, so under
   `filterwarnings=error` the first call raised with an empty

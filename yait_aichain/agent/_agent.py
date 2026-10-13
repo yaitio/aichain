@@ -57,7 +57,7 @@ from ..utilities._base import Utility
 from ..state import StateStore
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
-from .._console import install_console_handler
+from .._console import console
 from .. import _hints
 from ._swarm import acceptance_from, collecting_beacons
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
@@ -565,8 +565,6 @@ class Agent:
             names = [getattr(w, "name", None) or f"worker{i}" for i, w in enumerate(self.team)]
             raise ValueError(f"two workers share a name in {names}; delegate picks a worker by "
                              "name, and the model could reach only one of them")
-        if verbose:
-            install_console_handler(verbose)
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -1112,10 +1110,12 @@ class Agent:
                 # form in which "no rows" and "the tool declined" are still
                 # different things. `prompts.observation_text` is the model's
                 # view and stays the model's view.
+                # A copy: a hook that masks a token in the payload changed
+                # the argument the tool then ran with.
                 self._emit("tool_call.started", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "",
-                                    "arguments": call.arguments or {},
+                                    "arguments": _copy(call.arguments or {}),
                                     "agent": self.name or ""})
                 yield from drain()
 
@@ -1154,7 +1154,7 @@ class Agent:
                 failure, self._failure = self._failure, None
                 self._emit("tool_call.ended", name=call.name,
                            step=state["steps"],
-                           payload={"id": call.id or "", "result": result,
+                           payload={"id": call.id or "", "result": _copy(result),
                                     "agent": self.name or "",
                                     # The type and the traceback, which the
                                     # error string had dropped.
@@ -1380,7 +1380,7 @@ class Agent:
         # a second one would put the question to a person twice.
         if (problem := tool.check_args(kwargs)) is not None:
             raise ValueError(problem)
-        if _logger.isEnabledFor(logging.INFO):     # the arguments are serialised only to be shown
+        if self.verbose or _logger.isEnabledFor(logging.INFO):   # serialised only to be shown
             self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
         return tool.run(**kwargs)
 
@@ -1826,7 +1826,14 @@ class Agent:
             emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
 
     def _log(self, level: int, message: str = "") -> None:
-        _logger.log(logging.INFO if level == 1 else logging.DEBUG, "%s", message)
+        # This agent's verbosity, not the process's: the line goes to the
+        # console when this agent was asked to speak, and to the package
+        # logger otherwise, for whoever configured it.
+        lvl = logging.INFO if level == 1 else logging.DEBUG
+        if (self.verbose or 0) >= level:
+            console().log(lvl, "%s", message)
+        else:
+            _logger.log(lvl, "%s", message)
 
     def __repr__(self) -> str:
         team = ("auto" if self.team == "auto"
@@ -1841,6 +1848,14 @@ def _interrupted(result) -> bool:
     """A run that stopped on the model rather than on its own: worth a retry."""
     return (isinstance(result, AgentResult) and not result.success
             and result.stopped_by in ("llm_error", "truncated"))
+
+
+def _copy(value):
+    """A copy for an event; the value itself when it cannot be copied."""
+    try:
+        return copy.deepcopy(value)
+    except Exception:
+        return value
 
 
 #: The deepest a call's arguments may nest.

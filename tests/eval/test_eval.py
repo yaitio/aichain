@@ -351,7 +351,7 @@ class TestARunWithoutSideEffects(unittest.TestCase):
         import contextlib, io
         out = Path(tempfile.mkdtemp()) / "run.jsonl"
         printed = io.StringIO()
-        with contextlib.redirect_stdout(printed), self.assertLogs("yait_aichain.eval") as logged:
+        with contextlib.redirect_stdout(printed), self.assertLogs("yait_aichain.console") as logged:
             Eval([Case(id="a", input="x", expect="x")], {"echo": lambda c: c.input},
                  exact(), out=out).run()
         self.assertEqual(printed.getvalue(), "")

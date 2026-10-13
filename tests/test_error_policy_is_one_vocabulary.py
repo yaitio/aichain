@@ -95,10 +95,9 @@ class TestTheNewWordsWork(unittest.TestCase):
     def test_skip_still_warns(self):
         chain = Chain(steps=[(Boom(), "a"), (Fine(), "b")],
                       on_step_error="skip")
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with self.assertLogs("yait_aichain.chain", "WARNING") as logged:
             chain.run(variables={"input": "x"})
-        self.assertTrue([w for w in caught if "skipped" in str(w.message)])
+        self.assertTrue([line for line in logged.output if "skipped" in line])
 
     def test_a_pool_can_stop(self):
         """`stop` is new to Pool. It starts no more items; the ones already

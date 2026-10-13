@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Callable, Iterable
 
-from .._console import install_console_handler
+from .._console import console
 from ._records import Case, Record, read, write
 from ._report import Report
 from ._scorers import Scorer, normalise
@@ -107,7 +107,7 @@ class Eval:
         self.name    = name
         self.verbose = verbose
         if verbose:
-            install_console_handler(1)
+            pass
 
         # Created on the first write, not here: an Eval built where the
         # working directory is read-only (a Lambda) must still be buildable.
@@ -153,7 +153,7 @@ class Eval:
         if self.verbose:
             bad = [a for a in probe.arms if report.spend(a)["errors"]
                    or report.spend(a)["trials"] == 0]
-            _log.info("%s\n\nsmoke: %s", report.table(),
+            console().info("%s\n\nsmoke: %s", report.table(),
                       "all arms answered" if not bad else "TROUBLE in " + ", ".join(bad))
         return report
 
@@ -188,7 +188,7 @@ class Eval:
 
         if self.verbose:
             total = len(self.arms) * len(self.cases) * self.trials
-            _log.info("%s: %d of %d attempts to run (%d already on disk) → %s",
+            console().info("%s: %d of %d attempts to run (%d already on disk) → %s",
                       self.name, len(todo), total, len(done), self.out)
 
         if concurrency > 1:
@@ -275,7 +275,7 @@ class Eval:
         if self.verbose:
             mark = "!" if rec.error else ("+" if rec.ok else "·")
             note = f"  {rec.error[:60]}" if rec.error else ""
-            _log.info("  %s %-18s %-28s t%d %5.1fs%s",
+            console().info("  %s %-18s %-28s t%d %5.1fs%s",
                       mark, rec.arm, rec.case, rec.trial, rec.seconds, note)
 
     def _existing(self) -> list[Record]:
