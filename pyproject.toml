@@ -73,10 +73,7 @@ fail_under = 78.0
 "yait_aichain/tools/transcribe/_stt.py" = { kind = "external", reason = "transcription paths call four vendors' speech APIs" }
 "yait_aichain/tools/embed/_cohere.py" = { kind = "external", reason = "request shaping for the Cohere embeddings API" }
 "yait_aichain/tools/rerank/_voyage.py" = { kind = "external", reason = "request shaping for the Voyage rerank API" }
-"yait_aichain/utilities/vectors/providers/_pinecone.py" = { kind = "external", reason = "every operation needs a Pinecone index" }
 "yait_aichain/utilities/vectors/__init__.py" = { kind = "external", reason = "`VectorDB` connects to a provider on construction" }
-"yait_aichain/utilities/shell/_browse.py" = { kind = "debt", reason = "sandboxed and filesystem-only; a temporary directory is all a test needs" }
-"yait_aichain/utilities/shell/_write.py" = { kind = "debt", reason = "sandboxed and filesystem-only" }
 
 [tool.mutmut]
 # Which tests actually catch a broken line. A mutant is a one-token change to
