@@ -39,7 +39,8 @@ class REST(Utility):
     """
 
     def __init__(self, base_url: str, *, description: str, auth: dict | None = None,
-                 headers: dict | None = None, timeout: float | None = None) -> None:
+                 headers: dict | None = None, timeout: float | None = None,
+                 allow_private: bool | None = None) -> None:
         if not isinstance(base_url, str) or not base_url.lower().startswith(("http://", "https://")):
             raise ValueError(f"REST needs an http or https base URL; got {base_url!r}")
         if not isinstance(description, str) or not description.strip():
@@ -50,12 +51,15 @@ class REST(Utility):
         self.auth = dict(auth or {})
         self.headers = dict(headers or {})
         self.timeout = timeout
+        # One API on an internal network, not every URL in the process: the
+        # global AICHAIN_ALLOW_PRIVATE_URLS was the only way to reach one.
+        self.allow_private = allow_private
         self._endpoints: dict = {}
 
     def endpoint(self, name: str, method: str, path: str, *, description: str,
                  path_params=(), query_params=(), body_params=(), required_params=(),
                  content_type: str = "application/json", response_field: str | None = None,
-                 risk: str | None = None) -> RestApiTool:
+                 risk: str | None = None, fields: dict | None = None) -> RestApiTool:
         """
         A tool for one endpoint: *method* on the base URL plus *path* —
         ``"/booking/{id}"`` with ``path_params=["id"]``. Its fields are its
@@ -63,7 +67,9 @@ class REST(Utility):
 
         *risk* is what a permission policy reads; omitted, it follows the
         method — ``GET`` is ``read``, ``DELETE`` is ``destructive``,
-        ``POST``/``PUT``/``PATCH`` are ``external``.
+        ``POST``/``PUT``/``PATCH`` are ``external``. *fields* types them —
+        ``{"limit": (int, "page size"), "tags": ("array", "labels")}`` —
+        where every field was a string.
         """
         if name in self._endpoints:
             raise ValueError(f"this API already has an endpoint named {name!r}")
@@ -74,7 +80,8 @@ class REST(Utility):
                            path_params=path_params, query_params=query_params, body_params=body_params,
                            required_params=required_params, headers=self.headers, auth=self.auth,
                            content_type=content_type, response_field=response_field,
-                           timeout=self.timeout, risk=risk)
+                           timeout=self.timeout, risk=risk, fields=fields,
+                           allow_private=self.allow_private)
         self._endpoints[name] = tool
         return tool
 

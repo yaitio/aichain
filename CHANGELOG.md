@@ -125,6 +125,23 @@ where a fix is named below.
 
 ### Fixed
 
+- **A REST endpoint sends what its settings say.** `fields=` types an
+  endpoint's fields — `{"limit": (int, "page size"), "tags": ("array", …)}` —
+  where every field was a string described by its own name and an array could
+  not be asked for. Each auth type has the keys it reads, and anything else
+  is refused; a token that is not there — an unset variable, an empty field —
+  is an error, where the request went anonymous and some APIs answer that
+  with less data rather than 401. A new auth type `query` puts the key in the
+  query string, and errors print the URL without it. Booleans go as `true`,
+  lists repeat their key, and a form content type gets a form body, where it
+  got JSON. Fields named `input` and `options` are sent (`run(input, options,
+  /, **fields)`). `timeout=` keeps the connect timeout; retries spent end in
+  the API's typed error, not `MaxRetryError`; a non-2xx answer is the typed
+  `APIError` for its status. A URL placeholder with no path parameter, a
+  field placed twice or badly named, and a credential in the URL's query are
+  refused at construction. `REST(allow_private=True)` reaches one API on an
+  internal network without the process-wide flag.
+
 - **The local tools stay inside what they were given.** `local_run` starts
   each command in its own session with no stdin and kills the whole group on
   a timeout, keeping what it printed — only `/bin/sh` was killed, and a `&`

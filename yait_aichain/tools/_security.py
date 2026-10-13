@@ -96,7 +96,7 @@ _REDIRECTS = frozenset({301, 302, 303, 307, 308})
 MAX_REDIRECTS = 5
 
 
-def safe_request(http, method: str, url: str, **kwargs):
+def safe_request(http, method: str, url: str, *, allow_private: bool | None = None, **kwargs):
     """A urllib3 request whose every hop passes `assert_safe_url`.
 
     urllib3 follows redirects itself and checks nothing on the way, so a
@@ -106,7 +106,7 @@ def safe_request(http, method: str, url: str, **kwargs):
     GET without a body, as browsers do.
     """
     for _ in range(MAX_REDIRECTS + 1):
-        assert_safe_url(url)
+        assert_safe_url(url, allow_private=allow_private)
         response = http.request(method, url, redirect=False, **kwargs)
         location = response.headers.get("location") if response.status in _REDIRECTS else None
         if not location:

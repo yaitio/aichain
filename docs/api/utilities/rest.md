@@ -13,6 +13,7 @@ REST(
     auth: dict | None = None,
     headers: dict | None = None,
     timeout: float | None = None,
+    allow_private: bool | None = None,
 )
 ```
 
@@ -39,6 +40,7 @@ REST.endpoint(
     content_type: str = 'application/json',
     response_field: str | None = None,
     risk: str | None = None,
+    fields: dict | None = None,
 ) -> RestApiTool
 ```
 
@@ -48,7 +50,9 @@ arguments; the API's auth and headers are the utility's.
 
 *risk* is what a permission policy reads; omitted, it follows the
 method — `GET` is `read`, `DELETE` is `destructive`,
-`POST`/`PUT`/`PATCH` are `external`.
+`POST`/`PUT`/`PATCH` are `external`. *fields* types them —
+`{"limit": (int, "page size"), "tags": ("array", "labels")}` —
+where every field was a string.
 
 ### `REST.TOOLS`
 
@@ -95,6 +99,8 @@ RestApiTool(
     response_field: str | None = None,
     timeout: float | None = None,
     risk: str | None = None,
+    fields: dict | None = None,
+    allow_private: bool | None = None,
 )
 ```
 

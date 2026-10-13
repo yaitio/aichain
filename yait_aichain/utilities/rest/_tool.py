@@ -93,6 +93,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import urllib.parse
 from typing import Any
 
@@ -111,8 +112,46 @@ from ...tools._security import safe_request
 _DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=30.0)
 #: The most of a response REST reads.
 MAX_RESPONSE_BYTES = 10 << 20
-_DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5,
+# raise_on_status=False: retries spent, the last answer comes back and is
+# raised as the API's own typed error, where it was a raw MaxRetryError.
+_DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5, raise_on_status=False,
                          status_forcelist={429, 502, 503, 504})
+
+#: What each auth type reads. A key outside its type's set was dropped and
+#: the request went anonymous — GitHub answers that with less data, not 401.
+_AUTH_KEYS = {
+    "bearer":  {"type", "token", "token_field", "env"},
+    "cookie":  {"type", "token", "token_field", "env", "cookie_name"},
+    "api_key": {"type", "token", "token_field", "env", "header"},
+    "query":   {"type", "token", "token_field", "env", "param"},
+    "basic":   {"type", "username_env", "password_env"},
+}
+
+#: Content types a body can be written in.
+_FORM = "application/x-www-form-urlencoded"
+
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _field_schema(name: str, spec) -> dict:
+    """A field's schema from ``(type, description)``, a type alone, or nothing."""
+    from ...tools._base import _json_type
+    kind, desc = (spec if isinstance(spec, tuple) else (spec, None)) if spec is not None else (None, None)
+    if kind is None:
+        out = {"type": "string"}
+    elif isinstance(kind, str):
+        out = {"type": kind}
+    else:
+        out = _json_type(kind, f"REST field {name!r}")
+    out["description"] = desc or name
+    return out
+
+
+def _text(value) -> str:
+    """A value as a URL carries it: `true`, not `True`."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 # What a method does, as a risk class. HTTP calls GET, HEAD and OPTIONS safe —
@@ -252,6 +291,8 @@ class RestApiTool(Tool):
         response_field:  str | None  = None,
         timeout:         float | None = None,
         risk:            str | None  = None,
+        fields:          dict | None = None,
+        allow_private:   bool | None = None,
     ) -> None:
         # ── Public identity (Tool class attributes) ────────────────────
         self.name        = name
@@ -272,6 +313,9 @@ class RestApiTool(Tool):
         self._response_field = response_field
         self._timeout        = timeout
         self._required_params = list(required_params)
+        self._allow_private  = allow_private
+        self._fields         = dict(fields or {})
+        self._check(name)
         # The token has one source: a callable, a field the code or a chain
         # fills, or an environment variable. Two of them is an error, so none
         # can win over another in silence.
@@ -286,15 +330,13 @@ class RestApiTool(Tool):
         # what to pass — the token's field too, which only a chain fills.
         all_fields = set(path_params) | set(query_params) | set(body_params) | self._hidden
 
+        # Typed where `fields` says how: every field was a string with its
+        # own name as its description, and an array or an object could not be
+        # asked for at all.
         self.parameters = {
             "type": "object",
-            "properties": {
-                field: {
-                    "type":        "string",
-                    "description": field,
-                }
-                for field in sorted(all_fields)
-            },
+            "properties": {field: _field_schema(field, self._fields.get(field))
+                           for field in sorted(all_fields)},
             "required": list(required_params),
         }
 
@@ -308,10 +350,45 @@ class RestApiTool(Tool):
     # Public interface
     # ------------------------------------------------------------------
 
+    def _check(self, name: str) -> None:
+        """Settings that would be dropped in silence, refused by name."""
+        placed = [*self._path_params, *self._query_params, *self._body_params]
+        if bad := [f for f in placed if not _IDENT.match(str(f))]:
+            raise ValueError(f"RestApiTool {name!r}: {bad} cannot be field names — letters, digits and _")
+        if twice := sorted({f for f in placed if placed.count(f) > 1}):
+            raise ValueError(f"RestApiTool {name!r}: {twice} are placed twice (path, query, body); "
+                             "a field goes one place")
+        holes = set(re.findall(r"\{([^{}]*)\}", self._url_template))
+        if missing := sorted(holes - set(self._path_params)):
+            # Sent as written: `/items/{id}` reached the server with the braces.
+            raise ValueError(f"RestApiTool {name!r}: the URL has {missing} and path_params does not "
+                             "name them")
+        if unused := sorted(set(self._path_params) - holes):
+            raise ValueError(f"RestApiTool {name!r}: path_params {unused} are not in the URL")
+        if stray := sorted(set(self._fields) - set(placed) - {self._auth.get("token_field")}):
+            raise ValueError(f"RestApiTool {name!r}: fields= describes {stray}, which no list places")
+        if self._body_params and self._content_type != _FORM and "json" not in self._content_type:
+            raise ValueError(f"RestApiTool {name!r}: a body is written as JSON or as {_FORM}; "
+                             f"{self._content_type!r} is neither")
+        if self._auth:
+            kind = str(self._auth.get("type", "")).lower()
+            if kind not in _AUTH_KEYS:
+                raise ValueError(f"RestApiTool {name!r}: auth type {self._auth.get('type')!r} is not one "
+                                 f"of {sorted(_AUTH_KEYS)}")
+            if unknown := sorted(set(self._auth) - _AUTH_KEYS[kind]):
+                raise ValueError(f"RestApiTool {name!r}: auth {kind!r} reads {sorted(_AUTH_KEYS[kind])}; "
+                                 f"{unknown} would be ignored")
+        query = urllib.parse.urlsplit(self._url_template).query
+        if query and any(w in query.lower() for w in ("key", "token", "secret", "password")):
+            raise ValueError(f"RestApiTool {name!r}: the URL carries a credential in its query; it "
+                             "would be in every error and every saved chain — use auth={'type': "
+                             "'query', 'param': …, 'env': …}")
+
     def run(
         self,
         input:   dict | str | None = None,
         options: dict | None        = None,
+        /,
         **kwargs: Any,
     ) -> dict | list | str:
         """
@@ -328,9 +405,9 @@ class RestApiTool(Tool):
             given here are an error that says so.
         **kwargs
             Individual field values, merged with *input*; a field given in
-            both is an error.  This is the form used by Chains — each accumulated
-            variable whose name matches a declared parameter is passed here
-            automatically.
+            both is an error.  This is the form used by Chains and agents.
+            *input* and *options* are positional only, so a field named
+            ``input`` or ``options`` is passed here like any other.
 
         Returns
         -------
@@ -374,7 +451,7 @@ class RestApiTool(Tool):
                     f"RestApiTool '{self.name}': "
                     f"path parameter '{p}' is required but was not provided."
                 )
-            text = str(val)
+            text = _text(val)
             # `quote` leaves `.` and `..` alone and the HTTP layer collapses
             # them, so `{mid}` = ".." turned DELETE /projects/1/members/{mid}
             # into DELETE /projects/1. An empty value made `//`.
@@ -384,15 +461,19 @@ class RestApiTool(Tool):
             url = url.replace("{" + p + "}", urllib.parse.quote(text, safe=""))
 
         # ── 3. Build query string ──────────────────────────────────────
-        qs_parts: list[tuple[str, str]] = []
+        # A list repeats its key and a bool is `true`: `['a', 'b']` went as
+        # its repr and `True` as "True".
+        qs_parts: list[tuple[str, Any]] = []
         for p in self._query_params:
             val = data.get(p)
             if val is not None:
-                qs_parts.append((p, str(val)))
-
+                qs_parts.append((p, [_text(v) for v in val] if isinstance(val, (list, tuple))
+                                 else _text(val)))
+        shown_url = url                          # what an error may print
+        qs_parts += self._query_auth(data)
         if qs_parts:
             connector = "&" if "?" in url else "?"
-            url = f"{url}{connector}{urllib.parse.urlencode(qs_parts)}"
+            url = f"{url}{connector}{urllib.parse.urlencode(qs_parts, doseq=True)}"
 
         # ── 4. Build request body ──────────────────────────────────────
         body: bytes | None = None
@@ -403,7 +484,12 @@ class RestApiTool(Tool):
                 if p in data
             }
             if body_dict:
-                body = json.dumps(body_dict).encode("utf-8")
+                # Written in the type the header names: a form endpoint was
+                # sent JSON under a form content type.
+                body = (urllib.parse.urlencode({k: ([_text(x) for x in v] if isinstance(v, (list, tuple))
+                                                    else _text(v)) for k, v in body_dict.items()},
+                                               doseq=True)
+                        if self._content_type == _FORM else json.dumps(body_dict)).encode("utf-8")
 
         # ── 5. Build headers ───────────────────────────────────────────
         headers: dict[str, str] = {
@@ -420,12 +506,14 @@ class RestApiTool(Tool):
             req_kwargs["body"] = body
 
         if self._timeout is not None:
-            req_kwargs["timeout"] = urllib3.Timeout(read=float(self._timeout))
+            # The connect timeout kept: `timeout=5` alone left connecting unbounded.
+            req_kwargs["timeout"] = urllib3.Timeout(connect=10.0, read=float(self._timeout))
 
         # Only ever speak http(s), and block SSRF targets (private / loopback /
         # metadata IPs) unless AICHAIN_ALLOW_PRIVATE_URLS is set — needed when a
         # REST endpoint is on an internal network.
-        response = safe_request(self._http, self._method, url, preload_content=False, **req_kwargs)
+        response = safe_request(self._http, self._method, url, preload_content=False,
+                                allow_private=self._allow_private, **req_kwargs)
         try:
             data = response.read(MAX_RESPONSE_BYTES + 1)
         finally:
@@ -437,10 +525,12 @@ class RestApiTool(Tool):
         raw = data.decode("utf-8", errors="replace")
 
         if not (200 <= response.status < 300):
-            raise RuntimeError(
-                f"RestApiTool '{self.name}' — "
-                f"HTTP {response.status} {self._method} {url}: {raw[:500]}"
-            )
+            # Typed, as every other API error is, and without the query: an
+            # auth key in it was in every error message.
+            from ...clients._errors import error_from_status
+            raise error_from_status(response.status,
+                                    f"RestApiTool '{self.name}' {self._method} {shown_url}: {raw[:500]}",
+                                    response.headers)
 
         # ── 7. Parse response ──────────────────────────────────────────
         result: Any
@@ -473,12 +563,11 @@ class RestApiTool(Tool):
         auth_type = auth.get("type", "").lower()
 
         if auth_type == "bearer":
-            token = self._resolve_secret(auth, data)
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
+            token = self._need_secret(auth, data)
+            headers["Authorization"] = f"Bearer {token}"
 
         elif auth_type == "cookie":
-            token = self._resolve_secret(auth, data)
+            token = self._need_secret(auth, data)
             if token:
                 cookie_name = auth.get("cookie_name", "token")
                 # Merge with any existing Cookie header
@@ -491,6 +580,10 @@ class RestApiTool(Tool):
         elif auth_type == "basic":
             username = os.environ.get(auth.get("username_env", ""), "")
             password = os.environ.get(auth.get("password_env", ""), "")
+            if not (username or password):
+                raise ValueError(f"RestApiTool '{self.name}': basic auth reads "
+                                 f"{auth.get('username_env')!r} and {auth.get('password_env')!r}, "
+                                 "and neither is set — the request would have gone anonymous")
             if username or password:
                 encoded = base64.b64encode(
                     f"{username}:{password}".encode()
@@ -498,12 +591,29 @@ class RestApiTool(Tool):
                 headers["Authorization"] = f"Basic {encoded}"
 
         elif auth_type == "api_key":
-            token = self._resolve_secret(auth, data)
-            if token:
-                header_name = auth.get("header", "X-Api-Key")
-                headers[header_name] = token
+            token = self._need_secret(auth, data)
+            header_name = auth.get("header", "X-Api-Key")
+            headers[header_name] = token
 
         return headers
+
+    def _query_auth(self, data: dict) -> list:
+        if str(self._auth.get("type", "")).lower() != "query":
+            return []
+        return [(self._auth.get("param", "key"), self._need_secret(self._auth, data))]
+
+    def _need_secret(self, auth: dict, data: dict) -> str:
+        """The token, or an error saying where it was looked for. An unset
+        variable sent the request anonymous, and some APIs answer that with
+        less data rather than with a 401."""
+        token = self._resolve_secret(auth, data)
+        if not token:
+            where = (f"the environment variable {auth['env']!r}" if auth.get("env") else
+                     f"the field {auth['token_field']!r}" if auth.get("token_field") else
+                     "auth['token']")
+            raise ValueError(f"RestApiTool '{self.name}': no token in {where}; the request would "
+                             "have gone without its credential")
+        return token
 
     @staticmethod
     def _resolve_secret(
@@ -564,6 +674,9 @@ class RestApiTool(Tool):
             "headers": self._static_headers or None, "auth": self._auth or None,
             "content_type": self._content_type, "response_field": self._response_field,
             "timeout": self._timeout, "risk": self.risk,
+            "fields": ({k: (v if isinstance(v, (str, tuple)) or v is None else str(v))
+                        for k, v in self._fields.items()} or None),
+            "allow_private": self._allow_private,
         }
         return {k: v for k, v in args.items() if v not in (None, [], ())}
 

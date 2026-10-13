@@ -144,9 +144,9 @@ class TestREST(unittest.TestCase):
         kw = t._http.request.call_args.kwargs
         self.assertEqual((kw["headers"]["Accept"], kw["timeout"].read_timeout), ("application/json", 5.0))
         with self.assertRaisesRegex(ValueError, "headers is a setting of the tool"):
-            t.run(id="1", options={"headers": {"X": "1"}})
+            t.run({"id": "1"}, {"headers": {"X": "1"}})
         with self.assertRaisesRegex(ValueError, "timeout is a setting of the tool"):
-            t.run(id="1", options={"timeout": 1})
+            t.run({"id": "1"}, {"timeout": 1})
 
     def test_a_field_is_given_once(self):
         with self.assertRaisesRegex(ValueError, r"\['id'\] given both"):

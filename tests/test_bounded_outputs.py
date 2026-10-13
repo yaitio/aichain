@@ -58,7 +58,7 @@ class TestRest(unittest.TestCase):
         t._http.request.return_value = MagicMock(status=200, headers={},
                                                   read=MagicMock(return_value=b"0" * 11))
         with patch.object(_tool, "MAX_RESPONSE_BYTES", 10), \
-                patch("yait_aichain.tools._security.assert_safe_url", lambda u: None):
+                patch("yait_aichain.tools._security.assert_safe_url", lambda u, **k: None):
             with self.assertRaisesRegex(ValueError, "too large"):
                 t.run()
 
@@ -75,7 +75,7 @@ class TestFetchLocal(unittest.TestCase):
         return tool
 
     def test_an_archive_is_not_converted(self):
-        with patch("yait_aichain.tools._security.assert_safe_url", lambda u: None), \
+        with patch("yait_aichain.tools._security.assert_safe_url", lambda u, **k: None), \
                 patch("yait_aichain.tools.fetch.local.assert_safe_url", lambda u: None):
             page = self._tool("application/zip", [b"PK"]).run("https://e.com/a.zip")["pages"][0]
         self.assertIn("not a page", page["error"])
@@ -83,7 +83,7 @@ class TestFetchLocal(unittest.TestCase):
     def test_a_body_over_the_budget_is_not_read_on(self):
         from yait_aichain.tools.fetch import local
         with patch.object(local, "MAX_PAGE_BYTES", 10), \
-                patch("yait_aichain.tools._security.assert_safe_url", lambda u: None), \
+                patch("yait_aichain.tools._security.assert_safe_url", lambda u, **k: None), \
                 patch("yait_aichain.tools.fetch.local.assert_safe_url", lambda u: None):
             page = self._tool("text/html", [b"x" * 8, b"x" * 8, b"never"]).run("https://e.com")["pages"][0]
         self.assertIn("over 10 bytes", page["error"])
