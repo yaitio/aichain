@@ -392,7 +392,7 @@ TOOL_PAGES = {
     "api/tools/fetch.md":       ("Fetch: link → page", ["fetchFirecrawl", "fetchTavily", "fetchExa", "fetchParallel", "fetchLocal"]),
     "api/tools/speech.md":      ("Speech: text ↔ audio",
                              ["ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen",
-                              "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen"]),
+                              "sttOpenAI", "sttGoogle"]),
     "api/utilities/shell.md":  ("Local files and shell",
                              ["LocalBrowseTool", "LocalReadTool", "LocalWriteTool", "LocalRunTool"]),
     "api/utilities/vectors.md": ("Vector store tools",

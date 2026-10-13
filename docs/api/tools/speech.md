@@ -160,7 +160,7 @@ result = ttsXAI()(
 
 ### `ttsQwen`
 
-Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API.
+Text-to-speech via the Alibaba DashScope Qwen3-TTS API.
 
 | | |
 |---|---|
@@ -249,70 +249,6 @@ sttGoogle(
 
 ```python
 result = sttGoogle()(
-    input="…",
-    options={"language": …},
-)
-```
-
-### `sttXAI`
-
-Speech-to-text via the xAI STT API.
-
-| | |
-|---|---|
-| Import | `from yait_aichain.tools import sttXAI` |
-| Risk class | `external` |
-| Key | `XAI_API_KEY` |
-
-```python
-sttXAI(
-    api_key: str | None = None,
-    model: str | None = None,
-)
-```
-
-| Name | Type | Required | Description |
-|---|---|---|---|
-| `input` | `string` | ✓ | Path to the audio file to transcribe. |
-| `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
-| `options.prompt` | `string` |  | Context hint — domain vocabulary or spelling guidance. Supported by OpenAI and xAI. |
-| `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |
-
-```python
-result = sttXAI()(
-    input="…",
-    options={"language": …},
-)
-```
-
-### `sttQwen`
-
-Speech-to-text via the Alibaba DashScope ASR API.
-
-| | |
-|---|---|
-| Import | `from yait_aichain.tools import sttQwen` |
-| Risk class | `external` |
-| Key | `DASHSCOPE_API_KEY` |
-
-```python
-sttQwen(
-    api_key: str | None = None,
-    model: str | None = None,
-)
-```
-
-| Name | Type | Required | Description |
-|---|---|---|---|
-| `input` | `string` | ✓ | Path to the audio file to transcribe. |
-| `options.language` | `string` |  | Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'. Improves accuracy. Auto-detected when omitted. |
-| `options.timestamps` | `boolean` |  | Include word-level timestamps. When True the output is a JSON string. Default: false. |
-| `options.prompt` | `string` |  | Context hint — domain vocabulary or spelling guidance. Supported by OpenAI and xAI. |
-| `options.format` | `string` |  | Output format. ``text`` (default) — plain transcript. ``json`` — includes timestamps and segment metadata. One of `text`, `json`. |
-
-```python
-result = sttQwen()(
     input="…",
     options={"language": …},
 )

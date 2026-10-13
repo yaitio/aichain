@@ -59,7 +59,7 @@ class TestFactories(unittest.TestCase):
             rerank("cohere")
 
     def test_region_is_qwens(self):
-        self.assertEqual(speech("qwen", region="intl")._region, "intl")
+        self.assertEqual(speech("qwen", region="ap")._region, "ap")
         with self.assertRaisesRegex(TypeError, "region is speech\\('qwen'\\)'s"):
             speech("openai", region="intl")
 

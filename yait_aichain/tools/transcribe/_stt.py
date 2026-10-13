@@ -247,8 +247,19 @@ class _OpenAICompatSTT(Transcription):
         prompt     = opts.get("prompt")
         fmt        = opts.get("format", "text")
 
+        if fmt not in ("text", "json"):
+            raise ValueError(f"{type(self).__name__}: format is 'text' or 'json', not {fmt!r}")
+        if timestamps and model.startswith("gpt-4o"):
+            # verbose_json is whisper-1's alone; gpt-4o-transcribe answers 400.
+            raise ValueError(f"{model} gives no word timestamps; use model='whisper-1' for them")
         file_mb = os.path.getsize(input) / (1024 * 1024)
         if file_mb > self._MAX_FILE_MB:
+            if timestamps:
+                # The chunks are joined as text, so a large file returned the
+                # text alone where a small one returned words: keys that
+                # depended on the file's size.
+                raise ValueError(f"{type(self).__name__}: word timestamps are not available for a "
+                                 f"file over {self._MAX_FILE_MB:.0f} MB; split it first")
             return self._transcribe_chunked(input, model, language, prompt, timestamps, fmt)
         return self._transcribe_single(input, model, language, prompt, timestamps, fmt)
 
@@ -260,12 +271,14 @@ class _OpenAICompatSTT(Transcription):
                            prompt: str | None, timestamps: bool, fmt: str) -> str:
         """Send one file to the transcription endpoint and return the result."""
         verbose = timestamps or fmt == "json"
+        # gpt-4o-transcribe takes `json`, never `verbose_json`.
+        rich = verbose and not model.startswith("gpt-4o")
         with open(path, "rb") as fh:
             audio = fh.read()
         fields = [("model", model), ("file", (os.path.basename(path), audio)),
-                  ("response_format", "verbose_json" if verbose else "text")]
+                  ("response_format", "verbose_json" if rich else "json" if verbose else "text")]
         fields += [(k, v) for k, v in (("language", language), ("prompt", prompt)) if v]
-        if verbose:
+        if rich:
             fields.append(("timestamp_granularities[]", "word"))
         raw = request(self._http, "POST", f"{self._BASE_URL}/audio/transcriptions", fields=fields,
                       headers={"Authorization": f"Bearer {self._api_key}"},
@@ -430,8 +443,6 @@ class sttGoogle(Transcription):
         ".wav":  "LINEAR16",
         ".flac": "FLAC",
         ".mp3":  "MP3",
-        ".mp4":  "MP4",
-        ".m4a":  "MP4",
         ".webm": "WEBM_OPUS",
         ".ogg":  "OGG_OPUS",
         ".opus": "OGG_OPUS",
@@ -475,7 +486,12 @@ class sttGoogle(Transcription):
         fmt        = opts.get("format", "text")
 
         ext      = os.path.splitext(input)[1].lower()
-        encoding = self._ENCODING_MAP.get(ext, "MP3")
+        if ext not in self._ENCODING_MAP:
+            # Read as MP3 whatever it was, and `.m4a` was an AttributeError:
+            # the Speech API has no MP4 encoding.
+            raise ValueError(f"sttGoogle reads {sorted(self._ENCODING_MAP)}; {ext or 'no extension'} "
+                             "is not one — convert the file first")
+        encoding = self._ENCODING_MAP[ext]
         file_mb  = os.path.getsize(input) / (1024 * 1024)
 
         if self._api_key:
@@ -626,100 +642,3 @@ class sttGoogle(Transcription):
                 payload["words"] = words
             return json.dumps(payload, ensure_ascii=False)
         return combined
-
-
-# ── sttXAI ────────────────────────────────────────────────────────────────────
-
-class sttXAI(_OpenAICompatSTT):
-    """
-    Speech-to-text via the xAI STT API.
-
-    xAI exposes an OpenAI-compatible transcriptions endpoint.
-    See https://docs.x.ai/developers/model-capabilities/audio/voice for
-    available model names.
-
-    Audio files larger than 24 MB are automatically chunked.
-    Requires ``pydub`` for chunking (``pip install pydub``).
-
-    Parameters
-    ----------
-    api_key : str | None, optional
-        xAI API key.  Falls back to ``XAI_API_KEY`` env var.
-
-    Examples
-    --------
-    ::
-
-        from yait_aichain.tools import transcribe
-
-        tool = transcribe("xai")
-        text = tool.run(input="recording.mp3", options={"language": "en"})
-    """
-
-    name = "sttXAI"
-
-    # ── Chunking settings — advanced: adjust on the class before instantiating
-    _BASE_URL        = "https://api.x.ai/v1"
-    _DEFAULT_MODEL   = "grok-stt"    # check docs.x.ai for current model names
-    _ENV_KEY         = "XAI_API_KEY"
-    _CHUNK_SECONDS   = 600
-    _OVERLAP_SECONDS = 3
-    _MAX_FILE_MB     = 24.0
-
-
-# ── sttQwen ───────────────────────────────────────────────────────────────────
-
-class sttQwen(_OpenAICompatSTT):
-    """
-    Speech-to-text via the Alibaba DashScope ASR API.
-
-    Uses the OpenAI-compatible transcriptions endpoint exposed at
-    ``/compatible-mode/v1/audio/transcriptions``.
-
-    Audio files larger than 24 MB are automatically chunked using ``pydub``
-    and stitched into a single transcript (``pip install pydub``).
-
-    Models
-    ------
-    ``paraformer-v2``   High-accuracy Paraformer ASR model.  Default.
-    ``qwen3-asr``       Qwen3 ASR model — strong multilingual accuracy.
-
-    Region
-    ------
-    The base URL is selected from ``DASHSCOPE_REGION`` (ap|us|cn|hk),
-    defaulting to ``"ap"`` (international endpoint).
-
-    Parameters
-    ----------
-    api_key : str | None, optional
-        DashScope API key.  Falls back to ``DASHSCOPE_API_KEY`` env var.
-
-    Examples
-    --------
-    ::
-
-        from yait_aichain.tools import transcribe
-
-        tool = transcribe("qwen", model="qwen3-asr")
-        text = tool.run(input="meeting.mp3", options={"language": "zh"})
-    """
-
-    name = "sttQwen"
-
-    # ── Class-level defaults ────────────────────────────────────────────────
-    # The base URL is region-dependent; we resolve it lazily in __init__
-    # by reading DASHSCOPE_REGION (or the default "ap").
-    _BASE_URL        = None          # overwritten in __init__
-    _DEFAULT_MODEL   = "paraformer-v2"
-    _ENV_KEY         = "DASHSCOPE_API_KEY"
-    _CHUNK_SECONDS   = 600
-    _OVERLAP_SECONDS = 3
-    _MAX_FILE_MB     = 24.0
-
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        self.model = _model_setting(self, model)
-        # Resolve the region-aware base URL before calling the parent __init__
-        # (which reads self._BASE_URL for its requests).
-        from ...clients._families.qwen import resolve_qwen_base_url
-        self._BASE_URL = resolve_qwen_base_url() + "/compatible-mode/v1"
-        super().__init__(api_key=api_key, model=model)

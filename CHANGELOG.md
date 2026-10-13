@@ -123,7 +123,31 @@ where a fix is named below.
 - **`Embedder.batch()`** — it was `run()` with a type check, and `run()` takes
   a list. It warns now and goes in 5.0.
 
+### Removed
+
+- **`sttXAI` and `sttQwen`, which never transcribed anything.** Both
+  answered 404, checked live 2026-10-13: xAI offers speech-to-text over a
+  WebSocket stream, not the file endpoint the tool posted to, and DashScope's
+  OpenAI-compatible path has no `audio/transcriptions`. `transcribe()` takes
+  `"openai"` and `"google"`.
+
 ### Fixed
+
+- **Speech tools send what is set, in a format they write.** An option given
+  as `None` is not sent, where `voice=None` went into the request and
+  `speed=None` raised. Each speech tool names the formats it writes and
+  refuses others, where Google turned an unknown one into MP3. `ttsQwen`
+  defaults to `qwen3-tts-flash` with the voice `Cherry`, where its default,
+  `cosyvoice-v2`, answered "Model not exist" (checked live 2026-10-13), and
+  writes WAV, the one format that endpoint answers in — an MP3 asked for was
+  WAV saved as `.mp3`. An unknown region is refused at construction.
+- **Transcription keeps its shape.** `sttOpenAI` with `gpt-4o-transcribe`
+  asks for `json`, where it sent `verbose_json` and got 400 (checked live), and
+  refuses word timestamps, which only `whisper-1` gives. A file large enough to
+  be chunked refuses timestamps instead of returning text alone, so the keys
+  no longer depend on the file's size. `sttGoogle` refuses a file type it
+  cannot read, where `.m4a` was an `AttributeError` and anything unknown was
+  read as MP3.
 
 - **A REST endpoint sends what its settings say.** `fields=` types an
   endpoint's fields — `{"limit": (int, "page size"), "tags": ("array", …)}` —

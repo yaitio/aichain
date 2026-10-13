@@ -10,14 +10,12 @@ Tools
 -----
 sttOpenAI   OpenAI ``gpt-4o-transcribe`` and ``whisper-1``.
 sttGoogle   Google Gemini.
-sttXAI      xAI.
-sttQwen     Qwen (DashScope).
 """
 
-from ._stt import Transcription, sttGoogle, sttOpenAI, sttQwen, sttXAI
+from ._stt import Transcription, sttGoogle, sttOpenAI
 
 #: Provider name → tool class, for :func:`transcribe`.
-SERVICES = {"openai": sttOpenAI, "google": sttGoogle, "xai": sttXAI, "qwen": sttQwen}
+SERVICES = {"openai": sttOpenAI, "google": sttGoogle}
 
 
 def transcribe(service: str, *, model: "str | None" = None, api_key: "str | None" = None,
@@ -38,7 +36,7 @@ def transcribe(service: str, *, model: "str | None" = None, api_key: "str | None
     return named(cls(api_key=api_key, **({"model": model} if model is not None else {})), name, description)
 
 
-__all__ = ["transcribe", "SERVICES", "Transcription", "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen"]
+__all__ = ["transcribe", "SERVICES", "Transcription", "sttOpenAI", "sttGoogle"]
 
 from .._callable import callable_package as _callable_package
 _callable_package(__name__, transcribe)

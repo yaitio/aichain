@@ -65,8 +65,8 @@ class TestSpeech(unittest.TestCase):
     def test_the_model_is_a_setting(self):
         self.assertEqual(speech("xai", model="grok-tts-2").model, "grok-tts-2")
         self.assertEqual(speech("xai").model, "grok-tts")                    # the provider's default
-        self.assertEqual(transcribe("qwen", model="paraformer-v2").model, "paraformer-v2")
-        for t in (speech("xai"), transcribe("xai")):
+        self.assertEqual(transcribe("openai", model="whisper-1").model, "whisper-1")
+        for t in (speech("xai"), transcribe("openai")):
             self.assertNotIn("model", t.parameters["properties"]["options"]["properties"])
         with self.assertRaisesRegex(ValueError, "model is a setting of the tool"):
             speech("xai").run("hi", {"model": "x"})
@@ -74,7 +74,7 @@ class TestSpeech(unittest.TestCase):
             speech("google", model="x")
 
     def test_qwens_region_is_a_setting(self):
-        t = speech("qwen", region="intl")
+        t = speech("qwen", region="ap")
         with self.assertRaisesRegex(ValueError, "region is a setting of the tool"):
             t.run("hi", {"region": "cn"})
 

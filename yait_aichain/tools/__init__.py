@@ -42,7 +42,7 @@ from .decision   import Decision, decisionOpenAI, decisionTypeSafe
 from .embed      import Embedder, EmbeddingResult, EmbeddingOpenAI, EmbeddingCohere, EmbeddingVoyage, EmbeddingGoogle, EmbeddingQwen
 from .rerank     import RerankBase, RerankResult, RerankCohere, RerankVoyage, RerankQwen
 from .speech     import Speech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
-from .transcribe import Transcription, sttGoogle, sttOpenAI, sttQwen, sttXAI
+from .transcribe import Transcription, sttGoogle, sttOpenAI
 from .image._tool import Image
 from .chunk._chunk import Chunk
 
@@ -88,7 +88,7 @@ __all__ = [
     "EmbeddingGoogle", "EmbeddingQwen",
     "RerankBase", "RerankResult", "RerankCohere", "RerankVoyage", "RerankQwen",
     "Speech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen",
-    "Transcription", "sttOpenAI", "sttGoogle", "sttXAI", "sttQwen",
+    "Transcription", "sttOpenAI", "sttGoogle",
     "Image", "Wait", "Gate",
     # permissions
     "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",

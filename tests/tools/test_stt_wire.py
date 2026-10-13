@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from yait_aichain.tools.transcribe._stt import sttOpenAI, sttQwen, sttXAI
+from yait_aichain.tools.transcribe._stt import sttOpenAI
 
 KEYS = {"OPENAI_API_KEY": "k", "XAI_API_KEY": "k", "DASHSCOPE_API_KEY": "k"}
 
@@ -38,13 +38,28 @@ def _sent(cls, options=None, reply=b"hello"):
 @patch.dict(os.environ, KEYS)
 class TestTheWire(unittest.TestCase):
 
-    def test_each_goes_to_its_own_endpoint(self):
-        for cls, base in ((sttOpenAI, "https://api.openai.com/v1"), (sttXAI, "https://api.x.ai/v1")):
-            with self.subTest(cls.__name__):
-                method, url, _, _, _ = _sent(cls)
-                self.assertEqual((method, url), ("POST", base + "/audio/transcriptions"))
-        _, url, _, _, _ = _sent(sttQwen)
-        self.assertTrue(url.startswith("https://") and url.endswith("/compatible-mode/v1/audio/transcriptions"))
+    def test_it_goes_to_its_endpoint(self):
+        method, url, _, _, _ = _sent(sttOpenAI)
+        self.assertEqual((method, url), ("POST", "https://api.openai.com/v1/audio/transcriptions"))
+
+    def test_gpt_4o_transcribe_asks_for_json_not_verbose_json(self):
+        # verbose_json is whisper-1's alone: gpt-4o-transcribe answered 400,
+        # checked live 2026-10-13.
+        def make():
+            return sttOpenAI(model="gpt-4o-transcribe")
+        reply = json.dumps({"text": "hi"}).encode()
+        _, _, fields, raw, out = _sent(make, {"format": "json"}, reply)
+        self.assertEqual(fields["response_format"], "json")
+        self.assertNotIn(("timestamp_granularities[]", "word"), raw)
+        self.assertEqual(json.loads(out)["text"], "hi")
+        with self.assertRaisesRegex(ValueError, "whisper-1"):
+            _sent(make, {"timestamps": True})
+
+    def test_a_large_file_with_timestamps_is_refused(self):
+        tool = sttOpenAI()
+        tool._MAX_FILE_MB = 0.0
+        with self.assertRaisesRegex(ValueError, "split it"):
+            tool.run(_audio(), {"timestamps": True})
 
     def test_text_asks_for_text(self):
         _, _, fields, _, out = _sent(sttOpenAI, {"language": "en"})

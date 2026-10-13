@@ -40,11 +40,9 @@ Chains and Agents identically.
 | Speech | [`ttsOpenAI`](../api/tools/speech.md#ttsopenai) | `ttsOpenAI` | Text-to-speech via the OpenAI TTS API. | `OPENAI_API_KEY` | `draft` |
 | Speech | [`ttsGoogle`](../api/tools/speech.md#ttsgoogle) | `ttsGoogle` | Text-to-speech via Google Cloud Text-to-Speech. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `draft` |
 | Speech | [`ttsXAI`](../api/tools/speech.md#ttsxai) | `ttsXAI` | Text-to-speech via the xAI TTS API. | `XAI_API_KEY` | `draft` |
-| Speech | [`ttsQwen`](../api/tools/speech.md#ttsqwen) | `ttsQwen` | Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API. | `DASHSCOPE_API_KEY` | `draft` |
+| Speech | [`ttsQwen`](../api/tools/speech.md#ttsqwen) | `ttsQwen` | Text-to-speech via the Alibaba DashScope Qwen3-TTS API. | `DASHSCOPE_API_KEY` | `draft` |
 | Speech | [`sttOpenAI`](../api/tools/speech.md#sttopenai) | `sttOpenAI` | Speech-to-text via the OpenAI Whisper API. | `OPENAI_API_KEY` | `external` |
 | Speech | [`sttGoogle`](../api/tools/speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `external` |
-| Speech | [`sttXAI`](../api/tools/speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `external` |
-| Speech | [`sttQwen`](../api/tools/speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `external` |
 | Local | [`local_browse`](../api/utilities/shell.md#localbrowsetool) | `LocalBrowseTool` | List directory contents as a tree. | — | `read` |
 | Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `read` |
 | Local | [`local_write`](../api/utilities/shell.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |

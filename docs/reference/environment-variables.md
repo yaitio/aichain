@@ -73,7 +73,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 |---|---|---|
 | `BRAVE_SEARCH_API_KEY` | `searchBrave` | — |
 | `COHERE_API_KEY` | `EmbeddingCohere`, `RerankCohere` | — |
-| `DASHSCOPE_API_KEY` | `EmbeddingQwen`, `RerankQwen`, `sttQwen`, `ttsQwen` | yes |
+| `DASHSCOPE_API_KEY` | `EmbeddingQwen`, `RerankQwen`, `ttsQwen` | yes |
 | `EXA_API_KEY` | `fetchExa`, `searchExa` | — |
 | `FIRECRAWL_API_KEY` | `fetchFirecrawl`, `searchFirecrawl` | — |
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `sttGoogle`, `ttsGoogle` | yes |
@@ -84,7 +84,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `TAVILY_API_KEY` | `fetchTavily`, `searchTavily` | — |
 | `TYPESAFE_API_KEY` | `decisionTypeSafe` | — |
 | `VOYAGE_API_KEY` | `EmbeddingVoyage`, `RerankVoyage` | — |
-| `XAI_API_KEY` | `sttXAI`, `ttsXAI` | yes |
+| `XAI_API_KEY` | `ttsXAI` | yes |
 <!-- /g:env-tools -->
 
 A tool not listed reads no key.

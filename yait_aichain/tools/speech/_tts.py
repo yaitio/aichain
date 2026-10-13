@@ -68,6 +68,18 @@ def _no_model_option(tool, opts: dict) -> None:
         raise ValueError(f"{tool.name}: model is a setting of the tool, not of a call — "
                          f"make it with model=… ({type(tool).__name__}(model=…), or the factory)")
 
+
+def _call_options(tool, options) -> dict:
+    """A call's options without the unset ones — `voice=None` went into the
+    request and `speed=None` raised — and with the format checked against the
+    ones this provider writes, where an unknown one became MP3 in silence."""
+    _no_model_option(tool, options or {})
+    opts = {k: v for k, v in (options or {}).items() if v is not None}
+    fmt = opts.get("format", _DEFAULT_FORMAT)
+    if fmt not in tool._FORMATS:
+        raise ValueError(f"{tool.name} writes {sorted(tool._FORMATS)}; {fmt!r} is not one")
+    return opts
+
 def _output_folder(output_dir: str | None) -> str:
     """Where audio is written: the tool's ``output_dir``, else
     ``AICHAIN_OUTPUT_ROOT``, else the system's temporary directory — which is
@@ -247,6 +259,7 @@ class _OpenAISpeech(Speech):
     _BASE_URL: str = ""
     _ENV_KEY:  str = ""
     _LABEL:    str = ""
+    _FORMATS = frozenset({"mp3", "wav", "opus", "flac", "pcm", "aac"})
 
     def __init__(self, api_key: str | None = None, model: str | None = None, *,
                  output_dir: str | None = None) -> None:
@@ -267,8 +280,7 @@ class _OpenAISpeech(Speech):
         (``"mp3"`` default, ``"wav"``, ``"opus"``, ``"flac"``, ``"pcm"``). The
         file goes in the tool's ``output_dir``, made before the request.
         """
-        _no_model_option(self, options or {})
-        opts = options or {}
+        opts = _call_options(self, options)
         fmt  = opts.get("format", _DEFAULT_FORMAT)
         return self._save(opts, fmt, lambda: request(
             self._http, "POST", f"{self._BASE_URL}/audio/speech",
@@ -384,6 +396,7 @@ class ttsGoogle(Speech):
         "opus": ("OGG_OPUS", "opus"),
         "flac": ("FLAC",     "flac"),
     }
+    _FORMATS = frozenset(_FORMAT_MAP)
 
     def __init__(self, api_key: str | None = None, model: str | None = None, *,
                  output_dir: str | None = None) -> None:
@@ -419,12 +432,12 @@ class ttsGoogle(Speech):
         """
         texttospeech = require("google.cloud.texttospeech", package="google-cloud-texttospeech", who="ttsGoogle")
 
-        opts        = options or {}
+        opts        = _call_options(self, options)
         voice_name  = opts.get("voice")
         language    = opts.get("language",  self._DEFAULT_LANGUAGE)
         speed       = float(opts.get("speed", _DEFAULT_SPEED))
         fmt         = opts.get("format",    _DEFAULT_FORMAT)
-        g_encoding, ext = self._FORMAT_MAP.get(fmt, ("MP3", "mp3"))
+        g_encoding, ext = self._FORMAT_MAP[fmt]
 
         synthesis_input = texttospeech.SynthesisInput(text=input)
 
@@ -494,7 +507,7 @@ class ttsXAI(_OpenAISpeech):
 
 class ttsQwen(Speech):
     """
-    Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API.
+    Text-to-speech via the Alibaba DashScope Qwen3-TTS API.
 
     Uses the native DashScope multimodal generation endpoint
     (``POST /api/v1/services/aigc/multimodal-generation/generation``).
@@ -503,15 +516,12 @@ class ttsQwen(Speech):
 
     Models
     ------
-    ``cosyvoice-v2``           High-quality, multi-voice.  Default.
-    ``qwen3-tts-flash``        Qwen3 TTS model — fast and natural.
+    ``qwen3-tts-flash``        Qwen3 TTS — fast and natural.  Default.
     ``qwen3-tts-instruct-flash`` Instruction-following TTS.
 
-    Voices (cosyvoice-v2 selection)
-    --------------------------------
-    longxiaochun · longxiaochun_v2 · loongstella · longhua · longshuo
-    longfei · longxiang · longshu · longcheng · longmiao · loongbella
-    See the DashScope docs for a full list of 40+ voices.
+    Voices include ``Cherry`` (the default), ``Ethan``, ``Nofish``,
+    ``Jennifer``, ``Ryan``; see the DashScope docs for the full list. The
+    answer is WAV, the one format this tool writes.
 
     Region
     ------
@@ -527,7 +537,7 @@ class ttsQwen(Speech):
         Region selector: ``"ap"`` (default), ``"us"``, ``"cn"``, ``"hk"``.
         Overrides the ``DASHSCOPE_REGION`` env var.
     model : str | None, optional
-        Default ``"cosyvoice-v2"``.  A setting of the tool.
+        Default ``"qwen3-tts-flash"``.  A setting of the tool.
 
     Examples
     --------
@@ -539,21 +549,18 @@ class ttsQwen(Speech):
 
         path = tool.run(
             input="Hello from Qwen TTS!",
-            options={"voice": "longxiaochun", "format": "wav"},
+            options={"voice": "Cherry"},
         )
     """
 
     name           = "ttsQwen"
-    _DEFAULT_MODEL = "cosyvoice-v2"
-    _DEFAULT_VOICE = "longxiaochun"
+    # cosyvoice-v2 answered "Model not exist" on this endpoint; qwen3-tts-flash
+    # synthesises, checked live 2026-10-13. It answers WAV whatever format is
+    # asked, so WAV is the one format — an MP3 asked for was WAV saved as .mp3.
+    _DEFAULT_MODEL = "qwen3-tts-flash"
+    _DEFAULT_VOICE = "Cherry"
     _TTS_PATH      = "/api/v1/services/aigc/multimodal-generation/generation"
-
-    _FORMAT_EXT: dict[str, str] = {
-        "mp3":  "mp3",
-        "wav":  "wav",
-        "pcm":  "pcm",
-        "flac": "flac",
-    }
+    _FORMATS       = frozenset({"wav"})
 
     # `language` and `speed` are dropped from the shared schema: this
     # endpoint reads neither, and an option a model can set and watch vanish
@@ -578,6 +585,7 @@ class ttsQwen(Speech):
                 "Pass api_key= or set the DASHSCOPE_API_KEY environment variable."
             )
         self._region = region
+        self._base_url()        # an unknown region is refused here, not on the first call
 
         # Build HTTP client (no extra dependency — pure urllib3)
         self._http = make_http(
@@ -598,20 +606,21 @@ class ttsQwen(Speech):
         input : str
             Text to synthesise.
         options : dict | None, optional
-            ``voice``       — voice name.  Default: ``"longxiaochun"``.
-            ``format``      — ``"mp3"`` (default), ``"wav"``, ``"pcm"``,
-                              ``"flac"``.
+            ``voice``       — voice name.  Default: ``"Cherry"``.
+            ``format``      — ``"wav"``, the one this endpoint answers in.
 
         Returns
         -------
         str
             Absolute path to the saved audio file.
         """
-        _no_model_option(self, options or {})
-        opts        = options or {}
+        if "region" in (options or {}):
+            raise ValueError(f"{self.name}: region is a setting of the tool, not of a call — "
+                             "speech('qwen', region=…)")
+        opts        = _call_options(self, {"format": "wav", **(options or {})})
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
         model       = self.model
-        fmt         = opts.get("format",      _DEFAULT_FORMAT)
+        fmt         = opts.get("format",      "wav")
         if "region" in opts:
             raise ValueError(f"{self.name}: region is a setting of the tool, not of a call — "
                              "speech('qwen', region=…)")

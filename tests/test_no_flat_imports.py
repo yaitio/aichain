@@ -63,10 +63,11 @@ class TestEveryKeyOnlyToolConstructs(unittest.TestCase):
         self.assertGreater(built, 20)
 
     def test_qwen_speech_resolves_a_region(self):
-        from yait_aichain.tools import ttsQwen, sttQwen
+        from yait_aichain.tools import ttsQwen
         with mock.patch.dict(os.environ, KEYS):
             self.assertIn("dashscope", ttsQwen(region="us")._base_url())
-            self.assertIn("dashscope", sttQwen()._BASE_URL)
+            with self.assertRaises(ValueError):
+                ttsQwen(region="mars")
 
 
 if __name__ == "__main__":
