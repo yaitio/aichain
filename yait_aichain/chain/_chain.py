@@ -104,6 +104,7 @@ if TYPE_CHECKING:
 
 from .._budget import as_budget, lend, start_run
 
+import copy
 import importlib
 import warnings
 
@@ -172,16 +173,17 @@ def _import_tool(class_path: str, init_args: dict, trusted: bool):
     return tool
 
 
+_MISSING = object()
+
+
 def _usage_to_dict(usage) -> dict:
     """Serialise a ``Usage`` (or None) for the run document."""
     if not usage:
         return {}
-    return {
-        "input_tokens":  usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "total_tokens":  usage.total_tokens,
-        "cost":          usage.cost,
-    }
+    # Every field: four of the seven were kept, and the cache and image counts
+    # were lost at a pause.
+    from dataclasses import asdict
+    return asdict(usage)
 
 
 from .._runners import is_tool as _is_tool, is_agent as _is_agent
@@ -662,12 +664,8 @@ class Chain:
             accumulated.update(signal or {})
             signal = None
         u = doc.usage or {}
-        usage_in = Usage(
-            input_tokens  = u.get("input_tokens", 0),
-            output_tokens = u.get("output_tokens", 0),
-            total_tokens  = u.get("total_tokens", 0),
-            cost          = u.get("cost"),
-        ) if u else None
+        from dataclasses import fields as _fields
+        usage_in = Usage(**{f.name: u[f.name] for f in _fields(Usage) if f.name in u}) if u else None
         start_run(self, spent=u.get("cost") or 0.0)     # the parked part was spent already
         from ..state import using
         with using(context), lend(self.max_cost):
@@ -794,13 +792,19 @@ class Chain:
 
                     # Fold the agent's token usage into the chain total. An
                     # Agent has no ``last_usage`` (the generic accumulation
-                    # below would miss it); it reports tokens on AgentResult.
-                    _atok = getattr(agent_result, "tokens_used", 0) or 0
-                    if _atok:
-                        usage_total = (Usage(total_tokens=_atok) if usage_total is None
-                                       else usage_total + Usage(total_tokens=_atok))
+                    # below would miss it); it reports on its result, cost
+                    # included — the tokens alone left the chain's cost None.
+                    agent_usage = getattr(agent_result, "usage", None)
+                    if agent_usage is None and getattr(agent_result, "tokens_used", 0):
+                        agent_usage = Usage(total_tokens=agent_result.tokens_used)
+                    if agent_usage is not None:
+                        usage_total = agent_usage if usage_total is None else usage_total + agent_usage
 
                 else:
+                    # A copy for this step: one Skill shared by a Pool's
+                    # copies of this chain overwrote `last_usage` from another
+                    # thread before this one read it (35 of 400 items).
+                    shared, runner = runner, copy.copy(runner)
                     # Skill: pass full accumulated dict, honouring input_map renames.
                     if input_map:
                         skill_vars = dict(accumulated)
@@ -810,6 +814,11 @@ class Chain:
                         output = runner.run(variables=skill_vars)
                     else:
                         output = runner.run(variables=accumulated)
+                    # Mirrored onto the step the caller holds, for reading
+                    # afterwards; the chain's own sum reads the copy.
+                    for key, value in vars(runner).items():
+                        if vars(shared).get(key, _MISSING) is not value:
+                            setattr(shared, key, value)
                     # A chain used as a step contributes its output, and its
                     # failure is this step's failure — the same contract an
                     # agent step has.

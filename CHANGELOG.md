@@ -125,6 +125,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **A chain reports what its steps spent.** An agent step added its tokens
+  and not its cost, so `ChainResult.cost` was None or short; a Skill shared
+  by a Pool's copies of one chain had its usage read after another thread
+  overwrote it (35 of 400 items); a pause kept four of `Usage`'s seven
+  fields, losing the cache and image counts. An agent step adds its whole
+  usage, each Skill step runs on its own copy — the step the caller holds
+  still shows the result — and the run document keeps every field.
 - **A saved Skill, agent or tool comes back as it was, or saving says why
   not.** A Skill came back at temperature 1.0 from 0, with no fallback, no
   retries and no budget; an agent came back without its permission policy —
