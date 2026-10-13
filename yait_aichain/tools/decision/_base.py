@@ -53,7 +53,6 @@ from __future__ import annotations
 
 import base64
 import json
-import mimetypes
 import os
 
 from ...clients._base import make_http
@@ -105,6 +104,10 @@ def check_questions(questions, owner: str = "Decision") -> None:
                                  "description (None when an option needs none), at least two")
             if len(ch) > MAX_CHOICES:
                 raise ValueError(f"choice {name!r} has {len(ch)} options; at most {MAX_CHOICES}")
+            if bad := [k for k in ch if not isinstance(k, str) or not k.strip()]:
+                # An answer is keyed by the option's text; an int key matched
+                # nothing and every probability came back None.
+                raise ValueError(f"choice {name!r}: options are named by strings; got {bad[:3]}")
         elif "choices" in q:
             raise ValueError(f"{kind} {name!r} takes no choices")
         if kind == "score":
@@ -113,6 +116,10 @@ def check_questions(questions, owner: str = "Decision") -> None:
             if not isinstance(lv, list) or not lo <= len(lv) <= hi:
                 raise ValueError(f"score {name!r} needs levels: an ordered list of {lo} to {hi}, "
                                  "lowest first, each a label or {'label', 'description'}")
+            if bad := [x for x in lv if not isinstance(x, (str, dict))]:
+                # `levels: [1, 2, 3]` was an AttributeError on the first int.
+                raise ValueError(f"score {name!r}: a level is a label or {{'label', 'description'}}; "
+                                 f"got {bad[:3]}")
             labels = [_level(x)[0] for x in lv]
             if not all(labels) or len(set(labels)) != len(labels):
                 raise ValueError(f"score {name!r}: every level needs a label, and labels "
@@ -137,21 +144,41 @@ def describe(questions: dict) -> str:
             "probabilities, not prose. Pass the text as `state`.\n" + "\n".join(lines))
 
 
+#: The largest image sent: past it a provider refuses the request anyway.
+MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+_MAGIC = ((b"\x89PNG", "image/png"), (b"\xff\xd8\xff", "image/jpeg"),
+          (b"GIF8", "image/gif"))
+
+
+def _sniff(data: bytes) -> str:
+    """The image type its first bytes say — every byte string was labelled PNG."""
+    for magic, mime in _MAGIC:
+        if data.startswith(magic):
+            return mime
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    raise ValueError("the bytes are not a PNG, JPEG, GIF or WebP image")
+
+
 def image_url(image) -> str:
     """An image as the base64 data URL a decision endpoint takes — from a data
     URL, raw bytes, or a local path."""
     if isinstance(image, str) and image.startswith("data:"):
         return image
     if isinstance(image, (bytes, bytearray)):
-        data, mime = bytes(image), "image/png"
+        data = bytes(image)
     elif isinstance(image, str) and os.path.isfile(image):
+        if os.path.getsize(image) > MAX_IMAGE_BYTES:
+            raise ValueError(f"{image!r} is over {MAX_IMAGE_BYTES:,} bytes")
         with open(image, "rb") as fh:
             data = fh.read()
-        mime = mimetypes.guess_type(image)[0] or "image/png"
     else:
         raise ValueError("an image must be a data: URL, bytes or a local file path; "
                          "hosted URLs are not taken by the decision endpoints")
-    return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError(f"the image is over {MAX_IMAGE_BYTES:,} bytes")
+    return f"data:{_sniff(data)};base64,{base64.b64encode(data).decode()}"
 
 
 def _p(v) -> str:
@@ -248,11 +275,16 @@ class Decision(Tool):
         if images and not self.images:
             raise ValueError(f"{type(self).__name__} ({self._PROVIDER}) takes no images; "
                              "decisionOpenAI does")
+        if isinstance(images, (str, bytes, bytearray)):
+            images = [images]                   # one image, not its characters
         answers, model, usage = self._ask(state, [image_url(i) for i in images or []])
+        tokens = usage.get("input_tokens")
+        # No tokens reported is no cost known — it was $0.00, "reported".
         return Record({"answers": answers, "model": model, "usage": usage,
-                       "cost": (usage.get("input_tokens") or 0) * self._PRICE_PER_INPUT_TOKEN,
-                       "cost_basis": f"input tokens reported by {self._PROVIDER}, at the published "
-                                     f"rate ({self._PRICE_SOURCE})"},
+                       "cost": None if tokens is None else tokens * self._PRICE_PER_INPUT_TOKEN,
+                       "cost_basis": (f"not reported by {self._PROVIDER}" if tokens is None else
+                                      f"input tokens reported by {self._PROVIDER}, at the published "
+                                      f"rate ({self._PRICE_SOURCE})")},
                       self.render)
 
     def render(self, out: dict) -> str:
@@ -278,6 +310,11 @@ class Decision(Tool):
         answers = self._raw_answers(data)
         if answers is None:
             raise RuntimeError(f"{self._PROVIDER} returned no answers: {json.dumps(data)[:500]}")
+        # A question the provider skipped was an answer of None and a run
+        # that succeeded: fail closed, by name.
+        if missing := [n for n in self.questions if not answers.get(n)]:
+            raise RuntimeError(f"{self._PROVIDER} answered no {missing}; "
+                               f"it answered {sorted(k for k, v in answers.items() if v)}")
         usage = data.get("usage") or {}
         return ({n: self._answer(q, answers.get(n) or {}) for n, q in self.questions.items()},
                 data.get("model", self.model),

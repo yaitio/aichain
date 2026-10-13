@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from yait_aichain.tools import Decision, Record, decide, decisionOpenAI, decisionTypeSafe
+from yait_aichain.tools.decision._base import check_questions
 
 QUESTIONS = {
     "urgent": {"type": "predicate", "instructions": "Does this convey urgency?"},
@@ -248,13 +249,13 @@ class TestImages(unittest.TestCase):
             fh.write(b"\x89PNG fake")
         try:
             tool = _tool(decisionOpenAI)
-            tool.run(state="Inspect this photo.", images=[fh.name, b"raw", "data:image/jpeg;base64,AAAA"])
+            tool.run(state="Inspect this photo.", images=[fh.name, b"\xff\xd8\xffraw", "data:image/jpeg;base64,AAAA"])
             msg = _sent(tool)["input"]
             self.assertEqual(msg[0]["role"], "user")
             parts = msg[0]["content"]
             self.assertEqual(parts[0], {"type": "input_text", "text": "Inspect this photo."})
             self.assertEqual(parts[1]["image_url"], "data:image/png;base64," + base64.b64encode(b"\x89PNG fake").decode())
-            self.assertTrue(parts[2]["image_url"].startswith("data:image/png;base64,"))
+            self.assertTrue(parts[2]["image_url"].startswith("data:image/jpeg;base64,"))   # by its bytes, not PNG
             self.assertEqual(parts[3]["image_url"], "data:image/jpeg;base64,AAAA")
         finally:
             os.unlink(fh.name)
@@ -413,3 +414,39 @@ class TestDecisionLive(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFailsClosed(unittest.TestCase):
+    """A skipped question was an answer of None in a run that succeeded; no
+    usage was a cost of $0.00 "reported"; int levels, int option names and a
+    path given as one string were not caught."""
+
+    def test_a_question_the_provider_skipped_is_an_error(self):
+        partial = {**OPENAI, "answers": [a for a in OPENAI["answers"] if a["name"] != "team"]}
+        with self.assertRaisesRegex(RuntimeError, "team"):
+            _tool(decisionOpenAI, partial).run(state="x")
+
+    def test_no_usage_is_no_cost(self):
+        out = _tool(decisionOpenAI, {**OPENAI, "usage": None}).run(state="x")
+        self.assertIsNone(out["cost"])
+        self.assertIn("not reported", out["cost_basis"])
+
+    def test_malformed_levels_and_options_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "a level is"):
+            check_questions({"s": {"type": "score", "instructions": "i", "levels": [1, 2, 3]}})
+        with self.assertRaisesRegex(ValueError, "named by strings"):
+            check_questions({"c": {"type": "choice", "instructions": "i", "choices": {1: None, 2: None}}})
+
+    def test_one_image_path_is_one_image(self):
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fh:
+            fh.write(b"\x89PNG fake")
+        try:
+            tool = _tool(decisionOpenAI)
+            tool.run(state="x", images=fh.name)
+            self.assertEqual(len(_sent(tool)["input"][0]["content"]), 2)
+        finally:
+            os.unlink(fh.name)
+
+    def test_bytes_that_are_no_image_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "not a PNG"):
+            _tool(decisionOpenAI).run(state="x", images=[b"plain text"])

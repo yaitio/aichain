@@ -133,6 +133,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A decision tool fails closed.** A question the provider did not answer is
+  an error naming it, where it was a probability of `None` in a run that
+  succeeded. A provider that reports no usage gives a cost of `None`, "not
+  reported", where it gave $0.00 with a basis claiming it was reported.
+  Score levels that are not labels and choice options not named by strings
+  are refused at construction (`levels: [1, 2, 3]` was an `AttributeError`, int
+  option names answered nothing). One image path given as a string is one
+  image, where it was read a character at a time; an image is at most 20 MB
+  and its type is read from its bytes, where every byte string was labelled
+  PNG.
+
 - **The chunker keeps every line and joins only what belongs together.**
   Overlap joins text to text under the same headings, from the neighbour's own
   text: it glued a table's header to a data row and began a section with the
