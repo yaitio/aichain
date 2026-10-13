@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../control/cost-and-budget.md).
 
 <!-- g:api -->
-[`Budget`](#budget) · [`BudgetExceeded`](#budgetexceeded) · [`PermissionPolicy`](#permissionpolicy) · [`ApprovalRequest`](#approvalrequest) · [`ApprovalDecision`](#approvaldecision) · [`Event`](#event) · [`Hook`](#hook) · [`Tracer`](#tracer) · [`LoggingTracer`](#loggingtracer) · [`RISK_CLASSES`](#risk_classes) · [`DECISIONS`](#decisions)
+[`Budget`](#budget) · [`BudgetExceeded`](#budgetexceeded) · [`PermissionPolicy`](#permissionpolicy) · [`ApprovalRequest`](#approvalrequest) · [`ApprovalDecision`](#approvaldecision) · [`Event`](#event) · [`Hook`](#hook) · [`Tracer`](#tracer) · [`LoggingTracer`](#loggingtracer) · [`docs_dir`](#docs_dir) · [`RISK_CLASSES`](#risk_classes) · [`DECISIONS`](#decisions)
 
 ---
 
@@ -307,6 +307,21 @@ LoggingTracer(event: Event)
 ```
 
 Call self as a function.
+
+---
+
+## `docs_dir()`
+
+```python
+docs_dir()
+```
+
+The documentation of the installed version, as a directory.
+
+A released wheel carries `docs/` and `llms.txt` inside the package, so
+an agent writing code against it reads the pages of the version it will
+run rather than what it remembers of an older one. In a checkout the
+repository's own `docs/` is returned. `None` when neither is there.
 
 ---
 

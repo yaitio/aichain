@@ -54,10 +54,8 @@ jobs:
           fi
 
       - name: Build
-        run: |
-          pip install build twine
-          python -m build
-          twine check dist/*
+        # The pages of this version travel inside it; see yait_aichain.docs_dir().
+        run: sh .github/scripts/build.sh
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

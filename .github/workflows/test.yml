@@ -39,11 +39,23 @@ jobs:
       # tuning tasks' references; a stale copy fails here.
       - run: python .github/scripts/skill.py --check
 
+  # The release build, on every push: the wheel carries the docs of its own
+  # version (yait_aichain.docs_dir()), and a pattern that stops matching them
+  # fails here rather than on the day of a release.
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sh .github/scripts/build.sh
+
   # One stable name for branch protection to require. The matrix names change
   # whenever a Python version is added or dropped; this one does not.
   gate:
     if: always()
-    needs: test
+    needs: [test, wheel]
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.test.result }}" = "success"
+      - run: test "${{ needs.test.result }}" = "success" && test "${{ needs.wheel.result }}" = "success"

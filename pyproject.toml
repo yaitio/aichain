@@ -39,7 +39,9 @@ where = ["."]
 include = ["yait_aichain*"]
 
 [tool.setuptools.package-data]
-"yait_aichain" = ["py.typed"]
+# `_docs/` exists only while a release is built: the publish workflow copies
+# docs/ and llms.txt there, so the wheel carries the pages of its own version.
+"yait_aichain" = ["py.typed", "_docs/*.md", "_docs/*.txt", "_docs/**/*.md"]
 "yait_aichain.models" = ["providers/*.toml"]
 
 # Version is read from yait_aichain/__init__.py (__version__) — one place to bump.

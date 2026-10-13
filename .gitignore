@@ -52,3 +52,6 @@ mutants/
 /evals/
 /scripts/
 /COVERAGE.md
+
+# Copied in by the publish workflow; see yait_aichain.docs_dir()
+/yait_aichain/_docs/

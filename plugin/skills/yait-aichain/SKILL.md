@@ -14,6 +14,11 @@ raise.
 Worked programs are in `recipes.md` next to this file: twenty tasks, each with a
 program that solves it. Start from the closest one.
 
+When the package is installed, the documentation of that exact version is
+inside it — `python -c "import yait_aichain; print(yait_aichain.docs_dir())"`
+prints the folder, with `llms.txt` and every page. Prefer it to anything you
+remember: it matches the code that will run.
+
 ## Pick the primitive
 
 | The task | Use |

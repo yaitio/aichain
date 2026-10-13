@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The wheel carries the documentation of its own version, and
+  `yait_aichain.docs_dir()` returns it — the repository's `docs/` in a
+  checkout, `None` when neither is there. An agent writing against an
+  installed release reads its pages rather than the latest ones online or an
+  older version it remembers; the skill says so. About 120 KB compressed.
+  The release build is one script, run on every push as well, and it fails
+  when the wheel does not carry the pages.
+
 ## [4.1.0] — 2026-10-14
 
 ### Added
