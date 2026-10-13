@@ -17,6 +17,10 @@ from ...tools._base import Tool
 from ._base  import SandboxedTool
 
 
+
+#: The most entries one listing returns.
+MAX_ENTRIES = 2_000
+
 class LocalBrowseTool(Tool, SandboxedTool):
     """
     List directory contents as a tree.
@@ -97,6 +101,9 @@ class LocalBrowseTool(Tool, SandboxedTool):
                        if (show_hidden or not e.name.startswith("."))
                        and (e.is_dir() or fnmatch.fnmatch(e.name, pattern))]
             for i, entry in enumerate(visible):
+                if len(lines) > MAX_ENTRIES:
+                    lines.append(f"{prefix}… [{len(visible) - i} more; stopped at {MAX_ENTRIES} entries]")
+                    return
                 last = i == len(visible) - 1
                 branch = "└── " if last else "├── "
                 if entry.is_dir(follow_symlinks=False):
@@ -106,6 +113,8 @@ class LocalBrowseTool(Tool, SandboxedTool):
                     lines.append(f"{prefix}{branch}{entry.name}  ({self._fmt_size(entry.stat().st_size)})")
 
         walk(target, "", 0)
+        if len(lines) > MAX_ENTRIES + 1:
+            lines = lines[:MAX_ENTRIES + 1] + [f"… [stopped at {MAX_ENTRIES} entries; narrow depth or pattern]"]
         lines.append(f"\nRoot: {self.root}")
         return "\n".join(lines)
 

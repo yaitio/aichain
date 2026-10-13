@@ -118,7 +118,7 @@ class TestREST(unittest.TestCase):
         t = RestApiTool("get_booking", "One booking.", "GET", "https://example.com/booking/{id}",
                         path_params=["id"], **kw)
         t._http = MagicMock()
-        t._http.request.return_value = MagicMock(status=200, data=b'{"ok": 1}',
+        t._http.request.return_value = MagicMock(status=200, data=b'{"ok": 1}', read=MagicMock(return_value=b'{"ok": 1}'),
                                                  headers={"content-type": "application/json"})
         return t
 

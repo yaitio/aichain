@@ -125,6 +125,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **Nothing a tool reads or returns is unbounded.** A 149 KB answer that
+  MarkItDown's zip converter unpacked took 950 MB; `local_read` loaded a
+  2 GB log whole for forty lines; `local_run` and REST buffered everything.
+  `fetchLocal` reads at most 10 MB and converts only pages (text, markup,
+  JSON, PDF); `local_read` streams and stops at 200,000 characters;
+  `local_run` returns the head and tail of each stream, 50,000 characters;
+  `local_browse` stops at 2,000 entries; REST refuses a response over 10 MB.
 - **Security: credentials followed a redirect to another host.** urllib3
   drops `Authorization` on a cross-host redirect but sends `x-api-key`,
   `x-goog-api-key` and the body of a 307 on; REST forwarded its headers to

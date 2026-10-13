@@ -25,6 +25,10 @@ import sys
 
 from ...tools._base import Tool
 from ._base  import SandboxedTool
+from ...tools._security import clip
+
+#: The most of stdout, and of stderr, a run returns.
+MAX_OUTPUT_CHARS = 50_000
 
 
 _DEFAULT_TIMEOUT = 30   # seconds
@@ -135,9 +139,11 @@ class LocalRunTool(Tool, SandboxedTool):
                 "command":    command,
             }
 
+        # Head and tail of each: a command that prints a megabyte is a
+        # model's whole context, and the end is usually where the error is.
         return {
-            "stdout":     result.stdout,
-            "stderr":     result.stderr,
+            "stdout":     clip(result.stdout, MAX_OUTPUT_CHARS),
+            "stderr":     clip(result.stderr, MAX_OUTPUT_CHARS),
             "returncode": result.returncode,
             "command":    command,
         }

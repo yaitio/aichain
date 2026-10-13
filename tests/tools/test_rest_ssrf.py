@@ -40,7 +40,7 @@ class TestRestApiSSRF(unittest.TestCase):
     def test_opt_out_allows_private(self):
         os.environ["AICHAIN_ALLOW_PRIVATE_URLS"] = "1"
         tool = _tool("http://127.0.0.1:8080/admin")
-        resp = MagicMock(status=200, data=b"{}")
+        resp = MagicMock(status=200, data=b"{}", read=MagicMock(return_value=b"{}"))
         tool._http.request = MagicMock(return_value=resp)
         tool.run()                                  # no SSRF error → request made
         tool._http.request.assert_called_once()

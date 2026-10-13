@@ -42,6 +42,13 @@ from ._base import Fetch
 ROBOTS_AGENTS = ("*", "ClaudeBot", "Claude-User", "anthropic-ai")
 
 
+
+#: What fetchLocal converts: a page's types. A zip, an office file or an
+#: image is refused with its type named.
+_PAGE_TYPES = ("text/", "html", "xml", "json", "application/pdf")
+#: The most of one page fetchLocal reads.
+MAX_PAGE_BYTES = 10 << 20
+
 class fetchLocal(Fetch):
     """
     A web page's text fetched from this machine and converted by MarkItDown — free.
@@ -108,6 +115,24 @@ class fetchLocal(Fetch):
             if response.status_code >= 400:
                 return {u: self.page(u, final_url=response.url, error=f"HTTP {response.status_code}")}
             ctype = response.headers.get("content-type", "").lower()
+            # Pages, not archives: MarkItDown opens a zip it is handed, and a
+            # 149 KB answer unpacked to 950 MB. Text, markup, JSON and PDF are
+            # what a page is; anything else is said, not converted.
+            if ctype and not any(t in ctype for t in _PAGE_TYPES):
+                response.close()
+                return {u: self.page(u, final_url=response.url,
+                                     error=f"not a page ({ctype.split(';')[0]}); not converted")}
+            # Read up to the budget and no further — `stream=True` meant
+            # nothing while `.content` read the whole body after it.
+            body, size = [], 0
+            for piece in response.iter_content(64 * 1024):
+                size += len(piece)
+                if size > MAX_PAGE_BYTES:
+                    response.close()
+                    return {u: self.page(u, final_url=response.url,
+                                         error=f"over {MAX_PAGE_BYTES:,} bytes; not fetched")}
+                body.append(piece)
+            response._content = b"".join(body)      # what MarkItDown and `.content` read
             meta: dict = {}
             if "html" in ctype:
                 charset = response.encoding if "charset=" in ctype else "utf-8"

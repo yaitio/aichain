@@ -14,6 +14,10 @@ from ...tools._base import Tool
 from ._base  import SandboxedTool
 
 
+
+#: The most one read returns.
+MAX_READ_BYTES = 200_000
+
 class LocalReadTool(Tool, SandboxedTool):
     """
     Read a file's contents.
@@ -80,13 +84,25 @@ class LocalReadTool(Tool, SandboxedTool):
         if not os.path.isfile(path):
             raise FileNotFoundError(f"File not found: {input!r}")
 
-        with open(path, encoding=encoding, errors="replace") as fh:
-            lines = fh.readlines()
-
-        total = len(lines)
+        # Streamed, and bounded: a 2 GB log read whole for forty lines was the
+        # memory of the process, and a model asking for "all" of it was its
+        # context. Lines past MAX_READ_BYTES are counted, not kept.
         start = max(0, start_line - 1)
-        end   = (int(end_line) if end_line is not None else total)
-        chunk = lines[start:end]
+        end   = int(end_line) if end_line is not None else None
+        chunk, kept, total, clipped = [], 0, 0, False
+        with open(path, encoding=encoding, errors="replace") as fh:
+            for i, line in enumerate(fh):
+                total = i + 1
+                if i < start or (end is not None and i >= end):
+                    continue
+                if kept + len(line) > MAX_READ_BYTES:
+                    clipped = True
+                    continue
+                chunk.append(line)
+                kept += len(line)
+        if clipped:
+            chunk.append(f"\n… [stopped at {MAX_READ_BYTES:,} characters; ask for a narrower "
+                         "start_line/end_line] …\n")
 
         header = (
             f"── {self._rel(path)}  "

@@ -108,6 +108,8 @@ from ...tools._security import safe_request
 # ---------------------------------------------------------------------------
 
 _DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=30.0)
+#: The most of a response REST reads.
+MAX_RESPONSE_BYTES = 10 << 20
 _DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5,
                          status_forcelist={429, 502, 503, 504})
 
@@ -422,8 +424,16 @@ class RestApiTool(Tool):
         # Only ever speak http(s), and block SSRF targets (private / loopback /
         # metadata IPs) unless AICHAIN_ALLOW_PRIVATE_URLS is set — needed when a
         # REST endpoint is on an internal network.
-        response = safe_request(self._http, self._method, url, **req_kwargs)
-        raw = response.data.decode("utf-8", errors="replace")
+        response = safe_request(self._http, self._method, url, preload_content=False, **req_kwargs)
+        try:
+            data = response.read(MAX_RESPONSE_BYTES + 1)
+        finally:
+            response.release_conn()
+        if len(data) > MAX_RESPONSE_BYTES:
+            raise ValueError(f"RestApiTool '{self.name}': the response is over "
+                             f"{MAX_RESPONSE_BYTES:,} bytes, too large to hand a model; "
+                             "ask the API for less (a page, a filter)")
+        raw = data.decode("utf-8", errors="replace")
 
         if not (200 <= response.status < 300):
             raise RuntimeError(

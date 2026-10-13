@@ -199,6 +199,17 @@ def check_input_file(path: str, kind: str) -> str:
     return real
 
 
+def clip(text: str, limit: int) -> str:
+    """*text* at most *limit* characters: its head and its tail, the middle
+    replaced by a marker saying how much was left out. Strictly shorter than
+    a text over the limit, so clipping twice changes nothing more."""
+    if len(text) <= limit:
+        return text
+    marker = f"\n… [{len(text) - limit:,} characters left out] …\n"
+    keep = max(0, limit - len(marker))
+    return text[: keep // 2] + marker + text[len(text) - (keep - keep // 2):]
+
+
 def within(root: str, path: str) -> bool:
     """True when the resolved *path* is *root* or inside it.
 
