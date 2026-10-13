@@ -105,6 +105,10 @@ class EmbeddingQwen(_OpenAIShaped):
         self._region = region
         super().__init__(model, api_key=api_key, **defaults)
 
+    def _max_rows(self) -> int:
+        # text-embedding-v3 and v4 take ten rows a request; v1 and v2 take 25.
+        return 10 if self.model.startswith(("text-embedding-v3", "text-embedding-v4")) else 25
+
     def _url(self) -> str:
         from ...clients._families.qwen import resolve_qwen_base_url
         return resolve_qwen_base_url(self._region) + "/compatible-mode/v1/embeddings"

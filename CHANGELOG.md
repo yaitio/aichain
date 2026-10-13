@@ -125,6 +125,21 @@ where a fix is named below.
 
 ### Fixed
 
+- **Embedding batches are sized by what a provider refuses.** A request was
+  cut by count alone: 2,048 chunks of 400 tokens is 819k tokens against
+  OpenAI's 300k, DashScope's `text-embedding-v3`/`v4` take ten rows where 25
+  were sent, and 50 records of 3,072 floats are 3.4 MB against Pinecone's
+  2 MB. A batch is now bounded by rows, estimated tokens (OpenAI 300k, Voyage
+  120k) and bytes, and a vector store's write by records and about 1.5 MB. A
+  provider that returns fewer vectors than texts is an error, where Google
+  answering with none was a success.
+- **An upsert keeps what it paid for.** Records are embedded and written a
+  batch at a time, where every embedding was bought before the first write and
+  a failure at batch k lost them all. A failed batch raises `PartialUpsert`
+  with `written` and `total`, the cause chained; a bad record — reserved
+  metadata keys, no vector and no embedder — is refused before anything is
+  written, and `batch_size=0` is refused where it became 50.
+
 - **A reranker and an embedder send text, and only text.** A document is a
   string, a mapping's `text` or an object's `.text`; anything else is a
   `TypeError` before the request. `rerank.run("hello world")` sent eleven

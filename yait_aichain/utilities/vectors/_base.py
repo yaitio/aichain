@@ -75,6 +75,16 @@ def normalise_score(raw: float | None, metric: str) -> float | None:
     return float(raw)
 
 
+class PartialUpsert(RuntimeError):
+    """An upsert that stopped part way: ``written`` of ``total`` records are
+    stored, and the rest are not. The cause is chained."""
+
+    def __init__(self, written: int, total: int, cause: BaseException) -> None:
+        super().__init__(f"upsert stopped after {written} of {total} records: "
+                         f"{type(cause).__name__}: {cause}")
+        self.written, self.total = written, total
+
+
 @dataclass
 class VectorRecord:
     """
@@ -383,6 +393,9 @@ class VectorStore:
     # Pinecone caps upsert requests at 2 MB / 1000 vectors — 50 records of
     # 1536-dim JSON-encoded floats stay safely under both.
     _UPSERT_BATCH_SIZE: int = 50
+    # And by size: 50 records of 3,072 floats is 3.4 MB of JSON, past
+    # Pinecone's 2 MB. A float is about 20 bytes written out.
+    _UPSERT_MAX_BYTES: int = 1_500_000
 
     def upsert(self, records: list[dict], batch_size: int | None = None) -> int:
         """
@@ -395,24 +408,54 @@ class VectorStore:
           ``vector``   : list[float]    — optional pre-computed vector
                                           (required when no embedder is set)
 
-        Missing vectors are auto-computed in a single batched embedding call.
-        Writes are sent to the backend in batches of *batch_size* records
-        (default 50) so large ingests don't exceed provider request limits.
+        Records are embedded and written a batch at a time — at most
+        *batch_size* records (default 50) and about 1.5 MB each — so a
+        failure at batch k keeps the k − 1 batches already paid for and
+        written. The error says how many were.
 
         Returns
         -------
         int
             Number of records upserted.
+
+        Raises
+        ------
+        PartialUpsert
+            When a batch fails; ``written`` counts the records stored before
+            it, and the cause is chained.
         """
-        recs, vectors = self._prepare_records(records)
-        step = batch_size or self._UPSERT_BATCH_SIZE
-        if step <= 0:
-            raise ValueError(f"batch_size must be positive; got {step}")
-        for i in range(0, len(recs), step):
-            self._backend.upsert(
-                self._collection, recs[i : i + step], vectors[i : i + step]
-            )
-        return len(recs)
+        step = self._UPSERT_BATCH_SIZE if batch_size is None else batch_size
+        if isinstance(step, bool) or not isinstance(step, int) or step <= 0:
+            raise ValueError(f"batch_size must be a positive whole number; got {batch_size!r}")
+        records = list(records)
+        self._check_records(records)              # a bad record is refused before anything is written
+        written = 0
+        for batch in self._write_batches(records, step):
+            try:
+                recs, vectors = self._prepare_records(batch)
+                for part in self._by_bytes(recs, vectors):
+                    self._backend.upsert(self._collection, *part)
+                    written += len(part[0])
+            except Exception as exc:
+                raise PartialUpsert(written, len(records), exc) from exc
+        return written
+
+    @staticmethod
+    def _write_batches(records: list[dict], step: int):
+        for i in range(0, len(records), step):
+            yield records[i:i + step]
+
+    def _by_bytes(self, recs: list, vectors: list):
+        """Split one batch where its estimated JSON passes the byte limit."""
+        start, size = 0, 0
+        for i, (rec, vec) in enumerate(zip(recs, vectors)):
+            n = 20 * len(vec) + len(rec.text.encode("utf-8")) + 64 * (len(rec.metadata) + 1)
+            if i > start and size + n > self._UPSERT_MAX_BYTES:
+                yield recs[start:i], vectors[start:i]
+                start, size = i, 0
+            size += n
+        if start < len(recs):
+            yield recs[start:], vectors[start:]
 
     def fetch(self, ids: list[str]) -> list[VectorRecord]:
         """Retrieve specific records by ID (no score)."""
@@ -459,6 +502,19 @@ class VectorStore:
             )
         result = self._embedder.embed(text, input_type="query")
         return result.embeddings[0]
+
+    def _check_records(self, raw: list[dict]) -> None:
+        for r in raw:
+            clash = sorted(set(r.get("metadata") or {}) & set(RESERVED))
+            if clash:
+                raise ValueError(f"record {r['id']!r}: metadata may not use {clash} — the store "
+                                 "keeps the record's text and id under those names")
+        if self._embedder is None:
+            for r in raw:
+                if "vector" not in r:
+                    raise ValueError(
+                        f"Record {r['id']!r} has no 'vector' and no embedder is set.  "
+                        f"Pass embedder= to VectorDB() or include 'vector' in every record.")
 
     def _prepare_records(
         self,

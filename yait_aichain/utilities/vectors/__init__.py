@@ -72,7 +72,7 @@ Given to an agent::
     agent = Agent(Model("claude-haiku-5-5"), tools=[kb.query], stop_when=[step_count(10)])
 """
 
-from ._base    import VectorRecord, VectorBackend, VectorStore
+from ._base    import PartialUpsert, VectorRecord, VectorBackend, VectorStore
 from ._query import VectorQueryTool
 from ._upsert import VectorUpsertTool
 from ._fetch import VectorFetchTool
@@ -85,7 +85,7 @@ from .providers._qdrant   import QdrantBackend
 
 __all__ = ["Vectors", "VectorDB", "VectorStore", "VectorRecord", "VectorBackend", "ChromaBackend",
            "PineconeBackend", "QdrantBackend", "VectorQueryTool", "VectorUpsertTool",
-           "VectorFetchTool", "VectorDeleteTool"]
+           "VectorFetchTool", "VectorDeleteTool", "PartialUpsert"]
 
 
 # ---------------------------------------------------------------------------

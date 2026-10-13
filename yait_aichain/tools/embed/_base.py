@@ -192,6 +192,12 @@ class Embedder(Tool):
     provider:   str = ""
     _ENV_KEY:   str = ""
     _MAX_BATCH: int = 100
+    #: Tokens one request may carry, estimated from the text. A count of rows
+    #: is not a size: 2,048 chunks of 400 tokens is 819k tokens, and OpenAI
+    #: refuses a request over 300k.
+    _MAX_TOKENS: int | None = None
+    #: Bytes of text one request may carry.
+    _MAX_BYTES: int = 1_500_000
     #: Models that take a ``dimensions``; ``None`` means every model does.
     _DIMENSION_MODELS: frozenset | None = None
 
@@ -345,13 +351,17 @@ class Embedder(Tool):
                              "an embedding of nothing is not a vector of anything")
 
         _refuse_settings(type(self).__name__, refused)
-        limit = max(1, min(self.batch_size or self._MAX_BATCH, self._MAX_BATCH))
         vectors: list[list[float]] = []
         tokens: list[int] = []
         metadata: dict = {}
-        for i in range(0, len(texts), limit):
+        for chunk in self._batches(texts):
             vecs, tok, metadata = self._embed_chunk(
-                texts[i:i + limit], input_type=input_type, dimensions=self.dimensions)
+                chunk, input_type=input_type, dimensions=self.dimensions)
+            # Google answering with no `embeddings` gave zero vectors, and a
+            # successful result that paired nothing with anything.
+            if len(vecs) != len(chunk) or any(not v for v in vecs):
+                raise RuntimeError(f"{type(self).__name__}: {len(chunk)} texts sent, "
+                                   f"{sum(1 for v in vecs if v)} vectors returned")
             vectors.extend(vecs)
             if tok is not None:
                 tokens.append(tok)
@@ -363,6 +373,28 @@ class Embedder(Tool):
             total_tokens = sum(tokens) if tokens else None,
             metadata     = metadata,
         )
+
+    def _max_rows(self) -> int:
+        return self._MAX_BATCH
+
+    def _batches(self, texts: list[str]):
+        """Slices of *texts* no request refuses: at most the rows, the
+        estimated tokens and the bytes the provider takes, whichever binds."""
+        rows = max(1, min(self.batch_size or self._max_rows(), self._max_rows()))
+        chunk: list[str] = []
+        size = toks = 0
+        for text in texts:
+            n_bytes = len(text.encode("utf-8"))
+            n_toks = n_bytes // 3 + 1             # over, not under: most text is 4 bytes a token
+            if chunk and (len(chunk) >= rows or size + n_bytes > self._MAX_BYTES
+                          or (self._MAX_TOKENS and toks + n_toks > self._MAX_TOKENS)):
+                yield chunk
+                chunk, size, toks = [], 0, 0
+            chunk.append(text)
+            size += n_bytes
+            toks += n_toks
+        if chunk:
+            yield chunk
 
     def run(self, input: str | list[str], options: dict | None = None) -> EmbeddingResult:
         """

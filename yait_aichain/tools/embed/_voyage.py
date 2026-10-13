@@ -67,6 +67,7 @@ class EmbeddingVoyage(_OpenAIShaped):
     provider   = "voyage"
     _ENV_KEY   = "VOYAGE_API_KEY"
     _MAX_BATCH = 1000
+    _MAX_TOKENS = 120_000          # voyage-3-large's; the lighter models take more
     _URL        = f"{_BASE_URL}/v1/embeddings"
     _DIMS_FIELD = "output_dimension"
     _FLOAT      = False

@@ -63,4 +63,5 @@ class EmbeddingOpenAI(_OpenAIShaped):
     _DIMENSION_MODELS = _SUPPORTS_DIMENSIONS
     _ENV_KEY   = "OPENAI_API_KEY"
     _MAX_BATCH = 2048
+    _MAX_TOKENS = 300_000
     _URL       = f"{_BASE_URL}/v1/embeddings"
