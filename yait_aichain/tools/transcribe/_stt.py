@@ -20,23 +20,18 @@ stitched back into a single transcript.  The chunk size, overlap, and
 size thresholds are class-level constants prefixed with ``_`` — advanced
 users can adjust these directly on the class before instantiating.
 
-``sttOpenAI``, ``sttXAI``, and ``sttQwen`` share the internal
-``_OpenAICompatSTT`` base class; each simply points to a different
-base URL.
+``sttOpenAI`` is built on the internal ``_OpenAICompatSTT`` base class,
+which any provider with an OpenAI-shaped transcription endpoint can reuse.
 
 Installation
 ------------
-  OpenAI, xAI, Qwen :  nothing extra — plain HTTP
-  Google            :  pip install google-cloud-speech
-  Chunking          :  pip install pydub   (only when audio exceeds the size limit)
+  OpenAI, Google :  nothing extra — plain HTTP
+  Chunking       :  pip install "yait-aichain[audio]"   (only when audio exceeds the size limit)
 
 Environment variables
 ---------------------
   OpenAI  :  OPENAI_API_KEY
-  Google  :  GOOGLE_APPLICATION_CREDENTIALS  or  GOOGLE_API_KEY
-  xAI     :  XAI_API_KEY
-  Qwen    :  DASHSCOPE_API_KEY
-             DASHSCOPE_REGION  (optional: ap|us|cn|hk; default ap)
+  Google  :  GOOGLE_AI_API_KEY  or  GOOGLE_API_KEY  (Speech-to-Text API enabled)
 """
 
 from __future__ import annotations
@@ -51,7 +46,7 @@ import tempfile
 import urllib3
 
 from ...clients._base import make_http
-from ...clients._http import request
+from ...clients._http import request, request_json
 
 from .._security import check_input_file
 from .._base import Tool
@@ -392,23 +387,20 @@ class sttOpenAI(_OpenAICompatSTT):
 
 class sttGoogle(Transcription):
     """
-    Speech-to-text via Google Cloud Speech-to-Text.
+    Speech-to-text via Google Cloud Speech-to-Text, over its REST API.
 
-    Files up to ~10 MB are transcribed with the synchronous ``recognize``
-    call.  Larger files are automatically chunked using ``pydub`` and
-    stitched into a single transcript.
+    Audio up to about a minute goes in one ``speech:recognize`` request.
+    Longer audio is cut into pieces of under a minute with ``pydub``
+    (``pip install "yait-aichain[audio]"``) and the transcripts are joined.
 
-    Authentication
-    --------------
-    Set ``GOOGLE_APPLICATION_CREDENTIALS`` to a service-account JSON path,
-    or set ``GOOGLE_API_KEY`` for API-key authentication.
-    When neither is set, Application Default Credentials (ADC) are used.
+    One plain HTTPS request per piece; no Google SDK. The key is an API key
+    with the Cloud Speech-to-Text API enabled on its project.
 
     Parameters
     ----------
     api_key : str | None, optional
-        Google API key.  Falls back to ``GOOGLE_API_KEY`` env var.
-        When absent ADC is used automatically.
+        Google API key.  Falls back to ``GOOGLE_AI_API_KEY``, then
+        ``GOOGLE_API_KEY``.
     model : str | None, optional
         Default ``"latest_long"``.  A setting of the tool.
 
@@ -430,6 +422,7 @@ class sttGoogle(Transcription):
 
     name = "sttGoogle"
 
+    _URL              = "https://speech.googleapis.com/v1/speech:recognize"
     # ── Chunking settings — advanced: adjust on the class before instantiating
     _DEFAULT_LANGUAGE = "en-US"
     _DEFAULT_MODEL    = "latest_long"
@@ -454,7 +447,11 @@ class sttGoogle(Transcription):
         # accepted too. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
                          or os.environ.get("GOOGLE_API_KEY"))
-        # No ValueError — ADC may be available without an explicit key.
+        if not self._api_key:
+            raise ValueError("No Google API key found. Pass api_key= or set GOOGLE_AI_API_KEY "
+                             "(or GOOGLE_API_KEY); the key's project needs the Speech-to-Text API.")
+        self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=120.0),
+                               retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
         """
@@ -475,41 +472,24 @@ class sttGoogle(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        speech = require("google.cloud.speech", package="google-cloud-speech", who="sttGoogle", extra="google")
-
         input = check_input_file(input, "audio")
 
-        opts       = options or {}
+        opts       = {k: v for k, v in (options or {}).items() if v is not None}
         language   = opts.get("language", self._DEFAULT_LANGUAGE)
-        model      = self.model
         timestamps = bool(opts.get("timestamps", False))
         fmt        = opts.get("format", "text")
+        if fmt not in ("text", "json"):
+            raise ValueError(f"sttGoogle: format is 'text' or 'json', not {fmt!r}")
 
-        ext      = os.path.splitext(input)[1].lower()
+        ext = os.path.splitext(input)[1].lower()
         if ext not in self._ENCODING_MAP:
             # Read as MP3 whatever it was, and `.m4a` was an AttributeError:
             # the Speech API has no MP4 encoding.
             raise ValueError(f"sttGoogle reads {sorted(self._ENCODING_MAP)}; {ext or 'no extension'} "
                              "is not one — convert the file first")
-        encoding = self._ENCODING_MAP[ext]
-        file_mb  = os.path.getsize(input) / (1024 * 1024)
-
-        if self._api_key:
-            client = speech.SpeechClient(
-                client_options={"api_key": self._api_key}
-            )
-        else:
-            client = speech.SpeechClient()
-
-        config = speech.RecognitionConfig(
-            encoding                     = getattr(
-                speech.RecognitionConfig.AudioEncoding, encoding
-            ),
-            language_code                = language,
-            model                        = model,
-            enable_word_time_offsets     = timestamps,
-            enable_automatic_punctuation = True,
-        )
+        config = {"encoding": self._ENCODING_MAP[ext], "languageCode": language,
+                  "model": self.model, "enableWordTimeOffsets": timestamps,
+                  "enableAutomaticPunctuation": True}
 
         # The sync recognize API is limited by audio *duration* (~60 s), not
         # file size: a 5 MB low-bitrate MP3 can hold half an hour of speech.
@@ -518,19 +498,23 @@ class sttGoogle(Transcription):
         if duration_s is not None:
             use_sync = duration_s <= self._MAX_SYNC_SECONDS
         else:
-            # pydub unavailable — fall back to the size heuristic.  This can
-            # mis-route long low-bitrate files into the sync API; install
-            # pydub for an exact duration check.
-            use_sync = file_mb <= self._MAX_SYNC_MB
+            use_sync = os.path.getsize(input) / (1024 * 1024) <= self._MAX_SYNC_MB
 
         if use_sync:
             with open(input, "rb") as fh:
-                content = fh.read()
-            audio    = speech.RecognitionAudio(content=content)
-            response = client.recognize(config=config, audio=audio)
-            return self._format_results(response.results, timestamps, fmt)
+                results = self._recognize(config, fh.read())
+            return self._format_results(results, timestamps, fmt)
+        return self._transcribe_chunked(config, input, timestamps, fmt)
 
-        return self._transcribe_chunked(client, config, input, timestamps, fmt)
+    def _recognize(self, config: dict, audio: bytes) -> list:
+        """One ``speech:recognize`` request; the results it answered with."""
+        import base64
+        data = request_json(self._http, "POST", self._URL,
+                            json={"config": config,
+                                  "audio": {"content": base64.b64encode(audio).decode("ascii")}},
+                            headers={"x-goog-api-key": self._api_key},
+                            what="Google Speech-to-Text API")
+        return data.get("results") or []
 
     @staticmethod
     def _probe_duration_seconds(path: str) -> float | None:
@@ -549,86 +533,61 @@ class sttGoogle(Transcription):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _format_results(results, timestamps: bool, fmt: str) -> str:
-        if not timestamps and fmt == "text":
-            return " ".join(
-                r.alternatives[0].transcript
-                for r in results
-                if r.alternatives
-            )
-        text  = " ".join(
-            r.alternatives[0].transcript
-            for r in results
-            if r.alternatives
-        )
+    def _seconds(value) -> float:
+        """A protobuf Duration as JSON writes it — ``"1.500s"`` — in seconds."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        return float(str(value or "0").rstrip("s") or 0)
+
+    @classmethod
+    def _words(cls, results: list, offset: float = 0.0, skip_before: float = 0.0) -> list:
         words = []
         for r in results:
-            if not r.alternatives:
-                continue
-            for w in r.alternatives[0].words:
-                words.append({
-                    "word":  w.word,
-                    "start": w.start_time.total_seconds(),
-                    "end":   w.end_time.total_seconds(),
-                })
-        return json.dumps({"text": text, "words": words}, ensure_ascii=False)
+            alts = r.get("alternatives") or []
+            for w in (alts[0].get("words") or []) if alts else []:
+                start = cls._seconds(w.get("startTime"))
+                # Words inside the leading overlap of a later piece were
+                # already heard in the piece before it.
+                if start < skip_before:
+                    continue
+                words.append({"word": w.get("word", ""), "start": start + offset,
+                              "end": cls._seconds(w.get("endTime")) + offset})
+        return words
 
-    def _transcribe_chunked(
-        self, client, config, path: str, timestamps: bool, fmt: str
-    ) -> str:
-        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit", extra="audio").AudioSegment
+    @staticmethod
+    def _text(results: list) -> str:
+        return " ".join(r["alternatives"][0].get("transcript", "")
+                        for r in results if r.get("alternatives"))
 
-        from google.cloud import speech as _speech
+    @classmethod
+    def _format_results(cls, results: list, timestamps: bool, fmt: str) -> str:
+        text = cls._text(results)
+        if not timestamps and fmt == "text":
+            return text
+        return json.dumps({"text": text, "words": cls._words(results)}, ensure_ascii=False)
+
+    def _transcribe_chunked(self, config: dict, path: str, timestamps: bool, fmt: str) -> str:
+        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit",
+                               extra="audio").AudioSegment
 
         audio      = AudioSegment.from_file(path)
         chunk_ms   = self._CHUNK_SECONDS   * 1000
         overlap_ms = self._OVERLAP_SECONDS * 1000
         parts: list[str]  = []
         words: list[dict] = []
+        piece_config = {**config, "encoding": "LINEAR16"}
 
         # Each chunk starts an overlap before the last one ended, and the last
         # chunk is the one that reaches the end: a further chunk would be the
         # overlap alone, transcribed and billed a second time.
         for start_ms in range(0, len(audio), chunk_ms - overlap_ms):
-            chunk = audio[start_ms:start_ms + chunk_ms]
             buffer = io.BytesIO()
-            chunk.export(buffer, format="wav")
-            content = buffer.getvalue()
-            chunk_config = _speech.RecognitionConfig(
-                encoding      = _speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                language_code = config.language_code,
-                model         = config.model,
-                enable_word_time_offsets     = timestamps,
-                enable_automatic_punctuation = True,
-            )
-            resp = client.recognize(
-                config = chunk_config,
-                audio  = _speech.RecognitionAudio(content=content),
-            )
-            part = " ".join(
-                r.alternatives[0].transcript
-                for r in resp.results
-                if r.alternatives
-            )
-            parts.append(part.strip())
-
+            audio[start_ms:start_ms + chunk_ms].export(buffer, format="wav")
+            results = self._recognize(piece_config, buffer.getvalue())
+            parts.append(self._text(results).strip())
             if timestamps:
-                offset_s = start_ms / 1000.0
-                for r in resp.results:
-                    if not r.alternatives:
-                        continue
-                    for w in r.alternatives[0].words:
-                        local_start = w.start_time.total_seconds()
-                        # Words inside the leading overlap of a non-first
-                        # chunk were already captured by the previous
-                        # chunk — drop them to avoid duplicates.
-                        if start_ms > 0 and local_start < self._OVERLAP_SECONDS:
-                            continue
-                        words.append({
-                            "word":  w.word,
-                            "start": local_start + offset_s,
-                            "end":   w.end_time.total_seconds() + offset_s,
-                        })
+                words += self._words(results, offset=start_ms / 1000.0,
+                                     skip_before=self._OVERLAP_SECONDS if start_ms else 0.0)
             if start_ms + chunk_ms >= len(audio):
                 break
 

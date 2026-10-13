@@ -209,14 +209,22 @@ where a fix is named below.
   shorthand for 0.5, which OpenAI reads as its expensive high. An image asked
   for by `modalities` alone has its options checked as an image's.
 
-- **What the speech and fetch tools import is declared.** New extras
-  `google` (Google's speech SDKs, for `speech("google")` and
-  `transcribe("google")`) and `audio` (`pydub`, with `audioop-lts` on 3.13+,
-  for splitting a recording over a provider's size limit); `fetch` declares
-  the `requests` it uses; `all` brings them all, and each tool's ImportError
-  names its extra. Not done here: Google's speech tools still use its SDKs
-  rather than plain HTTP, and `fetch` still brings `markitdown` and its
-  `onnxruntime`; the installation page says how large that is.
+- **Google's speech tools are plain HTTP.** `speech("google")` and
+  `transcribe("google")` post JSON to `text:synthesize` and
+  `speech:recognize` with the key in `x-goog-api-key`, where they called
+  google-cloud-texttospeech and google-cloud-speech — grpc and protobuf in
+  the install, and errors that went past `APIError`. Every speech tool is now
+  plain HTTP. They need an API key (`GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY`)
+  whose project has the API enabled; Application Default Credentials, which
+  only the SDK read, are gone, and a missing key is said at construction.
+  Checked live 2026-10-13 up to Google's answer — the test key's project has
+  neither API enabled, so no audio came back.
+- **What the remaining tools import is declared.** A new extra `audio`
+  (`pydub`, with `audioop-lts` on 3.13+) for splitting a recording over a
+  provider's size limit; `fetch` declares the `requests` it uses; `all`
+  brings them all, and the ImportError names the extra. Not done here:
+  `fetch` still brings `markitdown` and its `onnxruntime`; the installation
+  page says how large that is.
 
 - **Offline tests stay offline.** Fifteen `list_models` tests mocked
   `urllib3.PoolManager`, and under an `HTTPS_PROXY` the client built a

@@ -25,12 +25,10 @@ yaml    = ["pyyaml>=5.1"]
 mcp     = ["fastmcp>=2.10,<5"]
 # fetchLocal reads pages through a requests session of its own.
 fetch   = ["markitdown", "requests"]
-# Google's speech tools call its SDKs.
-google  = ["google-cloud-texttospeech", "google-cloud-speech"]
 # Splitting a long recording. pydub needs audioop, which left the standard
 # library in 3.13.
 audio   = ["pydub", "audioop-lts; python_version >= '3.13'"]
-all     = ["yait-aichain[yaml,mcp,fetch,google,audio]"]
+all     = ["yait-aichain[yaml,mcp,fetch,audio]"]
 
 [project.urls]
 Homepage   = "https://github.com/yaitio/aichain"
@@ -70,7 +68,6 @@ fail_under = 78.0
 # whose module has climbed past the line. Kinds: external (the uncovered lines
 # are a vendor's request path), optional-dependency, legacy, debt (testable
 # offline and not yet tested — the list to shrink).
-"yait_aichain/tools/transcribe/_stt.py" = { kind = "external", reason = "transcription paths call four vendors' speech APIs" }
 "yait_aichain/tools/embed/_cohere.py" = { kind = "external", reason = "request shaping for the Cohere embeddings API" }
 "yait_aichain/tools/rerank/_voyage.py" = { kind = "external", reason = "request shaping for the Voyage rerank API" }
 "yait_aichain/utilities/vectors/__init__.py" = { kind = "external", reason = "`VectorDB` connects to a provider on construction" }

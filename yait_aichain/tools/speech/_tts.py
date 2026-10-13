@@ -19,14 +19,12 @@ streaming synthesis is reserved for a future release.
 
 Installation
 ------------
-  OpenAI, xAI, Qwen :  nothing extra — plain HTTP
-  Google            :  pip install google-cloud-texttospeech
+  Nothing extra — every provider is plain HTTP.
 
 Environment variables
 ---------------------
   OpenAI  :  OPENAI_API_KEY
-  Google  :  GOOGLE_APPLICATION_CREDENTIALS  (path to service-account JSON)
-             or GOOGLE_API_KEY
+  Google  :  GOOGLE_AI_API_KEY  or  GOOGLE_API_KEY  (Text-to-Speech API enabled)
   xAI     :  XAI_API_KEY
   Qwen    :  DASHSCOPE_API_KEY
              DASHSCOPE_REGION   (optional: ap|us|cn|hk; default ap)
@@ -34,7 +32,6 @@ Environment variables
 
 from __future__ import annotations
 
-from ..._require import require
 
 import json
 import os
@@ -348,13 +345,10 @@ class ttsOpenAI(_OpenAISpeech):
 
 class ttsGoogle(Speech):
     """
-    Text-to-speech via Google Cloud Text-to-Speech.
+    Text-to-speech via Google Cloud Text-to-Speech, over its REST API.
 
-    Authentication
-    --------------
-    Set ``GOOGLE_APPLICATION_CREDENTIALS`` to the path of a service-account
-    JSON file (Application Default Credentials), or set ``GOOGLE_API_KEY``
-    for API-key authentication.
+    One plain HTTPS request to ``text:synthesize``; no Google SDK. The key is
+    an API key with the Cloud Text-to-Speech API enabled on its project.
 
     Voices
     ------
@@ -364,8 +358,8 @@ class ttsGoogle(Speech):
     Parameters
     ----------
     api_key : str | None, optional
-        Google API key.  Falls back to ``GOOGLE_API_KEY`` env var.
-        When absent, Application Default Credentials are used automatically.
+        Google API key.  Falls back to ``GOOGLE_AI_API_KEY``, then
+        ``GOOGLE_API_KEY``.
 
     Examples
     --------
@@ -389,6 +383,7 @@ class ttsGoogle(Speech):
     parameters = _without_options(Speech.parameters, "model")
 
     name              = "ttsGoogle"
+    _URL              = "https://texttospeech.googleapis.com/v1/text:synthesize"
     _DEFAULT_LANGUAGE = "en-US"
 
     # Maps common format names to Google AudioEncoding names and file extensions
@@ -408,7 +403,11 @@ class ttsGoogle(Speech):
         # the older spelling. Embeddings accept both, and so does this.
         self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
                          or os.environ.get("GOOGLE_API_KEY"))
-        # No ValueError here — ADC may be available even without an explicit key.
+        if not self._api_key:
+            raise ValueError("No Google API key found. Pass api_key= or set GOOGLE_AI_API_KEY "
+                             "(or GOOGLE_API_KEY); the key's project needs the Text-to-Speech API.")
+        self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=60.0),
+                               retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
         """
@@ -432,39 +431,27 @@ class ttsGoogle(Speech):
         str
             Absolute path to the saved audio file.
         """
-        texttospeech = require("google.cloud.texttospeech", package="google-cloud-texttospeech", who="ttsGoogle", extra="google")
+        opts     = _call_options(self, options)
+        language = opts.get("language", self._DEFAULT_LANGUAGE)
+        fmt      = opts.get("format",   _DEFAULT_FORMAT)
+        encoding, ext = self._FORMAT_MAP[fmt]
+        voice = {"languageCode": language}
+        if opts.get("voice"):
+            voice["name"] = opts["voice"]
+        body = {"input": {"text": input}, "voice": voice,
+                "audioConfig": {"audioEncoding": encoding,
+                                "speakingRate": float(opts.get("speed", _DEFAULT_SPEED))}}
+        return self._save(opts, ext, lambda: self._synthesise(body))
 
-        opts        = _call_options(self, options)
-        voice_name  = opts.get("voice")
-        language    = opts.get("language",  self._DEFAULT_LANGUAGE)
-        speed       = float(opts.get("speed", _DEFAULT_SPEED))
-        fmt         = opts.get("format",    _DEFAULT_FORMAT)
-        g_encoding, ext = self._FORMAT_MAP[fmt]
-
-        synthesis_input = texttospeech.SynthesisInput(text=input)
-
-        voice_kwargs: dict = {"language_code": language}
-        if voice_name:
-            voice_kwargs["name"] = voice_name
-        voice_params = texttospeech.VoiceSelectionParams(**voice_kwargs)
-
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding = getattr(texttospeech.AudioEncoding, g_encoding),
-            speaking_rate  = speed,
-        )
-
-        if self._api_key:
-            client = texttospeech.TextToSpeechClient(
-                client_options={"api_key": self._api_key}
-            )
-        else:
-            client = texttospeech.TextToSpeechClient()
-
-        return self._save(opts, ext, lambda: client.synthesize_speech(
-            input        = synthesis_input,
-            voice        = voice_params,
-            audio_config = audio_config,
-        ).audio_content)
+    def _synthesise(self, body: dict) -> bytes:
+        import base64
+        data = request_json(self._http, "POST", self._URL, json=body,
+                            headers={"x-goog-api-key": self._api_key},
+                            what="Google Text-to-Speech API")
+        audio = data.get("audioContent")
+        if not audio:
+            raise RuntimeError(f"Google Text-to-Speech answered with no audio: {json.dumps(data)[:300]}")
+        return base64.b64decode(audio)
 
 
 # ── ttsXAI ────────────────────────────────────────────────────────────────────

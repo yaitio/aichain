@@ -93,7 +93,7 @@ result = ttsOpenAI()(
 
 ### `ttsGoogle`
 
-Text-to-speech via Google Cloud Text-to-Speech.
+Text-to-speech via Google Cloud Text-to-Speech, over its REST API.
 
 | | |
 |---|---|
@@ -225,7 +225,7 @@ result = sttOpenAI()(
 
 ### `sttGoogle`
 
-Speech-to-text via Google Cloud Speech-to-Text.
+Speech-to-text via Google Cloud Speech-to-Text, over its REST API.
 
 | | |
 |---|---|
