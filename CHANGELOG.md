@@ -125,6 +125,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A stream keeps its text whole, and a stream that fails says so.** Each
+  network chunk was decoded alone, so a character split between two reads —
+  any non-ASCII text — became two replacement marks; `splitlines()` cut an
+  event at U+2028, legal inside a JSON string. An error event mid-stream
+  (Anthropic's `overloaded`, an OpenAI-compatible `{"error": …}`) was taken
+  for data, and the reply cut short there became the answer; it raises the
+  typed error now (529 for overloaded). A timeout or a dropped connection
+  while reading is a `NetworkError`, retried while nothing has been shown; a
+  200 with a JSON body instead of a stream is read as one answer; and a
+  stream that is abandoned or breaks is closed, so the provider stops
+  generating for a reader that has gone.
 - **Nothing a tool reads or returns is unbounded.** A 149 KB answer that
   MarkItDown's zip converter unpacked took 950 MB; `local_read` loaded a
   2 GB log whole for forty lines; `local_run` and REST buffered everything.

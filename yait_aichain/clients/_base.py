@@ -1,3 +1,4 @@
+import codecs
 import inspect
 import os
 import urllib3
@@ -19,6 +20,22 @@ def _proxy_from_env() -> "dict | None":
     url = (os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
            or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
     return {"url": url} if url else None
+
+
+def _raise_if_error(event, kind: str = "") -> None:
+    """Raise the typed error a stream reports in the middle, where it was
+    taken for data and the reply cut short there became the final answer:
+    Anthropic's ``event: error`` (``overloaded_error`` is its 529), an
+    OpenAI-compatible ``{"error": {...}}``."""
+    if not isinstance(event, dict):
+        return
+    error = event.get("error")
+    if kind != "error" and event.get("type") != "error" and not error:
+        return
+    error = error if isinstance(error, dict) else {"message": str(error or event)}
+    code = error.get("code") or error.get("status")
+    status = code if isinstance(code, int) else 529 if error.get("type") == "overloaded_error" else 500
+    raise error_from_status(status, error.get("message") or json.dumps(error))
 
 
 def _clean_key(key):
@@ -385,30 +402,59 @@ class BaseClient:
             response.release_conn()
             raise error_from_status(response.status, body, response.headers)
 
+        # A 200 that is not a stream — a proxy, a server ignoring `stream` —
+        # is one answer, read as one event, where it gave an empty result.
+        if "application/json" in (response.headers.get("content-type") or "").lower():
+            whole = response.data
+            response.release_conn()
+            try:
+                event = json.loads(whole) if whole.strip() else None
+            except json.JSONDecodeError:
+                event = None
+            if event is not None:
+                _raise_if_error(event)
+                yield event
+            return
+
+        finished = False
         try:
+            # Decoded incrementally: a character split across two chunks —
+            # any non-ASCII text — came out as two replacement marks when each
+            # chunk was decoded on its own. Lines split on "\n" alone: U+2028,
+            # which `splitlines` also splits on, is legal inside a JSON string
+            # and cut an event in half.
+            decoder = codecs.getincrementaldecoder("utf-8")("replace")
             buffer = ""
-            for raw in response.stream(amt=None, decode_content=True):
-                buffer += raw.decode("utf-8", errors="replace")
-                while "\n\n" in buffer or "\r\n\r\n" in buffer:
-                    sep = "\r\n\r\n" if "\r\n\r\n" in buffer and (
-                        "\n\n" not in buffer
-                        or buffer.index("\r\n\r\n") < buffer.index("\n\n")
-                    ) else "\n\n"
-                    chunk, buffer = buffer.split(sep, 1)
-                    payload = "".join(
-                        line[5:].lstrip() if line.startswith("data:") else ""
-                        for line in chunk.splitlines()
-                        if line.startswith("data:"))
+            for raw in response.stream(8192, decode_content=True):
+                # The whole buffer: a "\r" and its "\n" can arrive apart.
+                buffer = (buffer + decoder.decode(raw)).replace("\r\n", "\n")
+                while "\n\n" in buffer:
+                    chunk, buffer = buffer.split("\n\n", 1)
+                    lines = chunk.split("\n")
+                    kind = next((ln[6:].strip() for ln in lines if ln.startswith("event:")), "")
+                    payload = "\n".join(ln[5:].lstrip() for ln in lines if ln.startswith("data:"))
                     if not payload or payload == "[DONE]":
                         continue
                     try:
-                        yield json.loads(payload)
+                        event = json.loads(payload)
                     except json.JSONDecodeError:
                         # A provider that sends a non-JSON comment or keeps
                         # the connection warm with junk must not end the run.
                         continue
+                    _raise_if_error(event, kind)
+                    yield event
+            finished = True
+        except TRANSPORT_ERRORS as exc:
+            # A read that timed out or a connection cut mid-stream is the
+            # network, retried as such — not a raw urllib3 error past APIError.
+            raise NetworkError(0, f"the stream broke off: {exc}") from exc
         finally:
-            response.release_conn()
+            if finished:
+                response.release_conn()
+            else:
+                # Abandoned or broken: closed, so the provider stops
+                # generating — and billing — for a reader that has gone.
+                getattr(response, "close", response.release_conn)()
 
     # ------------------------------------------------------------------
     # Public interface
