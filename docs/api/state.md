@@ -92,7 +92,12 @@ Raised by a suspend tool to pause the current run.
 ## `SuspendedResult`
 
 ```python
-SuspendedResult(run_id: str, awaiting: dict = <factory>, document: dict = <factory>)
+SuspendedResult(
+    run_id: str,
+    awaiting: dict = <factory>,
+    document: dict = <factory>,
+    history: tuple = (),
+)
 ```
 
 Returned by `run()` / `resume()` when the run paused instead of
@@ -105,6 +110,10 @@ run, mirroring `AgentResult`.
 - `awaiting` (*dict*, default `<factory>`) — `{"reason": ..., "resume_with": ...}` describing what is awaited.
 - `document` (*dict*, default `<factory>`) — The full self-contained run document (also saved in the store). Exposed
   so callers can persist/transport it themselves if they prefer.
+
+### `SuspendedResult.error`
+
+Not an error — what the run waits for, for code that prints `.error`.
 
 ---
 

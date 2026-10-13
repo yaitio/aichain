@@ -484,6 +484,13 @@ class Pool:
                     "Agent runner requires a 'task' key in the item variables."
                 )
             result = runner.run(task=task, variables=variables)
+            # A parked agent is falsy but did not fail: what the docstring
+            # above promises is the SuspendedResult as the item's output, with
+            # its run_id, not "Agent failed: unknown error" and an orphan
+            # document in the store.
+            from ..state import SuspendedResult
+            if isinstance(result, SuspendedResult):
+                return result, None
             if not result:
                 raise RuntimeError(
                     f"Agent failed: {getattr(result, 'error', 'unknown error')}"

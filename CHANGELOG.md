@@ -118,6 +118,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A pause is neither a failure nor a finished step.** `SuspendedResult` is
+  falsy, so a Pool reported "Agent failed: unknown error" for an item whose
+  agent had parked — losing the run id and orphaning its document — and a
+  Chain counted a parked nested chain as done and passed the
+  `SuspendedResult` on as a variable. A Pool now returns the
+  `SuspendedResult` as the item's output, a Chain refuses a child's pause by
+  name, and a `Suspend` from a function or a Skill step — re-run without its
+  signal on resume, so it paused for ever — is refused: only a tool step is
+  given the signal. `SuspendedResult` carries `success`, `suspended`,
+  `output`, `error`, `usage`, `cost` and `tokens_used` like every result.
 - **A Chain's or a Pool's budget holds without editing the steps.** A Chain
   lent its budget by writing it onto each step's `max_cost` and restoring it
   afterwards, and a Pool did the same on the runner — but a Pool's copies of

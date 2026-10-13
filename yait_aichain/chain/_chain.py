@@ -748,6 +748,13 @@ class Chain:
                     # A chain used as a step contributes its output, and its
                     # failure is this step's failure — the same contract an
                     # agent step has.
+                    if isinstance(output, SuspendedResult):
+                        raise RuntimeError(
+                            f"Chain step {idx} ({name!r}) parked its own run "
+                            f"({output.awaiting.get('reason') or 'no reason given'}) and a chain "
+                            "cannot carry a child's pause: put the Wait/Gate in this chain as "
+                            "its own step, or run that chain on its own and resume it with "
+                            f"its resume({output.run_id!r}, signal=...).")
                     if isinstance(output, ChainResult):
                         if not output:
                             raise RuntimeError(
@@ -755,6 +762,14 @@ class Chain:
                         output = output.output
 
             except Suspend as susp:
+                # Only a tool step is handed the signal on resume, so only a
+                # tool may pause here: a function or a Skill raising Suspend
+                # would be re-run without it and pause again, forever.
+                if kind != "tool":
+                    raise RuntimeError(
+                        f"Chain step {idx} ({name!r}) asked to pause, and only a tool step can: "
+                        "it is the one that is given the signal on resume. Use Wait or Gate "
+                        "as the step.") from susp
                 # A suspend tool paused the run: park the document and return a
                 # SuspendedResult; on resume the engine re-invokes this step.
                 awaiting = {"reason":      susp.reason,

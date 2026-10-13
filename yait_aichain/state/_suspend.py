@@ -65,6 +65,23 @@ class SuspendedResult:
     awaiting: dict  = field(default_factory=dict)
     document: dict  = field(default_factory=dict)
 
+    #: The fields every result has, so code written against `AgentResult` or
+    #: `ChainResult` reads a pause without a special case: not a success, no
+    #: output yet, and nothing failed — ``suspended`` says which of those
+    #: falsy results this is.
+    success   = False
+    suspended = True
+    output    = None
+    usage     = None
+    cost      = None
+    tokens_used = 0
+    history: tuple = ()
+
+    @property
+    def error(self) -> str:
+        """Not an error — what the run waits for, for code that prints `.error`."""
+        return f"waiting: {self.awaiting.get('reason') or 'a signal'}"
+
     def __getattr__(self, name):
         raise _hints.missing(self, name)
 
