@@ -121,9 +121,36 @@ class TestSkillInit(unittest.TestCase):
         skill = self._make_skill()
         self.assertEqual(skill.variables, {})
 
-    def test_options_stored(self):
-        skill = self._make_skill(options={"key": "val"})
-        self.assertEqual(skill.options["key"], "val")
+    def test_options_are_refused_and_point_at_the_model(self):
+        # Stored and never applied: Skill(options={"temperature": 0}) ran at 1.0.
+        with self.assertRaisesRegex(TypeError, "Model\\(name, options="):
+            self._make_skill(options={"temperature": 0})
+
+    def test_a_schema_under_json_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "json_schema"):
+            self._make_skill(output={"format": {"type": "json", "schema": {"type": "object"}}})
+
+    def test_an_image_format_is_refused_as_a_modality_is(self):
+        with self.assertRaisesRegex(ValueError, "image model is a tool"):
+            self._make_skill(output={"format": {"type": "image"}})
+
+    def test_turns_after_the_last_marker_are_answered(self):
+        # A system turn after the last generate point was dropped, and the
+        # caller got the draft before it.
+        model = Model("gpt-4o")
+        model.client = _stub_transport(model, _openai_response("draft"), _openai_response("final"))
+        skill = Skill(model, input={"messages": [
+            {"role": "user", "parts": [{"type": "text", "text": "write"}]},
+            {"role": "assistant"},
+            {"role": "system", "parts": [{"type": "text", "text": "now shorten it"}]}]})
+        self.assertEqual(skill.run(), "final")
+        self.assertEqual(skill.history, ["draft", "final"])
+
+    def test_a_saved_skill_with_options_is_refused(self):
+        from yait_aichain.skills import Skill
+        with self.assertRaisesRegex(ValueError, "model_options"):
+            Skill.from_dict({"model_name": "gpt-4o", "input": {"messages": []}, "options": {"t": 0}},
+                            api_key="k")
 
     def test_invalid_input_raises(self):
         model = Model("gpt-4o")

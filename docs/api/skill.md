@@ -17,7 +17,6 @@ Skill(
     prompt: str | None = None,
     output: dict | None = None,
     variables: dict | None = None,
-    options: dict | None = None,
     name: str | None = None,
     description: str | None = None,
     max_retries: int = 0,
@@ -26,6 +25,7 @@ Skill(
     max_cost: float | Budget | None = None,
     _tools: list | None = None,
     _image: bool = False,
+    **refused,
 )
 ```
 
@@ -89,7 +89,9 @@ A reusable, model-bound task unit.
 - `variables` (*dict | None, optional*, default `None`) — Default variable values.  Can be overridden or extended at call
   time via `run(variables={...})`.  Merged at run time; call-time
   values take precedence.
-- `options` (*dict | None, optional*, default `None`) — Reserved for future use (currently stored but not applied).
+- `**refused` — `options=` is refused: it was stored and never applied, so
+  `Skill(options={"temperature": 0})` ran at the model's default. A
+  model's options are `Model(name, options={…})`.
 - `name` (*str | None, optional*, default `None`) — Human-readable label for the skill.
 - `description` (*str | None, optional*, default `None`) — Short description of what the skill does.
 - `prompt` (*str | None, optional*, default `None`) — A shortcut for one user message: `Skill(model, prompt="Summarise:
@@ -229,7 +231,7 @@ Skill.save(path: str)
 Serialise this skill to a YAML file at *path*.
 
 The file stores everything needed to recreate the skill — the model
-name, input template, output spec, variables, options, name, and
+name, input template, output spec, variables, name, and
 description.  API keys are **never** written; `load` resolves
 them from environment variables at load time.
 

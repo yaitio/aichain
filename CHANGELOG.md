@@ -125,6 +125,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **Four Skill traps closed.** `Skill(options=…)` is refused with the place
+  options go — `Model(name, options={…})` — where it was stored and never
+  applied, so `Skill(options={"temperature": 0})` ran at 1.0; a saved Skill
+  carrying `options` is refused on load. A `schema` under format type `json`
+  is refused with a pointer to `json_schema`, where it was never sent and the
+  answer was still checked against it. Turns after the last generate marker
+  are answered, where they were dropped and the caller got the draft before
+  them. `format: {"type": "image"}` is refused as `modalities: ["image"]` is.
+
 - **`Skill.stream()` parses structured output the way `run()` does.** Fences
   are stripped and the schema is checked; an answer that does not parse
   raises, where the stream handed back the text as the value (`last_result`

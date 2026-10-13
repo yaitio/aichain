@@ -161,8 +161,10 @@ class Skill:
         time via ``run(variables={...})``.  Merged at run time; call-time
         values take precedence.
 
-    options : dict | None, optional
-        Reserved for future use (currently stored but not applied).
+    **refused
+        ``options=`` is refused: it was stored and never applied, so
+        ``Skill(options={"temperature": 0})`` ran at the model's default. A
+        model's options are ``Model(name, options={…})``.
 
     name : str | None, optional
         Human-readable label for the skill.
@@ -233,7 +235,6 @@ class Skill:
         prompt:       "str | None" = None,
         output:       "dict | None" = None,
         variables:    dict  | None  = None,
-        options:      dict  | None  = None,
         name:         str   | None  = None,
         description:  str   | None  = None,
         max_retries:  int           = 0,
@@ -242,7 +243,13 @@ class Skill:
         max_cost:     "float | Budget | None" = None,
         _tools:       list  | None  = None,
         _image:       bool          = False,
+        **refused,
     ) -> None:
+        if refused:
+            raise TypeError(
+                "Skill takes no " + ", ".join(f"{k}=" for k in sorted(refused))
+                + (" — a model's options are Model(name, options={…}); Skill(options=…) was "
+                   "stored and never applied" if "options" in refused else ""))
         # `prompt=` is the shortcut for the commonest shape there is: one
         # user message, one text part. The long form stays the only way to say
         # anything else — a system message, several turns, an image — because
@@ -277,7 +284,9 @@ class Skill:
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
-        if output and "image" in (output.get("modalities") or []) and not _image:
+        wants_image = output and ("image" in (output.get("modalities") or [])
+                                  or (output.get("format") or {}).get("type") == "image")
+        if wants_image and not _image:
             # An image model is a tool: it cannot be an agent's mind. The image
             # tool builds its request through a Skill, by the `_image` seam,
             # and that seam is the tool's alone.
@@ -293,7 +302,6 @@ class Skill:
         # public way to get a raw decision without execution is Agent.step().
         self._tools      = list(_tools) if _tools else None
         self.variables   = variables or {}
-        self.options     = options   or {}
         self.name        = name
         self.description = description
         self.max_retries = max_retries
@@ -619,7 +627,9 @@ class Skill:
         # unanswered ``user`` turn.
         seq: list = [("gen",) if adapters.is_generate_marker(m) else ("msg", m)
                      for m in messages]
-        if seq and seq[-1][0] == "msg" and seq[-1][1].get("role") == "user":
+        # Any turns after the last marker are a final question, whoever speaks
+        # them: they were dropped, and the caller got the draft before them.
+        if seq and seq[-1][0] == "msg":
             seq.append(("gen",))
         last_gen = max(k for k, s in enumerate(seq) if s[0] == "gen")
 
@@ -720,7 +730,7 @@ class Skill:
         Serialise this skill to a YAML file at *path*.
 
         The file stores everything needed to recreate the skill — the model
-        name, input template, output spec, variables, options, name, and
+        name, input template, output spec, variables, name, and
         description.  API keys are **never** written; :meth:`load` resolves
         them from environment variables at load time.
 
@@ -761,7 +771,6 @@ class Skill:
             "input":         self._input,
             "output":        self._output,
             "variables":     self.variables or None,
-            "options":       self.options or None,
             "max_retries":   self.max_retries or None,
             "retry_delay":   self.retry_delay if self.retry_delay != 2.0 else None,
             "max_cost":      self.max_cost.limit if self.max_cost is not None else None,
@@ -779,6 +788,9 @@ class Skill:
         api_key : str | None, optional
             The key for the model; its environment variable when omitted.
         """
+        if "options" in data:
+            raise ValueError("a saved Skill's 'options' were never applied and are not read; "
+                             "a model's options go under 'model_options'")
         options = data.get("model_options") or None
         models = [Model(data["model_name"], api_key=api_key, options=options)]
         models += [Model(name, api_key=api_key) for name in data.get("fallback") or []]
@@ -787,7 +799,6 @@ class Skill:
             input       = data["input"],
             output      = data.get("output"),
             variables   = data.get("variables"),
-            options     = data.get("options"),
             name        = data.get("name"),
             description = data.get("description"),
             max_retries = data.get("max_retries", 0),

@@ -498,6 +498,11 @@ def validate_output(output: dict) -> None:
         raise ValueError(
             "output['format']['type'] must be 'text', 'json', 'json_schema', or 'image'"
         )
+    if ftype == "json" and "schema" in fmt:
+        # A schema under `json` was never sent, and the answer was still
+        # checked against it — a failure for a rule the model never saw.
+        raise ValueError("a schema goes with format type 'json_schema', not 'json': "
+                         "{'type': 'json_schema', 'schema': …} sends it to the model")
     if ftype == "json_schema" and not isinstance(fmt.get("schema"), dict):
         raise ValueError(
             "output['format']['schema'] must be a dict for json_schema format"

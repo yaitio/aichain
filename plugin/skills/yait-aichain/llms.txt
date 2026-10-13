@@ -65,10 +65,9 @@ Model(name: str, options: dict | None = None, client_options: dict | None = None
       api_key: str | None = None, on_unsupported: str = 'warn')
 Skill(model: Model | list[Model], input: dict | None = None, *,
       prompt: str | None = None, output: dict | None = None,
-      variables: dict | None = None, options: dict | None = None,
-      name: str | None = None, description: str | None = None, max_retries: int = 0,
-      retry_delay: float = 2.0, hooks: list | None = None,
-      max_cost: float | Budget | None = None)
+      variables: dict | None = None, name: str | None = None,
+      description: str | None = None, max_retries: int = 0, retry_delay: float = 2.0,
+      hooks: list | None = None, max_cost: float | Budget | None = None, **refused)
 Chain(steps, variables: dict | None = None, name: str | None = None,
       description: str | None = None, on_step_error: str = 'raise', store = None,
       hooks: list | None = None, max_cost = None)

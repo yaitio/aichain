@@ -46,11 +46,10 @@ class Configured(Tool):
 class TestRoundTrip(unittest.TestCase):
 
     def setUp(self):
-        skill = Skill(Model("gpt-4o", api_key="k"),
+        skill = Skill(Model("gpt-4o", api_key="k", options={"temperature": 0.3}),
                       prompt="Summarise {text}",
                       output={"format": {"type": "json"}},
                       variables={"text": "default"},
-                      options={"temperature": 0.3},
                       name="summariser", description="makes it short")
         agent = Agent(Model("claude-sonnet-4-6", api_key="k"), tools=[],
                       mode="waterfall", instructions="be brief",
@@ -83,7 +82,7 @@ class TestRoundTrip(unittest.TestCase):
         self.assertEqual(s._input, o._input)
         self.assertEqual(s._output, o._output)
         self.assertEqual(s.variables, {"text": "default"})
-        self.assertEqual(s.options, {"temperature": 0.3})
+        self.assertEqual(s.model._asked, {"temperature": 0.3})
         self.assertEqual(s.model.name, "gpt-4o")
         self.assertEqual(s.model.client.api_key, "loaded-key")
 
