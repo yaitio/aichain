@@ -1,10 +1,43 @@
 # Changelog
 
-## [Unreleased]
+## [4.0.1] — 2026-10-13
 
-**Less code, the same behaviour.** The simplification half of the 4.0.0
-audit: copies merged, dead paths removed, nothing a caller sees changed except
-where a fix is named below.
+**The 4.0.0 audit, applied.** 117 findings — defects, silent behaviour,
+security gaps and copies of one thing — each fixed with a test that fails on
+the code before it. Every speech, fetch and model tool now speaks plain HTTP:
+no provider SDK and no MarkItDown. The offline suite passes on Python 3.10
+and 3.14 with no failures.
+
+**What can break code written for 4.0.0.** Most of these remove something
+that already did not work; each says what to write instead when it is hit.
+
+- `transcribe("xai")` and `transcribe("qwen")` are removed: both answered 404.
+- `Skill(options=…)` is refused — it was never applied; options go on `Model`.
+- `MCPTool.run`, `RestApiTool.run` take `input` and `options` positionally,
+  and `MCP.call` takes `name` positionally, so a field of that name is sent:
+  `tool.run({...})`, not `tool.run(input={...})`.
+- `agent.resume(run_id)` needs the `signal` a waiting run asked for.
+- An approver answers `True`, `False` or `ApprovalDecision`; anything else is
+  an error, not an approval.
+- Chain steps refuse settings nothing read — options on a non-agent step, an
+  `input_map` on an agent, an unknown `output_field`.
+- `Model` checks `temperature`, `top_p`, `top_k` and `max_tokens` at
+  construction; a model name or a vector collection name that could alter a
+  URL path is refused.
+- REST endpoints refuse unknown auth keys, URL placeholders with no path
+  parameter and credentials in the URL; a missing token is an error, not an
+  anonymous request.
+- `speech("google")` and `transcribe("google")` need an API key; Application
+  Default Credentials were the SDK's. The `google` extra is gone, and `fetch`
+  brings only `pypdf`.
+- `ttsQwen` defaults to `qwen3-tts-flash` and writes WAV only.
+- `InMemoryStore` saves through JSON as the file store does.
+- `Pool` items a stop never started are `CANCELLED`, not `PENDING`.
+- `Eval` thresholds are fractions, `Pass^k` is estimated from every trial,
+  and a number below 1.0 from a scorer is not a pass.
+- A tool error string carries its exception's type: `KeyError: 'x'`.
+- `check_auth()` raises on a rate limit, an empty balance and a missing
+  endpoint instead of answering False.
 
 ### Changed
 
