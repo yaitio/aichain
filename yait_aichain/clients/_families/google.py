@@ -229,7 +229,7 @@ class GoogleClient(BaseClient):
                     continue
                 out.append({
                     "slot":      f"{candidate.get('index', 0)}:{i}",
-                    "id":        fc.get("id") or fc.get("name") or "",
+                    "id":        fc.get("id") or "",
                     "name":      fc.get("name") or "",
                     "arguments": json.dumps(fc.get("args") or {}),
                 })
@@ -261,7 +261,10 @@ class GoogleClient(BaseClient):
                 contents.append({"role": "user", "parts": gparts})
             held.clear()
 
+        names: dict = {}                 # call id → function name, from the turns that asked
         for msg in messages:
+            if msg["role"] == "assistant":
+                names.update({c.get("id", ""): c["name"] for c in msg.get("tool_calls") or []})
             # One call's result: a functionResponse part in a USER turn.
             if msg["role"] == "tool":
                 # A functionResponse carries JSON, not media. Anything a tool
@@ -275,9 +278,9 @@ class GoogleClient(BaseClient):
                                   if p.get("type") == "text")
                 responses.append({
                     "functionResponse": {
-                        # call_id here carries the function NAME (see class
-                        # comment): Gemini has no ids on this wire.
-                        "name": msg.get("call_id", ""),
+                        # Gemini keys a result by the function's name: the
+                        # name of the call this result answers, by its id.
+                        "name": names.get(msg.get("call_id", ""), msg.get("call_id", "")),
                         "response": {"result": text},
                     }})
                 if follow_up:
@@ -427,7 +430,7 @@ class GoogleClient(BaseClient):
             # name and args is a call without its signature, and a 400.
             signed = any("thoughtSignature" in p for p in parts)
             return ToolCallRequest(
-                calls=tuple(ToolCall(id=c.get("name", ""),
+                calls=tuple(ToolCall(id=c.get("id", ""),
                                      name=c.get("name", ""),
                                      arguments=c.get("args") or {})
                             for c in calls),

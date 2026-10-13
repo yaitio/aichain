@@ -1107,8 +1107,7 @@ class Agent:
                     step        = state["steps"],
                 )
                 messages.append(tool_result_turn(
-                    call.id or call.name,
-                    prompts.result_message(result, error)))
+                    call.id, prompts.result_message(result, error)))
 
             state["journal"] = journal
             if fired := self._fired(state):
@@ -1508,9 +1507,10 @@ class Agent:
         deliberately left **unanswered**: that gap is what the run is waiting
         for, and `resume()` fills exactly it.
         """
-        for other in reply.calls[reply.calls.index(call) + 1:]:
+        at = next(i for i, c in enumerate(reply.calls) if c is call)
+        for other in reply.calls[at + 1:]:
             messages.append(tool_result_turn(
-                other.id or other.name,
+                other.id,
                 prompts.result_message(None, f"not executed: the run paused at "
                                              f"{call.name!r} before this call")))
 
@@ -1518,7 +1518,7 @@ class Agent:
         doc = self._save_parked(
             {"messages": messages, "state": self._portable_state(state),
              "journal": journal.to_list(), "run_id": self._run_id},
-            {**awaiting, "hint": susp.hint, "call_id": call.id or call.name,
+            {**awaiting, "hint": susp.hint, "call_id": call.id,
              "tool": call.name, "arguments": dict(call.arguments or {})},
             run_id=self._doc_id)                 # parked again: one identifier
         self._doc_id = doc.run_id

@@ -118,6 +118,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **Every tool call has its own id, and every result finds its call.**
+  harmony carried no id and Google used the function's name, so two calls to
+  one function shared an id; the agent answered under `call.id or call.name`
+  while a driver used `call.id`; `dangling_calls()` skipped empty ids and
+  checked against a set, so a repeated id answered once hid a lost result;
+  and a history made on Kimi (`functions.look:0`) sent to Anthropic — by a
+  fallback, a planner model or a driver changing models — was HTTP 400. A
+  `ToolCallRequest` now gives each call a unique, non-empty id; Google's
+  results are named by the call they answer; Anthropic gets ids it accepts,
+  mapped the same way on both sides; and `dangling_calls()` counts.
 - **A chain is checkpointed after every step, and resumes only its own
   runs.** The documentation promised a write after each step; the document
   was saved only on a pause, so a process that died in the tail resumed from

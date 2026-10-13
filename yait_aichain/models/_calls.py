@@ -83,6 +83,23 @@ class ToolCallRequest:
     text:  str = ""
     opaque: dict = field(default_factory=dict, hash=False, compare=False)
 
+    def __post_init__(self) -> None:
+        # Every call gets an id, and no two share one. harmony carries none,
+        # Google none on most models, and a result is matched to its call by
+        # id alone — two calls answering to one id, or to "", leave a result
+        # nobody can place and a dangling call nobody notices.
+        seen: set = set()
+        fixed = []
+        for i, call in enumerate(self.calls):
+            base = call.id or f"call_{i}"
+            new, n = base, 1
+            while new in seen:
+                n += 1
+                new = f"{base}_{n}"
+            seen.add(new)
+            fixed.append(call if new == call.id else ToolCall(new, call.name, call.arguments))
+        object.__setattr__(self, "calls", tuple(fixed))
+
     def __bool__(self) -> bool:
         return bool(self.calls)
 
@@ -228,17 +245,30 @@ def dangling_calls(messages: list) -> list:
     messages : list
         A conversation, as ``Agent.step()`` takes it.
     """
-    answered = {m.get("call_id") for m in messages
-                if isinstance(m, dict) and m.get("role") == "tool"}
-    asked: list = []
+    # Counted, not collected into a set: one id asked twice and answered once
+    # is a call left without its result, and a set saw both as answered.
+    # Walked in order, so a result answers a call made before it.
+    from collections import Counter
+    owed: Counter = Counter()
+    order: list = []
     for message in messages:
-        if not isinstance(message, dict) or message.get("role") != "assistant":
+        if not isinstance(message, dict):
             continue
-        for call in message.get("tool_calls") or []:
-            call_id = call.get("id") if isinstance(call, dict) else None
-            if call_id and call_id not in answered:
-                asked.append(call_id)
-    return asked
+        if message.get("role") == "assistant":
+            for call in message.get("tool_calls") or []:
+                call_id = (call.get("id") if isinstance(call, dict) else None) or ""
+                owed[call_id] += 1
+                order.append(call_id)
+        elif message.get("role") == "tool":
+            call_id = message.get("call_id") or ""
+            if owed[call_id] > 0:
+                owed[call_id] -= 1
+    dangling: list = []
+    for call_id in reversed(order):              # the latest calls are the unanswered ones
+        if owed[call_id] > 0:
+            owed[call_id] -= 1
+            dangling.append(call_id)
+    return list(reversed(dangling))
 
 
 def tool_result_turn(call_id: str, result) -> dict:

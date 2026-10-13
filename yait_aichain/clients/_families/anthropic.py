@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from ...models._schema import check_structure
 import json
+import re
 
 from .._base import BaseClient
 
@@ -93,6 +94,15 @@ def _part_to_anthropic(part: dict) -> dict | None:
     # ptype == "video" — not supported by Anthropic
     return None
 
+
+
+def _anthropic_id(call_id: str) -> str:
+    """A call id as this API accepts one — letters, digits, ``_`` and ``-``.
+    A history made with another model carries its ids (Kimi's
+    ``functions.get_weather:0``), and a fallback or a planner model sends that
+    history here; mapped the same way on both sides of the turn, the call and
+    its result still match."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", call_id or "") or "call"
 
 class AnthropicClient(BaseClient):
 
@@ -211,7 +221,7 @@ class AnthropicClient(BaseClient):
                     content = "\n".join(p.get("text", "") for p in parts
                                         if p.get("type") == "text")
                 block = {"type": "tool_result",
-                         "tool_use_id": msg.get("call_id", ""),
+                         "tool_use_id": _anthropic_id(msg.get("call_id", "")),
                          "content": content}
                 if amsgs and amsgs[-1]["role"] == "user" and \
                    all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
@@ -226,7 +236,7 @@ class AnthropicClient(BaseClient):
                 blocks = list((msg.get("opaque") or {}).get("anthropic") or [])
                 blocks += [b for b in (_part_to_anthropic(p) for p in msg.get("parts") or [])
                            if b is not None]
-                blocks += [{"type": "tool_use", "id": c.get("id", ""),
+                blocks += [{"type": "tool_use", "id": _anthropic_id(c.get("id", "")),
                             "name": c["name"], "input": c.get("arguments", {})}
                            for c in msg["tool_calls"]]
                 amsgs.append({"role": "assistant", "content": blocks})

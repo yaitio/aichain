@@ -134,14 +134,16 @@ class TestGoogleWire(unittest.TestCase):
                          {"name": "search", "args": {"q": "it"}})
 
     def test_result_turn_becomes_function_response_keyed_by_name(self):
+        # Keyed by the *function's* name — the call `t1` was `search` — which
+        # is what Gemini matches a result to; the id was sent in its place.
         contents = self._body(tools=[SEARCH])["contents"]
         frs = [p for c in contents for p in c["parts"] if "functionResponse" in p]
         self.assertEqual(len(frs), 2)
-        self.assertEqual(frs[0]["functionResponse"]["name"], "t1")
+        self.assertEqual(frs[0]["functionResponse"]["name"], "search")
         self.assertEqual(frs[0]["functionResponse"]["response"],
                          {"result": "found: it"})
 
-    def test_response_function_call_parses_with_name_as_id(self):
+    def test_response_function_call_gets_an_id_of_its_own(self):
         m = Model("gemini-3.1-pro-preview", api_key="k")
         reply = m.from_response({
             "candidates": [{"content": {"parts": [
@@ -149,8 +151,9 @@ class TestGoogleWire(unittest.TestCase):
             ]}}],
         }, OUT)
         self.assertIsInstance(reply, ToolCallRequest)
+        # Not the name: two calls to one function in a turn would share it.
         self.assertEqual(reply.calls[0],
-                         ToolCall(id="search", name="search",
+                         ToolCall(id="call_0", name="search",
                                   arguments={"q": "dogs"}))
 
     def test_plain_text_response_is_still_a_string(self):
