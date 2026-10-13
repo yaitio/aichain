@@ -133,6 +133,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A model option's value is checked where it is written.** `temperature`,
+  `top_p`, `top_k` and `max_tokens` are checked at construction — a number of
+  the right kind, in range, not a bool, not `None` — where `"0.3"`, `-1` and
+  `None` reached the provider and came back 400. A range a model declares is
+  applied there too, and the clamp is reported as an adaptation: 1.7 on
+  glm-5.x, declared 0–1, was sent as 1.7. `True` no longer passes a numeric
+  range as 1. A build that raises no longer leaves the previous call's
+  adaptations on `last_adaptations`. `fidelity="auto"` is no longer a
+  shorthand for 0.5, which OpenAI reads as its expensive high. An image asked
+  for by `modalities` alone has its options checked as an image's.
+
 - **What the speech and fetch tools import is declared.** New extras
   `google` (Google's speech SDKs, for `speech("google")` and
   `transcribe("google")`) and `audio` (`pydub`, with `audioop-lts` on 3.13+,

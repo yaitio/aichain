@@ -227,6 +227,15 @@ class _ToolCallAssembly:
             [(slot["name"], slot["arguments"], slot["id"]) for slot in self._slots.values()],
             text)
 
+
+#: The sampling options a Model checks at construction: (type, lowest, highest).
+_SAMPLING = {
+    "temperature": ((int, float), 0, None),
+    "top_p":       ((int, float), 0, 1),
+    "top_k":       (int, 1, None),
+    "max_tokens":  (int, 1, None),
+}
+
 class Model:
     """
     A configured model: provider resolved from the name, settings from data,
@@ -424,6 +433,25 @@ class Model:
                 "provider has goes in options={'extra': {...}}, which travels "
                 "verbatim and unchecked."
             )
+        # Checked here, before any request: `temperature="0.3"`, `max_tokens=-1`
+        # and 1.7 on a model declared 0–1 went to the provider and came back
+        # 400 after the round trip, while the docs promised a clamp.
+        self._clamped: list = []
+        for name, (kind, low, high) in _SAMPLING.items():
+            if name not in opts:
+                continue
+            value = opts[name]
+            if value is None or isinstance(value, bool) or not isinstance(value, kind):
+                raise ValueError(f"{name} is a {'whole number' if kind is int else 'number'}, "
+                                 f"not {value!r}; leave it out for the provider's default")
+            if value < low or (high is not None and value > high):
+                raise ValueError(f"{name} is between {low} and {high if high is not None else 'any'}; "
+                                 f"got {value}")
+            from ._options import check_value
+            sent, note = check_value(name, value, self._provider, self.name)
+            if note:
+                opts[name] = sent
+                self._clamped.append((name, value, sent, note))
         self.temperature   = opts.get("temperature",   defaults.get("temperature"))
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
         self.top_p         = opts.get("top_p",         defaults.get("top_p"))
@@ -681,8 +709,12 @@ class Model:
         from ._options import check_applies, check_value
 
         fmt = (output.get("format") or {})
-        kind = fmt.get("type", "text")
+        # An image asked for by modalities alone is an image, not "text".
+        kind = "image" if "image" in (output.get("modalities") or []) else fmt.get("type", "text")
         fixed = None
+        for name, asked, sent, note in getattr(self, "_clamped", ()):
+            record(Adaptation(kind=ADAPTED, option=name, asked=asked, sent=sent,
+                              model=self.name, why=note))
         for key, value in fmt.items():
             if key in ("type", "schema", "name", "strict") or value is None:
                 continue
@@ -707,6 +739,8 @@ class Model:
         """
         from ._adaptation import collect
 
+        # Emptied first: a build that raised left the previous call's record.
+        self.last_adaptations = []
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
             path, body = self.client.build_request(messages, output, self._params(), tools=tools)

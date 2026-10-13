@@ -151,7 +151,8 @@ def is_requirement(option: str) -> bool:
 #: single internal form, a range declared for one provider rejects the word
 #: another provider requires.
 SHORTHANDS: dict = {
-    "fidelity": {"low": 0.3, "high": 0.9, "auto": 0.5},
+    # No "auto": it became 0.5, which OpenAI reads as its expensive high.
+    "fidelity": {"low": 0.3, "high": 0.9},
 }
 
 
@@ -292,6 +293,9 @@ def check_value(option: str, value, provider: str, model: str):
     allowed = allowed_values(option, provider, model)
     if allowed is None:
         return value, None
+    if isinstance(value, bool) and not all(isinstance(v, bool) for v in allowed):
+        # `True` passed a [0, 1] range as 1, and `False` as 0.
+        raise ValueError(f"{model} takes {option} as a number, not {value!r}")
 
     # A two-number range, written [min, max], means clamp rather than refuse.
     if (len(allowed) == 2 and all(isinstance(v, (int, float)) for v in allowed)
