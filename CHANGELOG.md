@@ -118,6 +118,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A call's usage and adaptations are its own, on a shared Model.**
+  `last_stream_usage`, `last_stream_result` and `last_adaptations` were
+  written to the Model and read back after the network round, and one Model
+  serves a Pool's threads and every tenant: a stream read another's usage —
+  1,000 tokens became 8, and `max_cost` undercounted — and adaptations were
+  credited to another request. `Model.stream()` now returns a `StreamOutcome`
+  when it ends, `Model.build()` returns the adaptations beside the request,
+  and `from_response(..., tools_sent=)` is told whether tools were offered;
+  the attributes remain as mirrors for a single caller. A buffered fallback
+  keeps only the usage envelope, not the whole response with its images.
 - **A retried call cannot bill a generation twice, or sleep for hours.** The
   transport repeated a POST whose read failed — a balancer cutting a long
   generation, a 600 s timeout — up to five more times, each paid, and slept

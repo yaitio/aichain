@@ -35,13 +35,13 @@ from ..clients._errors import (
     InsufficientCreditsError,
 )
 from ..models._adaptation import SWAPPED, Adaptation
+from ..models._base import Model, StreamOutcome
 from ..models._usage import Usage, extract_usage, attach_cost
 from .._events import Event, emit
 from . import _adapters as adapters
 
 if TYPE_CHECKING:
     from .._budget import Budget
-    from ..models._base import Model
 
 #: What a retry or a fallback may answer: a rate limit, a server error —
 #: Anthropic's 529 overloaded among them — or no response at all. One tuple
@@ -66,6 +66,18 @@ def _pause(exc: APIError, attempt: int, delay: float) -> None:
     never past `_MAX_BACKOFF`."""
     wait = max(getattr(exc, "retry_after", None) or 0.0, delay * (2 ** attempt))
     time.sleep(min(_MAX_BACKOFF, wait + random.uniform(0, 1.0 if wait else 0.0)))
+
+
+def _tee(stream, into: list):
+    """Pass a stream's pieces through, keeping them in *into*, and return
+    what the stream returned when it ended."""
+    while True:
+        try:
+            piece = next(stream)
+        except StopIteration as done:
+            return done.value
+        into.append(piece)
+        yield piece
 
 
 def _retryable(exc: APIError, attempt: int, max_retries: int) -> bool:
@@ -476,12 +488,13 @@ class Skill:
         _tools = getattr(self, "_tools", None)
         pieces = []
 
+        outcome = None
         for attempt in _attempts(self.max_retries, self.retry_delay):
             t0 = self._started(model)
             try:
-                for piece in model.stream(messages, self._output, tools=_tools):
-                    pieces.append(piece)
-                    yield piece
+                # The outcome is this stream's own, returned when it ends — not
+                # read back off a model another stream may be using.
+                outcome = yield from _tee(model.stream(messages, self._output, tools=_tools), pieces)
                 break
             except Exception as exc:
                 self._ended(model, t0, error=exc)
@@ -494,8 +507,12 @@ class Skill:
                     continue
                 raise
 
-        self.last_adaptations = list(getattr(model, "last_adaptations", []))
-        raw_usage = getattr(model, "last_stream_usage", None)
+        if outcome is None:                      # a model-shaped double that returns nothing
+            outcome = StreamOutcome(getattr(model, "last_stream_result", None),
+                                    getattr(model, "last_stream_usage", None),
+                                    list(getattr(model, "last_adaptations", []) or []))
+        self.last_adaptations = list(outcome.adaptations)
+        raw_usage = outcome.usage
         if raw_usage:
             # `raw_usage` is already response-shaped — see
             # `BaseClient.stream_usage` — so it reaches the same branch of
@@ -506,7 +523,7 @@ class Skill:
             if self.max_cost is not None:
                 self.max_cost.charge(getattr(self.last_usage, "cost", None))
 
-        whole = getattr(model, "last_stream_result", None)
+        whole = outcome.result
         if whole is not None and not isinstance(whole, str):
             # The provider could not stream and answered in one piece; the
             # object it answered with is the result, not the text it renders
@@ -552,14 +569,10 @@ class Skill:
         ``last_usage`` is the sum across turns; ``history`` holds each reply.
         """
         if not any(adapters.is_generate_marker(m) for m in messages):
-            result, usage = self._call_once(
+            result, usage, made = self._call_once(
                 model, messages, self._output, max_retries, retry_delay)
             self.last_usage = usage
-            # A Model-like object from outside the library need not have
-            # grown this attribute; a new field of ours must not break code
-            # that was working.
-            self.last_adaptations = list(
-                getattr(model, "last_adaptations", ()) or ())
+            self.last_adaptations = made
             self.history    = [result]
             return result
 
@@ -583,8 +596,9 @@ class Skill:
                 running.append(item[1])
                 continue
             output = self._output if k == last_gen else _TEXT_OUTPUT
-            reply, usage = self._call_once(
+            reply, usage, made = self._call_once(
                 model, running, output, max_retries, retry_delay)
+            self.last_adaptations = made
             self.last_usage = usage if self.last_usage is None else self.last_usage + usage
             history.append(reply)
             final = reply
@@ -594,8 +608,6 @@ class Skill:
             running.append({"role": "assistant",
                             "parts": [{"type": "text", "text": text}]})
 
-        self.last_adaptations = list(
-            getattr(model, "last_adaptations", ()) or ())
         return final
 
     def _call_once(
@@ -605,16 +617,23 @@ class Skill:
         output:      dict,
         max_retries: int,
         retry_delay: float,
-    ) -> "tuple[str | dict, Usage]":
-        """One model call with transient retries; returns ``(result, usage)``."""
-        # Pass tools only when declared: this boundary accepts anything
-        # model-shaped (tests stub bare duck types), and a kwarg the double
-        # never heard of would break every caller that wants no tools at all.
+    ) -> "tuple[str | dict, Usage, list]":
+        """One model call with transient retries: ``(result, usage, adaptations)``.
+
+        The adaptations come back with the request that made them; reading
+        them off a Model shared between calls read another call's.
+        """
         _tools = getattr(self, "_tools", None)
-        if _tools:
-            path, body = model.to_request(messages, output, tools=_tools)
+        own = isinstance(model, Model)
+        if own:
+            path, body, made = model.build(messages, output, _tools)
         else:
-            path, body = model.to_request(messages, output)
+            # This boundary accepts anything model-shaped (tests stub bare
+            # duck types), and a kwarg the double never heard of would break
+            # every caller that wants no tools at all.
+            path, body = (model.to_request(messages, output, tools=_tools) if _tools
+                          else model.to_request(messages, output))
+            made = list(getattr(model, "last_adaptations", ()) or ())
 
         for attempt in _attempts(max_retries, retry_delay):
             t0 = self._started(model)
@@ -629,9 +648,10 @@ class Skill:
                                        getattr(model, "cache_ttl", "5m"))
                 if self.max_cost is not None:
                     self.max_cost.charge(getattr(usage, "cost", None))
-                result   = model.from_response(response, output)
+                result   = (model.from_response(response, output, tools_sent=bool(_tools)) if own
+                            else model.from_response(response, output))
                 self._ended(model, t0, usage)
-                return result, usage
+                return result, usage, made
             except APIError as exc:
                 self._ended(model, t0, error=exc)
                 if not _retryable(exc, attempt, max_retries):

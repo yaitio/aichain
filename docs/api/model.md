@@ -153,6 +153,25 @@ never calls anything, with no error anywhere.
 - `output` (*dict*) — The output spec: `{"modalities": [...], "format": {"type": …}}`.
 - `tools` (*list | None, optional*, default `None`) — Function-calling schemas, as `Tool.schema()` returns them.
 
+### `Model.build()`
+
+```python
+Model.build(messages: list, output: dict, tools: list | None = None)
+```
+
+`to_request`, and what building changed: `(path, body, adaptations)`.
+
+The adaptations are this request's, returned with it. One Model is
+shared — by a Pool's threads, by tenants — so a fact about one call
+left on the object (`last_adaptations`, kept as a mirror) is read by
+whichever call looks next.
+
+**Parameters**
+
+- `messages` (*list*) — Universal messages, placeholders already filled.
+- `output` (*dict*) — The output spec.
+- `tools` (*list | None, optional*, default `None`) — Function-calling schemas, as `Tool.schema()` returns them.
+
 ### `Model.stream()`
 
 ```python
@@ -172,7 +191,12 @@ one chunk at the end has something that looks like it worked, and
 that is precisely the class of loss `on_unsupported="requirements"`
 exists to raise on.
 
-Usage lands on `last_stream_usage` when the provider reports it.
+When the stream ends, the generator returns a `StreamOutcome`
+— the whole result, the usage the provider reported, and what was
+adapted — for `yield from` to receive. `last_stream_usage`,
+`last_stream_result` and `last_adaptations` mirror it on the
+model, for a single caller; the library reads the outcome, because a
+shared model's attributes belong to whichever stream wrote last.
 
 **Parameters**
 
@@ -184,7 +208,12 @@ Usage lands on `last_stream_usage` when the provider reports it.
 ### `Model.from_response()`
 
 ```python
-Model.from_response(response: dict, output: dict) -> str | dict
+Model.from_response(
+    response: dict,
+    output: dict,
+    *,
+    tools_sent: bool | None = None,
+) -> str | dict
 ```
 
 Extract the clean result (str for text, dict for json / image) from a
@@ -194,6 +223,9 @@ raw provider response, by delegating to the family client.
 
 - `response` (*dict*) — The provider's raw response body.
 - `output` (*dict*) — The output spec the request was built with.
+- `tools_sent` (*bool | None, optional*, default `None`) — Whether that request offered tools — only then can a reply be a
+  request to act. Passed by the caller that built the request; the
+  model's own record of its last request is the fallback.
 
 ---
 

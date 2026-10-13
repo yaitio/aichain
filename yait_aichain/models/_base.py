@@ -31,6 +31,7 @@ Provider detection is based on well-known model-name prefixes:
 
 import os
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .. import _hints
@@ -151,6 +152,17 @@ def _resolve_provider(name: str) -> str:
 # ---------------------------------------------------------------------------
 # Model — factory + base
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StreamOutcome:
+    """What a finished `Model.stream` returns: the whole result — text, a
+    parsed object, or a `ToolCallRequest` — the usage envelope the provider
+    reported (None when it reported none), and the adaptations made."""
+
+    result: object
+    usage: dict | None
+    adaptations: list
 
 
 def _merge_usage(into: "dict | None", incoming: dict) -> dict:
@@ -581,20 +593,36 @@ class Model:
         tools : list | None, optional
             Function-calling schemas, as ``Tool.schema()`` returns them.
         """
-        # Read by `from_response`: a reply can be a request to act only when
-        # tools were offered, whatever its text looks like.
-        self._sent_tools = bool(tools)
-        if tools:
-            if not self.client.supports_tools:
-                raise ValueError(
-                    f"provider family {type(self.client).__name__!r} does not "
-                    f"support native tool calling yet; model {self.name!r} "
-                    "cannot be given tools"
-                )
-            path, body = self._built(messages, output, tools=tools)
-        else:
-            path, body = self._built(messages, output)
+        path, body, _ = self.build(messages, output, tools)
         return path, body
+
+    def build(self, messages: list, output: dict, tools: list | None = None):
+        """`to_request`, and what building changed: ``(path, body, adaptations)``.
+
+        The adaptations are this request's, returned with it. One Model is
+        shared — by a Pool's threads, by tenants — so a fact about one call
+        left on the object (`last_adaptations`, kept as a mirror) is read by
+        whichever call looks next.
+
+        Parameters
+        ----------
+        messages : list
+            Universal messages, placeholders already filled.
+        output : dict
+            The output spec.
+        tools : list | None, optional
+            Function-calling schemas, as ``Tool.schema()`` returns them.
+        """
+        # A mirror for a caller reading it afterwards; the library passes
+        # `tools_sent` to `from_response` instead.
+        self._sent_tools = bool(tools)
+        if tools and not self.client.supports_tools:
+            raise ValueError(
+                f"provider family {type(self.client).__name__!r} does not "
+                f"support native tool calling yet; model {self.name!r} "
+                "cannot be given tools"
+            )
+        return self._built(messages, output, tools=tools or None)
 
     def _canonical_format(self, output: dict) -> dict:
         """Resolve a value's shorthand to the vocabulary's one type —
@@ -672,7 +700,7 @@ class Model:
         # `last_adaptations` to say what happened, and a raise that leaves the
         # evidence unwritten is the silence this whole channel exists against.
         enforce(made, self.on_unsupported)
-        return path, body
+        return path, body, list(made)
 
     # ------------------------------------------------------------------
     # Streaming
@@ -694,7 +722,12 @@ class Model:
         that is precisely the class of loss `on_unsupported="requirements"`
         exists to raise on.
 
-        Usage lands on ``last_stream_usage`` when the provider reports it.
+        When the stream ends, the generator returns a :class:`StreamOutcome`
+        — the whole result, the usage the provider reported, and what was
+        adapted — for ``yield from`` to receive. ``last_stream_usage``,
+        ``last_stream_result`` and ``last_adaptations`` mirror it on the
+        model, for a single caller; the library reads the outcome, because a
+        shared model's attributes belong to whichever stream wrote last.
 
         Parameters
         ----------
@@ -709,8 +742,7 @@ class Model:
         from ._adaptation import (Adaptation, DECLINED, announce, collect,
                                   enforce, note_absent)
 
-        self.last_stream_usage = None
-        self.last_stream_result = None
+        usage_seen: dict | None = None
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
             try:
@@ -733,26 +765,26 @@ class Model:
         enforce(made, self.on_unsupported)
 
         if body is None:
-            # `_built` reports on its own build and overwrites the record,
-            # which would drop the `declined` just made — the notice about
-            # streaming would be warned about and then vanish from the
-            # machine-readable half, which is the half that matters.
-            spoken = list(made)
-            path, body = self._built(messages, output, tools=tools)
-            self.last_adaptations = spoken + list(self.last_adaptations)
+            # `_built` reports on its own build, which would drop the
+            # `declined` just made — the notice about streaming would be
+            # warned about and then vanish from the machine-readable half,
+            # which is the half that matters.
+            path, body, built = self._built(messages, output, tools=tools)
+            notes = list(made) + built
+            self.last_adaptations = notes
             import json as _json
             raw = self.client.send(path, body, self.client._auth_headers())
             response = _json.loads(raw)
-            # The whole response is already the envelope `extract_usage`
-            # reads, per provider — taking `response["usage"]` out of it
-            # worked for two families and read as zero for Google.
-            self.last_stream_usage = response
-            result = self.from_response(response, output)
+            # The envelopes `extract_usage` reads, per provider — and only
+            # those: the whole response held every image's base64 on a
+            # long-lived object.
+            usage_seen = {k: response[k] for k in ("usage", "usageMetadata") if k in response}
+            result = self.from_response(response, output, tools_sent=bool(tools))
             # Kept whole beside the text. A tool call is neither a string nor
             # a dict, and rendering one to text and throwing the object away
             # is how a streamed tool-calling turn came to look like a model
             # that answered nothing.
-            self.last_stream_result = result
+            self.last_stream_usage, self.last_stream_result = usage_seen, result
             if isinstance(result, str):
                 yield result
             elif isinstance(result, dict):
@@ -765,7 +797,7 @@ class Model:
                 text = getattr(result, "text", "") or ""
                 if text:
                     yield text
-            return
+            return StreamOutcome(result, usage_seen, notes)
 
         assembly = _ToolCallAssembly()
         spoken: list = []
@@ -779,8 +811,7 @@ class Model:
                 # keeping the last report drops the entire prompt from the
                 # bill — and the number that comes back is still plausible,
                 # which is what makes it worth a comment rather than a line.
-                self.last_stream_usage = _merge_usage(
-                    self.last_stream_usage, usage)
+                usage_seen = _merge_usage(usage_seen, usage)
             piece = self.client.parse_stream_event(event, output)
             if piece:
                 spoken.append(piece)
@@ -790,9 +821,12 @@ class Model:
         # as an object for the caller to act on. Any text the model sent
         # beside the calls has already been yielded and rides along in
         # `text`, so nothing is shown twice and nothing is lost.
-        self.last_stream_result = assembly.request("".join(spoken))
+        result = assembly.request("".join(spoken))
+        self.last_stream_usage, self.last_stream_result = usage_seen, result
+        return StreamOutcome(result, usage_seen, list(made))
 
-    def from_response(self, response: dict, output: dict) -> "str | dict":
+    def from_response(self, response: dict, output: dict, *,
+                      tools_sent: bool | None = None) -> "str | dict":
         """
         Extract the clean result (str for text, dict for json / image) from a
         raw provider response, by delegating to the family client.
@@ -803,10 +837,15 @@ class Model:
             The provider's raw response body.
         output : dict
             The output spec the request was built with.
+        tools_sent : bool | None, optional
+            Whether that request offered tools — only then can a reply be a
+            request to act. Passed by the caller that built the request; the
+            model's own record of its last request is the fallback.
         """
         from ..clients._families._openai_compat import speaks_harmony
         if speaks_harmony(self.name):
-            mode = "calls" if self._sent_tools else "text"
+            sent = self._sent_tools if tools_sent is None else tools_sent
+            mode = "calls" if sent else "text"
             return self.client.parse_response(response, output, harmony=mode)
         return self.client.parse_response(response, output)
 
