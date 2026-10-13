@@ -133,6 +133,30 @@ def text_of(item, who: str) -> str:
     raise TypeError(f"{who}: a document is a string, a mapping with 'text', or an object with "
                     f".text; got {type(item).__name__}")
 
+
+def charged(tool, call):
+    """Run *call* — a tool's ``run`` — under every budget in force.
+
+    The budget was counted in ``Skill`` alone, so every paid tool — search,
+    fetch, decisions, speech, embeddings — spent outside ``max_cost``: a
+    decision tool reported its cost in its answer, which made the spend
+    visible and stopped nothing. A tool marked ``priced`` does not begin when
+    a budget has nothing left, and the ``cost`` its answer reports is charged
+    to each. A tool that reports no cost is checked and not charged — it
+    cannot be counted, and inventing a price would be worse than saying so.
+    """
+    from .._budget import in_force
+    budgets = in_force(None) if getattr(tool, "priced", False) else []
+    for budget in budgets:
+        budget.check(getattr(tool, "name", "") or type(tool).__name__)
+    result = call()
+    if budgets and not getattr(tool, "charges_itself", False):
+        cost = result.get("cost") if isinstance(result, dict) else None
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+            for budget in budgets:
+                budget.charge(cost)
+    return result
+
 # ---------------------------------------------------------------------------
 # ToolResult
 # ---------------------------------------------------------------------------
@@ -276,6 +300,13 @@ class Tool:
     # alternative is finding out at the moment the pause is needed and the
     # place to keep it does not exist.
     suspends:    bool = False
+    #: Each call costs money at a provider. A priced tool does not begin while
+    #: any budget in force has nothing left, and a `cost` it reports is
+    #: charged to them — see `charged`.
+    priced:      bool = False
+    #: The tool charges the budgets itself (through a Skill), so the cost it
+    #: reports is not charged a second time.
+    charges_itself: bool = False
     #: The key: a string, or a callable asked with the run's context on each
     #: request — see `_key.ApiKey`.
     _api_key = ApiKey()

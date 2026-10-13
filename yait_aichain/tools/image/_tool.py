@@ -51,6 +51,8 @@ class Image(Tool):
 
     name        = "image"
     risk        = "draft"
+    priced      = True
+    charges_itself = True       # its Skill charges what the usage prices; the rest below
     _safe_for_untrusted_load = True      # see Tool._safe_for_untrusted_load
     parameters  = {
         "type": "object",
@@ -102,6 +104,10 @@ class Image(Tool):
             # Priced by the picture: the registry holds the base size's rate,
             # so a larger picture on a tiered model costs more than this says.
             cost, basis = each, "the registry's price per image, at the base size"
+            # The Skill charged nothing it could not price; this it can.
+            from ..._budget import in_force
+            for budget in in_force(None):
+                budget.charge(cost)
         # "translated" is an option passed exactly, in the provider's word; the
         # rest change what was asked — those are what a reader needs to know.
         notices = [_notice(a) for a in skill.last_adaptations if getattr(a, "kind", "") != "translated"]

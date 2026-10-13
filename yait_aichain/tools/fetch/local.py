@@ -88,6 +88,7 @@ class fetchLocal(Fetch):
     description = ("Fetch a web page from this machine and return its text as Markdown, "
                    "with title, date and author where the page declares them.")
     max_batch   = 1
+    priced      = False          # runs here, costs nothing
     _PROVIDER   = "local"
     _LIST_PRICE   = 0.0
     _PRICE_SOURCE = "runs locally"

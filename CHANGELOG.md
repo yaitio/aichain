@@ -133,6 +133,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A tool that costs money is held to `max_cost`.** The budget was counted
+  in `Skill` alone, so search, fetch, decisions, speech, transcription,
+  embeddings and reranking spent outside it — a decision tool reported its
+  cost and nothing stopped the next call. A tool now declares `priced`; in an
+  agent, a chain or a pool it does not begin while any budget in force has
+  nothing left, and the `cost` its answer reports is charged to each. A tool
+  that reports no cost (speech, embeddings) is checked and not charged —
+  it cannot be counted. `image()` charges a per-image price its Skill could
+  not, where that was reported and never charged.
+
 - **Small security hardening.** A model name that could walk or end a URL
   path (`gemini-x/../..`, `?`, `#`, spaces) and a collection name outside
   letters, digits, `_`, `-` and `.` are refused, where both went into request

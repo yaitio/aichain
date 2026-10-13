@@ -48,13 +48,14 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
-from .._budget import Budget, as_budget, start_run
+from .._budget import Budget, as_budget, lend, start_run
 from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models import Model
 from ..models._adaptation import Adaptation
 from ..skills import Skill
 from ..utilities._base import Utility
 from ..state import StateStore
+from ..tools._base import charged
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
 from .._console import console
@@ -1402,7 +1403,9 @@ class Agent:
             raise ValueError(problem)
         if self.verbose or _logger.isEnabledFor(logging.INFO):   # serialised only to be shown
             self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
-        return tool.run(**kwargs)
+        # Under this agent's budget and every one around it.
+        with lend(self.max_cost):
+            return charged(tool, lambda: tool.run(**kwargs))
 
     def _gated_tool(self, call):
         """The tool a call will run, which the policy decides on. For `pool`

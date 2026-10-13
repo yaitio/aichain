@@ -198,6 +198,7 @@ class Speech(Tool):
     #: `draft`: it makes a file of its own in a folder the code chose, and
     #: overwrites nothing. A model never names the path.
     risk = "draft"
+    priced = True
     output_dir: str | None = None
 
     def run(self, input: str, options: dict | None = None) -> str:

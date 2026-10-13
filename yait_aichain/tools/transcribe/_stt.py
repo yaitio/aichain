@@ -98,6 +98,7 @@ class Transcription(Tool):
     """
 
     risk = "external"   # sends a local audio file to the provider
+    priced = True
 
     name        = "transcription"
     description = (

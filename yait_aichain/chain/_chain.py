@@ -769,10 +769,11 @@ class Chain:
 
                 elif kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
+                    from ..tools._base import charged
                     if step_signal is not None:
-                        output = runner.run(_signal=step_signal, **kwargs)
+                        output = charged(runner, lambda: runner.run(_signal=step_signal, **kwargs))
                     else:
-                        output = runner.run(**kwargs)
+                        output = charged(runner, lambda: runner.run(**kwargs))
 
                 elif kind == "agent":
                     # An agent step always starts a run. An agent can park

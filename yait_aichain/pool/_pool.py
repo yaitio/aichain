@@ -537,7 +537,8 @@ class Pool:
 
         if _is_tool(runner):
             kwargs = _build_tool_kwargs(runner, variables)
-            return runner.run(**kwargs), None
+            from ..tools._base import charged
+            return charged(runner, lambda: runner.run(**kwargs)), None
 
         if _is_agent(runner):
             task = variables.get("task", "")
