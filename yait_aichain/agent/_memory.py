@@ -139,12 +139,15 @@ class FileBackend(MemoryBackend):
 
     def load(self) -> dict:
         """Load and return the JSON state, or ``{}`` on any error."""
+        if not self._path.exists():
+            return {}
+        # A damaged file is said, not read as empty — the next save overwrote
+        # everything it held.
         try:
-            if self._path.exists():
-                return json.loads(self._path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-        return {}
+            return json.loads(self._path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise ValueError(f"the memory file {str(self._path)!r} cannot be read ({exc}); "
+                             "move it aside to start empty") from exc
 
     def save(self, data: dict) -> None:
         """

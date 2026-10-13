@@ -154,7 +154,7 @@ under `"task"` and every other key seeds the conversation the way
 ### `Agent.resume()`
 
 ```python
-Agent.resume(run_id: str, signal=None) -> AgentResult | SuspendedResult
+Agent.resume(run_id: str, signal=<required>) -> AgentResult | SuspendedResult
 ```
 
 Continue a run this agent parked, delivering *signal* as the answer.
@@ -177,7 +177,7 @@ conversation however many times it waits.
 **Parameters**
 
 - `run_id` (*str*) — The parked run, as the `SuspendedResult` named it.
-- `signal` (*any, optional*, default `None`) — The answer the run waited for — the result of the tool call that
+- `signal` (*any, optional*, default `<required>`) — The answer the run waited for — the result of the tool call that
   parked it. For a run made by `arm()`, a string is the task, or a dict
   gives it under `"task"`.
 
@@ -768,6 +768,7 @@ JournalEntry(
     reason: str = '',
     artifact: str | None = None,
     observation: str = '',
+    observation_sha: str = '',
     step: int | None = None,
     attempt: int | None = None,
     tokens: int = 0,
@@ -789,6 +790,7 @@ One recorded attempt.
 - `observation` (*a short excerpt of what came back. An attempt record that*, default `''`) — says only what was *tried* is not enough to decide the next move — the
   loop must be able to read its own feedback. Truncated to
   `OBSERVATION_CHARS`; the full value lives under *artifact*.
+- `observation_sha` (*a hash of the whole observation, which is what an*, default `''`) — acceptance's fingerprint compares — not the excerpt.
 - `step, attempt` (*plan coordinates; `None` in a goal loop.*)
 - `tokens` (*tokens spent on this attempt.*, default `0`)
 - `ts` (*unix timestamp.*, default `<factory>`)

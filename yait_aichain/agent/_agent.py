@@ -385,6 +385,15 @@ def _check_tools(tools: list) -> None:
         seen[t.name] = t
 
 
+class _Unset:
+    """No signal given — distinct from a signal of None."""
+
+    def __repr__(self) -> str:
+        return "<required>"
+
+
+_UNSET = _Unset()
+
 #: Names the loop's synthetic tools hold.
 _RESERVED = frozenset({"pool", "delegate", "write_plan"})
 
@@ -711,7 +720,7 @@ class Agent:
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
 
-    def resume(self, run_id: str, signal=None) -> AgentResult | SuspendedResult:
+    def resume(self, run_id: str, signal=_UNSET) -> AgentResult | SuspendedResult:
         """
         Continue a run this agent parked, delivering *signal* as the answer.
 
@@ -739,6 +748,17 @@ class Agent:
             parked it. For a run made by ``arm()``, a string is the task, or a dict
             gives it under ``"task"``.
         """
+        if signal is _UNSET:
+            # A run kept after a failure is retried with no answer; a run
+            # waiting for one is not resumed without it — taken without an
+            # answer, the parked question was gone: the run paused again with
+            # nobody to ask and its document deleted.
+            waiting = ((((self.store.load(run_id) if self.store is not None else None) or {})
+                        .get("steps") or [{}])[0].get("suspend") or {})
+            if waiting and waiting.get("at") != "after":
+                raise TypeError("resume needs the answer the run waited for: "
+                                "agent.resume(run_id, signal=…)")
+            signal = None
         return self._fork()._resume(run_id, signal)
 
     def _resume(self, run_id: str, signal=None) -> AgentResult | SuspendedResult:
@@ -1667,7 +1687,10 @@ class Agent:
                 prompts.result_message(None, f"not executed: the run paused at "
                                              f"{call.name!r} before this call")))
 
-        awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with)}
+        # The question with what it is about: a person asked to approve saw a
+        # reason and not the call it was for.
+        awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with),
+                    "tool": call.name, "arguments": _copy(dict(call.arguments or {}))}
         doc = self._save_parked(
             {"messages": messages, "state": self._portable_state(state),
              "journal": journal.to_list(), "run_id": self._run_id},

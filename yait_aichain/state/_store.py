@@ -56,6 +56,19 @@ class StateStore:
         return document
 
 
+def _as_json(document: dict) -> str:
+    try:
+        return json.dumps(document, ensure_ascii=False)
+    except (TypeError, ValueError) as exc:
+        # A chain variable or step output that reached the suspend point is not
+        # JSON-serialisable; a store cannot park it.
+        raise ValueError(
+            "Cannot persist the suspended run: a variable or step output is not "
+            "JSON-serialisable (e.g. bytes, a set, or a custom object). Stores "
+            f"require JSON-safe values at suspend points. ({exc})"
+        ) from exc
+
+
 class InMemoryStore(StateStore):
     """
     Process-local store (the default). Survives suspend→resume **within one
@@ -68,7 +81,9 @@ class InMemoryStore(StateStore):
         self._lock = threading.Lock()
 
     def save(self, run_id: str, document: dict) -> None:
-        self._runs[run_id] = copy.deepcopy(document)
+        # Through JSON, as every persistent store does: a set, bytes or an int
+        # key worked here and broke in production on the first FileStore.
+        self._runs[run_id] = json.loads(_as_json(document))
 
     def take(self, run_id: str) -> dict | None:
         """Claimed under a lock: of two threads taking one run, one gets it.
@@ -102,7 +117,8 @@ class FileStore(StateStore):
     """
 
     def __init__(self, directory: str) -> None:
-        self._dir = directory
+        # `~/runs` was a folder named "~" in the working directory.
+        self._dir = os.path.expanduser(directory)
         os.makedirs(self._dir, exist_ok=True)
 
     def _path(self, run_id: str) -> str:
@@ -112,19 +128,11 @@ class FileStore(StateStore):
 
     def save(self, run_id: str, document: dict) -> None:
         path = self._path(run_id)
+        # Serialised before the temporary file exists: a document that could
+        # not be written left an open descriptor and a stray file behind.
+        payload = _as_json(document)
         fd, tmp = tempfile.mkstemp(dir=self._dir, suffix=".tmp")
         try:
-            try:
-                payload = json.dumps(document, ensure_ascii=False)
-            except TypeError as exc:
-                # A chain variable or step output that reached the suspend point
-                # is not JSON-serialisable; a persistent store can't park it.
-                raise ValueError(
-                    "Cannot persist the suspended run: a variable or step "
-                    "output is not JSON-serialisable (e.g. bytes, a set, or a "
-                    "custom object). Persistent stores require JSON-safe values "
-                    f"at suspend points. ({exc})"
-                ) from exc
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(payload)
                 fh.flush()

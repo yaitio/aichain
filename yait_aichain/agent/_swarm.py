@@ -238,7 +238,7 @@ def acceptance_from(journal) -> Acceptance:
             continue
         kind = (record.get("evidence") or {}).get("kind")
         fact = {"action": record.get("action"),
-                "observation": record.get("observation", "")}
+                "observation": record.get("observation_sha") or record.get("observation", "")}
         if kind == "check":
             checks.append(fact)
         elif kind == "model_claim":

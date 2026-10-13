@@ -133,6 +133,21 @@ where a fix is named below.
 
 ### Fixed
 
+- **Small gaps in state, stores and the journal.** `InMemoryStore` saves
+  through JSON as every persistent store does, so a set or bytes fails in
+  development as it would in production. `FileStore` serialises before it
+  creates its temporary file, where a document it could not write left a
+  descriptor open and a stray file, and expands `~`. `agent.resume(run_id)`
+  with no signal is refused for a run waiting on an answer — it took the
+  parked question, paused again with nobody to ask and deleted the document —
+  while a run kept after a failure is still retried without one. A parked
+  run's `awaiting` and `run.suspended` carry the tool and its arguments, so a
+  person asked to approve sees what. An acceptance fingerprints the whole
+  observation (`JournalEntry.observation_sha`), where a change past the
+  240-character excerpt — "7 failed" — still held; a `Journal` is iterable,
+  where `still_holds(journal)` raised; and the deprecated `FileBackend`
+  refuses a damaged file instead of reading it as empty and overwriting it.
+
 - **A budget takes only money it can count.** A limit is a finite positive
   number — `Budget(nan)` was never exhausted and `True` was a dollar — and a
   charge is finite and not negative, where `charge(-10)` gave money back. A

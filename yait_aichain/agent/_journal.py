@@ -33,6 +33,8 @@ proven nothing, and the journal says so instead of hiding it.
 
 from __future__ import annotations
 
+import hashlib
+
 import json
 import time
 from dataclasses import asdict, dataclass, field
@@ -160,6 +162,8 @@ class JournalEntry:
         says only what was *tried* is not enough to decide the next move — the
         loop must be able to read its own feedback. Truncated to
         ``OBSERVATION_CHARS``; the full value lives under *artifact*.
+    observation_sha : a hash of the whole observation, which is what an
+        acceptance's fingerprint compares — not the excerpt.
     step, attempt : plan coordinates; ``None`` in a goal loop.
     tokens : tokens spent on this attempt.
     ts : unix timestamp.
@@ -173,6 +177,9 @@ class JournalEntry:
     reason:   str            = ""
     artifact: str | None   = None
     observation: str        = ""
+    #: A hash of the whole observation: the excerpt is cut at 240 characters,
+    #: and a result that changed past the cut ("… 7 failed") still "held".
+    observation_sha: str     = ""
     step:     int | None   = None
     attempt:  int | None   = None
     tokens:   int            = 0
@@ -219,6 +226,8 @@ class Journal:
             seq=len(self._entries), intent=intent, action=action or {},
             outcome=outcome, evidence=evidence, reason=reason,
             artifact=artifact, observation=_excerpt(observation),
+            observation_sha=(hashlib.sha256(str(observation).encode()).hexdigest()[:16]
+                             if observation else ""),
             step=step, attempt=attempt, tokens=tokens,
         )
         self._entries.append(entry)
@@ -228,6 +237,11 @@ class Journal:
     @property
     def entries(self) -> list[JournalEntry]:
         return list(self._entries)
+
+    def __iter__(self):
+        """The entries, in order — `still_holds(journal)` iterated a Journal
+        and raised, since it was not iterable."""
+        return iter(list(self._entries))
 
     def __len__(self) -> int:
         return len(self._entries)
