@@ -147,9 +147,9 @@ class TestPerplexityLive(unittest.TestCase):
     def test_check_auth_returns_true(self):
         self.assertTrue(self.client.check_auth())
 
-    def test_list_models_matches_known_list(self):
-        """Static list must be consistent regardless of the key."""
-        self.assertEqual(self.client.list_models(), _KNOWN_MODELS)
+    def test_list_models_includes_sonar(self):
+        """The live catalogue, not the static fallback: it changes, sonar stays."""
+        self.assertIn("sonar", self.client.list_models())
 
     def test_url_override_reaches_same_api(self):
         """Explicitly passing the default URL must behave identically."""

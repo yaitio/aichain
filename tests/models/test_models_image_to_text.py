@@ -291,14 +291,29 @@ class TestVisionFromResponse(unittest.TestCase):
 # Live integration tests
 # ---------------------------------------------------------------------------
 
-_IMAGE_URL_PUBLIC = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/320px-Cat03.jpg"
+#: A cat, fetched once here and sent as base64. Handing the URL to each
+#: provider failed when Wikimedia stopped serving that thumbnail width and
+#: refused clients without a User-Agent — the test measured Wikimedia.
+_IMAGE_URL_PUBLIC = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg"
+_IMAGE: list = []
+
+
+def _cat_base64() -> str:
+    if not _IMAGE:
+        import base64
+        import urllib3
+        raw = urllib3.PoolManager().request(
+            "GET", _IMAGE_URL_PUBLIC,
+            headers={"User-Agent": "yait-aichain-tests (https://github.com/yaitio/aichain)"}).data
+        _IMAGE.append(base64.b64encode(raw).decode("ascii"))
+    return _IMAGE[0]
 
 _OPENAI_REAL     = os.getenv("OPENAI_API_KEY",    "").startswith("sk-")
 _ANTHROPIC_REAL  = os.getenv("ANTHROPIC_API_KEY", "").startswith("sk-ant")
 _GOOGLE_REAL     = os.getenv("GOOGLE_AI_API_KEY", "").startswith("AIza")
 
 
-def _vision_skill(model_name, url=_IMAGE_URL_PUBLIC):
+def _vision_skill(model_name):
     from yait_aichain.models import Model
     from yait_aichain.skills import Skill
     return Skill(
@@ -308,13 +323,13 @@ def _vision_skill(model_name, url=_IMAGE_URL_PUBLIC):
                 {
                     "role": "user",
                     "parts": [
-                        {"type": "image", "source": {"kind": "url", "url": url, "mime": "image/jpeg"}},
+                        {"type": "image", "source": {"kind": "base64", "data": _cat_base64(),
+                                                     "mime": "image/jpeg"}},
                         {"type": "text",  "text": "What animal is in this image? One word answer."},
                     ],
                 }
             ]
         },
-        output_format = "text",
     )
 
 

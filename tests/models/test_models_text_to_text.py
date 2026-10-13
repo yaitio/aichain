@@ -585,7 +585,6 @@ def _make_skill_and_run(model_name, api_key_env):
     skill = Skill(
         model         = Model(model_name),
         input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-        output_format = "text",
     )
     return skill.run()
 
@@ -597,7 +596,6 @@ class TestOpenAILive(unittest.TestCase):
         skill = Skill(
             model         = Model("gpt-4o-mini"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -611,7 +609,6 @@ class TestAnthropicLive(unittest.TestCase):
         skill = Skill(
             model         = Model("claude-haiku-4-5-20251001"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -625,7 +622,6 @@ class TestGoogleLive(unittest.TestCase):
         skill = Skill(
             model         = Model("gemini-2.5-flash"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -639,7 +635,6 @@ class TestXAILive(unittest.TestCase):
         skill = Skill(
             model         = Model("grok-3-fast"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -653,7 +648,6 @@ class TestDeepSeekLive(unittest.TestCase):
         skill = Skill(
             model         = Model("deepseek-chat"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -665,9 +659,8 @@ class TestKimiLive(unittest.TestCase):
     def test_text_round_trip(self):
         from yait_aichain.skills import Skill
         skill = Skill(
-            model         = Model("kimi-k2-0905-preview"),
+            model         = Model("kimi-k2.6"),            # 0905-preview was retired: 404
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)
@@ -681,7 +674,6 @@ class TestQwenLive(unittest.TestCase):
         skill = Skill(
             model         = Model("qwen-turbo"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
-            output_format = "text",
         )
         result = skill.run()
         self.assertIsInstance(result, str)

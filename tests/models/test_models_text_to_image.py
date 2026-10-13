@@ -335,32 +335,19 @@ _QWEN_REAL   = os.getenv("DASHSCOPE_API_KEY", "").startswith("sk-")
 
 @unittest.skipUnless(_OPENAI_REAL, "Set a real OPENAI_API_KEY to run live image tests")
 class TestOpenAIImageLive(unittest.TestCase):
+    # An image model is a tool since 4.0: `image()`, not a Skill.
     def test_gpt_image_returns_base64(self):
-        from yait_aichain.skills import Skill
-        skill = Skill(
-            model         = Model("gpt-image-1"),
-            input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "A tiny red dot"}]}]},
-            output_format = "image",
-        )
-        result = skill.run()
-        self.assertIsInstance(result, dict)
-        self.assertIn("base64", result)
-        self.assertIsNotNone(result["base64"])
+        from yait_aichain.tools import image
+        found = image("openai", model="gpt-image-1").run("A tiny red dot")
+        self.assertTrue(found["images"][0]["base64"])
 
 
 @unittest.skipUnless(_GOOGLE_REAL, "Set a real GOOGLE_AI_API_KEY to run live image tests")
 class TestGoogleImageLive(unittest.TestCase):
     def test_gemini_image_returns_base64(self):
-        from yait_aichain.skills import Skill
-        skill = Skill(
-            model      = Model("gemini-3.1-flash-image"),
-            input      = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "A tiny red dot"}]}]},
-            output     = {"modalities": ["image"], "format": {"type": "image"}},
-        )
-        result = skill.run()
-        self.assertIsInstance(result, dict)
-        self.assertIn("base64", result)
-
+        from yait_aichain.tools import image
+        found = image("google", model="gemini-3.1-flash-image").run("A tiny red dot")
+        self.assertTrue(found["images"][0]["base64"])
 
 if __name__ == "__main__":
     unittest.main()
