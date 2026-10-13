@@ -169,7 +169,7 @@ Semantic similarity search over a `VectorStore`.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.vectors import VectorQueryTool` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 VectorQueryTool(
@@ -197,7 +197,7 @@ Retrieve records from a `VectorStore` by exact ID.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.vectors import VectorFetchTool` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 VectorFetchTool(
@@ -223,7 +223,7 @@ Delete records from a `VectorStore`.
 | | |
 |---|---|
 | Import | `from yait_aichain.utilities.vectors import VectorDeleteTool` |
-| Risk class | `write` |
+| Risk class | `destructive` |
 
 ```python
 VectorDeleteTool(

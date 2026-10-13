@@ -65,6 +65,8 @@ class VectorQueryTool(_VectorTool):
         Sorted by descending similarity score (highest first).
     """
 
+    risk = "read"   # reads the collection
+
     name        = "vector_query"
     description = (
         "Semantic similarity search — embed the query text and return the "

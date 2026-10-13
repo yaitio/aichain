@@ -27,9 +27,11 @@ working and you opt risky tools into gating by tagging their ``risk``.
 **A decision is a policy only where something acts on it.** The agent's loop
 asks before every tool call and acts on each answer — ``deny`` refuses,
 ``approve`` waits for ``approve=`` — and the tests assert that the decision
-*happened*, not only what :meth:`PermissionPolicy.decide` returns. In 4.0 the
-loop is the only place that asks: the ``pool`` tool, ``Agent.execute()``,
-``resume()`` and ``Chain``/``Pool`` steps do not yet.
+*happened*, not only what :meth:`PermissionPolicy.decide` returns. The loop
+asks, and so do the ``pool`` tool — about the tool it fans out — and
+``Agent.execute()``. ``resume()`` runs the call that was parked, which was
+asked about when it parked; ``Chain`` and ``Pool`` steps are the code's own
+choice and are not asked about.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ READ        = "read"          # pure reads, no side effects
 DRAFT       = "draft"         # produces a draft/proposal, commits nothing
 WRITE       = "write"         # internal write / state change
 EXTERNAL    = "external"      # sends something outside (email, message, post)
-FINANCIAL   = "financial"     # moves money / incurs charges
+FINANCIAL   = "financial"     # moves money: a payment, a refund, a transfer
 DESTRUCTIVE = "destructive"   # deletes / irreversibly overwrites
 PRIVILEGED  = "privileged"    # identity / access / security changes
 
@@ -148,6 +150,12 @@ class PermissionPolicy:
     """
 
     def __init__(self, rules: dict | None = None, *, default: str = APPROVE) -> None:
+        # A misspelt class is a rule that matches nothing: `{"destructve":
+        # "deny"}` left `destructive` at its default, silently.
+        unknown = sorted(set(rules or {}) - RISK_CLASSES)
+        if unknown:
+            raise ValueError(f"PermissionPolicy: {unknown} is not a risk class; the classes are "
+                             f"{sorted(RISK_CLASSES)}")
         merged = {**_DEFAULT_RULES, **(rules or {})}
         bad = {d for d in merged.values() if d not in DECISIONS} | (
             {default} if default not in DECISIONS else set()

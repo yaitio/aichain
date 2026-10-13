@@ -100,6 +100,13 @@ where a fix is named below.
   unchanged: shared, and spent down across every run that holds it.
   `Budget(limit, spent=…)` takes what is already spent.
 
+- **Risk classes, declared where they were inherited.** `vector_delete` is
+  `destructive`, the vector query and fetch tools `read`, upsert `write`,
+  transcription `external` (it sends a local file out), `Wait` `read`. With a
+  policy attached, transcription now asks and `vector_delete` is denied by
+  default. `financial` means moving money, not incurring charges.
+  `PermissionPolicy` refuses a key that is not a risk class.
+
 ### Deprecated
 
 - **`AgentMemory`, `FileBackend`, `InMemoryBackend`, `MemoryBackend` and
@@ -118,6 +125,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: an unclassified tool ran as `write`, which the policy
+  allows.** Tools that declared no risk inherited the default, so
+  `vector_delete` — a bulk delete by a filter the model writes — and every
+  transcription tool ran unasked under the shipped policy, and
+  `PermissionPolicy({"destructve": "deny"})` matched nothing and said
+  nothing. Every tool in the package declares its class now, held by a test.
 - **Every tool call has its own id, and every result finds its call.**
   harmony carried no id and Google used the function's name, so two calls to
   one function shared an id; the agent answered under `call.id or call.name`

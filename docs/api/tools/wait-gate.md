@@ -57,7 +57,7 @@ Pause the run until an external signal arrives.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import Wait` |
-| Risk class | `write` |
+| Risk class | `read` |
 
 ```python
 Wait(

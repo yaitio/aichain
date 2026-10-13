@@ -66,6 +66,8 @@ class VectorUpsertTool(_VectorTool):
         ``{"upserted": N}`` — number of records written.
     """
 
+    risk = "write"   # writes to the collection
+
     name        = "vector_upsert"
     description = (
         "Insert or update documents in the vector store.  Text is "

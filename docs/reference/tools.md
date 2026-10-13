@@ -41,22 +41,22 @@ Chains and Agents identically.
 | Speech | [`ttsGoogle`](../api/tools/speech.md#ttsgoogle) | `ttsGoogle` | Text-to-speech via Google Cloud Text-to-Speech. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `draft` |
 | Speech | [`ttsXAI`](../api/tools/speech.md#ttsxai) | `ttsXAI` | Text-to-speech via the xAI TTS API. | `XAI_API_KEY` | `draft` |
 | Speech | [`ttsQwen`](../api/tools/speech.md#ttsqwen) | `ttsQwen` | Text-to-speech via the Alibaba DashScope CosyVoice / Qwen3-TTS API. | `DASHSCOPE_API_KEY` | `draft` |
-| Speech | [`sttOpenAI`](../api/tools/speech.md#sttopenai) | `sttOpenAI` | Speech-to-text via the OpenAI Whisper API. | `OPENAI_API_KEY` | `write` |
-| Speech | [`sttGoogle`](../api/tools/speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `write` |
-| Speech | [`sttXAI`](../api/tools/speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `write` |
-| Speech | [`sttQwen`](../api/tools/speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `write` |
+| Speech | [`sttOpenAI`](../api/tools/speech.md#sttopenai) | `sttOpenAI` | Speech-to-text via the OpenAI Whisper API. | `OPENAI_API_KEY` | `external` |
+| Speech | [`sttGoogle`](../api/tools/speech.md#sttgoogle) | `sttGoogle` | Speech-to-text via Google Cloud Speech-to-Text. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `external` |
+| Speech | [`sttXAI`](../api/tools/speech.md#sttxai) | `sttXAI` | Speech-to-text via the xAI STT API. | `XAI_API_KEY` | `external` |
+| Speech | [`sttQwen`](../api/tools/speech.md#sttqwen) | `sttQwen` | Speech-to-text via the Alibaba DashScope ASR API. | `DASHSCOPE_API_KEY` | `external` |
 | Local | [`local_browse`](../api/utilities/shell.md#localbrowsetool) | `LocalBrowseTool` | List directory contents as a tree. | — | `read` |
 | Local | [`local_read`](../api/utilities/shell.md#localreadtool) | `LocalReadTool` | Read a file's contents. | — | `read` |
 | Local | [`local_write`](../api/utilities/shell.md#localwritetool) | `LocalWriteTool` | Write content to a file. | — | `write` |
 | Local | [`local_run`](../api/utilities/shell.md#localruntool) | `LocalRunTool` | Execute a shell command or Python file. | — | `privileged` |
 | Vector store | [`vector_chunk`](../api/utilities/vectors.md#chunk) | `Chunk` | Split text into overlapping chunks for embedding and vector-store ingestion. | — | `read` |
 | Vector store | [`vector_upsert`](../api/utilities/vectors.md#vectorupserttool) | `VectorUpsertTool` | Insert or update records in a `VectorStore`. | — | `write` |
-| Vector store | [`vector_query`](../api/utilities/vectors.md#vectorquerytool) | `VectorQueryTool` | Semantic similarity search over a `VectorStore`. | — | `write` |
-| Vector store | [`vector_fetch`](../api/utilities/vectors.md#vectorfetchtool) | `VectorFetchTool` | Retrieve records from a `VectorStore` by exact ID. | — | `write` |
-| Vector store | [`vector_delete`](../api/utilities/vectors.md#vectordeletetool) | `VectorDeleteTool` | Delete records from a `VectorStore`. | — | `write` |
+| Vector store | [`vector_query`](../api/utilities/vectors.md#vectorquerytool) | `VectorQueryTool` | Semantic similarity search over a `VectorStore`. | — | `read` |
+| Vector store | [`vector_fetch`](../api/utilities/vectors.md#vectorfetchtool) | `VectorFetchTool` | Retrieve records from a `VectorStore` by exact ID. | — | `read` |
+| Vector store | [`vector_delete`](../api/utilities/vectors.md#vectordeletetool) | `VectorDeleteTool` | Delete records from a `VectorStore`. | — | `destructive` |
 | HTTP | [`RestApiTool`](../api/utilities/rest.md) | `RestApiTool` | A single REST endpoint exposed as a library Tool. | — | `write` |
 | MCP | [`MCPTool`](../api/utilities/mcp.md) | `MCPTool` | A single tool from an MCP server, exposed as a standard aichain Tool. | — | `write` |
-| Pause | [`wait`](../api/tools/wait-gate.md#wait) | `Wait` | Pause the run until an external signal arrives. | — | `write` |
+| Pause | [`wait`](../api/tools/wait-gate.md#wait) | `Wait` | Pause the run until an external signal arrives. | — | `read` |
 | Pause | [`Gate`](../api/tools/wait-gate.md#gate) | `Gate` | Gate any Tool behind an external signal. | — | `write` |
 | Decision | [`decisionOpenAI`](../api/tools/decide.md#decisionopenai) | `decisionOpenAI` | Typed questions about a text — and images — answered with probabilities, by OpenAI's Decisions API. | `OPENAI_API_KEY` | `read` |
 | Decision | [`decisionTypeSafe`](../api/tools/decide.md#decisiontypesafe) | `decisionTypeSafe` | Typed questions about a text, answered with probabilities, by TypeSafe's Jev. | `TYPESAFE_API_KEY` | `read` |

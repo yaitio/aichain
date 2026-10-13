@@ -44,6 +44,8 @@ class Wait(Tool):
     On resume the ``signal`` passed to ``resume()`` becomes this step's output.
     """
 
+    risk = "read"   # it waits; the run's next step decides
+
     suspends = True
 
     def __init__(self, reason: str = "", resume_with: dict | None = None,

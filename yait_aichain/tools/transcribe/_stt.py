@@ -101,6 +101,8 @@ class Transcription(Tool):
         is requested.
     """
 
+    risk = "external"   # sends a local audio file to the provider
+
     name        = "transcription"
     description = (
         "Transcribe an audio file to text using an STT model.  "

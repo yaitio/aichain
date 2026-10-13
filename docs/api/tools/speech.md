@@ -198,7 +198,7 @@ Speech-to-text via the OpenAI Whisper API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import sttOpenAI` |
-| Risk class | `write` |
+| Risk class | `external` |
 | Key | `OPENAI_API_KEY` |
 
 ```python
@@ -230,7 +230,7 @@ Speech-to-text via Google Cloud Speech-to-Text.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import sttGoogle` |
-| Risk class | `write` |
+| Risk class | `external` |
 | Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` |
 
 ```python
@@ -261,7 +261,7 @@ Speech-to-text via the xAI STT API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import sttXAI` |
-| Risk class | `write` |
+| Risk class | `external` |
 | Key | `XAI_API_KEY` |
 
 ```python
@@ -293,7 +293,7 @@ Speech-to-text via the Alibaba DashScope ASR API.
 | | |
 |---|---|
 | Import | `from yait_aichain.tools import sttQwen` |
-| Risk class | `write` |
+| Risk class | `external` |
 | Key | `DASHSCOPE_API_KEY` |
 
 ```python

@@ -46,6 +46,8 @@ class VectorFetchTool(_VectorTool):
         Records without a ``score`` field (score is only set on query results).
     """
 
+    risk = "read"   # reads the collection
+
     name        = "vector_fetch"
     description = (
         "Retrieve specific documents from the vector store by ID.  "

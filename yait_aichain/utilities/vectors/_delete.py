@@ -54,6 +54,8 @@ class VectorDeleteTool(_VectorTool):
         ``{"deleted": true}`` on success.
     """
 
+    risk = "destructive"   # removes records, by a filter the model writes
+
     name        = "vector_delete"
     description = (
         "Remove documents from the vector store by ID or metadata filter.  "
