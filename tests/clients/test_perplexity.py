@@ -3,7 +3,7 @@ Integration tests for clients._perplexity — PerplexityClient.
 
 Two test classes:
 
-  InvalidAuth — always runs; makes a real HTTP request with a fake key
+  InvalidAuthLive — live (nightly): a real HTTP request with a fake key
                 and verifies the API rejects it (check_auth returns False).
                 list_models() is static on Perplexity, so no auth test
                 is needed for it — instead we test the static list directly.
@@ -68,7 +68,7 @@ class TestPerplexityUnit(unittest.TestCase):
 # Invalid-auth tests — always run, no valid key required
 # ---------------------------------------------------------------------------
 
-class TestPerplexityInvalidAuth(unittest.TestCase):
+class TestPerplexityInvalidAuthLive(unittest.TestCase):
     """
     Fake key → check_auth must return False.
 

@@ -221,6 +221,9 @@ class TestResuming(unittest.TestCase):
     def test_a_later_stream_leaves_a_parked_run_alone(self):
         agent  = _agent(_calls(("c1", "wait", {})), _text("done"))
         parked = agent.run("send the refund")
+        # The stream's own outcome does not matter here, only that it leaves
+        # the parked run alone; it fails at once rather than on the network.
+        agent.model.client._post_sse = MagicMock(side_effect=ConnectionError("offline"))
         list(agent.stream("something else"))
 
         self.assertIsNotNone(agent.store.load(parked.run_id))

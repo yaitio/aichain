@@ -3,7 +3,7 @@ Integration tests for clients._anthropic — AnthropicClient.
 
 Two test classes:
 
-  InvalidAuth — always runs; makes a real HTTP request with a fake key
+  InvalidAuthLive — live (nightly): a real HTTP request with a fake key
                 and verifies the API rejects it (check_auth returns False,
                 list_models raises APIError 401).
 
@@ -89,7 +89,7 @@ class TestAnthropicUnit(unittest.TestCase):
 # Invalid-auth tests — always run, no valid key required
 # ---------------------------------------------------------------------------
 
-class TestAnthropicInvalidAuth(unittest.TestCase):
+class TestAnthropicInvalidAuthLive(unittest.TestCase):
     """Fake key → check_auth must return False; list_models must raise 401."""
 
     def setUp(self):

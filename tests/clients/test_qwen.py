@@ -6,7 +6,7 @@ Three test classes:
   Unit        — no network; mocks urllib3.PoolManager to verify auth headers,
                 base URLs per region, and list_models response parsing.
 
-  InvalidAuth — always runs; makes a real HTTP request with a fake key and
+  InvalidAuthLive — live (nightly): a real HTTP request with a fake key and
                 verifies the API rejects it (check_auth returns False).
 
   Live        — skipped unless DASHSCOPE_API_KEY is set; verifies that
@@ -145,7 +145,7 @@ class TestQwenUnit(unittest.TestCase):
 # Invalid-auth tests — always run, no valid key required
 # ---------------------------------------------------------------------------
 
-class TestQwenInvalidAuth(unittest.TestCase):
+class TestQwenInvalidAuthLive(unittest.TestCase):
     """Fake key → check_auth must return False."""
 
     def setUp(self):

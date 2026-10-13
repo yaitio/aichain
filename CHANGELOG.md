@@ -133,6 +133,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **Offline tests stay offline.** Fifteen `list_models` tests mocked
+  `urllib3.PoolManager`, and under an `HTTPS_PROXY` the client built a
+  `ProxyManager` instead, so the "offline" test asked the real API with the
+  key "key" and failed on its 401. An offline test now runs with the proxy
+  variables cleared and a connection to anything but this machine refused, by
+  name. The `*InvalidAuth` classes, which call real APIs with a bad key on
+  purpose, are `*InvalidAuthLive` and run with the nightly live suite. The
+  offline suite passes on 3.10 and 3.14 with no failures.
+- **Packaging.** `license = "MIT"` with `license-files = ["LICENSE"]` and
+  `setuptools>=77`, so the wheel carries the licence text and a
+  `License-Expression`, where the table form was deprecated.
+
 - **The `step()` seam's state survives JSON.** Adaptations are kept in the
   state as plain dicts, where the first one put a dataclass there and
   `json.dumps` failed — and with `default=str` the dedupe never matched, so

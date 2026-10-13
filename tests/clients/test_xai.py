@@ -3,7 +3,7 @@ Integration tests for clients._xai — XAIClient.
 
 Two test classes:
 
-  InvalidAuth — always runs; makes a real HTTP request with a fake key
+  InvalidAuthLive — live (nightly): a real HTTP request with a fake key
                 and verifies the API rejects it (check_auth returns False,
                 list_models raises APIError).
 
@@ -87,7 +87,7 @@ class TestXAIUnit(unittest.TestCase):
 # Invalid-auth tests — always run, no valid key required
 # ---------------------------------------------------------------------------
 
-class TestXAIInvalidAuth(unittest.TestCase):
+class TestXAIInvalidAuthLive(unittest.TestCase):
     """Fake key → check_auth must return False; list_models must raise APIError."""
 
     def setUp(self):

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "yait-aichain"
 dynamic = ["version"]            # single source of truth: yait_aichain.__version__
 description = "The provider-agnostic AI toolkit for Python: pipelines and agents your coding agent can write, that run unchanged from a laptop to production, on any model."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "YAIT" }]
 requires-python = ">=3.10"
 

@@ -51,6 +51,37 @@ def _environment_is_restored():
         os.environ.update(saved)
 
 
+@pytest.fixture(autouse=True)
+def _offline_tests_stay_offline(request, monkeypatch):
+    """An offline test cannot reach the network.
+
+    Fifteen `list_models` tests mocked `urllib3.PoolManager`, and under an
+    `HTTPS_PROXY` the client built a `ProxyManager` instead: the mock never
+    applied, and the "offline" test asked the real API with the key "key".
+    The proxy variables are cleared for an offline test, and a connection to
+    anything but this machine is refused, so the next such test fails by
+    name instead of by a provider's 401.
+    """
+    if request.node.get_closest_marker("live"):
+        yield
+        return
+    for name in list(os.environ):
+        if name.lower() in ("http_proxy", "https_proxy", "all_proxy"):
+            monkeypatch.delenv(name, raising=False)
+    import socket
+    real = socket.socket.connect
+
+    def connect(sock, address, *a, **k):
+        host = address[0] if isinstance(address, tuple) else address
+        if isinstance(host, str) and host not in ("127.0.0.1", "::1", "localhost") \
+                and sock.family in (socket.AF_INET, socket.AF_INET6):
+            raise OSError(f"offline test tried to connect to {host}; mock the transport, "
+                          "or mark the test's class Live")
+        return real(sock, address, *a, **k)
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    yield
+
+
 def is_live(item) -> bool:
     cls = getattr(item, "cls", None)
     return cls is not None and cls.__name__.endswith("Live")
