@@ -1161,7 +1161,7 @@ class Agent:
                     return self._result(state, False, str(reply), "truncated",
                                         error="the answer was cut at max_tokens; raise max_tokens "
                                               "for the whole of it")
-                held = self._verify_gate(state)
+                held = self._verify_gate(state) or self._plan_gate(state)
                 if held is None:
                     self._log(1, f"\n[Done] ✓ answered · {state['steps']} step(s)")
                     return self._result(state, True, str(reply), "answered")
@@ -1177,6 +1177,12 @@ class Agent:
             # each with its own result turn and journal entry. Executing only
             # the first would silently narrow the channel.
             for call in reply.calls:
+                if state.get("plan") is not None and call.name != "write_plan":
+                    # What the plan gate reads: work done since the plan, a
+                    # pool counted by its items, since each may be a goal.
+                    items = (call.arguments or {}).get("items") if call.name == "pool" else None
+                    state["plan_calls"] = (state.get("plan_calls") or 0) + (
+                        len(items) if isinstance(items, list) and items else 1)
                 # Everything a program needs to rebuild this call, rather
                 # than a description of it. `id` is what tells two calls in
                 # one turn apart — a provider may request several, and the
@@ -1342,6 +1348,35 @@ class Agent:
                        payload={"name": cond.name, "message": message})
             return message
         return None
+
+    def _plan_gate(self, state: dict) -> str | None:
+        """Hold an answer once when the plan has more goals than work done.
+
+        A waterfall run that wrote five goals, made two calls and answered
+        ended as a clean success: "plan not completed" was recorded only when
+        a ceiling stopped the run. Nothing marks a goal done, so the count of
+        calls since the plan is the fact there is — fewer calls than goals
+        means some goal had none. Said once; the model may still answer, now
+        knowing which goals it has not touched.
+        """
+        plan = state.get("plan")
+        done = state.get("plan_calls") or 0
+        if not plan or done >= len(plan):
+            return None
+        latched = state.get("nudged")
+        if not isinstance(latched, set):
+            latched = state["nudged"] = set(latched or ())
+        if "plan" in latched:
+            return None
+        latched.add("plan")
+        goals = "\n".join(f"{i}. {g}" for i, g in enumerate(plan, 1))
+        message = (f"Before you answer: your plan has {len(plan)} goal(s) and the run has made "
+                   f"{done} call(s) since it was written.\n{goals}\n"
+                   "Do any goal that is not done now, or say in your answer which were not done "
+                   "and why.")
+        self._emit("nudge.fired", step=state.get("steps"),
+                   payload={"name": "plan", "message": message})
+        return message
 
     def _nudges(self, state: dict) -> list:
         """Messages from nudges that fired this turn — once per streak."""
@@ -1863,7 +1898,7 @@ class Agent:
         which is what resumes. The nudge latch is kept, so a resumed run does
         not repeat a nudge it already gave.
         """
-        out = {k: state.get(k) for k in ("steps", "tokens", "cost", "plan")}
+        out = {k: state.get(k) for k in ("steps", "tokens", "cost", "plan", "plan_calls")}
         # The latch travels: dropped, a resumed run said its nudge again.
         out["nudged"] = sorted(state.get("nudged") or ())
         return out

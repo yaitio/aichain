@@ -31,6 +31,13 @@
   `stopped_by="truncated"` and `success=False`, the partial text kept as
   `output`. It ended as `answered`, `success=True`, on half a sentence. A
   driver of `step()` reads the same fact in `state["truncated"]`.
+- A waterfall run that answers with fewer calls since its plan than the plan
+  has goals is held once, the goals listed, and the model asked to do them or
+  say which were not done. It ended as a clean success; "plan not completed"
+  was recorded only when a ceiling stopped the run. Nothing marks a goal done,
+  so the count of calls — a pool counted by its items — is the fact read. An
+  answer given after the hold ends the run as before. Announced as
+  `nudge.fired` with the name `plan`.
 
 ## [4.0.1] — 2026-10-13
 
