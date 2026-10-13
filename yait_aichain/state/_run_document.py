@@ -36,7 +36,15 @@ class StepStatus:
 
 @dataclass
 class RunDocument:
-    """One run's durable state (see module docstring)."""
+    """One run's durable state (see module docstring).
+
+    Parameters
+    ----------
+    failures : list[dict]
+        Steps that failed earlier in the run — ``step``, ``name``, ``type``,
+        ``message`` — kept so a run resumed after a skipped failure still
+        reports it.
+    """
 
     run_id:     str
     kind:       str                      # "chain" | "agent"
@@ -45,6 +53,9 @@ class RunDocument:
     usage:      dict           = field(default_factory=dict)
     definition: dict | None  = None
     context:    dict | None  = None     # serialised RunContext (tenant, metadata)
+    #: Steps that failed earlier in this run — step, name, type, message —
+    #: so a run resumed after a skipped failure still reports it.
+    failures:   list[dict]     = field(default_factory=list)
 
     # ── construction ─────────────────────────────────────────────────
     @classmethod
@@ -103,6 +114,7 @@ class RunDocument:
             "usage":      self.usage,
             "definition": self.definition,
             "context":    self.context,
+            "failures":   self.failures,
         }
 
     @classmethod
@@ -118,4 +130,5 @@ class RunDocument:
             usage      = data.get("usage", {}),
             definition = data.get("definition"),
             context    = data.get("context"),
+            failures   = list(data.get("failures") or []),
         )

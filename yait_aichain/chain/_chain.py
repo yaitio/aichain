@@ -477,7 +477,8 @@ class Chain:
         accumulated = {**self.variables, **(variables or {})}
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
-        doc = RunDocument.new("chain", step_names, variables=accumulated)
+        doc = RunDocument.new("chain", step_names, variables=accumulated,
+                              definition={"steps": self._signature()})
         from ..state import current, using
         # No context given is the one already in force — `with using(ctx):
         # chain.run()`, a chain inside a chain step, a chain in a Pool — and
@@ -530,7 +531,8 @@ class Chain:
         accumulated = {**self.variables, **(variables or {})}
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
-        doc = RunDocument.new("chain", step_names, variables=accumulated)
+        doc = RunDocument.new("chain", step_names, variables=accumulated,
+                              definition={"steps": self._signature()})
         doc.context = context.to_dict() if context is not None else None
 
         awaiting = {"reason": reason, "resume_with": dict(resume_with or {}),
@@ -593,6 +595,18 @@ class Chain:
                 f"(already resumed/completed, or unknown id)."
             )
         doc   = RunDocument.from_dict(raw)
+        # Whose run is this? A document of another kind — an agent's — or of
+        # a chain whose steps have changed since it parked would be run, and
+        # deleted, by the wrong code: the signal reaching another step, or an
+        # IndexError. Refused, and put back as it was.
+        then = (doc.definition or {}).get("steps")
+        problem = (f"it is an {doc.kind} run" if doc.kind != "chain" else
+                   "this chain's steps are not the ones it parked with "
+                   f"({then} then, {self._signature()} now)"
+                   if then is not None and then != self._signature() else None)
+        if problem:
+            self._store.save(run_id, raw)
+            raise ValueError(f"cannot resume {run_id!r} with this chain: {problem}")
         # Restore the run's context unless the caller supplied a new one.
         if context is None and doc.context is not None:
             context = RunContext.from_dict(doc.context)
@@ -600,16 +614,19 @@ class Chain:
             from ..state import current
             context = current()
         from ..state import StepStatus
-        failed = next((st for st in doc.steps if st["status"] == StepStatus.FAILED), None)
-        if doc.suspended_step() is None and failed is not None:
-            # A resumed run that failed afterwards was kept with that step
-            # marked; resuming it again retries that step and what follows,
-            # never the ones already done — an approved refund among them.
-            failed["status"] = StepStatus.PENDING
+        # FAILED: kept after a failure; RUNNING: the process died inside it.
+        failed = next((st for st in doc.steps
+                       if st["status"] in (StepStatus.FAILED, StepStatus.RUNNING)), None)
+        if doc.suspended_step() is None:
+            # Not parked: kept after a failure, or checkpointed by a process
+            # that died. Resuming retries from the first step not done, never
+            # the ones already done — an approved refund among them.
+            if failed is not None:
+                failed["status"] = StepStatus.PENDING
             signal = None
         start = doc.first_pending()
-        if start is None or (doc.suspended_step() is None and failed is None):
-            return None   # not actually suspended → idempotent no-op
+        if start is None:
+            return None   # nothing left to run → idempotent no-op
 
         accumulated = dict(doc.variables)
         if ((doc.suspended_step() or {}).get("suspend") or {}).get("at") == "start":
@@ -637,6 +654,16 @@ class Chain:
                                   signal=signal,
                                   usage_in=usage_in, on_error=_on_error,
                                   context=context, resumed=True)
+
+    def _signature(self) -> list:
+        """What each step is, as a document can record it: its name, or the
+        qualified name of the function or class it is — a run resumed by a
+        chain with other steps would hand the signal to the wrong one."""
+        out = []
+        for runner, *_rest in self._steps:
+            out.append(getattr(runner, "name", None) or getattr(runner, "__qualname__", None)
+                       or type(runner).__qualname__)
+        return out
 
     def _park(self, doc, idx, awaiting, accumulated, usage_total, history):
         """Persist the run as suspended at *idx* and return a SuspendedResult."""
@@ -669,12 +696,29 @@ class Chain:
         history:     list[dict] = []
         last_output: str | dict | None = None
         usage_total: Usage | None = usage_in
+        checkpoints = [True]                     # off once a document will not serialise
+
+        def checkpoint():
+            """The document as it stands, so a process that dies mid-run can
+            be resumed from the step it died in, not from the start — which
+            re-ran every step before it, side effects and all."""
+            if not checkpoints[0]:
+                return
+            doc.variables = dict(accumulated)
+            doc.usage     = _usage_to_dict(usage_total)
+            try:
+                self._store.save(doc.run_id, doc.to_dict())
+            except ValueError as exc:
+                checkpoints[0] = False
+                warnings.warn(f"Chain run {doc.run_id}: not checkpointed after each step — {exc}",
+                              RuntimeWarning, stacklevel=3)
 
         for idx in range(start_idx, len(self._steps)):
             runner, output_key, input_map, kind, options = self._steps[idx]
             step_input  = dict(accumulated)          # snapshot before the step
             name        = getattr(runner, "name", None) or f"step_{idx}"
             step_signal = signal if idx == start_idx else None
+            doc.steps[idx]["status"] = StepStatus.RUNNING
 
             self._emit("step.started", step=idx, name=name, payload={"kind": kind})
 
@@ -804,6 +848,8 @@ class Chain:
                         doc.variables = dict(accumulated)
                         doc.usage     = _usage_to_dict(usage_total)
                         self._store.save(doc.run_id, doc.to_dict())
+                    else:
+                        self._store.delete(doc.run_id)     # its checkpoints
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total
@@ -816,7 +862,9 @@ class Chain:
                 # re-run this step (first_pending would otherwise land on it).
                 doc.steps[idx]["status"] = StepStatus.SKIPPED
                 doc.steps[idx].pop("suspend", None)
-                doc.variables = dict(accumulated)
+                doc.failures.append({"step": idx, "name": name, "type": type(exc).__name__,
+                                     "message": str(exc)})
+                checkpoint()
                 if on_error == "skip":
                     warnings.warn(
                         f"Chain step {idx} ({name!r}) failed and was skipped: "
@@ -855,7 +903,7 @@ class Chain:
             # Checkpoint: the step is done; variables reflect its output.
             doc.steps[idx]["status"] = StepStatus.DONE
             doc.steps[idx].pop("suspend", None)
-            doc.variables = dict(accumulated)
+            checkpoint()
 
             self._emit("step.ended", step=idx, name=name, payload={"kind": kind})
 
@@ -871,7 +919,13 @@ class Chain:
     def _result(doc, history, accumulated, usage_total, last_output) -> ChainResult:
         # By the failure record, not by its message: `TimeoutError()` and a
         # bare `assert` have an empty one, and the chain reported success.
-        failed = [r for r in history if r.get("failure") or r.get("error")]
+        # Failures from before a pause come from the document, where they
+        # were kept; the history of this process starts at the resume.
+        seen = {r["step"] for r in history if r.get("failure") or r.get("error")}
+        failed = ([{"step": f["step"], "name": f["name"], "error": f["message"] or f["type"]}
+                   for f in doc.failures if f["step"] not in seen]
+                  + [r for r in history if r.get("failure") or r.get("error")])
+        failed.sort(key=lambda r: r["step"])
         error = (f"step {failed[0]['step']} ({failed[0]['name']}): {failed[0]['error']}"
                  if failed else None)
         return ChainResult(output=last_output, success=not failed, error=error,

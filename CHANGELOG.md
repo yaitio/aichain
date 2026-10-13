@@ -118,6 +118,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A chain is checkpointed after every step, and resumes only its own
+  runs.** The documentation promised a write after each step; the document
+  was saved only on a pause, so a process that died in the tail resumed from
+  the start, repeating every side effect. A chain now saves after each done
+  or skipped step (warning once, and carrying on, when a variable will not
+  serialise), and `resume()` continues an unfinished document from the first
+  step not done. A failure skipped before a pause is kept in the document and
+  still fails the run after it. And `resume()` refuses — putting the document
+  back — an agent's run or a chain whose steps differ from the ones it parked
+  with, where it ran the wrong steps and deleted the run.
 - **Claude is not sent combinations it refuses.** `reasoning` with a
   `json_schema`, `top_p` beside a temperature, `top_k` with thinking and a
   temperature above 1 each went out and came back HTTP 400 with nothing in

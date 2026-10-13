@@ -231,10 +231,17 @@ RunDocument(
     usage: dict = <factory>,
     definition: dict | None = None,
     context: dict | None = None,
+    failures: list[dict] = <factory>,
 )
 ```
 
 One run's durable state (see module docstring).
+
+**Parameters**
+
+- `failures` (*list[dict]*, default `<factory>`) — Steps that failed earlier in the run — `step`, `name`, `type`,
+  `message` — kept so a run resumed after a skipped failure still
+  reports it.
 
 ### `RunDocument.new()`
 
