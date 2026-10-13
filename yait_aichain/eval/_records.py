@@ -16,6 +16,7 @@ runs and the byheart retrieval bench both produce their own shapes, and
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field, asdict
 from typing import Any
 from collections.abc import Iterable, Iterator
@@ -110,7 +111,7 @@ class Record:
     group: str = ""
     seconds: float = 0.0
     tokens: int = 0
-    cost: float = 0.0
+    cost: float | None = 0.0
     meta: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -128,9 +129,19 @@ def write(records: Iterable[Record], path) -> int:
     process.
     """
     n = 0
+    # A line a crash left without its newline would swallow the next record.
+    torn = False
+    if os.path.exists(path) and os.path.getsize(path):
+        with open(path, "rb") as fh:
+            fh.seek(-1, os.SEEK_END)
+            torn = fh.read(1) != b"\n"
     with open(path, "a", encoding="utf-8") as fh:
+        if torn:
+            fh.write("\n")
         for r in records:
-            fh.write(json.dumps(r.as_dict(), ensure_ascii=False) + "\n")
+            # `repr` for what JSON cannot hold — bytes, a set, a datetime — so
+            # one odd output does not end the run and the attempts behind it.
+            fh.write(json.dumps(r.as_dict(), ensure_ascii=False, default=repr) + "\n")
             n += 1
     return n
 
@@ -138,16 +149,38 @@ def write(records: Iterable[Record], path) -> int:
 def read(path) -> list[Record]:
     """Read back what ``write`` produced, skipping lines a crash left broken."""
     out: list[Record] = []
+    broken = 0
     with open(path, encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line:
                 continue
             try:
-                out.append(Record(**json.loads(line)))
-            except (json.JSONDecodeError, TypeError):
-                continue                      # a partial last line, not data
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                broken += 1                   # a partial line a crash left, not data
+                continue
+            known = {k: v for k, v in row.items() if k in Record.__dataclass_fields__}
+            extra = {k: v for k, v in row.items() if k not in Record.__dataclass_fields__}
+            if extra:                         # written by a newer version: kept, not dropped
+                known["meta"] = {**extra, **(known.get("meta") or {})}
+            out.append(Record(**known))
+    if broken:
+        import warnings
+        warnings.warn(f"{path}: {broken} line(s) could not be read and were skipped",
+                      RuntimeWarning, stacklevel=2)
     return out
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, str):
+        word = value.strip().lower()
+        if word in ("true", "1", "yes", "pass", "passed", "ok"):
+            return True
+        if word in ("false", "0", "no", "fail", "failed", ""):
+            return False
+        raise ValueError(f"cannot read {value!r} as pass or fail")
+    return bool(value)
 
 
 def adapt(rows: Iterable[dict], **keys) -> Iterator[Record]:
@@ -175,5 +208,14 @@ def adapt(rows: Iterable[dict], **keys) -> Iterator[Record]:
         mapped.setdefault("arm", "")
         mapped.setdefault("case", "")
         mapped.setdefault("trial", 0)
+        # Other people's rows say "false" and "3": read as what they mean,
+        # where the string "false" was a pass.
+        if "ok" in mapped:
+            mapped["ok"] = _as_bool(mapped["ok"])
+        for key, kind in (("trial", int), ("score", float), ("tokens", int), ("seconds", float)):
+            if key in mapped and mapped[key] is not None:
+                mapped[key] = kind(mapped[key])
+        if mapped.get("cost") is not None:
+            mapped["cost"] = float(mapped["cost"])
         mapped["meta"] = {**rest, **(mapped.get("meta") or {})}
         yield Record(**mapped)

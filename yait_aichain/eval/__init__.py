@@ -44,7 +44,7 @@ direction nothing in the output will reveal.
 """
 
 from ._records import Case, Record, adapt, read, write
-from ._report import Report, se
+from ._report import Report, ci, se
 from ._eval import Eval
 from ._scorers import (
     Scorer, abstain, all_of, contains, exact, judge, normalise, numeric,
@@ -55,5 +55,5 @@ __all__ = [
     "Eval", "Case", "Record", "Report",
     "exact", "contains", "regex", "numeric", "judge", "pairwise",
     "abstain", "all_of",
-    "adapt", "read", "write", "normalise", "se", "Scorer",
+    "adapt", "read", "write", "normalise", "se", "ci", "Scorer",
 ]

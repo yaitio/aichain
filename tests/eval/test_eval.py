@@ -128,7 +128,7 @@ class TestValidity(unittest.TestCase):
         good = [_rec("good", f"c{i}", 1, True) for i in range(6)]
         bad  = [_rec("bad", f"c{i}", 1, False, output="") for i in range(6)]
         r = Report(good + bad)
-        why = r.reject(max_empty=2)
+        why = r.reject(max_empty=0.3)
         self.assertIn("bad", why)
         self.assertNotIn("bad", r.arms())          # absent from every figure
         self.assertEqual(r.mean("bad"), 0.0)       # nothing to count, not a score
@@ -137,7 +137,7 @@ class TestValidity(unittest.TestCase):
     def test_errors_over_threshold_reject(self):
         recs = [_rec("a", f"c{i}", 1, False, error="RateLimitError")
                 for i in range(6)]
-        self.assertIn("a", Report(recs).reject(max_errors=5))
+        self.assertIn("a", Report(recs).reject(max_errors=0.8))
 
     def test_clean_cell_survives(self):
         recs = [_rec("a", f"c{i}", 1, True, output="x") for i in range(6)]
@@ -285,8 +285,11 @@ class TestLedger(unittest.TestCase):
                   out=self.out, verbose=False)
         ev.run()
         rec = read(self.out)[0]
+        # Neither a pass nor the arm's fault: the instrument abstained, and
+        # the arm is counted apart, not marked wrong.
         self.assertFalse(rec.ok)
-        self.assertIn("scorer:", rec.error)
+        self.assertTrue(rec.meta["abstained"])
+        self.assertIn("scorer:", rec.meta["why"])
 
     def test_arm_may_report_what_it_spent(self):
         arm = lambda c: {"output": c.expect, "cost": 0.25, "tokens": 100,

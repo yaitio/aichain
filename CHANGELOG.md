@@ -125,6 +125,33 @@ where a fix is named below.
 
 ### Fixed
 
+- **The eval report counts what happened.** `Pass^k` used each arm's own
+  number of trials, so an interrupted arm at Pass^2 ranked beside a finished
+  one at Pass^3; k is one number for the report now. It is estimated from
+  every trial, C(c, k) / C(n, k), not from the first k, and no data is NaN, not
+  0. `reject()` thresholds are fractions (`max_empty=0.1`), where they were
+  counts. `controls()` raises when an arm has no scored data, where a missing
+  noise arm passed, and takes `oracle_arm`/`noise_arm` for reports that name
+  their arms differently. `spend()` counts every attempt, abstained and
+  rejected ones included, with `unpriced` for attempts with no cost. `ci()`,
+  the Wilson interval, is new.
+- **`Eval` runs what it says it ran.** A failed `AgentResult` (or any result
+  with `success=False`) is recorded as an error, where its partial output was
+  scored as an answer. A ledger is resumed only for attempts recorded with the
+  same input, expectation and scorer, and an errored attempt is run again.
+  `run(concurrency=…)` keeps the caller's context in each worker. A scorer
+  that raises abstains.
+- **Scorers.** `numeric()` reads the last number, and `1,234` as one thousand
+  two hundred and thirty-four; it and the other text scorers refuse a case
+  with no `expect`, which passed every answer. `all_of()` keeps what each
+  scorer reported and an abstention by any of them, and refuses no scorers. A
+  number is a pass only at 1.0 — `0.01` passed — and NaN abstains. A dict
+  verdict must carry `ok`.
+- **Records.** `adapt()` reads `"false"` as false and `"0"` as trial 0;
+  `read()` keeps unknown keys in `meta` and warns about lines it skipped;
+  `write()` repairs a line a crash left torn before appending, and a cost may
+  be `None` rather than 0.
+
 - **Cost estimates that were low, and a total that did not say it was
   partial.** A cache read was priced at a tenth of the input rate for every
   model, where gpt-4o reads at a half and gpt-4.1 at a quarter — an agent

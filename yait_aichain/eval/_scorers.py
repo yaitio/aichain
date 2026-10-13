@@ -77,6 +77,7 @@ def contains(*, fold: bool = True, all_of: bool = True) -> Scorer:
         Every expected string must appear; ``False`` — any one.
     """
     def _score(case, output):
+        _need_expect(case, "contains")
         want = case.expect if isinstance(case.expect, (list, tuple)) else [case.expect]
         hay  = _norm(_text(output), fold)
         hits = sum(1 for w in want if _norm(_text(w), fold) in hay)
@@ -94,12 +95,25 @@ def regex(*, flags: int = 0) -> Scorer:
         ``re`` flags.
     """
     def _score(case, output):
+        _need_expect(case, "regex")
         return bool(_re.search(_text(case.expect), _text(output), flags))
     return _score
 
 
+def _need_expect(case, scorer: str) -> None:
+    """A case with nothing expected passes every answer under these scorers —
+    `"" in anything` is true — so it is a mistake in the case, said so."""
+    if case.expect is None or case.expect == "" or case.expect == []:
+        raise ValueError(f"{scorer}(): case {case.id!r} has no expect, so every answer would pass")
+
+
 def numeric(*, tolerance: float = 0.0) -> Scorer:
-    """The first number in the answer equals ``case.expect``, within tolerance.
+    """The answer's number equals ``case.expect``, within tolerance.
+
+    The *last* number in the answer — a model shows its working and ends on
+    the result, and the first number was usually a figure from the question.
+    Thousands separators are read as such: ``1,234`` is one thousand two
+    hundred and thirty-four, where it was read as 1.234.
 
     Parameters
     ----------
@@ -107,11 +121,12 @@ def numeric(*, tolerance: float = 0.0) -> Scorer:
         The largest difference still counted equal.
     """
     def _score(case, output):
-        found = _re.search(r"-?\d+(?:[.,]\d+)?", _text(output))
+        _need_expect(case, "numeric")
+        found = _re.findall(r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?", _text(output))
         if not found:
             return False, 0.0
         try:
-            got  = float(found.group(0).replace(",", "."))
+            got  = float(found[-1].replace(",", ""))
             want = float(case.expect)
         except (TypeError, ValueError):
             return False, 0.0
@@ -281,11 +296,25 @@ def pairwise(model, *, rubric: str = "Which answer better fulfils the "
 # ── Combination ──────────────────────────────────────────────────────────────
 
 def all_of(*scorers: Scorer) -> Scorer:
-    """Passes when every scorer passes; the score is the mean of theirs."""
+    """Passes when every scorer passes; the score is the mean of theirs.
+
+    What each scorer says beside its verdict is kept — a judge's cost, an
+    abstention — where it was dropped, and an abstention by any of them is
+    the whole verdict's: one part unread is not a pass.
+    """
+    if not scorers:
+        raise ValueError("all_of needs at least one scorer: none would pass everything")
+
     def _score(case, output):
         verdicts = [normalise(s(case, output)) for s in scorers]
-        return (all(v[0] for v in verdicts),
-                sum(v[1] for v in verdicts) / len(verdicts) if verdicts else 0.0)
+        extra: dict = {}
+        for _, _, more in verdicts:
+            for key, value in more.items():
+                extra[key] = extra.get(key, 0) + value if key.startswith("judge_") else value
+        if any(more.get("abstained") for _, _, more in verdicts):
+            return {**extra, "ok": False, "score": 0.0, "abstained": True}
+        return {**extra, "ok": all(v[0] for v in verdicts),
+                "score": sum(v[1] for v in verdicts) / len(verdicts)}
     return _score
 
 
@@ -301,8 +330,16 @@ def normalise(verdict: Any) -> tuple[bool, float, dict]:
     if isinstance(verdict, bool):
         return verdict, 1.0 if verdict else 0.0, {}
     if isinstance(verdict, (int, float)):
-        return bool(verdict), float(verdict), {}
+        # A number is a score; a pass is a full one. `bool(0.01)` passed, and
+        # NaN — a scorer that could not decide — passed too.
+        score = float(verdict)
+        if score != score:
+            return False, 0.0, {"abstained": True, "why": "the scorer returned NaN"}
+        return score >= 1.0, score, {}
     if isinstance(verdict, dict):
+        if "ok" not in verdict:
+            raise TypeError("a scorer's dict must carry 'ok'; got keys "
+                            f"{sorted(verdict)}")
         ok = bool(verdict.get("ok"))
         extra = {k: v for k, v in verdict.items() if k not in ("ok", "score")}
         return ok, float(verdict.get("score", 1.0 if ok else 0.0)), extra

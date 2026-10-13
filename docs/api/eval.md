@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../control/eval.md).
 
 <!-- g:api -->
-[`Eval`](#eval) · [`Case`](#case) · [`Record`](#record) · [`Report`](#report) · [`exact`](#exact) · [`contains`](#contains) · [`regex`](#regex) · [`numeric`](#numeric) · [`judge`](#judge) · [`pairwise`](#pairwise) · [`abstain`](#abstain) · [`all_of`](#all_of) · [`adapt`](#adapt) · [`read`](#read) · [`write`](#write) · [`normalise`](#normalise) · [`se`](#se)
+[`Eval`](#eval) · [`Case`](#case) · [`Record`](#record) · [`Report`](#report) · [`exact`](#exact) · [`contains`](#contains) · [`regex`](#regex) · [`numeric`](#numeric) · [`judge`](#judge) · [`pairwise`](#pairwise) · [`abstain`](#abstain) · [`all_of`](#all_of) · [`adapt`](#adapt) · [`read`](#read) · [`write`](#write) · [`normalise`](#normalise) · [`se`](#se) · [`ci`](#ci)
 
 ---
 
@@ -129,7 +129,7 @@ Record(
     group: str = '',
     seconds: float = 0.0,
     tokens: int = 0,
-    cost: float = 0.0,
+    cost: float | None = 0.0,
     meta: dict = <factory>,
 )
 ```
@@ -197,24 +197,23 @@ run here.
 ```python
 Report.reject(
     *,
-    max_empty: int = 2,
-    max_errors: int = 5,
+    max_empty: float = 0.1,
+    max_errors: float = 0.2,
     max_abstained: float = 0.2,
 ) -> dict[str, str]
 ```
 
 Mark cells whose data is not worth reporting, and say why.
 
-The thresholds are the ones the τ²-bench runners used, where they
-fired three times: twice on exhausted credits and once on an adapter
-defect that produced empty dialogues under concurrency. A guard that
-never fires is not evidence of clean data; these fired, and each time
-the alternative was publishing a number that meant nothing.
+Thresholds are shares of the arm's attempts — absolute counts of two
+and five rejected a large clean run for noise and passed a small
+broken one. Each call decides afresh: an arm rejected under one
+threshold is not left rejected under the next.
 
 **Parameters**
 
-- `max_empty` (*int, optional*, default `2`) — Attempts with no output a cell may have.
-- `max_errors` (*int, optional*, default `5`) — Attempts that raised a cell may have.
+- `max_empty` (*float, optional*, default `0.1`) — The share of attempts that may come back with no output.
+- `max_errors` (*float, optional*, default `0.2`) — The share of attempts that may raise.
 - `max_abstained` (*float, optional*, default `0.2`) — The share of attempts a judge could not read; past it the cell is
   rejected rather than reported on a shrunken denominator.
 
@@ -244,23 +243,34 @@ Share of *attempts* that passed — pooled over cases, not averaged.
 - `arm` (*str*) — The arm.
 - `group` (*str, optional*, default `''`) — Only this group.
 
+### `Report.trials()`
+
+```python
+Report.trials() -> int
+```
+
+The number of trials, one for the whole report: the trials most
+cases have, across every arm. Per arm, an interrupted arm had a
+smaller k and read as more reliable — Pass^2 ranked beside Pass^3.
+
 ### `Report.pass_k()`
 
 ```python
 Report.pass_k(arm: str, k: int | None = None, group: str = '') -> float
 ```
 
-Share of *cases* an arm solved on **every** one of k trials.
+The chance a case is solved on **every** one of k trials, by case.
 
-`k` defaults to the number of trials actually present. A case with
-fewer than k trials is skipped rather than counted as a failure —
-being under-sampled is not the same as being wrong, and folding the
-two together makes an interrupted run look like a bad one.
+`k` defaults to the report's number of trials, the same for every
+arm. Estimated from all of a case's trials, not its first k: with c
+passes in n trials it is C(c, k) / C(n, k), the estimator τ²-bench
+uses, so Pass^1 is the mean. A case with fewer than k trials is left
+out — under-sampled is not wrong — and no case at all is NaN, not 0.
 
 **Parameters**
 
 - `arm` (*str*) — The arm.
-- `k` (*int | None, optional*, default `None`) — Trials that must all pass; the number of trials by default.
+- `k` (*int | None, optional*, default `None`) — Trials that must all pass; the report's number of trials by default.
 - `group` (*str, optional*, default `''`) — Only this group.
 
 ### `Report.flips()`
@@ -278,6 +288,21 @@ is unreliable, and only this number says so.
 
 Zero means perfectly reproducible — including reproducibly wrong,
 which is why it is read next to the mean and never on its own.
+
+**Parameters**
+
+- `arm` (*str*) — The arm.
+- `group` (*str, optional*, default `''`) — Only this group.
+
+### `Report.spend()`
+
+```python
+Report.spend(arm: str, group: str = '') -> dict[str, float]
+```
+
+What the arm spent, over every attempt — abstained ones included,
+since they were paid for too. `unpriced` counts attempts with no
+cost, which `cost` leaves out.
 
 **Parameters**
 
@@ -317,6 +342,8 @@ Report.controls(
     noise: Report,
     *,
     arm: str = '',
+    oracle_arm: str = '',
+    noise_arm: str = '',
     floor: float = 0.95,
     ceiling: float = 0.05,
 ) -> dict
@@ -338,6 +365,8 @@ the numbers themselves are worthless.
 - `oracle` (*Report*) — The harness fed known-correct answers.
 - `noise` (*Report*) — The harness fed answers that do nothing.
 - `arm` (*str, optional*, default `''`) — Which arm of each to read; the only one by default.
+- `oracle_arm` (*str, optional*, default `''`) — The oracle's arm, when the two reports name theirs differently.
+- `noise_arm` (*str, optional*, default `''`) — The noise report's arm, likewise.
 - `floor` (*float, optional*, default `0.95`) — The least the oracle must score.
 - `ceiling` (*float, optional*, default `0.05`) — The most the noise may score.
 
@@ -422,7 +451,12 @@ regex(*, flags: int = 0) -> Scorer
 numeric(*, tolerance: float = 0.0) -> Scorer
 ```
 
-The first number in the answer equals `case.expect`, within tolerance.
+The answer's number equals `case.expect`, within tolerance.
+
+The *last* number in the answer — a model shows its working and ends on
+the result, and the first number was usually a figure from the question.
+Thousands separators are read as such: `1,234` is one thousand two
+hundred and thirty-four, where it was read as 1.234.
 
 **Parameters**
 
@@ -528,6 +562,10 @@ all_of(*scorers) -> Scorer
 
 Passes when every scorer passes; the score is the mean of theirs.
 
+What each scorer says beside its verdict is kept — a judge's cost, an
+abstention — where it was dropped, and an abstention by any of them is
+the whole verdict's: one part unread is not a pass.
+
 ---
 
 ## `adapt()`
@@ -601,4 +639,22 @@ Standard error of a proportion — print it next to the proportion.
 At n=184 this is ≈0.035, so differences under 0.07 are not distinguishable;
 at n=30 it is ≈0.09 and almost nothing is. A number without its error bar
 invites a ranking the data cannot support.
+
+---
+
+## `ci()`
+
+```python
+ci(passed: int, n: int, z: float = 1.96) -> tuple[float, float]
+```
+
+The Wilson interval for *passed* of *n* — which `se` cannot give at the
+edges: at 10 of 10 the standard error is 0, an interval of one point,
+where the data says only "probably above 0.72".
+
+**Parameters**
+
+- `passed` (*int*) — Successes.
+- `n` (*int*) — Trials.
+- `z` (*float, optional*, default `1.96`) — The normal quantile; 1.96 for 95 %.
 <!-- /g:api -->

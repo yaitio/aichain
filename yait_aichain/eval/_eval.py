@@ -39,6 +39,8 @@ the wrong dialect, an arm that returns nothing at all.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
 from pathlib import Path
@@ -111,6 +113,14 @@ class Eval:
         # working directory is read-only (a Lambda) must still be buildable.
         self.out = Path(out) if out else Path.cwd() / "eval-runs" / f"{name}.jsonl"
 
+        # What a recorded attempt answered: this case's input and expectation,
+        # scored by this scorer. A ledger reused under the same name with other
+        # cases, or another scorer, is not resumed as if it were this run's.
+        scorer = getattr(score, "__qualname__", type(score).__qualname__)
+        self._fp = {c.id: hashlib.sha256(json.dumps([c.input, c.expect, scorer], default=repr,
+                                                    sort_keys=True).encode()).hexdigest()[:16]
+                    for c in self.cases}
+
         ids = [c.id for c in self.cases]
         if len(set(ids)) != len(ids):
             # Cases are joined by id across arms and trials. Two cases sharing
@@ -134,9 +144,11 @@ class Eval:
         n : int, optional
             How many cases, from the start.
         """
+        smoke_file = self.out.with_suffix(".smoke.jsonl")
+        if smoke_file.exists():
+            smoke_file.unlink()            # a smoke run checks today's wiring, not yesterday's
         probe = Eval(self.cases[:n], self.arms, self.score, trials=1,
-                     out=self.out.with_suffix(".smoke.jsonl"),
-                     name=f"{self.name}-smoke", verbose=self.verbose)
+                     out=smoke_file, name=f"{self.name}-smoke", verbose=self.verbose)
         report = probe.run()
         if self.verbose:
             bad = [a for a in probe.arms if report.spend(a)["errors"]
@@ -161,7 +173,13 @@ class Eval:
         concurrency : int, optional
             Attempts in flight at once.
         """
-        done = {(r.arm, r.case, r.trial) for r in self._existing()}
+        # Done means answered under this configuration: an attempt that
+        # failed — a 401, an empty balance — is run again once it is fixed,
+        # where it counted as done and the resume made no calls; and one made
+        # for other cases or another scorer, in a ledger of the same name, is
+        # not this run's.
+        done = {(r.arm, r.case, r.trial) for r in self._existing()
+                if not r.error and (r.meta or {}).get("fp") in (None, self._fp.get(r.case))}
         todo = [(arm, case, t)
                 for t in range(1, self.trials + 1)
                 for case in self.cases
@@ -174,10 +192,17 @@ class Eval:
                       self.name, len(todo), total, len(done), self.out)
 
         if concurrency > 1:
-            from concurrent.futures import ThreadPoolExecutor
+            # Written as each finishes, not in the order sent: one slow or
+            # failed attempt held back the record of every one after it, and
+            # an interrupted run lost attempts already paid for. Each in a
+            # copy of this context, so a tenant and a budget reach the arms.
+            import contextvars
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             with ThreadPoolExecutor(max_workers=concurrency) as pool:
-                for rec in pool.map(lambda job: self._attempt(*job), todo):
-                    self._commit(rec)
+                futures = [pool.submit(contextvars.copy_context().run, self._attempt, *job)
+                           for job in todo]
+                for future in as_completed(futures):
+                    self._commit(future.result())
         else:
             for job in todo:
                 self._commit(self._attempt(*job))
@@ -188,10 +213,12 @@ class Eval:
 
     # ── one attempt ──────────────────────────────────────────────────────
     def _attempt(self, arm: str, case: Case, trial: int) -> Record:
-        rec = Record(arm=arm, case=case.id, trial=trial, group=case.group)
+        rec = Record(arm=arm, case=case.id, trial=trial, group=case.group,
+                     meta={"fp": self._fp[case.id]})
         started = time.monotonic()
         try:
             raw = self.arms[arm](case)
+            self._unwrap(raw, rec)
         except Exception as exc:
             # One attempt failing is data, not a reason to stop: the guards
             # decide later whether there were too many. Dying here would throw
@@ -200,35 +227,47 @@ class Eval:
             rec.seconds = time.monotonic() - started
             return rec
 
+        rec.seconds = time.monotonic() - started
+        if rec.error:
+            return rec
+        try:
+            rec.ok, rec.score, extra = normalise(self.score(case, rec.output))
+            rec.meta.update(extra)
+        except Exception as exc:
+            # A scorer that cannot decide must not decide — and must not
+            # decide against the arm either: a judge's provider failing is an
+            # abstention, counted apart, not a wrong answer.
+            rec.ok, rec.score = False, 0.0
+            rec.meta.update(abstained=True, why=f"scorer: {type(exc).__name__}: {exc}")
+        return rec
+
+    @staticmethod
+    def _unwrap(raw, rec: Record) -> None:
+        """Read an arm's return into *rec*: a result object, an envelope, or
+        the answer itself. Inside the attempt's try, so a malformed envelope
+        is that attempt's error, not the run's."""
         # A primitive's result object — ChainResult, PoolResult, AgentResult
         # — records its output, and what it cost, rather than the object: the
         # ledger is JSON, and the object is not.
         if (not isinstance(raw, dict) and hasattr(raw, "output")
                 and hasattr(raw, "success")):
             rec.output = raw.output
-            rec.cost   = float(getattr(raw, "cost", 0.0) or 0.0)
+            cost = getattr(raw, "cost", None)
+            rec.cost   = float(cost) if cost is not None else None
             rec.tokens = int(getattr(raw, "tokens_used", 0) or 0)
-            rec.meta   = {"success": bool(raw.success),
-                          "run_error": getattr(raw, "error", None)}
+            rec.meta.update(success=bool(raw.success), run_error=getattr(raw, "error", None))
+            # A run that failed is an error, not an answer of None: a dead
+            # agent read as "all arms answered".
+            if not raw.success:
+                rec.error = f"run failed: {getattr(raw, 'error', None) or 'no reason given'}"
         elif isinstance(raw, dict) and "output" in raw:
             rec.output = raw.get("output")
-            rec.cost   = float(raw.get("cost") or 0.0)
+            cost = raw.get("cost")
+            rec.cost   = float(cost) if cost is not None else None
             rec.tokens = int(raw.get("tokens") or 0)
-            rec.meta   = {k: v for k, v in raw.items()
-                          if k not in ("output", "cost", "tokens")}
+            rec.meta.update({k: v for k, v in raw.items() if k not in ("output", "cost", "tokens")})
         else:
             rec.output = raw
-
-        rec.seconds = time.monotonic() - started
-        try:
-            rec.ok, rec.score, extra = normalise(self.score(case, rec.output))
-            rec.meta.update(extra)
-        except Exception as exc:
-            # A scorer that cannot decide must not decide. Recording the
-            # failure keeps it visible to the validity guards instead of
-            # letting a broken judge quietly mark everything passed.
-            rec.error = f"scorer: {type(exc).__name__}: {exc}"
-        return rec
 
     def _commit(self, rec: Record) -> None:
         self.out.parent.mkdir(parents=True, exist_ok=True)
