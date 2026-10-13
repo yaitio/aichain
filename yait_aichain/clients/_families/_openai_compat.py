@@ -56,6 +56,28 @@ def _drop_rejected(model, fmt: dict) -> dict:
     return {k: v for k, v in fmt.items() if k not in dropped}
 
 
+def _dropped(part: dict, why: str) -> None:
+    """A part this wire cannot carry: left out, and said. Video, URL audio and
+    documents dropped in silence, and the model answered about an attachment
+    it never saw."""
+    from ...models._adaptation import Adaptation, DECLINED, record
+    src = part.get("source") or {}
+    record(Adaptation(kind=DECLINED, option=f"{part.get('type')} input",
+                      asked=src.get("mime") or src.get("kind"), sent=None,
+                      why=f"{why}; the part was left out of the request"))
+    return None
+
+
+#: The audio formats chat completions names, by MIME type — `audio/mpeg`
+#: went out as "mpeg", which no endpoint takes.
+_AUDIO_FORMATS = {"audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav",
+                  "audio/x-wav": "wav", "audio/wave": "wav"}
+
+
+def _audio_format(mime: str) -> str | None:
+    return _AUDIO_FORMATS.get((mime or "").lower())
+
+
 def _part_to_openai(part: dict) -> dict | None:
     """
     Convert one universal part dict to an OpenAI content item.
@@ -90,18 +112,29 @@ def _part_to_openai(part: dict) -> dict | None:
     if ptype == "audio":
         src  = part["source"]
         kind = src["kind"]
-        if kind == "base64":
-            mime = src.get("mime", "audio/wav")
-            fmt  = mime.split("/")[-1]   # "wav", "mp3", …
+        if kind in ("base64", "file"):
+            fmt = _audio_format(src.get("mime", "audio/wav"))
+            if fmt is None:
+                return _dropped(part, f"audio input takes wav or mp3, not {src.get('mime')}")
             return {
                 "type":        "input_audio",
                 "input_audio": {"data": src["data"], "format": fmt},
             }
-        # URL audio is not supported by OpenAI input_audio
-        return None
+        return _dropped(part, "audio input takes the bytes, not a URL")
 
-    # ptype == "video" — not supported by OpenAI chat completions
-    return None
+    if ptype == "document":
+        src = part["source"]
+        if src.get("kind") in ("base64", "file"):
+            mime = src.get("mime", "application/pdf")
+            # A PDF goes as a file part, as the Responses API sends it.
+            return {"type": "file",
+                    "file": {"filename": src.get("filename", "document"),
+                             "file_data": f"data:{mime};base64,{src['data']}"}}
+        return _dropped(part, "a document is sent as its bytes, not a URL")
+
+    if ptype == "image":
+        return _dropped(part, f"an image source of kind {part['source'].get('kind')!r} cannot be sent")
+    return _dropped(part, f"chat completions take no {ptype} input")
 
 
 def _part_to_responses(part: dict, role: str = "user") -> dict | None:
@@ -141,7 +174,7 @@ def _part_to_responses(part: dict, role: str = "user") -> dict | None:
         elif kind in ("base64", "file"):
             url = f"data:{src.get('mime', 'image/png')};base64,{src['data']}"
         else:
-            return None
+            return _dropped(part, f"an image source of kind {kind!r} cannot be sent")
         # A string, not an object — the object form is the chat spelling.
         return {"type": "input_image", "image_url": url, "detail": detail}
 
@@ -152,18 +185,19 @@ def _part_to_responses(part: dict, role: str = "user") -> dict | None:
             return {"type": "input_file",
                     "filename": src.get("filename", "document"),
                     "file_data": f"data:{mime};base64,{src['data']}"}
-        return None
+        return _dropped(part, "a document is sent as its bytes, not a URL")
 
     if ptype == "audio":
         src = part["source"]
-        if src.get("kind") == "base64":
-            mime = src.get("mime", "audio/wav")
+        if src.get("kind") in ("base64", "file"):
+            fmt = _audio_format(src.get("mime", "audio/wav"))
+            if fmt is None:
+                return _dropped(part, f"audio input takes wav or mp3, not {src.get('mime')}")
             return {"type": "input_audio",
-                    "input_audio": {"data": src["data"],
-                                    "format": mime.split("/")[-1]}}
-        return None
+                    "input_audio": {"data": src["data"], "format": fmt}}
+        return _dropped(part, "audio input takes the bytes, not a URL")
 
-    return None                                   # video: unsupported
+    return _dropped(part, f"the Responses API takes no {ptype} input")
 
 
 def _text_of(msg: dict) -> str:
@@ -202,7 +236,11 @@ def _build_openai_compat_request(
 
     def release():
         if held:
-            openai_messages.append({"role": "user", "content": [_part_to_openai(p) for p in held]})
+            # Without the parts this wire cannot carry: a None among them went
+            # out as `null`, a 400.
+            items = [it for it in (_part_to_openai(p) for p in held) if it is not None]
+            if items:
+                openai_messages.append({"role": "user", "content": items})
             held.clear()
 
     for msg in messages:
@@ -967,7 +1005,9 @@ def _build_responses_api_request(
 
     def release():
         if held:
-            input_messages.append({"role": "user", "content": [_part_to_responses(p) for p in held]})
+            items = [it for it in (_part_to_responses(p) for p in held) if it is not None]
+            if items:
+                input_messages.append({"role": "user", "content": items})
             held.clear()
 
     for msg in messages:

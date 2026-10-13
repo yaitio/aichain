@@ -77,22 +77,18 @@ def _part_to_anthropic(part: dict) -> dict | None:
                 },
             }
 
-    if ptype == "audio":
-        src  = part["source"]
-        kind = src["kind"]
-        if kind == "base64":
-            return {
-                "type":   "document",
-                "source": {
-                    "type":       "base64",
-                    "media_type": src.get("mime", "audio/wav"),
-                    "data":       src["data"],
-                },
-            }
-        return None
-
-    # ptype == "video" — not supported by Anthropic
-    return None
+    from ._openai_compat import _dropped
+    if ptype == "document":
+        src = part["source"]
+        if src.get("kind") in ("base64", "file") and src.get("mime", "application/pdf") == "application/pdf":
+            return {"type": "document",
+                    "source": {"type": "base64", "media_type": "application/pdf", "data": src["data"]}}
+        return _dropped(part, "Claude reads a document as PDF bytes")
+    # Claude takes no audio — sent as a `document` it was a 400 — and no
+    # video: left out, and said.
+    if ptype == "image":
+        return _dropped(part, f"an image source of kind {part['source'].get('kind')!r} cannot be sent")
+    return _dropped(part, f"Claude takes no {ptype} input")
 
 
 

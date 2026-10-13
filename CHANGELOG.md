@@ -133,6 +133,17 @@ where a fix is named below.
 
 ### Fixed
 
+- **A part a provider cannot carry is left out and said.** Video, audio by
+  URL and documents were dropped in silence on the OpenAI-compatible and
+  Anthropic wires, and the model answered about an attachment it never saw;
+  each is a `declined` adaptation now. A PDF goes to chat completions as a
+  `file` part and to Claude as a `document`, where both dropped it. Audio's
+  format is read from its MIME type — `audio/mpeg` went as `"mpeg"` — and
+  Claude, which takes no audio, is no longer sent it as a document (a 400). A
+  tool's media follow-up no longer holds `null` for a part it could not encode
+  (a 400). Not done here: image-edit models that take fewer input images than
+  given still take the first ones in silence.
+
 - **A gpt-oss stream decides as its run does.** Where harmony parsing exists
   for — a private gpt-oss without a server-side parser — `Agent.stream()`
   lost the tool call and sent the raw analysis channel to a UI as
