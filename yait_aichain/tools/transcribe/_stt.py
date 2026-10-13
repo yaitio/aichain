@@ -53,6 +53,7 @@ import urllib3
 from ...clients._base import make_http
 from ...clients._http import request
 
+from .._security import check_input_file
 from .._base import Tool
 
 
@@ -237,8 +238,7 @@ class _OpenAICompatSTT(Transcription):
             Plain transcript, or JSON string when timestamps/format="json".
         """
         _no_model_option(self, options or {})
-        if not os.path.isfile(input):
-            raise FileNotFoundError(f"Audio file not found: {input!r}")
+        input = check_input_file(input, "audio")
 
         opts       = options or {}
         language   = opts.get("language")
@@ -466,8 +466,7 @@ class sttGoogle(Transcription):
         _no_model_option(self, options or {})
         speech = require("google.cloud.speech", package="google-cloud-speech", who="sttGoogle")
 
-        if not os.path.isfile(input):
-            raise FileNotFoundError(f"Audio file not found: {input!r}")
+        input = check_input_file(input, "audio")
 
         opts       = options or {}
         language   = opts.get("language", self._DEFAULT_LANGUAGE)

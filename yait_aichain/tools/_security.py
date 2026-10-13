@@ -17,6 +17,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import stat
 from urllib.parse import urljoin, urlparse
 
 
@@ -127,6 +128,55 @@ def safe_get(session, url: str, **kwargs):
             return response
         url = urljoin(url, location)
     raise ValueError(f"more than {MAX_REDIRECTS} redirects, last to {url!r}")
+
+
+#: What a file of each kind starts with. A file a model or a variable named is
+#: read and sent to a provider; `/proc/self/environ` — the AWS keys on Lambda —
+#: is a regular file too, and it starts with none of these.
+_MAGIC = {
+    "image":    (lambda h: h[:3] == b"\xff\xd8\xff" or h[:8] == b"\x89PNG\r\n\x1a\n"
+                 or h[:4] == b"GIF8" or (h[:4] == b"RIFF" and h[8:12] == b"WEBP")
+                 or h[4:8] == b"ftyp" or h[:2] == b"BM"),
+    "audio":    (lambda h: h[:3] == b"ID3" or (len(h) > 1 and h[0] == 0xFF and h[1] & 0xE0 == 0xE0)
+                 or (h[:4] == b"RIFF" and h[8:12] == b"WAVE") or h[:4] in (b"OggS", b"fLaC")
+                 or h[4:8] == b"ftyp" or h[:4] == b"\x1aE\xdf\xa3"),
+    "video":    (lambda h: h[4:8] == b"ftyp" or h[:4] == b"\x1aE\xdf\xa3"
+                 or (h[:4] == b"RIFF" and h[8:12] == b"AVI ")),
+    "document": (lambda h: h[:5] == b"%PDF-"),
+}
+
+#: The most a local media file may be, read whole into a request.
+MAX_INPUT_BYTES = {"image": 20 << 20, "video": 100 << 20, "document": 32 << 20, "audio": 200 << 20}
+
+
+def check_input_file(path: str, kind: str) -> str:
+    """The real path of a local *kind* file it is safe to read and send, or an error.
+
+    A path a model or a variable chose is read and handed to a third party:
+    ``images=["/proc/self/environ"]`` sent the environment, and ``/dev/zero``
+    exhausted the memory. It must be a regular file, no larger than
+    ``MAX_INPUT_BYTES`` for its kind, start the way a file of that kind does,
+    and — when ``AICHAIN_INPUT_ROOT`` is set — sit inside that folder.
+    """
+    real = os.path.realpath(os.path.expanduser(path))
+    root = os.environ.get("AICHAIN_INPUT_ROOT", "").strip()
+    if root and not within(os.path.realpath(root), real):
+        raise PermissionError(f"{path!r} is outside AICHAIN_INPUT_ROOT")
+    try:
+        info = os.stat(real)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no {kind} file at {path!r}") from None
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError(f"{path!r} is not a regular file, so it is not read as {kind}")
+    if info.st_size > MAX_INPUT_BYTES[kind]:
+        raise ValueError(f"{path!r} is {info.st_size:,} bytes; a {kind} file may be at most "
+                         f"{MAX_INPUT_BYTES[kind]:,}")
+    with open(real, "rb") as fh:
+        head = fh.read(16)
+    if not _MAGIC[kind](head):
+        raise ValueError(f"{path!r} does not look like {kind}: its first bytes are not a "
+                         f"{kind} format's")
+    return real
 
 
 def within(root: str, path: str) -> bool:

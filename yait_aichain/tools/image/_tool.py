@@ -11,6 +11,8 @@ and a line for a model — never the image's bytes in a conversation.
 
 from __future__ import annotations
 
+from .._security import check_input_file
+
 import base64
 import hashlib
 import os
@@ -80,6 +82,8 @@ class Image(Tool):
         opts = dict(options or {})
         if unknown := sorted(set(opts) - set(OPTIONS)):
             raise ValueError(f"{self.name}: unknown option(s) {unknown}; it takes {sorted(OPTIONS)}")
+        if isinstance(images, str):
+            images = [images]           # one path, not a list of its characters
         parts = [_image_part(i) for i in (images or [])] + [input.strip()]
         # Through a Skill, by the seam only this tool uses: retries, the budget
         # and the record of adaptations come with it.
@@ -156,8 +160,7 @@ def _image_part(ref: str) -> dict:
         raise ValueError(f"an image to edit is a file path or a URL; got {ref!r}")
     if ref.lower().startswith(("http://", "https://")):
         return {"type": "image", "source": {"kind": "url", "url": ref}}
-    if not os.path.isfile(ref):
-        raise FileNotFoundError(f"no image at {ref!r}")
+    check_input_file(ref, "image")
     return {"type": "image", "source": {"kind": "file", "path": ref}}
 
 

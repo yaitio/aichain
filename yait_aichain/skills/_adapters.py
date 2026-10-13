@@ -151,7 +151,8 @@ def _resolve_file_source(part: dict) -> None:
         return
     if src.get("data") or "path" not in src:
         return
-    path = pathlib.Path(src["path"]).expanduser()
+    from ..tools._security import check_input_file
+    path = pathlib.Path(check_input_file(src["path"], part.get("type", "image")))
     raw = path.read_bytes()
     src["data"] = base64.b64encode(raw).decode("ascii")
     if not src.get("mime"):

@@ -125,6 +125,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: image, transcription and Skill media read any local path.**
+  `images=["/proc/self/environ"]` uploaded the environment — the AWS keys on
+  Lambda — to an image provider, `transcribe("~/.aws/credentials")` sent the
+  credentials, and `/dev/zero` as a Skill's media exhausted memory. A local
+  media file must now be a regular file, within a size limit for its kind,
+  and start the way that kind of file does; `AICHAIN_INPUT_ROOT` confines
+  reads to a folder. `images` given as one string is one image, not a list of
+  characters.
 - **Security: an unclassified tool ran as `write`, which the policy
   allows.** Tools that declared no risk inherited the default, so
   `vector_delete` — a bulk delete by a filter the model writes — and every
