@@ -102,7 +102,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..state import SuspendedResult
 
-from .._budget import as_budget, start_run
+from .._budget import as_budget, lend, start_run
 from .._require import require
 
 import importlib
@@ -483,7 +483,7 @@ class Chain:
         # chain.run()`, a chain inside a chain step, a chain in a Pool — and
         # the run document keeps it, so a resume in another process has it.
         context = context if context is not None else current()
-        with using(context), self._lend_budget():
+        with using(context), lend(self.max_cost):
             return self._run_from(doc, accumulated, start_idx=0, signal=None,
                                   usage_in=None, on_error=_on_error,
                                   context=context)
@@ -632,40 +632,11 @@ class Chain:
         ) if u else None
         start_run(self, spent=u.get("cost") or 0.0)     # the parked part was spent already
         from ..state import using
-        with using(context), self._lend_budget():
+        with using(context), lend(self.max_cost):
             return self._run_from(doc, accumulated, start_idx=start,
                                   signal=signal,
                                   usage_in=usage_in, on_error=_on_error,
                                   context=context, resumed=True)
-
-    def _lend_budget(self):
-        """Put this chain's budget on every step that can hold one.
-
-        Lent, not injected at construction: the steps arrive already built,
-        and a caller who set a budget on the chain means the chain's whole
-        spend rather than each step's. Restored afterwards, because a Skill
-        reused in two chains must not keep the first one's ceiling — that
-        would be the chain quietly editing an object it does not own.
-        """
-        import contextlib
-
-        @contextlib.contextmanager
-        def _lent():
-            if self.max_cost is None:
-                yield
-                return
-            touched = []
-            for entry in self._steps:
-                runner = entry[0]
-                if hasattr(runner, "max_cost"):
-                    touched.append((runner, runner.max_cost))
-                    runner.max_cost = self.max_cost
-            try:
-                yield
-            finally:
-                for runner, previous in touched:
-                    runner.max_cost = previous
-        return _lent()
 
     def _park(self, doc, idx, awaiting, accumulated, usage_total, history):
         """Persist the run as suspended at *idx* and return a SuspendedResult."""

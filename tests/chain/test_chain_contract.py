@@ -60,7 +60,8 @@ class Spends(Tool):
         self.held = []
 
     def run(self, text=None, options=None):
-        self.held.append(self.max_cost)
+        from yait_aichain._budget import in_force
+        self.held.append(in_force(self.max_cost))
         return text
 
 
@@ -301,11 +302,25 @@ class TestPerCallPolicy(unittest.TestCase):
 
 
 class TestTheBudgetIsLentAndGivenBack(unittest.TestCase):
+    """In force for the steps while the chain runs, and never written onto
+    them: a Pool's copies of one chain share its steps, and writing the
+    budget on and off them raced."""
 
     def test_a_step_holds_the_chain_budget_only_while_it_runs(self):
+        from yait_aichain._budget import in_force
         step, budget = Spends(), Budget(0.5)
         Chain(steps=[(step, "out")], max_cost=budget).run({"text": "a"})
-        self.assertIs(step.held[0], budget)
+        self.assertEqual(step.held[0], [budget])
+        self.assertIsNone(step.max_cost)
+        self.assertEqual(in_force(None), [])
+
+    def test_a_chain_in_a_pool_lends_to_every_item_and_edits_no_step(self):
+        from yait_aichain import Pool
+        step, budget = Spends(), Budget(0.5)
+        chain = Chain(steps=[(step, "out")])
+        Pool(chain, [{"text": str(i)} for i in range(12)], max_flows=6, max_cost=budget).run()
+        self.assertEqual(len(step.held), 12)
+        self.assertTrue(all(held == [budget] for held in step.held))
         self.assertIsNone(step.max_cost)
 
     def test_it_is_given_back_even_when_the_run_raises(self):

@@ -20,7 +20,7 @@ the :meth:`Skill.load` class method.
 """
 
 
-from .._budget import as_budget, start_run
+from .._budget import as_budget, in_force, start_run
 from .._require import require
 import json
 import os
@@ -336,8 +336,8 @@ class Skill:
         it is paid for, so a budget bounds "do not begin another call" and
         never "do not exceed by a cent".
         """
-        if self.max_cost is not None:
-            self.max_cost.check(f"{model.name} for skill {self.name or '(unnamed)'}")
+        for budget in in_force(self.max_cost):
+            budget.check(f"{model.name} for skill {self.name or '(unnamed)'}")
         self._emit("llm_call.started", name=model.name)
         return time.monotonic()
 
@@ -520,8 +520,8 @@ class Skill:
             self.last_usage = attach_cost(
                 extract_usage(raw_usage), model.name,
                 getattr(model, "cache_ttl", "5m"))
-            if self.max_cost is not None:
-                self.max_cost.charge(getattr(self.last_usage, "cost", None))
+            for budget in in_force(self.max_cost):
+                budget.charge(getattr(self.last_usage, "cost", None))
 
         whole = outcome.result
         if whole is not None and not isinstance(whole, str):
@@ -646,8 +646,8 @@ class Skill:
                 # that already succeeded.
                 usage    = attach_cost(extract_usage(response), model.name,
                                        getattr(model, "cache_ttl", "5m"))
-                if self.max_cost is not None:
-                    self.max_cost.charge(getattr(usage, "cost", None))
+                for budget in in_force(self.max_cost):
+                    budget.charge(getattr(usage, "cost", None))
                 result   = (model.from_response(response, output, tools_sent=bool(_tools)) if own
                             else model.from_response(response, output))
                 self._ended(model, t0, usage)

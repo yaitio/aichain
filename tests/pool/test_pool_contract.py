@@ -80,7 +80,8 @@ class Counts:
         self.seen_budgets = []
 
     def run(self, variables=None):
-        self.seen_budgets.append(self.max_cost)
+        from yait_aichain._budget import in_force
+        self.seen_budgets.extend(in_force(self.max_cost))
         n = len(variables["value"])
         self.last_usage = Usage(input_tokens=n, output_tokens=n, total_tokens=2 * n)
         return variables["value"].upper()
@@ -240,9 +241,10 @@ class TestUsage(unittest.TestCase):
         runner, budget = Counts(), Budget(1.0)
         p = Pool(runner, items("a", "b", "c"), max_cost=budget)
         p.run()
-        # Each item runs on a shallow copy; the list is shared, so it saw all three.
+        # In force in every worker, the one object, and never put on the runner.
         self.assertEqual(len(runner.seen_budgets), 3)
         self.assertTrue(all(b is budget for b in runner.seen_budgets))
+        self.assertIsNone(runner.max_cost)
 
 
 class TestAgentRunner(unittest.TestCase):
@@ -271,7 +273,8 @@ class TestAgentRunner(unittest.TestCase):
         original = type(agent).run
 
         def run(self, *a, **k):
-            seen.append(self.max_cost)
+            from yait_aichain._budget import in_force
+            seen.extend(in_force(self.max_cost))
             return original(self, *a, **k)
         type(agent).run = run
         try:

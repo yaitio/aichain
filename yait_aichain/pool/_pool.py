@@ -65,7 +65,7 @@ FAILED  = 3
 # means "start no more items", which is what a fan-out can offer where a
 # sequence stops running steps. The difference between the two is the
 # difference between a sequence and a fan-out, not between two vocabularies.
-from .._budget import as_budget, start_run
+from .._budget import as_budget, lend, start_run
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 from .. import _hints
 from ..state import Suspend
@@ -281,7 +281,9 @@ class Pool:
         # submit time, so every worker posts to this one — and the wait below
         # is where a blocker is noticed, which is the wait it exists to end.
         from ..agent._swarm import collecting_beacons
-        with collecting_beacons() as board:
+        # The budget too is ambient for the fan-out: copied into each worker
+        # with the context, and charged by every Skill inside an item.
+        with collecting_beacons() as board, lend(self.max_cost):
             with ThreadPoolExecutor(max_workers=self._max_flows) as executor:
                 future_to_idx: dict = {}
 
@@ -481,11 +483,6 @@ class Pool:
                 raise ValueError(
                     "Agent runner requires a 'task' key in the item variables."
                 )
-            # A copy carries the pool's budget, so the agent the caller holds
-            # keeps its own ceiling after the pool is done with it.
-            if self.max_cost is not None and hasattr(runner, "max_cost"):
-                runner = copy.copy(runner)
-                runner.max_cost = self.max_cost
             result = runner.run(task=task, variables=variables)
             if not result:
                 raise RuntimeError(
@@ -503,13 +500,6 @@ class Pool:
         # ``last_usage``. The copy is shallow: configuration is shared, the
         # usage counter is not.
         own = copy.copy(runner)
-        # The copy is shallow, so the budget travels by reference and every
-        # item charges the same object — which is the point. Copying the
-        # runner is what makes usage per-item; copying the ceiling would make
-        # it per-item too, and a hundred items with the full budget each is
-        # not a budget.
-        if self.max_cost is not None and hasattr(own, "max_cost"):
-            own.max_cost = self.max_cost
         output = own.run(variables=variables)
         # A chain as the runner contributes its output; a chain that did not
         # complete is a failed item, exactly as a failed agent is.

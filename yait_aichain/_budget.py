@@ -27,6 +27,8 @@ about the one number a caller checks.
 from __future__ import annotations
 
 import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from ._picklable import Picklable
 
@@ -148,6 +150,38 @@ def as_budget(value) -> Budget | None:
     budget = Budget(float(value))
     budget._per_run = True
     return budget
+
+
+#: The budgets of the runs this call sits inside — a Chain's, a Pool's —
+#: ambient for the duration of each, as the tenant is. A Skill checks and
+#: charges its own and every one of these. Lending by writing the budget onto
+#: each step's `max_cost` and restoring it afterwards raced in a Pool, whose
+#: copies of one Chain share its steps: items ran with no budget, and a Skill
+#: kept the Pool's ceiling for good.
+_AMBIENT: ContextVar = ContextVar("yait_aichain_budgets", default=())
+
+
+@contextmanager
+def lend(budget: Budget | None):
+    """Make *budget* hold for every call inside the block, nested under any
+    budget already in force."""
+    if budget is None:
+        yield
+        return
+    token = _AMBIENT.set(_AMBIENT.get() + (budget,))
+    try:
+        yield
+    finally:
+        _AMBIENT.reset(token)
+
+
+def in_force(own: Budget | None) -> list:
+    """*own* and every budget lent around the call, each once."""
+    out: list = []
+    for budget in (own, *_AMBIENT.get()):
+        if budget is not None and all(budget is not b for b in out):
+            out.append(budget)
+    return out
 
 
 def start_run(owner, spent: float = 0.0) -> None:

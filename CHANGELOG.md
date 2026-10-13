@@ -118,6 +118,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **A Chain's or a Pool's budget holds without editing the steps.** A Chain
+  lent its budget by writing it onto each step's `max_cost` and restoring it
+  afterwards, and a Pool did the same on the runner — but a Pool's copies of
+  one Chain share its steps, so the writes raced: items ran with no budget,
+  and a Skill kept the Pool's ceiling for good; an agent run by a Pool kept
+  an exhausted overnight budget. The budget is now ambient for the run, as
+  the tenant is, and a Skill checks and charges its own and every one it
+  runs inside.
 - **A call's usage and adaptations are its own, on a shared Model.**
   `last_stream_usage`, `last_stream_result` and `last_adaptations` were
   written to the Model and read back after the network round, and one Model
