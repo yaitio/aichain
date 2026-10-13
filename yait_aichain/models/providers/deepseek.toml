@@ -19,6 +19,9 @@ chat_path        = "/v1/chat/completions"
 # a runtime adaptation and is reported when it happens.
 # No top_k. Reasoning is a separate model here, so asking for it swaps the model.
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+# JSON mode, no schema: the schema goes in the prompt, and an answer fenced in
+# ```json is unfenced before it is parsed.
+json_schema = false
 
 [provider.defaults]
 temperature = 1.0

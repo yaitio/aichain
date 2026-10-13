@@ -292,7 +292,14 @@ class OpenAIClient(BaseClient):
 
         if p == "deepseek":
             path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            if m.reasoning is not None:
+            if m.reasoning is not None and m.name not in ("deepseek-chat", "deepseek-reasoner"):
+                # The map is the chat/reasoner pair's: on deepseek-v4-pro even
+                # "low" sent deepseek-chat — another generation, retiring.
+                record(Adaptation(
+                    kind=DECLINED, option="reasoning", asked=m.reasoning, sent=None, model=m.name,
+                    why="reasoning here is a swap between deepseek-chat and deepseek-reasoner; "
+                        "this model is neither, and no setting of its own is known"))
+            elif m.reasoning is not None:
                 body["model"] = m._REASONING_MAP[m.reasoning]
                 if body["model"] != m.name:
                     # The loudest kind: a different model answers, at a
@@ -318,8 +325,17 @@ class OpenAIClient(BaseClient):
                 has = any(isinstance(x.get("content"), str)
                           and "json" in x["content"].lower()
                           for x in body["messages"] if x.get("role") == "system")
-                if not has:
-                    _json_in_prompt(body, fmt if ft == "json_schema" else {})
+                # A schema always goes in: a system prompt that merely said
+                # "JSON" dropped it, and the answer was checked against rules
+                # the model never saw.
+                if ft == "json_schema":
+                    _json_in_prompt(body, fmt)
+                    record(Adaptation(
+                        kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
+                        model=m.name, why="this provider takes JSON but not a schema; the schema "
+                                          "is in the prompt and the answer is checked against it"))
+                elif not has:
+                    _json_in_prompt(body, {})
             return path, body
 
         if p == "qwen":

@@ -81,6 +81,15 @@ def _tee(stream, into: list):
         yield piece
 
 
+def _priced_as(model, made) -> str:
+    """The model a call is priced as: the one it was swapped to, if it was."""
+    for a in made or ():
+        if getattr(a, "kind", None) == SWAPPED and getattr(a, "option", "") != "model" \
+                and isinstance(getattr(a, "sent", None), str):
+            return a.sent
+    return model.name
+
+
 def _retryable(exc: APIError, attempt: int, max_retries: int) -> bool:
     """A transient failure with retries left. Never a failed async task, whose
     retry is a new billable job, nor an empty balance, which can arrive as 429
@@ -549,7 +558,7 @@ class Skill:
             # `BaseClient.stream_usage` — so it reaches the same branch of
             # `extract_usage` a buffered response does, per provider.
             self.last_usage = attach_cost(
-                extract_usage(raw_usage), model.name,
+                extract_usage(raw_usage), _priced_as(model, self.last_adaptations),
                 getattr(model, "cache_ttl", "5m"),
                 getattr(model, "_provider", None))
             for budget in in_force(self.max_cost):
@@ -703,7 +712,10 @@ class Skill:
                 # model-shaped, and the lifetime only picks a price multiplier.
                 # A cost estimate is the last thing that should abort a call
                 # that already succeeded.
-                usage    = attach_cost(extract_usage(response), model.name,
+                # Priced as the model that answered: a swap sends the request
+                # to another model at another rate, and the budget counted it
+                # at the one asked for.
+                usage    = attach_cost(extract_usage(response), _priced_as(model, made),
                                        getattr(model, "cache_ttl", "5m"),
                 getattr(model, "_provider", None))
                 for budget in in_force(self.max_cost):

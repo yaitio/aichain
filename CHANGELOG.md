@@ -133,6 +133,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **DeepSeek's reasoning swap is the chat/reasoner pair's.** `reasoning` on
+  `deepseek-v4-pro` or `deepseek-flash` is declined and said, where even
+  `"low"` sent `deepseek-chat` — another, retiring generation. A swapped call
+  is priced as the model that answered, where the budget counted it at the
+  rate of the one asked for (on every provider that swaps). A `json_schema`
+  schema always goes into the prompt, where a system prompt that merely said
+  "JSON" dropped it; a fenced JSON answer is unfenced before it is parsed.
+
 - **Search and fetch read one value as one value, and keep what they paid
   for.** A string where a search option takes a list is a list of one, where
   `domains="hbr.org"` became `site:h OR site:b …` on all six providers, and
