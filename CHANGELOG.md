@@ -118,6 +118,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **Claude is not sent combinations it refuses.** `reasoning` with a
+  `json_schema`, `top_p` beside a temperature, `top_k` with thinking and a
+  temperature above 1 each went out and came back HTTP 400 with nothing in
+  `last_adaptations`. Reasoning with a schema is refused before the call;
+  `top_p` replaces the temperature, thinking drops `top_k` and raises `top_p`
+  to its floor of 0.95, and a temperature above 1 is clamped — each recorded.
 - **Security: an API key could land in an error message.** A key read with
   `open().read()` ends in a newline; the header library raised with the
   whole `Bearer sk-…` in its text, and the transport's catch-all made that a

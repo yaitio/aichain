@@ -344,8 +344,22 @@ class AnthropicClient(BaseClient):
                                 "provider caches on an explicit breakpoint"))
                         break
 
+        # The API's own range for temperature is 0 to 1; above it is a 400
+        # after the round trip, where it can be said here.
+        if (body.get("temperature") or 0) > 1.0:
+            record(Adaptation(
+                kind=ADAPTED, option="temperature", asked=body["temperature"], sent=1.0,
+                model=params["name"], why="this provider's range is 0 to 1"))
+            body["temperature"] = 1.0
         if params.get("top_p") is not None:
             body["top_p"] = params["top_p"]
+            # Claude takes one of the two, not both: the request is refused
+            # when both are set. The one the caller set by name wins.
+            if "temperature" in body:
+                record(Adaptation(
+                    kind=ADAPTED, option="temperature", asked=body.pop("temperature"),
+                    sent=None, model=params["name"],
+                    why="this provider takes temperature or top_p, not both; top_p was set"))
         if params.get("top_k") is not None:
             body["top_k"] = params["top_k"]
 
@@ -356,6 +370,14 @@ class AnthropicClient(BaseClient):
                 why="sent as a thinking budget, this provider's own control"))
             budget = rmap.get(reasoning)
             if budget is not None:
+                if output.get("format", {}).get("type") == "json_schema":
+                    # Structured output here is a forced tool call, and the API
+                    # does not take a forced tool with thinking on: refused
+                    # before the round trip, as tools with a schema are below.
+                    raise ValueError(
+                        "Anthropic cannot combine reasoning with output json_schema: "
+                        "structured output is a forced tool call, which extended thinking "
+                        "does not allow. Drop reasoning, or ask for format 'json'.")
                 body["thinking"]    = {"type": "enabled", "budget_tokens": budget}
                 if body.get("temperature") not in (None, 1.0):
                     record(Adaptation(
@@ -365,6 +387,21 @@ class AnthropicClient(BaseClient):
                         why="this provider requires temperature 1.0 while "
                             "thinking is enabled"))
                 body["temperature"] = 1.0
+                if "top_p" in body:
+                    # Thinking takes top_p only from 0.95, and not beside a
+                    # temperature: the temperature it requires is the default.
+                    body.pop("temperature")
+                    if body["top_p"] < 0.95:
+                        record(Adaptation(
+                            kind=ADAPTED, option="top_p", asked=body["top_p"], sent=0.95,
+                            model=params["name"],
+                            why="extended thinking takes top_p from 0.95 to 1"))
+                        body["top_p"] = 0.95
+                if "top_k" in body:
+                    record(Adaptation(
+                        kind=DECLINED, option="top_k", asked=body.pop("top_k"), sent=None,
+                        model=params["name"],
+                        why="extended thinking does not take top_k"))
                 if body["max_tokens"] <= budget:
                     # The budget has to fit inside the answer's ceiling, so a
                     # max_tokens smaller than it is raised rather than left to
