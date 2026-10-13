@@ -133,6 +133,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **A gpt-oss stream decides as its run does.** Where harmony parsing exists
+  for — a private gpt-oss without a server-side parser — `Agent.stream()`
+  lost the tool call and sent the raw analysis channel to a UI as
+  `text.delta`. A harmony model's stream is the buffered reply parsed whole,
+  in one piece, with a `declined` adaptation saying why.
+
 - **Streamed tool calls run in the order they began, each its own.** The
   slots were sorted as strings, so in a turn of eleven calls or more slot 10
   ran before slot 2 and the side effects came in another order than `run()`

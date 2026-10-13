@@ -182,3 +182,35 @@ class TestOnlyAModelThatSpeaksItIsParsed(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStreamDecidesAsRunDoes(unittest.TestCase):
+    """Streamed, the raw analysis channel went to a UI as text.delta and a
+    harmony tool call was lost: run() and stream() decided differently on the
+    same bytes. A harmony model's stream is the buffered reply, parsed whole,
+    and says so."""
+
+    TOOLS = TestThroughTheModelLayer.TOOLS
+
+    def test_a_streamed_harmony_call_is_a_call(self):
+        import json
+        from unittest.mock import MagicMock
+        from yait_aichain.models import Model
+        from yait_aichain.models._adaptation import DECLINED
+        m = Model("private/openai/gpt-oss-20b", api_key="k",
+                  client_options={"url": "http://127.0.0.1:8080/v1"})
+        m.client.send = MagicMock(return_value=json.dumps({"choices": [{"message": {"content": (
+            "<|channel|>analysis<|message|>need the tool<|end|>" + CALL)}}]}).encode())
+        m.client._post_sse = MagicMock(side_effect=AssertionError("must not stream"))
+        m.client._auth_headers = MagicMock(return_value={})
+        stream = m.stream([{"role": "user", "parts": [{"type": "text", "text": "hi"}]}], OUT,
+                          tools=self.TOOLS)
+        pieces = []
+        try:
+            while True:
+                pieces.append(next(stream))
+        except StopIteration as done:
+            outcome = done.value
+        self.assertNotIn("need the tool", "".join(pieces))
+        self.assertIsInstance(outcome.result, ToolCallRequest)
+        self.assertIn(DECLINED, [a.kind for a in outcome.adaptations if a.option == "stream"])

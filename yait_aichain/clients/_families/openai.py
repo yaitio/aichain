@@ -151,6 +151,14 @@ class OpenAIClient(BaseClient):
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         if fmt == "image":
             raise NotImplementedError("an image is not delivered progressively")
+        from ._openai_compat import speaks_harmony
+        if speaks_harmony(m.name):
+            # Its channels are parsed from the whole reply. Streamed, the raw
+            # analysis text went to a UI as text.delta and a tool call written
+            # in harmony was lost — run() and stream() decided differently on
+            # the same bytes.
+            raise NotImplementedError(f"{m.name!r} writes harmony, which is parsed from the "
+                                      "whole reply")
         # Forwarded unconditionally: every override of `build_request` takes
         # `tools`, so a stream with tools degrades through NotImplementedError
         # where it must, instead of crashing on a signature.
