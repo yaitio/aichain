@@ -110,12 +110,19 @@ class LocalBrowseTool(Tool, SandboxedTool):
                     lines.append(f"{prefix}{branch}📁 {entry.name}/")
                     walk(entry.path, prefix + ("    " if last else "│   "), depth + 1)
                 else:
-                    lines.append(f"{prefix}{branch}{entry.name}  ({self._fmt_size(entry.stat().st_size)})")
+                    # Not followed: a dangling link raised and ended the listing.
+                    try:
+                        size = self._fmt_size(entry.stat(follow_symlinks=False).st_size)
+                    except OSError:
+                        size = "unreadable"
+                    lines.append(f"{prefix}{branch}{entry.name}  ({size})")
 
         walk(target, "", 0)
         if len(lines) > MAX_ENTRIES + 1:
             lines = lines[:MAX_ENTRIES + 1] + [f"… [stopped at {MAX_ENTRIES} entries; narrow depth or pattern]"]
-        lines.append(f"\nRoot: {self.root}")
+        # Not the host's absolute path: where the folder lives is not the
+        # model's business, and every path it gives is relative to it anyway.
+        lines.append("\nRoot: .")
         return "\n".join(lines)
 
     @staticmethod

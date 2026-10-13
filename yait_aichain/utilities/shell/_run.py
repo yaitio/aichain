@@ -19,7 +19,9 @@ sandbox root (or a sub-directory of it).
 from __future__ import annotations
 
 import os
+import re
 import shlex
+import signal
 import subprocess
 import sys
 
@@ -32,6 +34,18 @@ MAX_OUTPUT_CHARS = 50_000
 
 
 _DEFAULT_TIMEOUT = 30   # seconds
+#: The longest a model may ask a command to run. Unbounded, `10**9` was an
+#: OverflowError and a large one a process that outlived the agent.
+MAX_TIMEOUT = 600
+
+#: Environment names a child does not inherit: the provider keys in this
+#: process's environment were the child's, and `env` printed them to the model.
+_SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH", re.IGNORECASE)
+
+
+def _child_env() -> dict:
+    return {k: v for k, v in os.environ.items()
+            if not _SECRET_NAME.search(k) and not k.startswith("AWS_")}
 
 
 class LocalRunTool(Tool, SandboxedTool):
@@ -103,7 +117,11 @@ class LocalRunTool(Tool, SandboxedTool):
 
     def run(self, input: str, options: dict | None = None) -> dict:
         opts    = options or {}
-        timeout = int(opts.get("timeout", _DEFAULT_TIMEOUT))
+        try:
+            timeout = int(opts.get("timeout", _DEFAULT_TIMEOUT))
+        except (TypeError, ValueError):
+            raise ValueError(f"timeout is a whole number of seconds, not {opts.get('timeout')!r}") from None
+        timeout = max(1, min(timeout, MAX_TIMEOUT))
         cwd_rel = opts.get("cwd", ".")
         force_python = bool(opts.get("python", False))
 
@@ -121,30 +139,36 @@ class LocalRunTool(Tool, SandboxedTool):
         if force_python or first.endswith(".py"):
             command = f"{shlex.quote(sys.executable)} {command}"
 
-        # Execute
+        # Its own session, so a timeout kills the whole group — `sleep 99 &`
+        # and every stage of a pipeline outlived the shell that was killed —
+        # no stdin to wait on, and an environment without this process's keys.
+        proc = subprocess.Popen(
+            command, shell=True, cwd=cwd, env=_child_env(),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            start_new_session=True)
+        timed_out = False
         try:
-            result = subprocess.run(
-                command,
-                shell      = True,
-                cwd        = cwd,
-                capture_output = True,
-                text       = True,
-                timeout    = timeout,
-            )
+            out, err = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            return {
-                "stdout":     "",
-                "stderr":     f"[timeout] Process killed after {timeout}s.",
-                "returncode": -1,
-                "command":    command,
-            }
+            timed_out = True
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (AttributeError, ProcessLookupError, PermissionError):
+                proc.kill()
+            out, err = proc.communicate()       # what it printed before, kept
+        # Decoded leniently: one invalid byte raised after the command's
+        # effects had happened, and the result of a command that ran was lost.
+        stdout = out.decode("utf-8", errors="replace")
+        stderr = err.decode("utf-8", errors="replace")
+        if timed_out:
+            stderr += f"\n[timeout] Process group killed after {timeout}s."
 
         # Head and tail of each: a command that prints a megabyte is a
         # model's whole context, and the end is usually where the error is.
         return {
-            "stdout":     clip(result.stdout, MAX_OUTPUT_CHARS),
-            "stderr":     clip(result.stderr, MAX_OUTPUT_CHARS),
-            "returncode": result.returncode,
+            "stdout":     clip(stdout, MAX_OUTPUT_CHARS),
+            "stderr":     clip(stderr, MAX_OUTPUT_CHARS),
+            "returncode": -1 if timed_out else proc.returncode,
             "command":    command,
         }
 

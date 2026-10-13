@@ -87,8 +87,12 @@ class LocalReadTool(Tool, SandboxedTool):
         # Streamed, and bounded: a 2 GB log read whole for forty lines was the
         # memory of the process, and a model asking for "all" of it was its
         # context. Lines past MAX_READ_BYTES are counted, not kept.
+        # Brought to the file's bounds: `end_line=-1` matched every line as
+        # past the end and read nothing; 0 or below is "to the end".
         start = max(0, start_line - 1)
         end   = int(end_line) if end_line is not None else None
+        if end is not None and end < 1:
+            end = None
         chunk, kept, total, clipped = [], 0, 0, False
         with open(path, encoding=encoding, errors="replace") as fh:
             for i, line in enumerate(fh):

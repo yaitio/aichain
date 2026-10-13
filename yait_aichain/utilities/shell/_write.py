@@ -82,12 +82,19 @@ class LocalWriteTool(Tool, SandboxedTool):
             raise ValueError("options['path'] is required for local_write.")
         mode     = opts.get("mode", "w")
         encoding = opts.get("encoding", "utf-8")
+        if mode not in ("w", "a"):
+            raise ValueError(f"mode is 'w' or 'a', not {mode!r}")
+        if not isinstance(input, str):
+            raise TypeError(f"local_write writes text, not {type(input).__name__}")
+        # Encoded before the file is opened: `open('w')` emptied it first, so
+        # text the encoding could not hold lost the file's old contents too.
+        data = input.encode(encoding)
 
         path = self._resolve(rel_path)
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
-        with open(path, mode=mode, encoding=encoding) as fh:
-            fh.write(input)
+        with open(path, mode=mode + "b") as fh:
+            fh.write(data)
 
         n_bytes = os.path.getsize(path)
         return {

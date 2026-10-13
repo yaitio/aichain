@@ -125,6 +125,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **The local tools stay inside what they were given.** `local_run` starts
+  each command in its own session with no stdin and kills the whole group on
+  a timeout, keeping what it printed — only `/bin/sh` was killed, and a `&`
+  child or a pipeline lived on; a model's timeout is capped at 600 seconds,
+  where `10**9` was an `OverflowError`; the child no longer inherits names
+  carrying KEY, TOKEN, SECRET, PASSWORD, CREDENTIAL, AUTH or `AWS_`, which
+  `env` printed to the model; and output is decoded with replacement, where
+  one invalid byte raised after the command had run. `local_write` encodes
+  before it opens, so text the encoding cannot hold no longer empties the
+  file, and refuses a mode other than `w` or `a`. `local_browse` lists a
+  dangling link instead of ending on it and no longer shows the host's
+  absolute path. `local_read` with `end_line` of 0 or below reads to the end.
+
 - **A secret a chain carries reaches its tool and nothing else.** `REST`
   recommends `token_field` from a chain variable; every pause wrote that token
   to the store, to `SuspendedResult.document` and to each history record, and
