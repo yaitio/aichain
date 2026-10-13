@@ -346,7 +346,9 @@ class TestOpenAIImageLive(unittest.TestCase):
 class TestGoogleImageLive(unittest.TestCase):
     def test_gemini_image_returns_base64(self):
         from yait_aichain.tools import image
-        found = image("google", model="gemini-3.1-flash-image").run("A tiny red dot")
+        # Not "a red dot": a picture that common is refused as IMAGE_RECITATION.
+        found = image("google", model="gemini-3.1-flash-image").run(
+            "A teal paper lighthouse on a stack of library books, watercolour")
         self.assertTrue(found["images"][0]["base64"])
 
 if __name__ == "__main__":

@@ -553,7 +553,9 @@ def _real(var):
 class TestSearchLive(unittest.TestCase):
     """The same query and window to every provider with a key: the same record back."""
 
-    OPTS = {"max_results": 3, "start_date": (TODAY - timedelta(days=30)).isoformat(), "domains": ["hbr.org"]}
+    # Half a year: thirty days of one site left Tavily's index with nothing
+    # some nights, which measured the index rather than the tool.
+    OPTS = {"max_results": 3, "start_date": (TODAY - timedelta(days=180)).isoformat(), "domains": ["hbr.org"]}
 
     def _check(self, cls, var):
         if not _real(var):
