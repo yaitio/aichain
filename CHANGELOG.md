@@ -133,6 +133,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **A run document carries its format.** `RunDocument.to_dict()` writes
+  `"format": 1`, and `from_dict()` brings an older document up through a
+  migration step per version — one saved before 4.0 is format 0 and is read
+  as it was. A document from a newer release is refused by name rather than
+  misread. Until now a change of shape could only break every saved run.
+
 - **A tool that costs money is held to `max_cost`.** The budget was counted
   in `Skill` alone, so search, fetch, decisions, speech, transcription,
   embeddings and reranking spent outside it — a decision tool reported its

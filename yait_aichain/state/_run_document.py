@@ -34,6 +34,37 @@ class StepStatus:
     TERMINAL  = frozenset({"done", "skipped", "failed"})
 
 
+#: The format a document is written in. Raised when its shape changes, with a
+#: step in `_MIGRATIONS` that brings the previous one up to it — so a document
+#: saved by an older release is read, not refused, and one from a newer
+#: release is refused by name rather than misread.
+FORMAT = 1
+
+#: version → function taking a document of that version and returning the
+#: next one. Version 0 is every document written before the field existed.
+_MIGRATIONS: dict = {
+    0: lambda d: {**d, "format": 1},
+}
+
+
+def migrate(data: dict) -> dict:
+    """*data* brought up to `FORMAT`, one step at a time.
+
+    Parameters
+    ----------
+    data : dict
+        A stored run document, of any version this release knows.
+    """
+    version = data.get("format", 0)
+    if not isinstance(version, int) or version > FORMAT:
+        raise ValueError(f"run document {data.get('run_id')!r} is format {version!r}; this release "
+                         f"reads up to {FORMAT} — it was written by a newer one")
+    while version < FORMAT:
+        data = _MIGRATIONS[version](data)
+        version = data["format"]
+    return data
+
+
 @dataclass
 class RunDocument:
     """One run's durable state (see module docstring).
@@ -106,6 +137,7 @@ class RunDocument:
     # ── serialisation ────────────────────────────────────────────────
     def to_dict(self) -> dict:
         return {
+            "format":     FORMAT,
             "run_id":     self.run_id,
             "kind":       self.kind,
             "status":     self.status,        # derived, stored for readers
@@ -122,6 +154,7 @@ class RunDocument:
         if not isinstance(data, dict) or "run_id" not in data:
             raise ValueError("not a run document: no run_id — "
                              f"got {type(data).__name__} with keys {sorted(data)[:8] if isinstance(data, dict) else '-'}")
+        data = migrate(data)
         return cls(
             run_id     = data["run_id"],
             kind       = data.get("kind", "chain"),
