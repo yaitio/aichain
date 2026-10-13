@@ -4,6 +4,11 @@
 
 ### Added
 
+- `Agent.owns(call)` — whether a call `step()` returned is the agent's own
+  (`pool`, `write_plan`, `delegate`) and goes to `execute()` rather than to
+  the driver's environment. The τ²-bench adapter handed every call to the
+  benchmark, which answered "tool not found" to 962 of them: every plan and
+  every fan-out of the aichain arms. `step()` now says so in its docstring.
 - The wheel carries the documentation of its own version, and
   `yait_aichain.docs_dir()` returns it — the repository's `docs/` in a
   checkout, `None` when neither is there. An agent writing against an

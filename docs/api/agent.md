@@ -228,6 +228,13 @@ Returns a `ToolCallRequest` when the model asked
 to act, or a string — the answer. The caller appends the reply (via
 `.as_turn()`) and whatever the world answered, then calls again.
 
+**Some calls are the agent's own, not the world's**: `pool`,
+`write_plan` and `delegate` exist only inside this library, so a
+driver that hands every call to its environment gets "tool not found"
+back for each. Ask `owns` and run those through `execute`.
+Measured 2026-10-14: the τ²-bench adapter did not, and 962 of its
+aichain arms' calls — every plan and every fan-out — failed that way.
+
 **The obligation in that sentence is now checked.** A history holding
 a tool call nobody answered is malformed, and the providers disagree
 about it in the worst way: three reject the request, Google is looser,
@@ -277,6 +284,22 @@ The messages of nudges that fire now, once per streak — what
 **Parameters**
 
 - `state` (*dict*) — The state passed to `step()`.
+
+### `Agent.owns()`
+
+```python
+Agent.owns(call) -> bool
+```
+
+Whether *call* is one of the agent's own — `pool`, `write_plan`,
+`delegate` — which exist only inside this library and so go to
+`execute`, never to the driver's environment. The tools the
+agent was given are the driver's to place: a tool declared by schema
+alone runs in the world, one with a body may run in either.
+
+**Parameters**
+
+- `call` (*ToolCall*) — One call from a `ToolCallRequest` that `step()` returned.
 
 ### `Agent.execute()`
 
