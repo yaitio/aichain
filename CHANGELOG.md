@@ -118,6 +118,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: an API key could land in an error message.** A key read with
+  `open().read()` ends in a newline; the header library raised with the
+  whole `Bearer sk-…` in its text, and the transport's catch-all made that a
+  `NetworkError` — retried, switching the fallback model, and written to
+  events, logs and run documents. Keys and header values are stripped, a
+  control character left inside is refused by naming the header and never
+  the value, and the transport catches only what the network raises; a body
+  that does not serialise raises as itself, before anything is sent.
 - **A step that fails without a message has failed.** Success was read from
   the error's text, and `TimeoutError()`, a bare `assert` and
   `RuntimeError()` render as `""`: a Chain under `stop`, `skip` or `collect`

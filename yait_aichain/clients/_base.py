@@ -6,6 +6,7 @@ import base64
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 from .._multipart import Multipart
+from ._http import TRANSPORT_ERRORS
 from ._constants import (
     DEFAULT_TIMEOUT,
     DEFAULT_RETRIES,
@@ -18,6 +19,21 @@ def _proxy_from_env() -> "dict | None":
     url = (os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
            or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
     return {"url": url} if url else None
+
+
+def _clean_key(key):
+    """A key as a header can carry it: surrounding whitespace removed — a key
+    read with ``open().read()`` ends in a newline — and refused if a control
+    character remains, by saying so and never by quoting it. Left as it was,
+    the header library raised with the whole ``Bearer sk-…`` in its message,
+    and the message went into events, logs and run documents."""
+    if not isinstance(key, str):
+        return key
+    key = key.strip()
+    if any(ord(c) < 32 or ord(c) == 127 for c in key):
+        raise ValueError("the API key contains a control character, so no header can carry "
+                         "it; check how it was read — the value is not shown")
+    return key
 
 
 def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=DEFAULT_RETRIES):
@@ -175,10 +191,10 @@ class BaseClient:
         under another's credential, and the provider would answer normally.
         """
         if self._resolve_key is None:
-            return self._api_key
+            return _clean_key(self._api_key)
         from ..state import current
         context = current()
-        key = self._resolve_key(context)
+        key = _clean_key(self._resolve_key(context))
         if not key:
             tenant = getattr(context, "tenant", None)
             raise ValueError(
@@ -350,15 +366,16 @@ class BaseClient:
           commonest way an SSE reader ends its stream with an exception
           instead of a return.
         """
+        body = json.dumps(data).encode("utf-8")       # a bug here is a bug, not the network
         try:
             response = self._http.request(
                 "POST",
                 self._base_url + path,
-                body=json.dumps(data).encode("utf-8"),
+                body=body,
                 headers={**headers, "Accept": "text/event-stream"},
                 preload_content=False,
             )
-        except Exception as exc:
+        except TRANSPORT_ERRORS as exc:
             raise NetworkError(0, str(exc)) from exc
 
         if not (200 <= response.status < 300):
