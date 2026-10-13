@@ -125,6 +125,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **A chain reads every setting of a step, or refuses it.** A Skill step's
+  `input_map` is resolved as a tool's is — templates filled, a variable the
+  chain lacks an error — where names it lacked were dropped. A tool with no
+  declared properties refuses a mapping, where it took one and dropped it; an
+  open schema takes it. An Agent step refuses an `input_map`, unknown options
+  and an `output_field` that is not a field of `AgentResult` (a typo gave
+  `None` and success); options on any other step are refused, since nothing
+  read them. A store of one's own is kept even when it is empty and falsy. A
+  step given as a list — `[runner, "key"]`, as YAML writes it — is a step,
+  and a step that is not a runner is refused at construction, where it failed
+  in `run()`. A function's positional-only parameters are passed
+  positionally, so `len` works as a step.
+
 - **A stream runs in the context it was made in.** `Skill.stream()` and
   `Agent.stream()` capture the context when they are called and advance every
   step inside it. A generator runs in whichever context advances it:

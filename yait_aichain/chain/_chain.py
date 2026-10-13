@@ -216,9 +216,12 @@ def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
     accumulated: Current accumulated variable dict.
     input_map  : ``{"tool_param": value}`` — see above.
     """
+    from ..tools._base import _open
     props  = tool.parameters.get("properties", {})
     name   = getattr(tool, "name", None) or type(tool).__name__
-    if props and (unknown := [k for k in input_map if k not in props]):
+    # A tool with no properties took any mapping and dropped it; an open
+    # schema takes what it is given, and anything else refuses a stranger.
+    if not _open(tool.parameters) and (unknown := [k for k in input_map if k not in props]):
         raise ValueError(f"the step maps {unknown} into {name!r}, which takes {sorted(props)}")
     kwargs = {}
     for param in props:
@@ -226,6 +229,9 @@ def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
             kwargs[param] = _resolve(input_map[param], accumulated, f"{name}.{param}", top=True)
         elif param in accumulated:
             kwargs[param] = accumulated[param]
+    for param in input_map:
+        if param not in props:
+            kwargs[param] = _resolve(input_map[param], accumulated, f"{name}.{param}", top=True)
     return kwargs
 
 
@@ -235,11 +241,13 @@ def _callable_name(f) -> str:
             else getattr(f, "__name__", None) or type(f).__name__)
 
 
-def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> dict:
+def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> tuple[list, dict]:
     """
     The arguments for a function or a method step: each parameter its
     signature names, filled as a tool's are (see `_build_tool_kwargs`); a
-    required one the chain cannot fill is an error naming it.
+    required one the chain cannot fill is an error naming it. Positional-only
+    parameters — `len(obj, /)` — go positionally, where they went by name and
+    the call failed.
     """
     import inspect
     params = {n: p for n, p in inspect.signature(f).parameters.items()
@@ -247,16 +255,23 @@ def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> dict:
     where = _callable_name(f)
     if unknown := [k for k in input_map if k not in params]:
         raise ValueError(f"the step maps {unknown} into {where!r}, which takes {list(params)}")
+    args: list = []
     kwargs = {}
     for name, p in params.items():
         if name in input_map:
-            kwargs[name] = _resolve(input_map[name], accumulated, f"{where}.{name}", top=True)
+            value = _resolve(input_map[name], accumulated, f"{where}.{name}", top=True)
         elif name in accumulated:
-            kwargs[name] = accumulated[name]
+            value = accumulated[name]
         elif p.default is p.empty:
             raise ValueError(f"{where} needs {name!r}, and the chain has no variable of that name — "
                              f"map one: ({where}, key, {{{name!r}: 'variable'}}); it has {sorted(accumulated)}")
-    return kwargs
+        else:
+            continue
+        if p.kind is p.POSITIONAL_ONLY:
+            args.append(value)
+        else:
+            kwargs[name] = value
+    return args, kwargs
 
 
 def _tool_spec(tool) -> dict:
@@ -404,7 +419,9 @@ class Chain:
         # engine has one uniform path; pass store= for persistence (FileStore,
         # S3, …). It holds suspended runs for resume.
         from ..state import InMemoryStore
-        self._store = store or InMemoryStore()
+        # `is not None`: a store of one's own with a `__len__` is falsy when
+        # empty, and was replaced by an in-memory one that nobody read.
+        self._store = store if store is not None else InMemoryStore()
         # A Wait is a pause for a human, and a human answers in another
         # process — `resume()` is typically a separate command, sometimes the
         # next day. The default store is process-local, so that pause is
@@ -743,7 +760,8 @@ class Chain:
 
             try:
                 if kind == "call":
-                    output = runner(**_build_call_kwargs(runner, accumulated, input_map))
+                    args, kwargs = _build_call_kwargs(runner, accumulated, input_map)
+                    output = runner(*args, **kwargs)
 
                 elif kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
@@ -788,7 +806,7 @@ class Chain:
                     output_field = options.get(
                         "output_field", _AGENT_DEFAULT_OPTIONS["output_field"]
                     )
-                    output = getattr(agent_result, output_field, None)
+                    output = getattr(agent_result, output_field)
 
                     # Fold the agent's token usage into the chain total. An
                     # Agent has no ``last_usage`` (the generic accumulation
@@ -807,10 +825,11 @@ class Chain:
                     shared, runner = runner, copy.copy(runner)
                     # Skill: pass full accumulated dict, honouring input_map renames.
                     if input_map:
+                        # Resolved as a tool's are: a template filled, a name
+                        # the chain lacks an error — they were dropped.
                         skill_vars = dict(accumulated)
                         for dst, src in input_map.items():
-                            if src in accumulated:
-                                skill_vars[dst] = accumulated[src]
+                            skill_vars[dst] = _resolve(src, accumulated, f"{name}.{dst}", top=True)
                         output = runner.run(variables=skill_vars)
                     else:
                         output = runner.run(variables=accumulated)
@@ -1313,6 +1332,8 @@ class Chain:
         """
         result = []
         for item in steps:
+            if isinstance(item, list):
+                item = tuple(item)                 # a step from YAML: [runner, "key"]
             if isinstance(item, tuple):
                 if len(item) == 2:
                     runner, key = item
@@ -1364,8 +1385,29 @@ class Chain:
                 # A function or a utility's method — `kb.upsert` — called with
                 # the arguments its signature names.
                 kind = "call"
-            else:
+            elif callable(getattr(runner, "run", None)):
                 kind = "skill"
+            else:
+                # Refused here, where it failed only when run() reached it.
+                raise TypeError(f"a chain step is a Skill, a tool, an Agent, a Chain or a "
+                                f"function; got {type(runner).__name__} {runner!r}")
+
+            if kind == "agent":
+                if input_map:
+                    raise ValueError(
+                        f"an Agent step takes no input_map — it reads its task from one variable "
+                        f"(options={{'task_key': …}}) and is given all of them; got {input_map}")
+                if unknown := sorted(set(options) - set(_AGENT_DEFAULT_OPTIONS)):
+                    raise ValueError(f"an Agent step's options are {sorted(_AGENT_DEFAULT_OPTIONS)}; "
+                                     f"got {unknown}")
+                from ..agent._result import AgentResult
+                field = options.get("output_field", _AGENT_DEFAULT_OPTIONS["output_field"])
+                if field not in AgentResult.__dataclass_fields__:
+                    raise ValueError(f"output_field {field!r} is not a field of AgentResult; "
+                                     f"it has {sorted(AgentResult.__dataclass_fields__)}")
+            elif options:
+                raise ValueError(f"step options are an Agent step's only ({sorted(_AGENT_DEFAULT_OPTIONS)}); "
+                                 f"this {kind} step was given {sorted(options)}, which nothing would read")
 
             result.append((runner, key, input_map, kind, options))
 

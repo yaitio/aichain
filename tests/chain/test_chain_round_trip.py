@@ -57,7 +57,7 @@ class TestRoundTrip(unittest.TestCase):
                       name="researcher", description="finds things")
         self.original = Chain(
             steps=[(skill, "summary"),
-                   (Configured(factor=3), "tripled", {"input": "summary"}, {"note": "x"}),
+                   (Configured(factor=3), "tripled", {"input": "summary"}),
                    (agent, "answer", {}, {"task_key": "summary"})],
             variables={"lang": "pt"}, name="pipeline", description="three kinds",
             on_step_error="skip")
