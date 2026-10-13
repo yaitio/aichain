@@ -238,7 +238,8 @@ class TestTheTextAModelReads(unittest.TestCase):
         self.assertIsInstance(found, Record)
         self.assertEqual(found["pages"][0]["title"], "Example Domain")
         self.assertTrue(str(found).startswith("Title: Example Domain\nURL: https://example.com/\n"
-                                              "Published: 2026-09-30 · Author: IANA\n\n"))
+                                              "Published: 2026-09-30 · Author: IANA\n<page>\n"))
+        self.assertTrue(str(found).rstrip().endswith("</page>"))    # the page's text, fenced
         self.assertIn("documentation examples", str(found))
 
     def test_a_failed_page_is_its_reason_not_an_exception(self):

@@ -229,7 +229,10 @@ class Fetch(Tool):
                ([f"Author: {p['author']}"] if p["author"] else [])
         if meta:
             head.append(" · ".join(meta))
-        return "\n".join(head) + "\n\n" + p["text"].strip()
+        # Fenced: the page's text is another site's, and a page could forge
+        # the "Note:" lines and "---" separators this rendering uses around it.
+        body = p["text"].strip().replace("</page>", "</ page>")
+        return "\n".join(head) + "\n<page>\n" + body + "\n</page>"
 
     @staticmethod
     def page(url, final_url="", title="", published="", author="", text="", error="") -> dict:

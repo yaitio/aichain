@@ -1209,7 +1209,7 @@ class Agent:
                     step        = state["steps"],
                 )
                 messages.append(tool_result_turn(
-                    call.id, prompts.result_message(result, error)))
+                    call.id, prompts.result_message(result, error), is_error=bool(error)))
 
             state["journal"] = journal
             try:

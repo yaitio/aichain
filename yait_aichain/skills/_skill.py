@@ -879,6 +879,8 @@ class Skill:
             parts.append(f"name={self.name!r}")
         if self.description:
             parts.append(f"description={self.description!r}")
+        # Names only: a repr goes into logs and tracebacks, and the values
+        # are often a person's data.
         if self.variables:
-            parts.append(f"variables={self.variables!r}")
+            parts.append(f"variables={sorted(self.variables)}")
         return f"Skill({', '.join(parts)})"

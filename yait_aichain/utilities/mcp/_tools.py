@@ -602,13 +602,24 @@ async def _discover(server: _Server, filter: list[str] | None) -> list[MCPTool]:
                            f"it has {[t.name for t in listed]}")
     return [MCPTool(
         name        = t.name,
-        description = getattr(t, "description", "") or "",
+        # Bounded: a server's description goes into every request's tool
+        # list, and an unbounded one is where a hostile server hides its
+        # instructions.
+        description = _bounded(getattr(t, "description", "") or ""),
         server      = server,
         # `input_schema` since MCP SDK v2; `inputSchema` before it, and
         # deprecated now — read only when the new field is absent.
         parameters  = getattr(t, "input_schema", None) or getattr(t, "inputSchema", None),
         risk        = risk_from_annotations(getattr(t, "annotations", None)),
     ) for t in listed if filter is None or t.name in filter]
+
+
+#: The most of a server's tool description passed on to a model.
+MAX_DESCRIPTION_CHARS = 2000
+
+
+def _bounded(text: str) -> str:
+    return text if len(text) <= MAX_DESCRIPTION_CHARS else text[:MAX_DESCRIPTION_CHARS] + "…"
 
 
 def _hint(annotations: Any, snake: str, camel: str) -> bool | None:

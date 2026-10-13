@@ -306,7 +306,7 @@ class GoogleClient(BaseClient):
                         # Gemini keys a result by the function's name: the
                         # name of the call this result answers, by its id.
                         "name": names.get(msg.get("call_id", ""), msg.get("call_id", "")),
-                        "response": {"result": text},
+                        "response": {"error": text} if msg.get("is_error") else {"result": text},
                     }})
                 if follow_up:
                     held.extend(follow_up["parts"])

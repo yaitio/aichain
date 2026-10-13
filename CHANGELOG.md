@@ -133,6 +133,20 @@ where a fix is named below.
 
 ### Fixed
 
+- **Small security hardening.** A model name that could walk or end a URL
+  path (`gemini-x/../..`, `?`, `#`, spaces) and a collection name outside
+  letters, digits, `_`, `-` and `.` are refused, where both went into request
+  paths unchecked. `Skill`'s repr lists its variables' names, not their
+  values, which went into logs. An MCP server's tool description is cut at
+  2,000 characters, and `MCP(trust_annotations=False)` ignores the server's
+  annotations so every tool is `privileged` unless `risk=` says otherwise. A
+  fetched page's text is fenced in `<page>` tags it cannot close, where it
+  could forge the "Note:" lines around it; a judged answer is fenced in
+  `<answer>` tags likewise. A failed tool call is marked `is_error` on
+  Anthropic and answered as an error on Gemini, where an "ERROR:" prefix was
+  all that told it from output. `ttsQwen` downloads its audio over https and
+  refuses a file over 50 MB.
+
 - **Small gaps in state, stores and the journal.** `InMemoryStore` saves
   through JSON as every persistent store does, so a set or bytes fails in
   development as it would in production. `FileStore` serialises before it

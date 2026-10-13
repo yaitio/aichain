@@ -287,7 +287,7 @@ def dangling_calls(messages: list) -> list:
     return list(reversed(dangling))
 
 
-def tool_result_turn(call_id: str, result) -> dict:
+def tool_result_turn(call_id: str, result, is_error: bool = False) -> dict:
     """
     One call's result as a universal ``tool`` turn.
 
@@ -309,7 +309,15 @@ def tool_result_turn(call_id: str, result) -> dict:
         The ``ToolCall.id`` this result answers.
     result : any
         What the tool returned; a non-string is rendered as text.
+    is_error : bool, optional
+        The call failed and *result* is its error: Anthropic marks it
+        `is_error` and Gemini answers it as an error, where an "ERROR:"
+        prefix was all that told it from what a tool printed.
     """
+    if is_error:
+        text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
+        return {"role": "tool", "call_id": call_id, "is_error": True,
+                "parts": [{"type": "text", "text": text}]}
     if _is_part(result):
         return {"role": "tool", "call_id": call_id, "parts": [result]}
 

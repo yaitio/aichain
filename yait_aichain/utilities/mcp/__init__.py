@@ -20,7 +20,8 @@ the server and listing its tools (60 s), ``call_timeout`` one call of a tool
 Each tool's risk class — what a permission policy reads — comes from the
 server's annotations, and is ``privileged`` where the server says nothing:
 another server's tool is unknown here, and the unknown goes to a person.
-``prefix="wiki_"`` names its tools ``wiki_…`` for an agent holding two
+``trust_annotations=False`` ignores the server's annotations, so every tool
+is ``privileged`` unless ``risk=`` says otherwise. ``prefix="wiki_"`` names its tools ``wiki_…`` for an agent holding two
 servers whose tools share names; ``tool()``, ``call()`` and ``risk=`` take
 the server's own names. ``risk={"tool_name": "read"}`` puts your word over
 the server's::
@@ -49,7 +50,7 @@ class MCP(Utility):
                  env: dict | None = None, cwd: str | None = None, transport: str | None = None,
                  connect_timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT,
                  call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT, risk: dict | None = None,
-                 prefix: str = "") -> None:
+                 prefix: str = "", trust_annotations: bool = True) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool.
         self.server = server
@@ -66,6 +67,7 @@ class MCP(Utility):
             raise ValueError(f"MCP risk: {bad} — each must be one of {sorted(RISK_CLASSES)}")
         self._risk = dict(risk or {})
         self._prefix = prefix
+        self._trust = trust_annotations
 
     @property
     def tools(self) -> list:
@@ -76,7 +78,10 @@ class MCP(Utility):
                 raise KeyError(f"risk= names {missing}, which the server does not have; "
                                f"it has {[_remote(t) for t in tools]}")
             for t in tools:
-                t.risk = self._risk.get(_remote(t), t.risk)
+                # The server's own word lowers nothing when it is not trusted:
+                # every tool is privileged unless `risk=` says otherwise.
+                base = t.risk if self._trust else "privileged"
+                t.risk = self._risk.get(_remote(t), base)
                 if self._prefix:
                     t.name = self._prefix + t.name
             self._tools = tools

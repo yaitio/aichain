@@ -373,6 +373,12 @@ class VectorStore:
         embedder:   Any | None = None,
     ) -> None:
         self._backend    = backend
+        # Part of every request's path: one that walks it, or ends it, is refused.
+        import re
+        if not isinstance(collection, str) or not re.fullmatch(r"[A-Za-z0-9_\-][A-Za-z0-9_.\-]{0,254}",
+                                                                collection) or collection in (".", ".."):
+            raise ValueError(f"a collection name is letters, digits, '_', '-' and '.'; "
+                             f"got {collection!r}")
         self._collection = collection
         self._embedder   = embedder
 

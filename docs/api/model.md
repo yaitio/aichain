@@ -424,7 +424,7 @@ This reply as a universal assistant turn, for appending.
 ## `tool_result_turn()`
 
 ```python
-tool_result_turn(call_id: str, result) -> dict
+tool_result_turn(call_id: str, result, is_error: bool = False) -> dict
 ```
 
 One call's result as a universal `tool` turn.
@@ -445,6 +445,9 @@ message.
 
 - `call_id` (*str*) — The `ToolCall.id` this result answers.
 - `result` (*any*) — What the tool returned; a non-string is rendered as text.
+- `is_error` (*bool, optional*, default `False`) — The call failed and *result* is its error: Anthropic marks it
+  `is_error` and Gemini answers it as an error, where an "ERROR:"
+  prefix was all that told it from what a tool printed.
 
 ---
 

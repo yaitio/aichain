@@ -50,6 +50,8 @@ from .._security import assert_safe_url, confine_output_path
 # ── Module-level defaults ─────────────────────────────────────────────────────
 
 _DEFAULT_FORMAT = "mp3"
+#: The largest audio file a speech tool saves.
+MAX_AUDIO_BYTES = 50 * 1024 * 1024
 _DEFAULT_SPEED  = 1.0
 
 
@@ -657,6 +659,15 @@ class ttsQwen(Speech):
         # ── Download audio bytes ──────────────────────────────────────
         # The URL comes from the provider response — guard it (SSRF) and do not
         # follow redirects to an unvalidated host.
+        # DashScope hands back an http:// link to its own storage; it is fetched
+        # over https, and no larger than an audio file can reasonably be.
+        from urllib.parse import urlsplit
+        parts = urlsplit(audio_url)
+        if parts.scheme == "http" and (parts.hostname or "").endswith(".aliyuncs.com"):
+            audio_url = "https://" + audio_url[len("http://"):]
         assert_safe_url(audio_url)
-        return request(self._http, "GET", audio_url, redirect=False,
+        data = request(self._http, "GET", audio_url, redirect=False,
                        what="DashScope TTS audio download").data
+        if len(data) > MAX_AUDIO_BYTES:
+            raise ValueError(f"ttsQwen: the audio is over {MAX_AUDIO_BYTES:,} bytes; not saved")
+        return data

@@ -236,6 +236,17 @@ _SAMPLING = {
     "max_tokens":  (int, 1, None),
 }
 
+
+def _check_name(name) -> None:
+    """A model name is part of a URL path on some providers — Google's
+    `models/{name}:generateContent` — so one that could walk the path
+    (`gemini-x/../..`) or end it (`?`, `#`, a space) is refused."""
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"a model name is a non-empty string, not {name!r}")
+    if any(seg in ("..", ".") for seg in name.split("/")) or any(
+            c in name for c in "?#\\ \t\r\n%"):
+        raise ValueError(f"model name {name!r} cannot be part of a URL path")
+
 class Model:
     """
     A configured model: provider resolved from the name, settings from data,
@@ -350,6 +361,7 @@ class Model:
     ) -> None:
         # The provider is resolved from the (possibly prefixed) name; the wire
         # name has any "provider/" prefix stripped (it only steers selection).
+        _check_name(name)
         self._provider = _resolve_provider(name)
         self.name      = _split_provider_prefix(name)[1]
 

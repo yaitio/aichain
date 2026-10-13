@@ -228,6 +228,8 @@ class AnthropicClient(BaseClient):
                 block = {"type": "tool_result",
                          "tool_use_id": _anthropic_id(msg.get("call_id", "")),
                          "content": content}
+                if msg.get("is_error"):
+                    block["is_error"] = True
                 if amsgs and amsgs[-1]["role"] == "user" and \
                    all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
                     amsgs[-1]["content"].append(block)
