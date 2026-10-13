@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `ttsGoogle` and `sttGoogle` read `GOOGLE_CLOUD_API_KEY` first, then
+  `GOOGLE_AI_API_KEY` and `GOOGLE_API_KEY`. Speech is a Cloud API, and an AI
+  Studio key restricted to Gemini answers `API_KEY_SERVICE_BLOCKED` there, so
+  a project can now keep one key for each without passing `api_key=`.
+
 ## [4.0.1] — 2026-10-13
 
 **The 4.0.0 audit, applied.** 117 findings — defects, silent behaviour,

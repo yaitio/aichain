@@ -31,7 +31,7 @@ Installation
 Environment variables
 ---------------------
   OpenAI  :  OPENAI_API_KEY
-  Google  :  GOOGLE_AI_API_KEY  or  GOOGLE_API_KEY  (Speech-to-Text API enabled)
+  Google  :  GOOGLE_CLOUD_API_KEY, GOOGLE_AI_API_KEY or GOOGLE_API_KEY  (Speech-to-Text API enabled)
 """
 
 from __future__ import annotations
@@ -400,8 +400,8 @@ class sttGoogle(Transcription):
     Parameters
     ----------
     api_key : str | None, optional
-        Google API key.  Falls back to ``GOOGLE_AI_API_KEY``, then
-        ``GOOGLE_API_KEY``.
+        Google Cloud API key.  Falls back to ``GOOGLE_CLOUD_API_KEY``, then
+        ``GOOGLE_AI_API_KEY``, then ``GOOGLE_API_KEY``.
     model : str | None, optional
         Default ``"latest_long"``.  A setting of the tool.
 
@@ -444,13 +444,16 @@ class sttGoogle(Transcription):
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
-        # GOOGLE_AI_API_KEY is the Google provider's key; GOOGLE_API_KEY is
-        # accepted too. Embeddings accept both, and so does this.
-        self._api_key = (api_key or os.environ.get("GOOGLE_AI_API_KEY")
+        # GOOGLE_CLOUD_API_KEY first: speech is a Cloud API, and an AI Studio
+        # key is often restricted to Gemini, which answers
+        # API_KEY_SERVICE_BLOCKED here. GOOGLE_AI_API_KEY is the Google
+        # provider's key and GOOGLE_API_KEY its older spelling.
+        self._api_key = (api_key or os.environ.get("GOOGLE_CLOUD_API_KEY")
+                         or os.environ.get("GOOGLE_AI_API_KEY")
                          or os.environ.get("GOOGLE_API_KEY"))
         if not self._api_key:
-            raise ValueError("No Google API key found. Pass api_key= or set GOOGLE_AI_API_KEY "
-                             "(or GOOGLE_API_KEY); the key's project needs the Speech-to-Text API.")
+            raise ValueError("No Google API key found. Pass api_key= or set GOOGLE_CLOUD_API_KEY "
+                             "(or GOOGLE_AI_API_KEY); the key's project needs the Speech-to-Text API.")
         self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=120.0),
                                retries=urllib3.Retry(total=2, backoff_factor=0.5))
 

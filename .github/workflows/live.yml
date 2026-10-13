@@ -26,6 +26,7 @@ jobs:
       OPENAI_API_KEY:     ${{ secrets.OPENAI_API_KEY }}
       ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
       GOOGLE_AI_API_KEY:  ${{ secrets.GOOGLE_AI_API_KEY }}
+      GOOGLE_CLOUD_API_KEY: ${{ secrets.GOOGLE_CLOUD_API_KEY }}
       XAI_API_KEY:        ${{ secrets.XAI_API_KEY }}
       PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
       MOONSHOT_API_KEY:   ${{ secrets.MOONSHOT_API_KEY }}

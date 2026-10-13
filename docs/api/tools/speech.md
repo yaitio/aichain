@@ -99,7 +99,7 @@ Text-to-speech via Google Cloud Text-to-Speech, over its REST API.
 |---|---|
 | Import | `from yait_aichain.tools import ttsGoogle` |
 | Risk class | `draft` |
-| Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` |
+| Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` or `GOOGLE_CLOUD_API_KEY` |
 
 ```python
 ttsGoogle(
@@ -231,7 +231,7 @@ Speech-to-text via Google Cloud Speech-to-Text, over its REST API.
 |---|---|
 | Import | `from yait_aichain.tools import sttGoogle` |
 | Risk class | `external` |
-| Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` |
+| Key | `GOOGLE_AI_API_KEY` or `GOOGLE_API_KEY` or `GOOGLE_CLOUD_API_KEY` |
 
 ```python
 sttGoogle(

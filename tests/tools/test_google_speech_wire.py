@@ -64,5 +64,17 @@ class TestGoogleSpeechWire(unittest.TestCase):
                     make()
 
 
+    def test_a_cloud_key_comes_before_the_gemini_key(self):
+        # An AI Studio key restricted to Gemini answers API_KEY_SERVICE_BLOCKED
+        # on speech, so a project keeps a second key for Cloud and it has to win.
+        with patch.dict(os.environ, {"GOOGLE_CLOUD_API_KEY": "cloud", "GOOGLE_AI_API_KEY": "gemini",
+                                     "GOOGLE_API_KEY": "old"}):
+            self.assertEqual(speech("google")._api_key, "cloud")
+            self.assertEqual(transcribe("google")._api_key, "cloud")
+        with patch.dict(os.environ, {"GOOGLE_AI_API_KEY": "gemini"}, clear=True):
+            self.assertEqual(speech("google")._api_key, "gemini")
+            self.assertEqual(transcribe("google")._api_key, "gemini")
+
+
 if __name__ == "__main__":
     unittest.main()
