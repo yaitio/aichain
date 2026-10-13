@@ -54,9 +54,24 @@ def _public_only(url, **_):
 @patch.object(_security, "assert_safe_url", _public_only)
 class TestEveryHop(unittest.TestCase):
 
+    def test_a_redirect_to_another_host_is_not_followed(self):
+        http, asked = _answers((307, "https://elsewhere.example/collect"))
+        with self.assertRaisesRegex(ValueError, "another host"):
+            safe_request(http, "POST", "https://api.example.com/x", body=b"{}",
+                         headers={"X-Api-Key": "secret"})
+        self.assertEqual(len(asked), 1)
+
+    def test_a_sessions_headers_are_left_off_on_another_host(self):
+        session = MagicMock(headers={"Authorization": "Bearer s", "User-Agent": "ua"})
+        session.get.side_effect = [MagicMock(status_code=302, headers={"location": "https://b.example/"}),
+                                   MagicMock(status_code=200, headers={})]
+        safe_get(session, "https://a.example/")
+        self.assertNotIn("headers", session.get.call_args_list[0].kwargs)
+        self.assertEqual(session.get.call_args_list[1].kwargs["headers"], {"Authorization": None})
+
     def test_a_redirect_to_the_metadata_service_is_refused(self):
         http, asked = _answers((302, "http://169.254.169.254/latest/meta-data/"))
-        with self.assertRaisesRegex(ValueError, "non-public"):
+        with self.assertRaisesRegex(ValueError, "non-public|another host"):
             safe_request(http, "GET", "https://example.com/")
         self.assertEqual(asked, [("GET", "https://example.com/", False)])   # never asked
 

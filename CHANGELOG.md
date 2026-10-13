@@ -125,6 +125,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **Security: credentials followed a redirect to another host.** urllib3
+  drops `Authorization` on a cross-host redirect but sends `x-api-key`,
+  `x-goog-api-key` and the body of a 307 on; REST forwarded its headers to
+  wherever the server pointed, and `fetchLocal` applied the caller's session
+  headers to every host. Provider and search clients no longer follow
+  redirects (a 3xx raises); REST refuses a redirect to another host and says
+  where it pointed; `fetchLocal` leaves the caller's headers off any host but
+  the one it was asked for.
 - **Security: image, transcription and Skill media read any local path.**
   `images=["/proc/self/environ"]` uploaded the environment — the AWS keys on
   Lambda — to an image provider, `transcribe("~/.aws/credentials")` sent the

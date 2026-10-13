@@ -65,10 +65,13 @@ PRE_INFERENCE = frozenset({429, 503, 529})
 # to a second of jitter so a fleet of Lambdas does not retry in step.
 # allowed_methods=None so POST — every generative call — is covered for the
 # statuses above, which urllib3's default method list would exclude.
+# redirect=False: a provider's API does not redirect, and urllib3 following one
+# to another host drops Authorization but sends `x-api-key`,
+# `x-goog-api-key` and the body on — so a 3xx is returned, and raises.
 DEFAULT_RETRIES = Retry(
     total=3,
     read=False,
-    redirect=2,
+    redirect=False,
     backoff_factor=1.0,
     backoff_jitter=1.0,
     status_forcelist=PRE_INFERENCE,
@@ -81,7 +84,7 @@ DEFAULT_RETRIES = Retry(
 # concerns.
 DEFAULT_IDEMPOTENT_RETRIES = Retry(
     total=3,
-    redirect=2,
+    redirect=False,
     backoff_factor=1.0,
     backoff_jitter=1.0,
     status_forcelist=PRE_INFERENCE | {500, 502, 504},

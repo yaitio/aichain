@@ -81,6 +81,7 @@ from .._base import Record, Tool
 SEARCH_TIMEOUT = urllib3.Timeout(connect=10.0, read=120.0)
 SEARCH_RETRIES = Retry(
     total=3,
+    redirect=False,             # see DEFAULT_RETRIES: a key header must not follow one
     backoff_factor=1.0,
     backoff_jitter=1.0,
     status_forcelist={429, 500, 502, 503, 504, 529},

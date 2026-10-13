@@ -111,18 +111,38 @@ def safe_request(http, method: str, url: str, **kwargs):
         location = response.headers.get("location") if response.status in _REDIRECTS else None
         if not location:
             return response
-        url = urljoin(url, location)
+        nxt = urljoin(url, location)
+        # To another host, never: the request carries whatever the caller
+        # gave it — an `X-Api-Key`, a token in a header urllib3 does not know
+        # to drop, a body a 307 would resend — and the host it was meant for
+        # chose to send it elsewhere. Said, with the address, instead.
+        if urlparse(nxt).netloc != urlparse(url).netloc:
+            raise ValueError(f"the server redirected to another host ({nxt}); not followed, "
+                             "so the request's headers and body stay with the host they were for")
+        url = nxt
         if response.status == 303:
             method = "GET"
             kwargs.pop("body", None)
     raise ValueError(f"more than {MAX_REDIRECTS} redirects, last to {url!r}")
 
 
+def _bare(session) -> dict:
+    """The session's headers with every one set by the caller replaced by None,
+    which `requests` reads as "do not send"; its own defaults stay."""
+    defaults = {"user-agent", "accept", "accept-encoding", "connection"}
+    return {k: None for k in session.headers if k.lower() not in defaults}
+
+
 def safe_get(session, url: str, **kwargs):
     """`safe_request` for a ``requests`` session: every hop checked."""
+    first = urlparse(url).netloc
     for _ in range(MAX_REDIRECTS + 1):
         assert_safe_url(url)
-        response = session.get(url, allow_redirects=False, **kwargs)
+        # The session's own headers belong to the host they were set for: on
+        # any other host — one a redirect or a model chose — they are left off.
+        response = session.get(url, allow_redirects=False,
+                               **({} if urlparse(url).netloc == first else {"headers": _bare(session)}),
+                               **kwargs)
         location = response.headers.get("location") if response.status_code in _REDIRECTS else None
         if not location:
             return response
