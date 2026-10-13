@@ -46,7 +46,7 @@ import os
 import uuid
 
 from ....clients._errors import APIError
-from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, check_metric, record_from_payload
+from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
 
 def _point_id(rec_id: str | int) -> int | str:
     """Map an arbitrary record ID onto a Qdrant-acceptable point ID.
@@ -55,7 +55,9 @@ def _point_id(rec_id: str | int) -> int | str:
     becomes a UUIDv5; the original is kept in the payload under
     ``_ORIGINAL_ID_KEY`` and restored on every read."""
     s = str(rec_id)
-    if s.isdigit():
+    # Only an integer's own spelling: "007" and "7" were one point, and "²"
+    # passed isdigit() and raised in int().
+    if s.isascii() and s.isdigit() and s == str(int(s)):
         return int(s)
     try:
         return str(uuid.UUID(s))
@@ -125,7 +127,6 @@ class QdrantBackend(VectorBackend):
         url:     str | None = None,
         api_key: str | None = None,
         metric:  str        = "cosine",
-        **kwargs,
     ) -> None:
         super().__init__(
             url     = url     or os.environ.get("QDRANT_URL", self._DEFAULT_URL),
@@ -225,7 +226,9 @@ class QdrantBackend(VectorBackend):
                 "vector":  vec,
                 "payload": payload,
             })
-        self._put(f"/collections/{collection}/points", {"points": points})
+        # wait=true: Qdrant acknowledges a write before it is searchable, and a
+        # query straight after an upsert found nothing.
+        self._put(f"/collections/{collection}/points?wait=true", {"points": points})
 
     def fetch(
         self,
@@ -246,16 +249,9 @@ class QdrantBackend(VectorBackend):
     ) -> None:
         # The VectorStore layer guarantees at least one non-empty argument
         # (an empty list/dict would otherwise mean "delete everything").
-        body: dict = {}
-        if ids:
-            body["points"] = [_point_id(i) for i in ids]
-        elif filter:
-            body["filter"] = filter
-        else:
-            raise ValueError(
-                "QdrantBackend.delete: provide non-empty ids or filter."
-            )
-        self._post(f"/collections/{collection}/points/delete", body)
+        _one_of(ids, filter)
+        body: dict = {"points": [_point_id(i) for i in ids]} if ids else {"filter": filter}
+        self._post(f"/collections/{collection}/points/delete?wait=true", body)
 
     def count(self, collection: str) -> int:
         data = self._post(

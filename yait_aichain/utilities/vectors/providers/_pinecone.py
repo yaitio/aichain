@@ -44,7 +44,7 @@ import os
 from urllib.parse import urlencode
 
 from ....clients._errors import APIError
-from .._base import VectorBackend, VectorRecord, check_metric, record_from_payload
+from .._base import VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -113,7 +113,6 @@ class PineconeBackend(VectorBackend):
         cloud:   str        = "aws",
         region:  str        = "us-east-1",
         metric:  str        = "cosine",
-        **kwargs,
     ) -> None:
         # Named here because the data plane cannot discover it: the metric is
         # a property of the index, on the control plane. Without it `score`
@@ -203,6 +202,24 @@ class PineconeBackend(VectorBackend):
             back = {v: k for k, v in _METRIC_MAP.items()}
             metric = back.get(info.get("metric"), metric)
         self._metric = metric
+        self._wait_ready()
+
+    #: How long a new index may take to come up before create gives up.
+    READY_TIMEOUT = 120.0
+
+    def _wait_ready(self) -> None:
+        """A serverless index takes seconds to come up, and a write before then
+        is refused; create returns once it is ready."""
+        import time
+        deadline = time.monotonic() + self.READY_TIMEOUT
+        while True:
+            info = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}")
+            if (info.get("status") or {}).get("ready", True):
+                return
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Pinecone index {self._index!r} was not ready after "
+                                   f"{self.READY_TIMEOUT:.0f}s")
+            time.sleep(1.0)
 
     def query(
         self,
@@ -268,14 +285,14 @@ class PineconeBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
+        # Nothing named was `deleteAll` here — the whole namespace.
+        _one_of(ids, filter)
         host  = self._index_url_resolved()
         body: dict = {"namespace": collection}
         if ids:
             body["ids"] = ids
-        if filter:
+        else:
             body["filter"] = filter
-        if not ids and not filter:
-            body["deleteAll"] = True
         self._call("POST", f"{host}/vectors/delete", body)
 
     def count(self, collection: str) -> int:

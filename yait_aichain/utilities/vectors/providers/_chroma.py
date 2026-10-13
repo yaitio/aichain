@@ -45,7 +45,7 @@ from __future__ import annotations
 import os
 
 from ....clients._errors import APIError
-from .._base import VectorBackend, VectorRecord, check_metric, normalise_score
+from .._base import VectorBackend, VectorRecord, _one_of, check_metric, normalise_score
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -137,7 +137,6 @@ class ChromaBackend(VectorBackend):
         api_key:  str | None = None,
         tenant:   str | None = None,
         database: str | None = None,
-        **kwargs,
     ) -> None:
         super().__init__(
             url     = url     or os.environ.get("CHROMA_URL", self._DEFAULT_URL),
@@ -259,16 +258,8 @@ class ChromaBackend(VectorBackend):
     ) -> None:
         # An empty ids+filter would tell Chroma to delete the whole collection.
         # Guard at the backend too (defence in depth), mirroring Qdrant.
-        if not ids and not filter:
-            raise ValueError(
-                "delete() requires ids or a filter; refusing to delete the "
-                "entire collection."
-            )
-        body: dict = {}
-        if ids:
-            body["ids"] = ids
-        if filter:
-            body["where"] = filter
+        _one_of(ids, filter)
+        body: dict = {"ids": ids} if ids else {"where": filter}
         self._on(collection, "delete", body)
 
     def count(self, collection: str) -> int:

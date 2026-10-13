@@ -125,6 +125,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **The vector backends agree.** A delete takes ids or a filter — exactly one,
+  on every backend and in the store: both meant three things (Qdrant dropped
+  the filter, Chroma took both), and a Pinecone delete with neither sent
+  `deleteAll`. Qdrant writes and deletes wait until they are searchable,
+  where a query straight after an upsert found nothing. A new Pinecone index
+  is waited for until ready. A backend's settings are its named parameters
+  only, so `indx=` and `regoin=` are a `TypeError` instead of being swallowed.
+  A Qdrant id is an integer only in an integer's own spelling — `"007"` and
+  `"7"` were one point, and `"²"` raised. A record with no id, no text or
+  metadata that is not a dict is refused before anything is written, and
+  metadata of `None` is empty.
+
 - **A vector store's scores are read on the metric it was created with.**
   `create(4, metric="euclidean")` on Qdrant and Pinecone built a euclidean
   collection and scored it as cosine: an identical document scored 0.5 and a

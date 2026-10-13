@@ -90,6 +90,18 @@ def check_metric(metric: str, accepted, who: str) -> str:
     return metric
 
 
+def _one_of(ids, filter) -> None:
+    """A delete names records by id or by filter — exactly one. Both meant
+    three things across three backends (Qdrant dropped the filter, Chroma
+    took both), and neither meant the whole collection on Pinecone."""
+    if ids and filter:
+        raise ValueError("delete takes ids or a filter, not both — the backends disagree on "
+                         "what both would mean; call it twice")
+    if not ids and not filter:
+        raise ValueError("delete needs ids or a filter; nothing named would delete the "
+                         "whole collection on some backends, and is refused on all")
+
+
 class PartialUpsert(RuntimeError):
     """An upsert that stopped part way: ``written`` of ``total`` records are
     stored, and the rest are not. The cause is chained."""
@@ -487,18 +499,12 @@ class VectorStore:
         """
         Remove records.
 
-        Pass *ids* to delete specific records, *filter* to delete by
-        metadata condition, or both.  At least one must be provided and
-        non-empty: an empty list/dict is rejected rather than treated as
-        "match everything", because some backends (Pinecone, Qdrant) would
-        otherwise interpret it as a full-collection wipe.
+        Pass *ids* to delete specific records or *filter* to delete by
+        metadata condition — one of them, non-empty. Both are refused, since
+        the backends disagree on what both would mean, and neither is
+        refused rather than read as "everything".
         """
-        if not ids and not filter:
-            raise ValueError(
-                "Provide at least one non-empty argument: ids, filter. "
-                "An empty list/dict is rejected to avoid accidentally "
-                "deleting the whole collection."
-            )
+        _one_of(ids, filter)
         # Normalise empties so backends never see ids=[] / filter={}.
         self._backend.delete(
             self._collection,
@@ -522,6 +528,17 @@ class VectorStore:
         return result.embeddings[0]
 
     def _check_records(self, raw: list[dict]) -> None:
+        for n, r in enumerate(raw):
+            if not isinstance(r, dict):
+                raise TypeError(f"record {n} is a {type(r).__name__}, not a dict with id and text")
+            rid = r.get("id")
+            if isinstance(rid, bool) or not isinstance(rid, (str, int)) or str(rid) == "":
+                raise ValueError(f"record {n} has no id; every record needs a string or integer id")
+            if not isinstance(r.get("text"), str):
+                raise ValueError(f"record {rid!r} has no text")
+            if not isinstance(r.get("metadata") or {}, dict):
+                raise TypeError(f"record {rid!r}: metadata is a dict, not "
+                                f"{type(r.get('metadata')).__name__}")
         for r in raw:
             clash = sorted(set(r.get("metadata") or {}) & set(RESERVED))
             if clash:
