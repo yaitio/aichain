@@ -87,7 +87,7 @@ class MCP(Utility):
                 return t
         raise KeyError(f"the server has no tool {name!r}; it has {self.names}")
 
-    def call(self, name: str, **arguments):
+    def call(self, name: str, /, **arguments):
         """Run the server's tool *name* with *arguments*; its result, or the error it raised."""
         return self.tool(name).run(**arguments)
 

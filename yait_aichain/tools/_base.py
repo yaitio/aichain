@@ -104,6 +104,12 @@ class Record(dict):
         return (dict, (dict(self),))
 
 
+
+def _open(schema) -> bool:
+    """True when *schema* admits keys it does not name."""
+    extra = schema.get("additionalProperties") if isinstance(schema, dict) else None
+    return extra is True or isinstance(extra, dict)
+
 # ---------------------------------------------------------------------------
 # ToolResult
 # ---------------------------------------------------------------------------
@@ -419,11 +425,14 @@ class Tool:
             The arguments of a call.
         """
         declared = self.parameters.get("properties", {})
-        unknown  = [k for k in kwargs if k not in declared]
+        # A schema that says more keys are allowed — `additionalProperties`
+        # true or a schema of its own — is an open map: every key was refused,
+        # and an agent spent its steps on a tool that took nothing.
+        unknown  = [] if _open(self.parameters) else [k for k in kwargs if k not in declared]
         for key, spec in declared.items():
-            nested = (spec or {}).get("properties")
+            nested = spec.get("properties") if isinstance(spec, dict) else None
             value  = kwargs.get(key)
-            if nested and isinstance(value, dict):
+            if nested and isinstance(value, dict) and not _open(spec):
                 unknown += [f"{key}.{k}" for k in value if k not in nested]
         return sorted(unknown)
 
@@ -431,7 +440,7 @@ class Tool:
         declared = self.parameters.get("properties", {})
         known = sorted(declared)
         for key, spec in declared.items():
-            for nested in sorted((spec or {}).get("properties") or {}):
+            for nested in sorted((spec.get("properties") if isinstance(spec, dict) else None) or {}):
                 known.append(f"{key}.{nested}")
         return (f"Invalid call to tool '{self.name}': unknown "
                 f"argument(s) {unknown}. Accepted: {known}.")

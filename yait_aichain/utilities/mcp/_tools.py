@@ -412,7 +412,7 @@ class MCPTool(Tool):
             description = "Get current weather for a city.",
             server      = "https://weather.example.com/mcp",
         )
-        result = tool.run(input={"city": "Tokyo"})
+        result = tool.run({"city": "Tokyo"})
 
         # ── STDIO subprocess ───────────────────────────────────────────
         tool = MCPTool(
@@ -420,7 +420,7 @@ class MCPTool(Tool):
             description = "List files in a directory.",
             server      = {"command": "python", "args": ["./fs_server.py"]},
         )
-        result = tool.run(input={"path": "/tmp"})
+        result = tool.run({"path": "/tmp"})
 
         # ── Use in a Chain step ────────────────────────────────────────
         from yait_aichain.chain import Chain
@@ -470,6 +470,7 @@ class MCPTool(Tool):
         self,
         input:   dict | str | None = None,
         options: dict | None        = None,
+        /,
         **kwargs: Any,
     ) -> Any:
         """
@@ -486,9 +487,10 @@ class MCPTool(Tool):
             options given here are an error that says so.
         **kwargs
             Individual argument values, merged with *input*; an argument
-            given in both is an error.  This is the form used by Chains — accumulated
-            variables whose names match declared parameter properties are
-            passed here automatically.
+            given in both is an error.  This is the form used by Chains and
+            agents. *input* and *options* are positional only, so a server
+            argument named ``input``, ``options`` or ``name`` is passed here
+            like any other: ``tool.run(input={"a": 1})`` sends ``input``.
 
         Returns
         -------
@@ -530,6 +532,7 @@ class MCPTool(Tool):
         self,
         input:   dict | str | None = None,
         options: dict | None        = None,
+        /,
         **kwargs: Any,
     ) -> ToolResult:
         """

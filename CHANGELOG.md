@@ -125,6 +125,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **An MCP server's `input`, `options` and `name` arguments are sent.**
+  `MCPTool.run(input, options, /, **arguments)` and `MCP.call(name, /,
+  **arguments)` take those positionally, so a server argument of the same
+  name goes to the server: `options` was refused, a dict `input` was spread
+  into separate arguments, a list `input` was dropped and `call(name=…)` was a
+  `TypeError`. Code that wrote `tool.run(input={...})` for the argument dict
+  writes `tool.run({...})`.
+- **An open schema admits its keys.** A tool whose schema has
+  `additionalProperties: true`, or a schema for them, had every argument
+  refused as unknown — an `MCPTool` built directly, which has that schema by
+  default, refused all of them, and the agent spent its steps on it.
+
 - **An MCP tool's image reaches the model as an image.** Images, audio and
   binary resources become the library's media parts, so a model is shown the
   picture rather than its base64 as text; text beside them is kept as strings.

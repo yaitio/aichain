@@ -385,7 +385,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
         call_result = _make_call_result(data=result_data)
         mock = _mock_client(call_tool_return=call_result)
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
-            return tool.run(input=arguments)
+            return tool.run(arguments)
 
     # ── basic invocation ────────────────────────────────────────────────────
 
@@ -425,7 +425,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
         mock = _mock_client(call_tool_return=_make_call_result(data="ok"))
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             with self.assertRaisesRegex(ValueError, r"\['message'\] given both"):
-                self._tool().run(input={"message": "from dict"}, message="from kwarg")
+                self._tool().run({"message": "from dict"}, message="from kwarg")
         mock.call_tool.assert_not_called()
 
     def test_string_input_stored_as_input_field(self):
@@ -439,7 +439,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
 
         mock.call_tool = capture_call
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
-            self._tool().run(input="plain string")
+            self._tool().run("plain string")
         self.assertEqual(captured["args"], {"input": "plain string"})
 
     def test_none_input_sends_empty_dict(self):
@@ -453,7 +453,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
 
         mock.call_tool = capture_call
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
-            self._tool().run(input=None)
+            self._tool().run(None)
         self.assertEqual(captured["args"], {})
 
     # ── __call__ (safe wrapper) ─────────────────────────────────────────────
@@ -504,7 +504,7 @@ class TestMCPToolRunMocked(unittest.TestCase):
     def test_a_calls_timeout_is_a_setting(self):
         # 3.7.0: `timeout` meant the connection on MCPTools and one call here.
         with self.assertRaisesRegex(ValueError, "call_timeout"):
-            self._tool().run(message="hi", options={"timeout": 30.0})
+            self._tool().run({"message": "hi"}, {"timeout": 30.0})
 
     def test_no_timeout_not_sent(self):
         call_result = _make_call_result(data="ok")
@@ -519,6 +519,35 @@ class TestMCPToolRunMocked(unittest.TestCase):
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
             self._tool(call_timeout=None).run()
         self.assertNotIn("timeout", captured.get("kw", {}))
+
+    def test_server_arguments_named_input_options_and_name_are_sent(self):
+        call_result = _make_call_result(data="ok")
+        mock = _mock_client(call_tool_return=call_result)
+        seen = {}
+
+        async def capture_call(name, arguments, **kw):
+            seen.update(arguments)
+            return call_result
+
+        mock.call_tool = capture_call
+        tool = MCPTool("t", "d", "https://example.com/mcp", parameters={
+            "type": "object", "properties": {"input": {"type": "object"},
+                                             "options": {"type": "array"},
+                                             "name": {"type": "string"}}})
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
+            tool.run(input={"a": 1}, options=["x"], name="n")
+        self.assertEqual(seen, {"input": {"a": 1}, "options": ["x"], "name": "n"})
+
+    def test_an_open_schema_admits_any_argument(self):
+        tool = MCPTool("t", "d", "https://example.com/mcp")
+        self.assertEqual(tool.unknown_keys({"anything": 1}), [])
+        closed = MCPTool("t", "d", "https://example.com/mcp", parameters={
+            "type": "object", "properties": {"q": {"type": "string"}}})
+        self.assertEqual(closed.unknown_keys({"x": 1}), ["x"])
+        mapped = MCPTool("t", "d", "https://example.com/mcp", parameters={
+            "type": "object", "properties": {"q": {"type": "string"}},
+            "additionalProperties": {"type": "string"}})
+        self.assertEqual(mapped.unknown_keys({"x": "1"}), [])
 
     def test_a_call_has_a_finite_timeout_by_default(self):
         call_result = _make_call_result(data="ok")
@@ -855,7 +884,7 @@ class TestMCPToolFliLive(unittest.TestCase):
         tools = {t.name: t for t in MCPTools(self._SERVER)}
         t     = tools["search_flights"]
 
-        result = t.run(input={
+        result = t.run({
             "origin":         "LAX",
             "destination":    "JFK",
             "departure_date": _DEPART_DATE,
@@ -871,7 +900,7 @@ class TestMCPToolFliLive(unittest.TestCase):
         tools = {t.name: t for t in MCPTools(self._SERVER)}
         t     = tools["search_flights"]
 
-        result = t.run(input={
+        result = t.run({
             "origin":         "SFO",
             "destination":    "ORD",
             "departure_date": _DEPART_DATE,
@@ -902,7 +931,7 @@ class TestMCPToolFliLive(unittest.TestCase):
         tools = {t.name: t for t in MCPTools(self._SERVER)}
         t     = tools["search_dates"]
 
-        result = t.run(input={
+        result = t.run({
             "origin":      "LAX",
             "destination": "JFK",
             "start_date":  _DEPART_DATE,
@@ -919,7 +948,7 @@ class TestMCPToolFliLive(unittest.TestCase):
         tools = {t.name: t for t in MCPTools(self._SERVER)}
         t     = tools["search_dates"]
 
-        result = t.run(input={
+        result = t.run({
             "origin":       "NYC",
             "destination":  "LAX",
             "start_date":   _DEPART_DATE,
@@ -940,7 +969,7 @@ class TestMCPToolFliLive(unittest.TestCase):
             server      = self._SERVER,
         )
 
-        result = tool.run(input={
+        result = tool.run({
             "origin":         "SEA",
             "destination":    "DEN",
             "departure_date": _DEPART_DATE,
