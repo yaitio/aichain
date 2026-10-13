@@ -223,12 +223,14 @@ class GoogleClient(BaseClient):
         out = []
         for candidate in (event.get("candidates") or []):
             parts = ((candidate.get("content") or {}).get("parts")) or []
-            for i, part in enumerate(parts):
+            for part in parts:
                 fc = part.get("functionCall")
                 if not fc:
                     continue
+                # No slot: Google numbers its parts afresh in every event, so
+                # two whole calls in two events both claimed "0:0" — the first
+                # was lost and the second ran with `{}`. Each is its own.
                 out.append({
-                    "slot":      f"{candidate.get('index', 0)}:{i}",
                     "id":        fc.get("id") or "",
                     "name":      fc.get("name") or "",
                     "arguments": json.dumps(fc.get("args") or {}),

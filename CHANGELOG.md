@@ -133,6 +133,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **Streamed tool calls run in the order they began, each its own.** The
+  slots were sorted as strings, so in a turn of eleven calls or more slot 10
+  ran before slot 2 and the side effects came in another order than `run()`
+  gives. Google renumbers its parts in every event, so two whole calls from
+  two events both took slot `"0:0"`: the first was lost and the second ran
+  with `{}`. A whole call now takes a slot of its own.
+
 - **A streamed request is built as a buffered one is.** `Model.stream()` had
   its own copy of the request's tail and dropped `extra` while
   `effective_options` said it was sent; both paths share one tail now, and one

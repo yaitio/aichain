@@ -201,9 +201,10 @@ class _ToolCallAssembly:
 
     def add(self, fragments: list) -> None:
         for f in fragments or []:
-            slot = self._slots.setdefault(
-                f.get("slot", len(self._slots)),
-                {"id": "", "name": "", "arguments": ""})
+            # A fragment with no slot is a whole call of its own: it gets a
+            # new one, never a slot an earlier call already holds.
+            key = f["slot"] if "slot" in f else ("whole", len(self._slots))
+            slot = self._slots.setdefault(key, {"id": "", "name": "", "arguments": ""})
             # An id and a name arrive once, usually with the first fragment;
             # later ones carry arguments alone. Overwriting with the empty
             # string that follows is how a call loses its name and becomes
@@ -220,10 +221,10 @@ class _ToolCallAssembly:
         if not self._slots:
             return None
         from ..clients._families._openai_compat import _tool_call_request
+        # In the order the calls began, as the buffered reply lists them:
+        # sorted as strings, slot 10 ran before slot 2.
         return _tool_call_request(
-            [(slot["name"], slot["arguments"], slot["id"])
-             for _, slot in sorted(self._slots.items(),
-                                   key=lambda kv: str(kv[0]))],
+            [(slot["name"], slot["arguments"], slot["id"]) for slot in self._slots.values()],
             text)
 
 class Model:
