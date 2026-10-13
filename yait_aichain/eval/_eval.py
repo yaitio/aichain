@@ -82,7 +82,7 @@ class Eval:
     name : str, optional
         The run's name, and the ledger's.
     verbose : bool, optional
-        Log each attempt as it finishes, to the ``yait_aichain.eval`` logger
+        Log each attempt as it finishes, to the ``yait_aichain.console`` logger
         with a console handler installed.
     """
 

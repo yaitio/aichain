@@ -40,7 +40,7 @@ a couple of cases first. `run()` returns a `Report`.
 - `out` (*str | Path | None, optional*, default `None`) — The ledger; `./eval-runs/<name>.jsonl` by default, never a scratch
   directory.
 - `name` (*str, optional*, default `'eval'`) — The run's name, and the ledger's.
-- `verbose` (*bool, optional*, default `True`) — Log each attempt as it finishes, to the `yait_aichain.eval` logger
+- `verbose` (*bool, optional*, default `True`) — Log each attempt as it finishes, to the `yait_aichain.console` logger
   with a console handler installed.
 
 ### `Eval.smoke()`
