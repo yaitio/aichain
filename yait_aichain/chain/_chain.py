@@ -113,7 +113,7 @@ from ..models._usage import Usage
 from .._events import Event, emit
 from ._result import ChainResult
 from ..tools._base import Record
-from .._template import _PLACEHOLDER_RE, substitute_placeholders
+from .._template import _PLACEHOLDER_RE, placeholder_names, substitute_placeholders
 
 # One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
 # is a silent `skip`: a chain of a hundred generated steps that expects a few
@@ -293,7 +293,7 @@ def _refuse_function_tool(t) -> None:
 def _resolve(value, accumulated: dict, where: str, top: bool = False):
     """One value of a step's input_map, filled from the chain's variables."""
     if isinstance(value, str):
-        names = _PLACEHOLDER_RE.findall(value)
+        names = placeholder_names(value)
         if not names:
             if not top:
                 return value                                  # a literal inside a dict

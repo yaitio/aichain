@@ -533,7 +533,7 @@ def substitute(messages: list, variables: dict) -> list:
             if part.get("type") == "text":
                 new_part = dict(part)
                 new_part["text"] = substitute_placeholders(
-                    part["text"], variables
+                    part["text"], variables, warn=True
                 )
                 new_parts.append(new_part)
             else:

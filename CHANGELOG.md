@@ -125,6 +125,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **A placeholder is filled wherever it stands.** `{"summary": {text}}` was
+  read as an escaped brace and the document never went in; the template is
+  scanned left to right now, `{{` and `}}` taken as literals and anything else
+  of the form `{name}` filled — `{θέμα}` included, which was not a
+  placeholder. A placeholder a Skill could not fill, with variables given, is
+  said once with the nearest name, where a typo sent `{topic}` to the model
+  as written while a Chain raised on the same mistake. A plain dict or list
+  goes into a prompt as JSON, not as its Python repr.
+
 - **The vector backends agree.** A delete takes ids or a filter — exactly one,
   on every backend and in the store: both meant three things (Qdrant dropped
   the filter, Chroma took both), and a Pinecone delete with neither sent
