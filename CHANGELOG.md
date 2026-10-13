@@ -125,6 +125,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A Pool stops when it says it stops.** `on_error="raise"` raised only
+  after the whole queue had run — a thousand paid calls after the first one
+  failed — and so did Ctrl-C; the queue is cancelled now. Items a stop, a
+  raise or an attention beacon never started are `CANCELLED` (new, `4`) with
+  the reason in `error`, where they stayed `PENDING` and a loop polling for
+  `DONE + FAILED` waited for ever. A worker checks for a stop before it
+  starts an item, so one free between a blocker and the cancel no longer takes
+  the next. A runner without `run()` (a plain function), items that are not
+  dicts and a `max_flows` below 1 are refused at construction.
+
 - **Tool names the model cannot tell apart are refused, and a rename
   renames.** A tool named `pool`, `delegate` or `write_plan` is refused —
   the loop's own tool answered it — and so are two workers of one name, which

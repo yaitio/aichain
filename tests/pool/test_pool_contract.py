@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from yait_aichain import Budget                                      # noqa: E402
 from yait_aichain.agent import beacon                                # noqa: E402
 from yait_aichain.models._usage import Usage                         # noqa: E402
-from yait_aichain.pool import DONE, FAILED, PENDING, RUNNING, Pool   # noqa: E402
+from yait_aichain.pool import CANCELLED, DONE, FAILED, PENDING, RUNNING, Pool   # noqa: E402
 from yait_aichain.state import RunContext, current, using            # noqa: E402
 from yait_aichain.tools._base import Tool                            # noqa: E402
 
@@ -154,7 +154,7 @@ class TestHistoryAndStatus(unittest.TestCase):
 
     def test_before_a_run_everything_is_pending(self):
         p = Pool(Echo(), items("a", "b"))
-        self.assertEqual(p.status, {PENDING: 2, RUNNING: 0, DONE: 0, FAILED: 0})
+        self.assertEqual(p.status, {PENDING: 2, RUNNING: 0, DONE: 0, FAILED: 0, CANCELLED: 0})
 
     def test_a_record_carries_what_a_reader_needs(self):
         p = Pool(Echo(), items("a"))
@@ -218,10 +218,13 @@ class TestErrorPolicies(unittest.TestCase):
         p = Pool(FailOn("bad", pause=0.02), items(*values), max_flows=1, on_error="stop")
         out = p.run()
         self.assertIsNone(out[0])
-        # Items already running finish; the rest are never begun and stay
-        # PENDING — the honest status for work nobody started.
-        self.assertGreaterEqual(p.status[PENDING], 40)
-        self.assertTrue(all(o is None for o, r in zip(out, p.history) if r["status"] == PENDING))
+        # Items already running finish; the rest are never begun and are
+        # CANCELLED with the reason — PENDING for ever hung a polling loop.
+        self.assertGreaterEqual(p.status[CANCELLED], 40)
+        self.assertEqual(p.status[PENDING], 0)
+        cancelled = [r for r in p.history if r["status"] == CANCELLED]
+        self.assertIn("on_error='stop'", cancelled[0]["error"])
+        self.assertTrue(all(o is None for o, r in zip(out, p.history) if r["status"] == CANCELLED))
 
 
 class TestUsage(unittest.TestCase):

@@ -13,7 +13,7 @@ Public API
 ``Pool(runner, items, *, max_flows, on_error)``
     Run *runner* in parallel for every dict in *items*.
 
-``PENDING = 0``  ``RUNNING = 1``  ``DONE = 2``  ``FAILED = 3``
+``PENDING = 0``  ``RUNNING = 1``  ``DONE = 2``  ``FAILED = 3``  ``CANCELLED = 4``
     Integer status constants for reading ``pool.history`` and ``pool.status``.
 
 Runner support
@@ -33,13 +33,15 @@ Result and memory
     One record per item:
       ``index``     — position in items list
       ``variables`` — merged variable dict passed to the runner
-      ``status``    — int  (PENDING / RUNNING / DONE / FAILED)
+      ``status``    — int  (PENDING / RUNNING / DONE / FAILED / CANCELLED,
+                      the last for an item a stop never started; ``error``
+                      says why)
       ``output``    — runner output, or ``None``
       ``error``     — error message, or ``None``
       ``duration``  — seconds, or ``None`` if not yet finished
 
 ``pool.status``  → ``dict``
-    ``{PENDING: N, RUNNING: N, DONE: N, FAILED: N}``
+    ``{PENDING: N, RUNNING: N, DONE: N, FAILED: N, CANCELLED: N}``
     Thread-safe — safe to poll while the pool is running.
 
 on_error
@@ -101,7 +103,7 @@ Use a Chain as runner (multi-step pipeline per item)::
     results  = pool.run()
 """
 
-from ._pool import Pool, PENDING, RUNNING, DONE, FAILED
+from ._pool import Pool, PENDING, RUNNING, DONE, FAILED, CANCELLED
 from ._result import PoolResult
 
 __all__ = [
@@ -111,4 +113,5 @@ __all__ = [
     "RUNNING",
     "DONE",
     "FAILED",
+    "CANCELLED",
 ]

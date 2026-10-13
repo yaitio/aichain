@@ -46,6 +46,7 @@ import threading
 import time
 import warnings
 import contextvars
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +61,10 @@ PENDING = 0
 RUNNING = 1
 DONE    = 2
 FAILED  = 3
+#: Never started, and never will this run: a stop, a raise, an attention
+#: beacon. Such items stayed PENDING for ever, and a polling loop waiting for
+#: DONE + FAILED to reach the count waited for ever too.
+CANCELLED = 4
 
 # One vocabulary with Chain — see `_errors_policy`. `stop` is new here: it
 # means "start no more items", which is what a fan-out can offer where a
@@ -213,6 +218,19 @@ class Pool:
         description: str | None = None,
         max_cost=None,
     ) -> None:
+        if not callable(getattr(runner, "run", None)):
+            # A plain function had no `run`, and every item failed into a list
+            # of None under the default on_error.
+            raise TypeError(f"Pool runs a Skill, a Tool, a Chain or an Agent — something with "
+                            f"run(); got {type(runner).__name__}. Wrap a function with @tool")
+        if isinstance(items, (str, bytes)) or not hasattr(items, "__iter__"):
+            raise TypeError(f"Pool items is a list of dicts, not a {type(items).__name__}")
+        items = list(items)
+        if bad := [i for i, it in enumerate(items) if not isinstance(it, Mapping)]:
+            raise TypeError(f"Pool items are dicts of variables; item {bad[0]} is a "
+                            f"{type(items[bad[0]]).__name__} — e.g. [{{'text': t}} for t in texts]")
+        if isinstance(max_flows, bool) or not isinstance(max_flows, int) or max_flows < 1:
+            raise ValueError(f"max_flows is a whole number of at least 1, not {max_flows!r}")
         if not items:
             raise ValueError("Pool requires at least one item.")
         if on_error not in _VALID_ON_ERROR:
@@ -283,10 +301,14 @@ class Pool:
         from ..agent._swarm import collecting_beacons
         # The budget too is ambient for the fan-out: copied into each worker
         # with the context, and charged by every Skill inside an item.
+        self._stop = threading.Event()
+        self._stop_reason = ""
         with collecting_beacons() as board, lend(self.max_cost):
-            with ThreadPoolExecutor(max_workers=self._max_flows) as executor:
-                future_to_idx: dict = {}
-
+            self._board = board
+            executor = ThreadPoolExecutor(max_workers=self._max_flows)
+            future_to_idx: dict = {}
+            finished = False
+            try:
                 for i, item in enumerate(self._items):
                     merged = {**shared, **item}
                     # `contextvars` do not cross a thread boundary on their
@@ -299,38 +321,52 @@ class Pool:
                         contextvars.copy_context().run, self._run_one, i, merged)
                     future_to_idx[future] = i
 
-                def stop_starting():
+                def stop_starting(why: str):
                     # Items in flight finish: killing a call mid-request costs
                     # the tokens anyway and loses the answer, so stopping can
-                    # only honestly mean not beginning more.
+                    # only honestly mean not beginning more. The event stops
+                    # a worker that is free between the decision and here.
+                    self._stop_reason = self._stop_reason or why
+                    self._stop.set()
                     for pending in future_to_idx:
                         pending.cancel()
 
                 for future in as_completed(future_to_idx):
                     idx = future_to_idx[future]
                     if future.cancelled():
-                        continue        # never started: PENDING in the history, honestly
+                        continue
                     if board.attention():
                         # A blocker, a question or a changed contract from any
                         # item, or from anything it delegated to: the rest of
                         # the fan-out would be spent on work it made pointless.
-                        stop_starting()
+                        stop_starting("an attention beacon was raised")
                     try:
                         results[idx] = future.result()
                     except Exception as exc:
                         if self._on_error == "raise":
+                            stop_starting(f"item {idx} raised")
                             raise
                         if self._on_error == "stop":
-                            stop_starting()
+                            stop_starting(f"item {idx} failed and on_error='stop'")
                         if self._on_error == "skip":
                             name = getattr(self._runner, "name", None) or type(self._runner).__name__
                             warnings.warn(f"Pool item {idx} ({name!r}) failed and was skipped: "
                                           f"{type(exc).__name__}: {exc}", RuntimeWarning, stacklevel=2)
                         # "collect", "skip" and "stop" all leave results[idx] None
+                finished = True
+            finally:
+                if not finished:
+                    # A raise — on_error="raise", Ctrl-C — waited for the whole
+                    # queue: a thousand paid calls after the first one failed.
+                    self._stop_reason = self._stop_reason or "the run was interrupted"
+                    self._stop.set()
+                executor.shutdown(wait=finished, cancel_futures=not finished)
+                self._cancel_unstarted()
         self._beacons = board.all()
 
         from ._result import PoolResult
         history = self.history
+        self._board = None
         return PoolResult(results, success=all(r["status"] == DONE for r in history),
                           history=history, usage=self.usage, beacons=self._beacons)
 
@@ -386,7 +422,7 @@ class Pool:
                 time.sleep(0.5)
         """
         with self._lock:
-            counts = {PENDING: 0, RUNNING: 0, DONE: 0, FAILED: 0}
+            counts = {PENDING: 0, RUNNING: 0, DONE: 0, FAILED: 0, CANCELLED: 0}
             for record in self._history:
                 counts[record["status"]] += 1
             return counts
@@ -408,6 +444,17 @@ class Pool:
             for i, item in enumerate(self._items)
         ]
 
+    _stop_reason: str = ""
+    _stop: threading.Event | None = None
+    _board = None
+
+    def _cancel_unstarted(self) -> None:
+        with self._lock:
+            for record in self._history:
+                if record["status"] == PENDING:
+                    record.update(status=CANCELLED,
+                                  error=f"not started: {self._stop_reason or 'the pool stopped'}")
+
     def _run_one(self, index: int, merged: dict) -> Any:
         """
         Execute the runner for one item.  Called inside a worker thread.
@@ -415,6 +462,15 @@ class Pool:
         Updates ``_history[index]`` at every status transition.
         Raises the original exception after recording it as FAILED.
         """
+        # Checked before starting, by the worker itself: a free worker took
+        # the next item in the moment between a blocker and the cancel.
+        if (self._stop is not None and self._stop.is_set()) or (
+                self._board is not None and self._board.attention()):
+            with self._lock:
+                self._history[index].update(
+                    status=CANCELLED,
+                    error=f"not started: {self._stop_reason or 'an attention beacon was raised'}")
+            return None
         with self._lock:
             self._history[index]["status"]    = RUNNING
             self._history[index]["variables"] = merged
