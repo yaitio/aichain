@@ -76,5 +76,18 @@ class TestGoogleSpeechWire(unittest.TestCase):
             self.assertEqual(transcribe("google")._api_key, "gemini")
 
 
+
+@unittest.skipUnless(os.environ.get("GOOGLE_CLOUD_API_KEY"), "GOOGLE_CLOUD_API_KEY not set")
+class TestGoogleSpeechRoundTripLive(unittest.TestCase):
+    """A sentence spoken and heard back. Each half alone can pass on a wrong
+    reading of the other's format; together they cannot."""
+
+    def test_what_is_said_is_heard(self):
+        sentence = "The quick brown fox jumps over the lazy dog."
+        path = speech("google", output_dir=tempfile.mkdtemp()).run(sentence, {"format": "wav"})
+        heard = str(transcribe("google").run(path, {"language": "en-US"}))
+        self.assertEqual(heard.strip().rstrip(".").lower(), sentence.rstrip(".").lower())
+
+
 if __name__ == "__main__":
     unittest.main()
