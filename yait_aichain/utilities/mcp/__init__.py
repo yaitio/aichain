@@ -14,7 +14,8 @@ declares, each with the name, description and schema the server gives it.
     Agent(model, tools=deepwiki.tools)
 
 Each tool is an ``MCPTool``. Two settings: ``connect_timeout`` bounds reaching
-the server and listing its tools, ``call_timeout`` one call of a tool.
+the server and listing its tools (60 s), ``call_timeout`` one call of a tool
+(300 s); ``None`` waits indefinitely.
 
 Each tool's risk class — what a permission policy reads — comes from the
 server's annotations, and is ``privileged`` where the server says nothing:
@@ -27,7 +28,7 @@ another server's tool is unknown here, and the unknown goes to a person.
 from __future__ import annotations
 
 from .._base import Utility
-from ._tools import DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted, _Server, discover, risk_from_annotations
+from ._tools import DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted, _Server, discover, risk_from_annotations
 
 
 class MCP(Utility):
@@ -40,7 +41,7 @@ class MCP(Utility):
     def __init__(self, server, *, filter: list | None = None, headers: dict | None = None,
                  env: dict | None = None, cwd: str | None = None, transport: str | None = None,
                  connect_timeout: float | None = DEFAULT_MCP_SETUP_TIMEOUT,
-                 call_timeout: float | None = None, risk: dict | None = None) -> None:
+                 call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT, risk: dict | None = None) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool.
         self.server = server

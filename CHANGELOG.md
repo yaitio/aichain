@@ -125,6 +125,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **An MCP call ends.** `call_timeout` is 300 seconds by default, where a
+  server that took a call and never answered held the agent forever; `None`
+  still waits indefinitely, and a value of 0 or below is refused. From
+  Python 3.11 a `TimeoutError` raised by the server's call was mistaken for
+  the bridge's own wait and reported as a `TypeError`; the wait names the
+  setting to raise, `call_timeout` or `connect_timeout`. A forked child starts
+  its own event loop instead of waiting on the parent's, and a synchronous
+  call from the loop's own thread raises instead of deadlocking.
+
 - **The eval report counts what happened.** `Pass^k` used each arm's own
   number of trials, so an interrupted arm at Pass^2 ranked beside a finished
   one at Pass^3; k is one number for the report now. It is estimated from

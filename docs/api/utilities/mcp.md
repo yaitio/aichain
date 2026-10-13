@@ -15,7 +15,7 @@ MCP(
     cwd: str | None = None,
     transport: str | None = None,
     connect_timeout: float | None = 60.0,
-    call_timeout: float | None = None,
+    call_timeout: float | None = 300.0,
     risk: dict | None = None,
 )
 ```
@@ -83,7 +83,7 @@ MCPTool(
     env: dict | None = None,
     cwd: str | None = None,
     transport: str | None = None,
-    call_timeout: float | None = None,
+    call_timeout: float | None = 300.0,
     risk: str = 'privileged',
 )
 ```

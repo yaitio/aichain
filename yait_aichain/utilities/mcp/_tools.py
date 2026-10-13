@@ -64,7 +64,7 @@ import os
 import shlex
 import sys
 import threading
-from concurrent.futures import TimeoutError as FuturesTimeoutError
+import concurrent.futures
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -109,7 +109,7 @@ class _AsyncBridge:
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
-    def run(self, coro: Any, timeout: float | None = None) -> Any:
+    def run(self, coro: Any, timeout: float | None = None, setting: str = "call_timeout") -> Any:
         """
         Submit *coro* to the background loop and block until it completes.
 
@@ -117,17 +117,25 @@ class _AsyncBridge:
         server (e.g. a STDIO subprocess that spawned but never answers the
         protocol handshake) would block the calling thread forever — the
         daemon loop thread is not interruptible from the caller's side.
+        ``setting`` is the name the timeout error tells the caller to raise.
         """
+        if threading.current_thread() is self._thread:
+            coro.close()
+            raise RuntimeError("an MCP tool was called synchronously from the MCP loop's own "
+                               "thread, which would wait on itself forever; await it instead")
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        try:
-            return future.result(timeout)  # re-raises coroutine exceptions
-        except FuturesTimeoutError:
+        # wait(), not result(timeout): from 3.11 the futures TimeoutError is
+        # the builtin one, so a TimeoutError the coroutine raised was caught
+        # as the wait's own and reported as `None:.0f` — a TypeError.
+        done, _ = concurrent.futures.wait([future], timeout)
+        if not done:
             future.cancel()
             raise TimeoutError(
                 f"MCP operation did not complete within {timeout:.0f}s "
-                "(server hung during connection or call). Pass a larger "
-                "call_timeout=… if the operation is legitimately slow."
-            ) from None
+                f"(server hung during connection or call). Pass a larger "
+                f"{setting}=… if the operation is legitimately slow."
+            )
+        return future.result()                   # re-raises coroutine exceptions
 
     @classmethod
     def get(cls) -> _AsyncBridge:
@@ -137,16 +145,32 @@ class _AsyncBridge:
                 cls._instance = cls()
             return cls._instance
 
+    @classmethod
+    def _after_fork(cls) -> None:
+        # A forked child inherits the singleton but not its thread: every
+        # call would wait on a loop nobody runs. The child starts its own.
+        cls._instance = None
+        cls._lock = threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_AsyncBridge._after_fork)
+
 
 # Wall-clock cap for the connection/handshake phase (and tool discovery).
 # Generous — covers slow STDIO subprocess startup — but finite, so a dead
 # server fails with TimeoutError instead of hanging the pipeline forever.
 DEFAULT_MCP_SETUP_TIMEOUT = 60.0
 
+# Wall-clock cap for one call of a tool. Finite, so a server that accepts a
+# call and never answers fails the call instead of holding the agent forever;
+# ``call_timeout=None`` asks for that wait explicitly.
+DEFAULT_MCP_CALL_TIMEOUT = 300.0
 
-def _run_sync(coro: Any, timeout: float | None = None) -> Any:
+
+def _run_sync(coro: Any, timeout: float | None = None, setting: str = "call_timeout") -> Any:
     """Run *coro* synchronously from any context (sync or async)."""
-    return _AsyncBridge.get().run(coro, timeout=timeout)
+    return _AsyncBridge.get().run(coro, timeout=timeout, setting=setting)
 
 
 # ---------------------------------------------------------------------------
@@ -186,12 +210,17 @@ class _Server:
     env:          dict | None  = None
     cwd:          str | None   = None
     transport:    str | None   = None
-    call_timeout: float | None = None
+    call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT
 
     def __post_init__(self) -> None:
         if self.spec is None or (isinstance(self.spec, str) and not self.spec.strip()):
             raise ValueError("MCP needs a server: a URL, a command such as "
                              "'python server.py', or a dict with 'url' or 'command'")
+        if self.call_timeout is not None and not (
+                isinstance(self.call_timeout, (int, float)) and not isinstance(self.call_timeout, bool)
+                and self.call_timeout > 0):
+            raise ValueError(f"MCP call_timeout is a number of seconds above 0, or None to wait "
+                             f"indefinitely — not {self.call_timeout!r}")
         if self.transport is not None and self.transport not in _TRANSPORTS:
             raise ValueError(f"MCP transport {self.transport!r} is not one of {list(_TRANSPORTS)}")
         if isinstance(self.spec, dict):
@@ -332,6 +361,9 @@ class MCPTool(Tool):
     transport : str | None, optional
         Force transport: ``"http"``, ``"streamable"``, ``"sse"`` or
         ``"stdio"``. Auto-detected from *server* when omitted.
+    call_timeout : float | None, optional
+        Seconds one call may take, 300 by default; ``None`` waits
+        indefinitely.
     risk : str, optional
         The risk class a permission policy reads. ``"privileged"`` when
         omitted: what another server's tool does is unknown here, and the
@@ -379,7 +411,7 @@ class MCPTool(Tool):
         env:         dict | None = None,
         cwd:         str | None  = None,
         transport:   str | None  = None,
-        call_timeout: float | None = None,
+        call_timeout: float | None = DEFAULT_MCP_CALL_TIMEOUT,
         risk:        str           = "privileged",
     ) -> None:
         from ...tools._permissions import RISK_CLASSES
@@ -457,7 +489,12 @@ class MCPTool(Tool):
                              + ("timeout is a setting — MCP(…, call_timeout=…)"
                                 if "timeout" in options else
                                 f"a call takes the server's arguments, not options {sorted(options)}"))
-        return _run_sync(self._acall(arguments))
+        # The bridge's own cap sits above the call's and the handshake's, so
+        # the server's timeout fires first and names itself; this one catches
+        # a client that ignored both.
+        limit = self._conn.call_timeout
+        return _run_sync(self._acall(arguments),
+                         timeout=None if limit is None else limit + DEFAULT_MCP_SETUP_TIMEOUT + 5)
 
     def __call__(
         self,
@@ -534,7 +571,7 @@ def discover(server: _Server, *, filter: list[str] | None = None,
     — connect, handshake, listing — and ``None`` waits indefinitely. The
     connection closes here; each tool opens its own when it runs.
     """
-    return _run_sync(_discover(server, filter), timeout=timeout)
+    return _run_sync(_discover(server, filter), timeout=timeout, setting="connect_timeout")
 
 
 async def _discover(server: _Server, filter: list[str] | None) -> list[MCPTool]:

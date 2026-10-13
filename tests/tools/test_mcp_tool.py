@@ -476,8 +476,22 @@ class TestMCPToolRunMocked(unittest.TestCase):
 
         mock.call_tool = capture_call
         with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
-            self._tool().run()
+            self._tool(call_timeout=None).run()
         self.assertNotIn("timeout", captured.get("kw", {}))
+
+    def test_a_call_has_a_finite_timeout_by_default(self):
+        call_result = _make_call_result(data="ok")
+        mock = _mock_client(call_tool_return=call_result)
+        captured = {}
+
+        async def capture_call(name, arguments, **kw):
+            captured["kw"] = kw
+            return call_result
+
+        mock.call_tool = capture_call
+        with patch("yait_aichain.utilities.mcp._tools._build_client", return_value=mock):
+            self._tool().run()
+        self.assertEqual(captured["kw"]["timeout"], 300.0)
 
     # ── correct tool name passed ────────────────────────────────────────────
 
@@ -675,6 +689,48 @@ class TestAsyncBridge(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             _AsyncBridge.get().run(boom())
         self.assertIn("from coroutine", str(ctx.exception))
+
+    def test_a_timeout_the_coroutine_raises_is_its_own(self):
+        # From 3.11 the futures TimeoutError is the builtin; the bridge took
+        # the coroutine's for its own wait and formatted `None:.0f`.
+        async def slow():
+            raise TimeoutError("the server's own")
+
+        with self.assertRaisesRegex(TimeoutError, "the server's own"):
+            _AsyncBridge.get().run(slow())
+
+    def test_the_wait_names_the_setting_to_raise(self):
+        import asyncio
+
+        async def hang():
+            await asyncio.sleep(5)
+
+        with self.assertRaisesRegex(TimeoutError, "connect_timeout"):
+            _AsyncBridge.get().run(hang(), timeout=0.05, setting="connect_timeout")
+
+    def test_a_call_from_the_loop_thread_is_refused(self):
+        import asyncio
+
+        async def inner():
+            return 1
+
+        async def outer():
+            return _AsyncBridge.get().run(inner())
+
+        with self.assertRaisesRegex(RuntimeError, "await it instead"):
+            _AsyncBridge.get().run(outer(), timeout=5)
+
+    def test_a_forked_child_gets_a_fresh_bridge(self):
+        b = _AsyncBridge.get()
+        _AsyncBridge._after_fork()
+        try:
+            self.assertIsNot(_AsyncBridge.get(), b)
+        finally:
+            _AsyncBridge._instance = b
+
+    def test_call_timeout_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            MCPTool("t", "d", "https://example.com/mcp", call_timeout=0)
 
     def test_thread_is_daemon(self):
         bridge = _AsyncBridge.get()
