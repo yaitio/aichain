@@ -554,7 +554,7 @@ API_PAGES = {
     "api/pool.md": [("yait_aichain", n) for n in ("Pool", "PoolResult", "PENDING", "RUNNING", "DONE", "FAILED")],
     "api/agent.md": [("yait_aichain.agent", n) for n in (
         "Agent", "AgentResult", "step_count", "token_budget", "cost_budget", "check", "nudge",
-        "stalled", "repeating", "Acceptance", "acceptance_from", "beacon", "Beacon", "ATTENTION",
+        "stalled", "repeating", "verified", "Acceptance", "acceptance_from", "beacon", "Beacon", "ATTENTION",
         "COORDINATION", "Journal", "JournalEntry", "evidence", "AgentMemory", "MemoryBackend",
         "InMemoryBackend", "FileBackend")],
     "api/tools/index.md": [("yait_aichain.tools", n) for n in ("tool", "Tool", "FunctionTool", "ToolResult", "Record", "media_part")],

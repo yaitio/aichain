@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../agents/overview.md).
 
 <!-- g:api -->
-[`Agent`](#agent) · [`AgentResult`](#agentresult) · [`step_count`](#step_count) · [`token_budget`](#token_budget) · [`cost_budget`](#cost_budget) · [`check`](#check) · [`nudge`](#nudge) · [`stalled`](#stalled) · [`repeating`](#repeating) · [`Acceptance`](#acceptance) · [`acceptance_from`](#acceptance_from) · [`beacon`](#beacon) · [`Beacon`](#beacon) · [`ATTENTION`](#attention) · [`COORDINATION`](#coordination) · [`Journal`](#journal) · [`JournalEntry`](#journalentry) · [`evidence`](#evidence) · [`AgentMemory`](#agentmemory) · [`MemoryBackend`](#memorybackend) · [`InMemoryBackend`](#inmemorybackend) · [`FileBackend`](#filebackend)
+[`Agent`](#agent) · [`AgentResult`](#agentresult) · [`step_count`](#step_count) · [`token_budget`](#token_budget) · [`cost_budget`](#cost_budget) · [`check`](#check) · [`nudge`](#nudge) · [`stalled`](#stalled) · [`repeating`](#repeating) · [`verified`](#verified) · [`Acceptance`](#acceptance) · [`acceptance_from`](#acceptance_from) · [`beacon`](#beacon) · [`Beacon`](#beacon) · [`ATTENTION`](#attention) · [`COORDINATION`](#coordination) · [`Journal`](#journal) · [`JournalEntry`](#journalentry) · [`evidence`](#evidence) · [`AgentMemory`](#agentmemory) · [`MemoryBackend`](#memorybackend) · [`InMemoryBackend`](#inmemorybackend) · [`FileBackend`](#filebackend)
 
 ---
 
@@ -506,6 +506,32 @@ nothing called it.
 **Parameters**
 
 - `last_k` (*int, optional*, default `5`) — Attempts that must all have been the same move.
+
+---
+
+## `verified()`
+
+```python
+verified(message: str | None = None, name: str = 'verified')
+```
+
+Before the run answers, ask once for a check of what it changed.
+
+The commonest agent failure there is: "done" with nothing run. When the
+model answers after a call that changed something — a write, an external
+call, a delete — and no call has succeeded since to look at the result,
+its answer is held, *message* is put to it as a user turn, and the loop
+goes on. Once per run: a model that answers again is believed, and the
+record says it was asked.
+
+Only a call clears it — a read, a test run, anything that succeeds after
+the change. The model saying it checked does not, because that is the
+claim the gate exists to test.
+
+**Parameters**
+
+- `message` (*str | None, optional*, default `None`) — What the model is told; a default names the change.
+- `name` (*str, optional*, default `'verified'`) — How the nudge is reported in its event.
 
 ---
 

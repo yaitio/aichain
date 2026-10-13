@@ -77,7 +77,7 @@ agent composes the library rather than reimplementing it.
 """
 
 from ._agent   import (Agent, step_count, token_budget, cost_budget, check,
-                       nudge, stalled, repeating)
+                       nudge, stalled, repeating, verified)
 from ._journal import Journal, JournalEntry, evidence
 from ._memory  import AgentMemory, MemoryBackend, InMemoryBackend, FileBackend
 from ._result  import AgentResult
@@ -102,6 +102,7 @@ __all__ = [
     "nudge",
     "stalled",
     "repeating",
+    "verified",
     # Journal
     "Journal",
     "JournalEntry",

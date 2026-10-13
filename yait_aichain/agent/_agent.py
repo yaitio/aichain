@@ -168,6 +168,44 @@ def nudge(predicate, message, name: str = "nudge"):
     return _c
 
 
+#: The risk classes that change something. A call of one of these is an
+#: effect; any later call that succeeds — a read, a test run — is a look at
+#: what it did.
+_EFFECTS = frozenset({"write", "external", "financial", "destructive"})
+
+
+def verified(message: str | None = None, name: str = "verified"):
+    """
+    Before the run answers, ask once for a check of what it changed.
+
+    The commonest agent failure there is: "done" with nothing run. When the
+    model answers after a call that changed something — a write, an external
+    call, a delete — and no call has succeeded since to look at the result,
+    its answer is held, *message* is put to it as a user turn, and the loop
+    goes on. Once per run: a model that answers again is believed, and the
+    record says it was asked.
+
+    Only a call clears it — a read, a test run, anything that succeeds after
+    the change. The model saying it checked does not, because that is the
+    claim the gate exists to test.
+
+    Parameters
+    ----------
+    message : str | None, optional
+        What the model is told; a default names the change.
+    name : str, optional
+        How the nudge is reported in its event.
+    """
+    def _c(state):
+        return state.get("unverified")
+    _c.kind, _c.name = "verify", name
+    _c.message = message or (lambda state: (
+        f"You changed something with {state.get('unverified')!r} and have not looked at the "
+        "result since. Check it — read it back, or run the check that shows it works — "
+        "before you answer."))
+    return _c
+
+
 def stalled(last_k: int = 5):
     """Nudge when the last *last_k* attempts moved nothing.
 
@@ -1112,10 +1150,17 @@ class Agent:
                                     error=f"{type(exc).__name__}: {exc}")
             yield from drain()
 
-            # Text is the answer — one exit, not two spellings of it.
+            # Text is the answer — one exit, not two spellings of it — unless
+            # a `verified()` gate holds it once for a check.
             if not isinstance(reply, ToolCallRequest):
-                self._log(1, f"\n[Done] ✓ answered · {state['steps']} step(s)")
-                return self._result(state, True, str(reply), "answered")
+                held = self._verify_gate(state)
+                if held is None:
+                    self._log(1, f"\n[Done] ✓ answered · {state['steps']} step(s)")
+                    return self._result(state, True, str(reply), "answered")
+                messages.append({"role": "assistant", "parts": [{"type": "text", "text": str(reply)}]})
+                messages.append({"role": "user", "parts": [{"type": "text", "text": held}]})
+                yield from drain()
+                continue
 
             state["steps"] += 1
             messages.append(reply.as_turn())
@@ -1173,6 +1218,15 @@ class Agent:
                     yield from drain()
                     return parked
                 failure, self._failure = self._failure, None
+                if not error:
+                    # What a `verified()` gate reads: the last change not yet
+                    # looked at. Any later call that succeeds clears it.
+                    from ..tools._permissions import risk_of
+                    acted = self._gated_tool(call)
+                    if acted is not None and risk_of(acted, dict(call.arguments or {})) in _EFFECTS:
+                        state["unverified"] = call.name
+                    elif state.get("unverified"):
+                        state["unverified"] = None
                 self._emit("tool_call.ended", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "", "result": _copy(result),
@@ -1257,10 +1311,28 @@ class Agent:
     def _fired(self, state: dict):
         """The first terminal condition that fired. Nudges are not terminal."""
         for cond in self.stop_when:
-            if getattr(cond, "kind", "ceiling") == "nudge":
+            if getattr(cond, "kind", "ceiling") in ("nudge", "verify"):
                 continue
             if fired := cond(state):
                 return fired, cond
+        return None
+
+    def _verify_gate(self, state: dict) -> str | None:
+        """The message a `verified()` gate holds an answer for, or None."""
+        latched = state.get("nudged")
+        if not isinstance(latched, set):
+            latched = state["nudged"] = set(latched or ())
+        for i, cond in enumerate(self.stop_when):
+            if getattr(cond, "kind", None) != "verify":
+                continue
+            key = f"{i}:{cond.name}"
+            if key in latched or not cond(state):
+                continue
+            latched.add(key)
+            message = cond.message(state) if callable(cond.message) else cond.message
+            self._emit("nudge.fired", step=state.get("steps"),
+                       payload={"name": cond.name, "message": message})
+            return message
         return None
 
     def _nudges(self, state: dict) -> list:

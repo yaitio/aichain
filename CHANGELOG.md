@@ -133,6 +133,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **`verified()`: no "done" with nothing checked.** A stop condition, opt-in:
+  when the model answers after a call that changed something — `write`,
+  `external`, `financial` or `destructive`, by the call's own class — and no
+  call has succeeded since to look at the result, the answer is held once
+  and the model is asked to check before it answers. Only a later call clears
+  it; the model saying it checked does not. It fires `nudge.fired` and is
+  latched per run, across a pause too.
+
 - **A permission decision can see the call it decides.**
   `PermissionPolicy.decide(tool, arguments)` asks the tool, where it can tell,
   for this call's class through `risk_for(arguments)`; `risk_of()` is the same
