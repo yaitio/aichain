@@ -279,43 +279,73 @@ def _extract_result(result: Any) -> Any:
 
     Priority:
 
-    1. ``result.data`` — fully deserialised value (fastmcp ≥ 2.x).
-    2. Single text content block → plain ``str``.
-    3. Multiple / mixed content blocks → ``list[dict]``.
-    4. Empty result → ``None``.
+    1. Media in the content — images, audio, binary resources — makes the
+       result a list of the library's parts, text as strings beside them, so
+       the model sees an image rather than megabytes of base64.
+    2. ``structured_content`` — the server's JSON as sent, unwrapped from
+       ``{"result": …}`` only where fastmcp says it wrapped it. Not ``.data``:
+       for a typed schema that is a generated dataclass, and the model read
+       ``Root(code='LH1')``.
+    3. ``.data``, for a client that has no structured content.
+    4. The content: one text block is a ``str``, several a list.
+    5. Empty → ``None``.
     """
-    # Prefer .data (covers primitives, dicts, lists, Pydantic models, etc.)
+    content = list(getattr(result, "content", None) or [])
+    parts = [_part(item) for item in content]
+    if any(isinstance(p, dict) for p in parts):
+        return parts
+
+    structured = getattr(result, "structured_content", None)
+    if isinstance(structured, dict):
+        meta = getattr(result, "meta", None)
+        wrapped = isinstance(meta, dict) and (meta.get("fastmcp") or {}).get("wrap_result")
+        return structured.get("result") if wrapped else structured
+
     data = getattr(result, "data", _MISSING)
     if data is not _MISSING and data is not None:
+        import dataclasses
+        if dataclasses.is_dataclass(data) and not isinstance(data, type):
+            return dataclasses.asdict(data)
         return data
 
-    content = getattr(result, "content", None)
-    if not content:
+    if not parts:
         return None
+    return parts[0] if len(parts) == 1 else parts
 
-    blocks: list[dict] = []
-    for item in content:
-        itype = getattr(item, "type", None)
-        if itype == "text":
-            blocks.append({"type": "text", "text": item.text})
-        elif itype == "image":
-            blocks.append({
-                "type":      "image",
-                "data":      item.data,
-                "mime_type": getattr(item, "mimeType", "image/png"),
-            })
-        elif itype == "resource":
-            blocks.append({
-                "type":     "resource",
-                "resource": item.resource,
-            })
-        else:
-            blocks.append({"type": str(itype), "raw": str(item)})
 
-    if len(blocks) == 1 and blocks[0]["type"] == "text":
-        return blocks[0]["text"]
+def _media(kind: str, mime: str, data: Any) -> dict:
+    return {"type": kind, "source": {"kind": "base64", "mime": mime, "data": data}}
 
-    return blocks if blocks else None
+
+def _mime(item: Any, default: str) -> str:
+    # `mime_type` since MCP SDK v2; `mimeType` before it.
+    mime = getattr(item, "mime_type", None)
+    if not isinstance(mime, str):
+        mime = getattr(item, "mimeType", None)
+    return mime if isinstance(mime, str) and mime else default
+
+
+def _part(item: Any) -> Any:
+    """One content block as a string of text or a media part."""
+    itype = getattr(item, "type", None)
+    if itype == "text":
+        return item.text
+    if itype in ("image", "audio"):
+        return _media(itype, _mime(item, "image/png" if itype == "image" else "audio/wav"), item.data)
+    if itype == "resource":
+        res = item.resource
+        text = getattr(res, "text", None)
+        if isinstance(text, str):
+            return text
+        blob = getattr(res, "blob", None)
+        if isinstance(blob, str):
+            mime = _mime(res, "application/octet-stream")
+            kind = mime.split("/", 1)[0]
+            return _media(kind if kind in ("image", "audio", "video") else "document", mime, blob)
+        return f"[resource {getattr(res, 'uri', '')}]"
+    if itype == "resource_link":
+        return f"[resource {getattr(item, 'uri', '')}]"
+    return str(item)
 
 
 _MISSING = object()  # sentinel for "attribute not present"

@@ -125,6 +125,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **An MCP tool's image reaches the model as an image.** Images, audio and
+  binary resources become the library's media parts, so a model is shown the
+  picture rather than its base64 as text; text beside them is kept as strings.
+  Structured results are the server's JSON as sent, where a typed schema gave
+  fastmcp's generated dataclass and the model read `Root(code='LH1')`, and
+  `{"result": …}` is unwrapped only where fastmcp says it wrapped it. Several
+  text blocks are a list of strings, where they were `{"type": "text"}` dicts.
+
 - **An MCP call ends.** `call_timeout` is 300 seconds by default, where a
   server that took a call and never answered held the agent forever; `None`
   still waits indefinitely, and a value of 0 or below is refused. From

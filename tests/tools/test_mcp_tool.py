@@ -88,6 +88,7 @@ def _make_call_result(data=_MISSING, content=None):
         # Simulate an object that doesn't have .data
         del r.data
     r.content = content or []
+    r.structured_content = None
     return r
 
 
@@ -287,18 +288,14 @@ class TestExtractResult(unittest.TestCase):
             _make_text_content("Part 2"),
         ])
         result = _extract_result(r)
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["text"], "Part 1")
-        self.assertEqual(result[1]["text"], "Part 2")
+        self.assertEqual(result, ["Part 1", "Part 2"])
 
     def test_image_content_preserved(self):
         r = _make_call_result(content=[_make_image_content("b64data", "image/jpeg")])
         result = _extract_result(r)
-        self.assertIsInstance(result, list)
-        self.assertEqual(result[0]["type"], "image")
-        self.assertEqual(result[0]["data"], "b64data")
-        self.assertEqual(result[0]["mime_type"], "image/jpeg")
+        # The library's own media part, so the model sees an image, not base64 text.
+        self.assertEqual(result, [{"type": "image", "source": {
+            "kind": "base64", "mime": "image/jpeg", "data": "b64data"}}])
 
     def test_mixed_text_and_image_returns_list(self):
         r = _make_call_result(content=[
@@ -306,9 +303,53 @@ class TestExtractResult(unittest.TestCase):
             _make_image_content(),
         ])
         result = _extract_result(r)
-        self.assertIsInstance(result, list)
-        self.assertEqual(result[0]["type"], "text")
+        self.assertEqual(result[0], "caption")
         self.assertEqual(result[1]["type"], "image")
+
+    def test_structured_content_is_the_json_as_sent(self):
+        from dataclasses import dataclass
+
+        @dataclass
+        class Root:
+            code: str
+
+        r = _make_call_result(data=Root("LH1"), content=[_make_text_content('{"code":"LH1"}')])
+        r.structured_content = {"code": "LH1"}
+        r.meta = {}
+        self.assertEqual(_extract_result(r), {"code": "LH1"})
+
+    def test_a_wrapped_result_is_unwrapped_only_when_fastmcp_wrapped_it(self):
+        r = _make_call_result(content=[_make_text_content("5")])
+        r.structured_content, r.meta = {"result": 5}, {"fastmcp": {"wrap_result": True}}
+        self.assertEqual(_extract_result(r), 5)
+        r.meta = {}
+        self.assertEqual(_extract_result(r), {"result": 5})
+
+    def test_a_dataclass_from_data_is_a_dict(self):
+        from dataclasses import dataclass
+
+        @dataclass
+        class Root:
+            code: str
+
+        self.assertEqual(_extract_result(_make_call_result(data=Root("LH1"))), {"code": "LH1"})
+
+    def test_media_beside_structured_content_is_kept(self):
+        r = _make_call_result(content=[_make_text_content("chart"), _make_image_content()])
+        r.structured_content, r.meta = {"rows": 3}, {}
+        self.assertEqual(_extract_result(r)[1]["type"], "image")
+
+    def test_a_blob_resource_is_a_document_part(self):
+        res = SimpleNamespace(uri="file:///a.pdf", blob="QUJD", mime_type="application/pdf")
+        item = SimpleNamespace(type="resource", resource=res)
+        r = _make_call_result(content=[item])
+        self.assertEqual(_extract_result(r), [{"type": "document", "source": {
+            "kind": "base64", "mime": "application/pdf", "data": "QUJD"}}])
+
+    def test_a_text_resource_is_its_text(self):
+        res = SimpleNamespace(uri="file:///a.txt", text="hello")
+        r = _make_call_result(content=[SimpleNamespace(type="resource", resource=res)])
+        self.assertEqual(_extract_result(r), "hello")
 
     def test_empty_content_returns_none(self):
         r = _make_call_result(content=[])
