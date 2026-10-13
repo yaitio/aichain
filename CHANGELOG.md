@@ -125,6 +125,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **Stop conditions hold on both seams.** A `stop_when` with no ceiling gets
+  `step_count(30)` and a warning, where `stop_when=[check(...)]` dropped the
+  default and the loop had none. `cost_budget` on a model with no price warns
+  at construction, since its cost is never known and it never fires. Two
+  nudges of one name each speak — the latch is keyed by place, not by name —
+  and the latch survives a pause, where a resumed run repeated its nudge.
+  `step()` counts a decision as `run()` does, so a driver's `step_count`
+  moves, and `agent.stopped(state)` and `agent.nudges(state)` give a driver
+  what `run()` asks after each turn. The journal records a call with a hash of
+  its whole arguments, where two calls that differed past 200 characters read
+  as one repeated and `repeating()` fired.
+
 - **`Agent.stream()` hands each text delta over as it arrives.** The deltas
   were emitted inside a synchronous model call and drained when it returned,
   so hooks saw them at 0.31, 0.61 and 0.91 s and a `for ev in stream()`

@@ -44,6 +44,7 @@ import copy
 import logging
 import time
 import uuid
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -475,6 +476,19 @@ class Agent:
                              "no other mode has a planning phase")
         self.planner_model = planner_model
         self.stop_when    = list(stop_when) if stop_when is not None else [step_count(30)]
+        if not any(getattr(c, "kind", "ceiling") == "ceiling" for c in self.stop_when):
+            # `stop_when=[check(...)]` replaced the default step_count(30), and
+            # a check that never passes ran the loop without end.
+            warnings.warn("stop_when has no ceiling, so step_count(30) is added; give one of "
+                          "your own — step_count, token_budget, cost_budget — to choose",
+                          stacklevel=3)
+            self.stop_when.append(step_count(30))
+        if any(getattr(c, "name", "") == "cost_budget" for c in self.stop_when):
+            from ..models._usage import _price_of
+            if _price_of(getattr(model, "name", ""), getattr(model, "_provider", None)) is None:
+                warnings.warn(f"cost_budget on {getattr(model, 'name', model)!r}, which has no "
+                              "price: its cost is never known, so the budget never fires",
+                              stacklevel=3)
         self.hooks        = list(hooks or [])
 
         #: The result of the last :meth:`stream`, once the generator has run
@@ -919,7 +933,36 @@ class Agent:
                 "previous reply — failed ones included, with the error as "
                 "the result — before calling step() again. `run()` does this "
                 "for you; an external driver owns it.")
-        return self._ask(messages, state if state is not None else self.new_state())
+        state = state if state is not None else self.new_state()
+        reply = self._ask(messages, state)
+        if isinstance(reply, ToolCallRequest):
+            # Counted here as run() counts it: a driver on this seam had a
+            # step_count that never moved, and so no ceiling at all.
+            state["steps"] = (state.get("steps") or 0) + 1
+        return reply
+
+    def stopped(self, state: dict) -> str | None:
+        """The name of the terminal condition that holds, or None — what
+        ``run()`` asks after every turn, for a driver of ``step()`` to ask too.
+
+        Parameters
+        ----------
+        state : dict
+            The state passed to ``step()``.
+        """
+        fired = self._fired(state)
+        return fired[0] if fired else None
+
+    def nudges(self, state: dict) -> list:
+        """The messages of nudges that fire now, once per streak — what
+        ``run()`` appends as user turns, for a driver of ``step()`` to append.
+
+        Parameters
+        ----------
+        state : dict
+            The state passed to ``step()``.
+        """
+        return self._nudges(state)
 
     def execute(self, call, state: dict | None = None):
         """Run one :class:`ToolCall`. Returns ``(result, error)``: a tool that
@@ -1095,8 +1138,7 @@ class Agent:
                     # here would make ten different searches read as one
                     # search repeated to `repeating()`; the action carries it.
                     "",
-                    action      = _safe({"name": call.name,
-                                         "arguments": call.arguments}),
+                    action      = _action(call),
                     outcome     = _J_FAILED if error else _J_DONE,
                     # A call that *ran* is a fact, but what it returned is
                     # only as good as its source. `delegate` hands back a
@@ -1151,17 +1193,23 @@ class Agent:
 
     def _nudges(self, state: dict) -> list:
         """Messages from nudges that fired this turn — once per streak."""
-        latched = state.setdefault("nudged", set())
+        # Keyed by place, not name: two nudges of one name — every nudge is
+        # "nudge" unless named, `stalled(3)` beside `stalled(8)` — shared one
+        # latch, and the second never spoke. A list after a resume.
+        latched = state.get("nudged")
+        if not isinstance(latched, set):
+            latched = state["nudged"] = set(latched or ())
         notes = []
-        for cond in self.stop_when:
+        for i, cond in enumerate(self.stop_when):
             if getattr(cond, "kind", None) != "nudge":
                 continue
+            key = f"{i}:{cond.name}"
             if not cond(state):
-                latched.discard(cond.name)        # cleared: re-arm
+                latched.discard(key)              # cleared: re-arm
                 continue
-            if cond.name in latched:
+            if key in latched:
                 continue                          # said already, still true
-            latched.add(cond.name)
+            latched.add(key)
             message = (cond.message(state) if callable(cond.message)
                        else cond.message)
             self._emit("nudge.fired", step=state.get("steps"),
@@ -1609,11 +1657,15 @@ class Agent:
         """The counters that survive a pause, and only those.
 
         The journal travels beside this, in its own serialised form. What is
-        dropped is dropped on purpose: `nudged` is a latch for one process's
-        loop, and `adaptations` are per-request notices about what went on the
-        wire — neither describes the conversation, which is what resumes.
+        dropped is dropped on purpose: `adaptations` are per-request notices
+        about what went on the wire, and do not describe the conversation,
+        which is what resumes. The nudge latch is kept, so a resumed run does
+        not repeat a nudge it already gave.
         """
-        return {k: state.get(k) for k in ("steps", "tokens", "cost", "plan")}
+        out = {k: state.get(k) for k in ("steps", "tokens", "cost", "plan")}
+        # The latch travels: dropped, a resumed run said its nudge again.
+        out["nudged"] = sorted(state.get("nudged") or ())
+        return out
 
     def _note_unfinished(self, journal, state, why: str) -> None:
         """A ceiling reached with a plan outstanding is a plan not finished."""
@@ -1704,6 +1756,16 @@ def _interrupted(result) -> bool:
     """A run that stopped on the model rather than on its own: worth a retry."""
     return (isinstance(result, AgentResult) and not result.success
             and result.stopped_by in ("llm_error", "truncated"))
+
+
+def _action(call) -> str:
+    """A call as the journal records it: the name and arguments, shortened for
+    reading, with a hash of the whole arguments — two calls that differed only
+    past the cut read as one repeated, and `repeating()` fired on them."""
+    import hashlib
+    full = json.dumps(call.arguments or {}, ensure_ascii=False, default=str, sort_keys=True)
+    digest = hashlib.sha256(full.encode()).hexdigest()[:12]
+    return f"{_safe({'name': call.name, 'arguments': call.arguments})} #{digest}"
 
 
 def _safe(value, limit: int = 200):

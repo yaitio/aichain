@@ -252,6 +252,32 @@ for reliability, not for accuracy.
 - `state` (*dict | None, optional*, default `None`) — The run's working state between calls, kept by the caller; the plan in
   `waterfall` mode lives here.
 
+### `Agent.stopped()`
+
+```python
+Agent.stopped(state: dict) -> str | None
+```
+
+The name of the terminal condition that holds, or None — what
+`run()` asks after every turn, for a driver of `step()` to ask too.
+
+**Parameters**
+
+- `state` (*dict*) — The state passed to `step()`.
+
+### `Agent.nudges()`
+
+```python
+Agent.nudges(state: dict) -> list
+```
+
+The messages of nudges that fire now, once per streak — what
+`run()` appends as user turns, for a driver of `step()` to append.
+
+**Parameters**
+
+- `state` (*dict*) — The state passed to `step()`.
+
 ### `Agent.execute()`
 
 ```python
