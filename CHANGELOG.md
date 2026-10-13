@@ -133,6 +133,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **The `step()` seam's state survives JSON.** Adaptations are kept in the
+  state as plain dicts, where the first one put a dataclass there and
+  `json.dumps` failed — and with `default=str` the dedupe never matched, so
+  the list grew every step; `AgentResult.adaptations` still holds
+  `Adaptation`s. `ToolCallRequest.from_turn(turn)` rebuilds the calls of a
+  turn kept as JSON between invocations.
+
 - **A run that cannot go on ends with a reason.** A request past the model's
   context window is `ContextWindowExceededError` (an `InvalidRequestError`,
   now exported) and stops an agent with `stopped_by="context_overflow"`, where

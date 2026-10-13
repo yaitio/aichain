@@ -103,6 +103,22 @@ class ToolCallRequest:
     def __bool__(self) -> bool:
         return bool(self.calls)
 
+    @classmethod
+    def from_turn(cls, turn: dict) -> ToolCallRequest:
+        """The reply an assistant turn holds — the inverse of `as_turn`, for a
+        driver that kept the conversation as JSON between invocations and has
+        to act on its last turn.
+
+        Parameters
+        ----------
+        turn : dict
+            An assistant turn with ``tool_calls``, as ``as_turn`` wrote it.
+        """
+        calls = tuple(ToolCall(id=c.get("id", ""), name=c["name"], arguments=dict(c.get("arguments") or {}))
+                      for c in turn.get("tool_calls") or [])
+        text = "".join(p.get("text", "") for p in turn.get("parts") or [] if p.get("type") == "text")
+        return cls(calls=calls, text=text, opaque=dict(turn.get("opaque") or {}))
+
     def as_turn(self) -> dict:
         """This reply as a universal assistant turn, for appending."""
         turn: dict = {

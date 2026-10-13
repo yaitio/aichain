@@ -40,6 +40,7 @@ from __future__ import annotations
 import json
 import contextlib
 import copy
+import dataclasses
 import logging
 import time
 import uuid
@@ -50,6 +51,7 @@ from typing import Any
 from .._budget import Budget, as_budget, start_run
 from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models import Model
+from ..models._adaptation import Adaptation
 from ..skills import Skill
 from ..utilities._base import Utility
 from ..state import StateStore
@@ -1325,8 +1327,13 @@ class Agent:
         # Kept per run, deduplicated: a loop asks the same thing of the same
         # model every turn, so without this the list grows by a copy a step.
         for a in skill.last_adaptations:
-            if a not in state["adaptations"]:
-                state["adaptations"].append(a)
+            # As plain data: the state of the step() seam is documented as
+            # JSON-serialisable, and a dataclass in it broke `json.dumps` on
+            # the first adaptation — and with `default=str` the `not in`
+            # check never matched, so the list grew every step.
+            entry = dataclasses.asdict(a) if dataclasses.is_dataclass(a) else a
+            if entry not in state["adaptations"]:
+                state["adaptations"].append(entry)
         usage = skill.last_usage
         state["tokens"] += getattr(usage, "total_tokens", 0) or 0
         if (c := getattr(usage, "cost", None)) is not None:
@@ -1616,7 +1623,8 @@ class Agent:
             steps_taken=state["steps"], tokens_used=state["tokens"],
             cost=state["cost"], stopped_by=stopped_by, error=error,
             plan=[{"goal": g} for g in (state["plan"] or [])],
-            adaptations=list(state.get("adaptations") or []),
+            adaptations=[Adaptation(**a) if isinstance(a, dict) else a
+                         for a in state.get("adaptations") or []],
         )
 
     def _finished(self, result, journal, board):

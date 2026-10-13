@@ -397,6 +397,20 @@ silently narrow the channel this feature exists to widen.
   assistant turn before a tool result when extended thinking is on.
   Not for reading; carried so the history stays one the provider takes.
 
+### `ToolCallRequest.from_turn()`
+
+```python
+ToolCallRequest.from_turn(turn: dict) -> ToolCallRequest
+```
+
+The reply an assistant turn holds — the inverse of `as_turn`, for a
+driver that kept the conversation as JSON between invocations and has
+to act on its last turn.
+
+**Parameters**
+
+- `turn` (*dict*) — An assistant turn with `tool_calls`, as `as_turn` wrote it.
+
 ### `ToolCallRequest.as_turn()`
 
 ```python
