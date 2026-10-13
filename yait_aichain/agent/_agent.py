@@ -882,8 +882,11 @@ class Agent:
         """
         opening = task
         if variables:
+            # Without its secrets: a token a chain carried for a tool went to
+            # the model's provider in this block.
+            from ..state._secret import public
             opening = (f"{task}\n\nGIVEN:\n"
-                       + json.dumps(variables, indent=1, ensure_ascii=False,
+                       + json.dumps(public(variables), indent=1, ensure_ascii=False,
                                     default=str))
         return [
             {"role": "system",

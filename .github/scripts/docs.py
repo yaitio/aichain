@@ -564,7 +564,7 @@ API_PAGES = {
                       + [("yait_aichain.tools", n) for n in ("RISK_CLASSES", "DECISIONS")],
     "api/state.md": [("yait_aichain.state", n) for n in ("RunContext", "current", "using", "Suspend",
                                                          "SuspendedResult", "StateStore", "InMemoryStore",
-                                                         "FileStore", "RunDocument", "StepStatus")],
+                                                         "FileStore", "RunDocument", "StepStatus", "Secret")],
     "api/eval.md": [("yait_aichain.eval", n) for n in ("Eval", "Case", "Record", "Report", "exact", "contains",
                                                        "regex", "numeric", "judge", "pairwise", "abstain",
                                                        "all_of", "adapt", "read", "write", "normalise", "se", "ci")],

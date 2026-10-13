@@ -114,6 +114,7 @@ from .._events import Event, emit
 from ._result import ChainResult
 from ..tools._base import Record
 from .._template import _PLACEHOLDER_RE, placeholder_names, substitute_placeholders
+from ..state._secret import public
 
 # One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
 # is a silent `skip`: a chain of a hundred generated steps that expects a few
@@ -517,7 +518,7 @@ class Chain:
         accumulated = {**self.variables, **(variables or {})}
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
-        doc = RunDocument.new("chain", step_names, variables=accumulated,
+        doc = RunDocument.new("chain", step_names, variables=public(accumulated),
                               definition={"steps": self._signature()})
         from ..state import current, using
         # No context given is the one already in force — `with using(ctx):
@@ -571,7 +572,7 @@ class Chain:
         accumulated = {**self.variables, **(variables or {})}
         step_names  = [getattr(r, "name", None) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
-        doc = RunDocument.new("chain", step_names, variables=accumulated,
+        doc = RunDocument.new("chain", step_names, variables=public(accumulated),
                               definition={"steps": self._signature()})
         doc.context = context.to_dict() if context is not None else None
 
@@ -706,7 +707,7 @@ class Chain:
         from ..state import StepStatus, SuspendedResult
         doc.steps[idx]["status"]  = StepStatus.SUSPENDED
         doc.steps[idx]["suspend"] = awaiting
-        doc.variables = dict(accumulated)
+        doc.variables = public(accumulated)
         doc.usage     = _usage_to_dict(usage_total)
         self._history     = history
         self._accumulated = dict(accumulated)
@@ -740,7 +741,7 @@ class Chain:
             re-ran every step before it, side effects and all."""
             if not checkpoints[0]:
                 return
-            doc.variables = dict(accumulated)
+            doc.variables = public(accumulated)
             doc.usage     = _usage_to_dict(usage_total)
             try:
                 self._store.save(doc.run_id, doc.to_dict())
@@ -876,7 +877,7 @@ class Chain:
                     "step":       idx,
                     "kind":       kind,
                     "name":       name,
-                    "input":      step_input,
+                    "input":      public(step_input),
                     "output":     None,
                     "output_key": output_key,
                     "options":    options,
@@ -894,7 +895,7 @@ class Chain:
                     # otherwise lose the run — resume() retries from this step.
                     doc.steps[idx]["status"] = StepStatus.FAILED
                     if resumed:
-                        doc.variables = dict(accumulated)
+                        doc.variables = public(accumulated)
                         doc.usage     = _usage_to_dict(usage_total)
                         self._store.save(doc.run_id, doc.to_dict())
                     else:
@@ -929,7 +930,7 @@ class Chain:
                 "step":       idx,
                 "kind":       kind,
                 "name":       name,
-                "input":      step_input,
+                "input":      public(step_input),
                 "output":     output,
                 "output_key": output_key,
                 "options":    options,

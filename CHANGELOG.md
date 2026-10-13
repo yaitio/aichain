@@ -125,6 +125,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **A secret a chain carries reaches its tool and nothing else.** `REST`
+  recommends `token_field` from a chain variable; every pause wrote that token
+  to the store, to `SuspendedResult.document` and to each history record, and
+  an Agent step put it in the GIVEN block sent to the model's provider. A
+  value wrapped in the new `state.Secret` is left out of all four, prints as
+  `***`, refuses to be pickled, and is read by the tool with `reveal()` —
+  `REST` does so for `token_field`. A run resumed in another process does not
+  have it; pass it again in the signal.
+
 - **A chain reads every setting of a step, or refuses it.** A Skill step's
   `input_map` is resolved as a tool's is — templates filled, a variable the
   chain lacks an error — where names it lacked were dropped. A tool with no

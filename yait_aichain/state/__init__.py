@@ -21,6 +21,7 @@ from ._current import current, using
 from ._suspend import Suspend, SuspendedResult
 from ._store import StateStore, InMemoryStore, FileStore
 from ._run_document import RunDocument, StepStatus
+from ._secret import Secret
 
 __all__ = [
     "RunContext", "current", "using",
@@ -31,4 +32,5 @@ __all__ = [
     "FileStore",
     "RunDocument",
     "StepStatus",
+    "Secret",
 ]

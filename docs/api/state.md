@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../pipelines/pause-and-resume.md).
 
 <!-- g:api -->
-[`RunContext`](#runcontext) · [`current`](#current) · [`using`](#using) · [`Suspend`](#suspend) · [`SuspendedResult`](#suspendedresult) · [`StateStore`](#statestore) · [`InMemoryStore`](#inmemorystore) · [`FileStore`](#filestore) · [`RunDocument`](#rundocument) · [`StepStatus`](#stepstatus)
+[`RunContext`](#runcontext) · [`current`](#current) · [`using`](#using) · [`Suspend`](#suspend) · [`SuspendedResult`](#suspendedresult) · [`StateStore`](#statestore) · [`InMemoryStore`](#inmemorystore) · [`FileStore`](#filestore) · [`RunDocument`](#rundocument) · [`StepStatus`](#stepstatus) · [`Secret`](#secret)
 
 ---
 
@@ -280,4 +280,35 @@ attempted and are never re-run, so the cursor advances past them; only
 ```python
 StepStatus()
 ```
+
+---
+
+## `Secret`
+
+```python
+Secret(value: str)
+```
+
+A value a run uses and never writes down: a token a chain variable
+carries to a tool.
+
+`REST` recommends `token_field` from a chain variable, and every pause
+wrote that variable to the store, to `SuspendedResult.document` and to
+every history record; an Agent step was handed it in its GIVEN block, so it
+went to the model's provider. A `Secret` is left out of all four: its
+`repr` and `str` are `***`, the chain keeps it in memory only, and
+a tool that takes one reads it with `reveal`. A run resumed in
+another process does not have it — pass it again in the signal.
+
+**Parameters**
+
+- `value` (*str*) — The secret.
+
+### `Secret.reveal()`
+
+```python
+Secret.reveal() -> str
+```
+
+The value itself, for the one call that needs it.
 <!-- /g:api -->

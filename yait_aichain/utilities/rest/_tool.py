@@ -42,7 +42,8 @@ Auth strategies (``auth`` kwarg)
 | ``"bearer"``  | ``Authorization: Bearer <value>``                         |
 |               | Source: one of ``token`` (a value or a callable),         |
 |               | ``token_field`` (a field code or a chain fills — never    |
-|               | the model) or ``env``; two of them is an error.           |
+|               | the model; wrap it in ``state.Secret`` so a paused chain  |
+|               | does not store it) or ``env``; two of them is an error.   |
 +---------------+-----------------------------------------------------------+
 | ``"cookie"``  | ``Cookie: <cookie_name>=<value>``                         |
 |               | Source: as for ``"bearer"``.                              |
@@ -519,7 +520,8 @@ class RestApiTool(Tool):
             return str(token() if callable(token) else token)
         token_field = auth.get("token_field")
         if token_field and token_field in data:
-            return str(data[token_field])
+            from ...state._secret import reveal
+            return str(reveal(data[token_field]))
         env_key = auth.get("env")
         if env_key:
             return os.environ.get(env_key)
