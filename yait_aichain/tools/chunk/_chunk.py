@@ -47,12 +47,14 @@ Segments are parsed in a single pass:
 
 Plain text
 ----------
-Split priority: \\n\\n → ". " → space.
+Split priority: \\n\\n → \\n → ". " → 。！？ → space.
 ``metadata.headings`` is always ``[]``.
 
 Overlap
 -------
-The last ``overlap_chars`` characters of chunk N are prepended to chunk N+1.
+The last ``overlap_chars`` characters of chunk N are prepended to chunk N+1
+when both are text under the same headings — never to a table or a code
+block, and never across a heading.
 The left boundary of the overlap window is shifted right to the nearest space
 so that no word is split across the boundary.  The final prepend is trimmed to
 ensure ``chunk["chars"] <= max_chars``.  Overlap is never applied to code chunks.
@@ -101,6 +103,10 @@ class _Chunk:
     text:     str
     headings: list[str] = field(default_factory=list)
     is_code:  bool      = False
+    #: "text", "table" or "code". Overlap joins text to text only: a table's
+    #: header row was glued to a data row, and a section's first chunk began
+    #: with the end of the section before it.
+    kind:     str       = "text"
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +115,10 @@ class _Chunk:
 
 _MD_FENCE_RE  = re.compile(r'```|~~~')
 _MD_TABLE_RE  = re.compile(r'\|\s*[-:]+\s*\|')
-_MD_INLINE_RE = re.compile(r'\*\*|__|\*|(?<!_)_(?!_)')
+# Emphasis as a pair around words, not a lone marker: one `_` in a CSV
+# column name switched the whole document to Markdown, and its rows were cut
+# in the middle.
+_MD_INLINE_RE = re.compile(r'\*\*\S[^\n]*?\*\*|__\S[^\n]*?__|(?<![\w*])\*\S[^*\n]*\*(?![\w*])')
 
 def _is_markdown(text: str) -> bool:
     for line in text.splitlines():
@@ -216,8 +225,11 @@ def _split_by_priority(
     return _force_split(text, max_chars)
 
 
-_MD_TEXT_SEPS    = ["\n\n", "\n", ". ", " "]
-_PLAIN_TEXT_SEPS = ["\n\n", ". ", " "]
+# Chinese and Japanese end a sentence without a space after it; text in them
+# was cut at fixed offsets. A line break splits plain text too.
+_CJK_SEPS        = ["。", "！", "？"]
+_MD_TEXT_SEPS    = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
+_PLAIN_TEXT_SEPS = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +252,8 @@ def _pack(prefix: str, lines: list[str], suffix: str, max_chars: int,
 
     def flush(rows: list[str]) -> None:
         if rows:
-            chunks.append(_Chunk(text=prefix + "\n".join(rows) + suffix, is_code=is_code))
+            chunks.append(_Chunk(text=prefix + "\n".join(rows) + suffix, is_code=is_code,
+                                 kind="code" if is_code else "table"))
 
     for line in lines:
         if len(line) > budget:
@@ -262,7 +275,7 @@ def _chunk_code(header: str, body: str, fence: str, max_chars: int) -> list[_Chu
     fence repeated in every piece."""
     full = f"{header}\n{body}\n{fence}"
     if len(full) <= max_chars:
-        return [_Chunk(text=full, is_code=True)]
+        return [_Chunk(text=full, is_code=True, kind="code")]
     return _pack(f"{header}\n", body.split("\n"), f"\n{fence}", max_chars, is_code=True)
 
 
@@ -273,13 +286,14 @@ def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
     """A Markdown table, split by rows with the header rows and the separator
     row repeated in every piece, so each is a valid table."""
     if len(table) <= max_chars:
-        return [_Chunk(text=table)]
+        return [_Chunk(text=table, kind="table")]
     rows = table.split("\n")
     sep_idx = next((i for i, r in enumerate(rows) if _SEP_ROW_RE.match(r)), None)
     header = "\n".join(rows[:sep_idx + 1]) if sep_idx is not None else ""
     # Not a table, or a header that leaves no room for a row: split as text.
     if sep_idx is None or len(header) + 2 >= max_chars:
-        return [_Chunk(text=p.rstrip()) for p in _split_by_priority(table, max_chars, _MD_TEXT_SEPS)]
+        return [_Chunk(text=p.rstrip(), kind="table")
+                for p in _split_by_priority(table, max_chars, _MD_TEXT_SEPS)]
     return _pack(header + "\n", [r for r in rows[sep_idx + 1:] if r.strip()], "", max_chars)
 
 
@@ -331,8 +345,12 @@ def _parse_markdown(text: str) -> list[_Segment]:
             body_lines: list[str] = []
             i += 1
             closed = False
+            # A closing fence is the fence character alone, at least as many
+            # as opened it (CommonMark): a "```python" line inside a block
+            # closed it, and what followed was lost.
+            closing = re.compile(rf"^ {{0,3}}{re.escape(fence_chars[0])}{{{len(fence_chars)},}}\s*$")
             while i < n:
-                if lines[i].startswith(fence_chars):
+                if closing.match(lines[i]):
                     closed = True
                     i += 1
                     break
@@ -455,8 +473,14 @@ class Chunk(Tool):
         # A tenth of a piece unless given: 150 at the default 1 500. A fixed
         # 150 cut 780 characters into 30 near-identical windows at
         # max_chars=200 — every piece three-quarters its neighbour.
+        if isinstance(max_chars, bool) or not isinstance(max_chars, int) or max_chars < 1:
+            raise ValueError(f"max_chars is a whole number of at least 1, not {max_chars!r}")
         if overlap_chars is None:
             overlap_chars = max_chars // 10
+        if isinstance(overlap_chars, bool) or not isinstance(overlap_chars, int) or overlap_chars < 0:
+            # A negative overlap broke the size contract: pieces came out
+            # longer than max_chars.
+            raise ValueError(f"overlap_chars is a whole number of 0 or more, not {overlap_chars!r}")
         if overlap_chars >= max_chars:
             raise ValueError(
                 f"overlap_chars ({overlap_chars}) must be less than "
@@ -494,14 +518,17 @@ class Chunk(Tool):
         list[dict]
             Each item: ``{"text": str, "chars": int, "metadata": {"headings": list[str], "is_code": bool}}``
         """
-        if not input or not input.strip():
-            return []
-
         # The sizes are the tool's settings: a store is filled with pieces cut
-        # one way.
+        # one way. Any other key is a typo nothing reads.
         if options and (given := [k for k in ("max_chars", "overlap_chars", "merge_peers") if k in options]):
             raise ValueError(f"{self.name}: {', '.join(given)} is a setting of the chunker, not of a call "
                              f"— chunk({given[0]}=…)")
+        if options:
+            raise ValueError(f"{self.name} takes no options; got {sorted(options)}")
+        if not input or not input.strip():
+            return []
+        # Windows line ends: "\r\n\r\n" was not a paragraph break.
+        input = input.replace("\r\n", "\n").replace("\r", "\n")
         max_chars     = self._max_chars
         overlap_chars = self._overlap_chars
         merge_peers   = self._merge_enabled
@@ -605,6 +632,7 @@ class Chunk(Tool):
                     text     = prev.text + "\n" + chunk.text,
                     headings = list(prev.headings),
                     is_code  = False,
+                    kind     = "text" if prev.kind == chunk.kind == "text" else "table",
                 )
             else:
                 merged.append(chunk)
@@ -633,10 +661,10 @@ class Chunk(Tool):
 
         result: list[_Chunk] = [chunks[0]]
 
-        for chunk in chunks[1:]:
-            prev = result[-1]
-
-            if prev.is_code or chunk.is_code:
+        for prev, chunk in zip(chunks, chunks[1:]):
+            # Text to text in one section only, and the tail is the neighbour's
+            # own text — not what overlap already added to it.
+            if prev.kind != "text" or chunk.kind != "text" or prev.headings != chunk.headings:
                 result.append(chunk)
                 continue
 
@@ -667,6 +695,7 @@ class Chunk(Tool):
                 text     = new_text,
                 headings = list(chunk.headings),
                 is_code  = chunk.is_code,
+                kind     = chunk.kind,
             ))
 
         return result

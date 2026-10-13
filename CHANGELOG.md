@@ -133,6 +133,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **The chunker keeps every line and joins only what belongs together.**
+  Overlap joins text to text under the same headings, from the neighbour's own
+  text: it glued a table's header to a data row and began a section with the
+  end of the one before. A lone `_` or `*` no longer makes a document Markdown,
+  where one `_` in a CSV header cut its rows mid-line. Plain text splits on
+  line breaks and on `。！？`, where Chinese and Japanese were cut at fixed
+  offsets; Windows line ends are normalised, so `\r\n\r\n` is a paragraph
+  break. A code block closes on a bare fence of at least its own length, as in
+  CommonMark, where a "```python" line inside one closed it and the text after
+  was lost. Sizes that are not whole numbers in range and any option are
+  refused, where a negative overlap broke the size contract.
+
 - **Speech tools send what is set, in a format they write.** An option given
   as `None` is not sent, where `voice=None` went into the request and
   `speed=None` raised. Each speech tool names the formats it writes and
