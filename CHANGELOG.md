@@ -125,6 +125,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **A reranker and an embedder send text, and only text.** A document is a
+  string, a mapping's `text` or an object's `.text`; anything else is a
+  `TypeError` before the request. `rerank.run("hello world")` sent eleven
+  one-character documents, a `VectorRecord` went as its repr (its fields are
+  merged back into the result now), and a mapping with no `text` went whole,
+  metadata included. A reranker refuses a missing query, where it sent `""`,
+  reads `top_n` as a whole number of at least 1, and answers `[]` for no
+  documents without a request. An embedder sends a `chunk()` dict's text, and
+  refuses `None` and empty strings.
+
 - **`tool(input, options)` calls `run` the way `run` declares.** Options
   went positionally to whatever came second — `Image.run(input, images,
   options)` took them as images — a `@tool` function with no parameters

@@ -55,7 +55,7 @@ from yait_aichain.clients._base import make_http
 
 from ...clients._constants import TOOL_TIMEOUT, DEFAULT_RETRIES
 from ...clients._http import request_json
-from .._base import Tool
+from .._base import Tool, text_of
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +337,12 @@ class Embedder(Tool):
             texts = [texts]
         if not texts:
             raise ValueError("texts must not be empty")
+        # A chunk() dict whole was a 400, None was embedded as "None", and ""
+        # was a request the provider refused.
+        texts = [text_of(t, type(self).__name__) for t in texts]
+        if blank := [i for i, t in enumerate(texts) if not t.strip()]:
+            raise ValueError(f"{type(self).__name__}: text {blank[:5]} is empty; "
+                             "an embedding of nothing is not a vector of anything")
 
         _refuse_settings(type(self).__name__, refused)
         limit = max(1, min(self.batch_size or self._MAX_BATCH, self._MAX_BATCH))

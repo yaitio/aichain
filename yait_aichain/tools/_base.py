@@ -110,6 +110,27 @@ def _open(schema) -> bool:
     extra = schema.get("additionalProperties") if isinstance(schema, dict) else None
     return extra is True or isinstance(extra, dict)
 
+
+def text_of(item, who: str) -> str:
+    """The text of one document: a string, a mapping's ``text``, or an
+    object's ``.text`` — anything else is a ``TypeError`` naming it.
+
+    ``str(item)`` was the fallback, and it sent a ``VectorRecord(...)`` repr
+    to a reranker, a mapping with no text — metadata, emails, ACLs — to a
+    provider whole, and ``None`` as the word "None".
+    """
+    from collections.abc import Mapping
+    if isinstance(item, str):
+        return item
+    if isinstance(item, Mapping):
+        text = item.get("text")
+    else:
+        text = getattr(item, "text", None)
+    if isinstance(text, str):
+        return text
+    raise TypeError(f"{who}: a document is a string, a mapping with 'text', or an object with "
+                    f".text; got {type(item).__name__}")
+
 # ---------------------------------------------------------------------------
 # ToolResult
 # ---------------------------------------------------------------------------

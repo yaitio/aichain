@@ -47,6 +47,7 @@ This makes the reranker a drop-in Chain step after a vector search::
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -54,7 +55,7 @@ from yait_aichain.clients._base import make_http
 
 from ...clients._constants import TOOL_TIMEOUT, DEFAULT_RETRIES
 from ...clients._http import request_json
-from .._base import Tool
+from .._base import Tool, text_of
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +234,23 @@ class RerankBase(Tool):
         RerankResult
             Results sorted by descending relevance score.
         """
+        if isinstance(query, bool) or not isinstance(query, str) or not query.strip():
+            raise ValueError(f"{type(self).__name__}: rerank needs a query — options={{'query': …}}")
+        if isinstance(documents, (str, bytes)) or isinstance(documents, Mapping):
+            # A string is a sequence of characters, and was sent as one
+            # document per character.
+            raise TypeError(f"{type(self).__name__}: documents is a list of documents, "
+                            f"not one {type(documents).__name__}")
+        if top_n is not None:
+            if isinstance(top_n, bool) or not isinstance(top_n, (int, str)) \
+                    or not str(top_n).strip().isdigit() or int(top_n) < 1:
+                raise ValueError(f"{type(self).__name__}: top_n is a whole number of at least 1, "
+                                 f"not {top_n!r}")
+            top_n = int(top_n)
+        documents = list(documents)
+        if not documents:
+            return RerankResult(results=[], model=self.model, provider=self.provider,
+                                total_tokens=None, metadata={})
         texts, originals = self._normalise(documents)
         raw, total_tokens, metadata = self._rerank_request(query, texts, top_n)
 
@@ -281,7 +299,7 @@ class RerankBase(Tool):
             :attr:`RerankResult.results`).
         """
         opts  = options or {}
-        query = opts.get("query", "")
+        query = opts.get("query")
         top_n = opts.get("top_n")
         return self.rerank(query, input, top_n=top_n).results
 
@@ -334,14 +352,12 @@ class RerankBase(Tool):
         texts:     list[str]        = []
         originals: list[dict | None] = []
         for doc in documents:
-            if isinstance(doc, str):
-                texts.append(doc)
-                originals.append(None)
-            elif isinstance(doc, dict):
-                texts.append(doc.get("text", str(doc)))
-                originals.append(doc)
+            texts.append(text_of(doc, type(self).__name__))
+            if isinstance(doc, Mapping):
+                originals.append(dict(doc))
+            elif callable(getattr(doc, "to_dict", None)):
+                originals.append(doc.to_dict())
             else:
-                texts.append(str(doc))
                 originals.append(None)
         return texts, originals
 
