@@ -125,6 +125,13 @@ where a fix is named below.
 
 ### Fixed
 
+- **`NO_PROXY` is honoured, and each scheme gets its own proxy.** One proxy
+  was chosen for the whole client, so a `private/` model on localhost, a
+  Chroma or Qdrant in the VPC and an internal REST endpoint went through the
+  corporate proxy, got 502 — read as the provider's server error — and
+  started a fallback; and `HTTPS_PROXY` was used for `http://` too, where the
+  proxy reads the key. The proxy is now chosen per request from the
+  environment variables; an explicit `proxy=` still applies to everything.
 - **A stream keeps its text whole, and a stream that fails says so.** Each
   network chunk was decoded alone, so a character split between two reads —
   any non-ASCII text — became two replacement marks; `splitlines()` cut an

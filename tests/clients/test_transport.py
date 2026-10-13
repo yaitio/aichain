@@ -16,9 +16,18 @@ from yait_aichain.clients._base import make_http
 
 class TestMakeHttp(unittest.TestCase):
 
+    def setUp(self):
+        self._saved = {k: os.environ.pop(k) for k in list(os.environ) if k.lower().endswith("_proxy")}
+
     def tearDown(self):
-        for k in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
-            os.environ.pop(k, None)
+        for k in list(os.environ):
+            if k.lower().endswith("_proxy"):
+                os.environ.pop(k)
+        os.environ.update(self._saved)
+
+    @staticmethod
+    def _route(http, url="https://api.openai.com/v1"):
+        return http._for(url) if hasattr(http, "_for") else http
 
     def test_no_proxy_is_plain_pool_manager(self):
         http = make_http()
@@ -27,7 +36,7 @@ class TestMakeHttp(unittest.TestCase):
 
     def test_env_proxy_is_honoured(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
-        self.assertIsInstance(make_http(), urllib3.ProxyManager)
+        self.assertIsInstance(self._route(make_http()), urllib3.ProxyManager)
 
     def test_explicit_proxy_overrides_and_adds_basic_auth(self):
         http = make_http({"url": "http://p:3128", "username": "u", "password": "p"})
@@ -39,7 +48,7 @@ class TestMakeHttp(unittest.TestCase):
         # ignores them, and every such proxy answered 407.
         import base64
         os.environ["HTTPS_PROXY"] = "http://us%40er:p%3Ass@corp-proxy:3128"
-        http = make_http()
+        http = self._route(make_http())
         self.assertIsInstance(http, urllib3.ProxyManager)
         expected = "Basic " + base64.b64encode(b"us@er:p:ss").decode()
         self.assertEqual(http.proxy_headers.get("Proxy-Authorization"), expected)
@@ -56,13 +65,13 @@ class TestMakeHttp(unittest.TestCase):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
         from yait_aichain.models import Model
         m = Model("gpt-4o", api_key="k")
-        self.assertIsInstance(m.client._http, urllib3.ProxyManager)
+        self.assertIsInstance(self._route(m.client._http), urllib3.ProxyManager)
 
     def test_tool_client_uses_factory(self):
         os.environ["HTTPS_PROXY"] = "http://corp-proxy:3128"
         from yait_aichain.tools import search
         tool = search("perplexity", api_key="k")
-        self.assertIsInstance(tool._http, urllib3.ProxyManager)
+        self.assertIsInstance(self._route(tool._http), urllib3.ProxyManager)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import urllib3
 import json
 import base64
 from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.request import getproxies_environment, proxy_bypass_environment
 
 from .._multipart import Multipart
 from ._http import TRANSPORT_ERRORS
@@ -72,10 +73,58 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
     of a proxy URL, so without this every such proxy answers 407.
     """
     if proxy is None:
-        proxy = _proxy_from_env()
-    if not proxy:
-        return urllib3.PoolManager(timeout=timeout, retries=retries)
+        if not _proxy_from_env():
+            return urllib3.PoolManager(timeout=timeout, retries=retries)
+        return _EnvironmentRouted(timeout=timeout, retries=retries)
+    return _proxy_manager(proxy, timeout=timeout, retries=retries)
 
+
+class _EnvironmentRouted:
+    """A proxy chosen per request, as the environment says, not once per client.
+
+    ``NO_PROXY`` exempts hosts — a ``private/`` model on localhost, a Chroma
+    or Qdrant in the VPC, an internal REST — which through the corporate proxy
+    answered 502, read as the provider's server error, and started a fallback.
+    ``HTTPS_PROXY`` is for https and ``HTTP_PROXY`` for http: the https one
+    applied to an ``http://`` server let the proxy read the key. The macOS
+    system settings are not consulted, only the variables.
+    """
+
+    def __init__(self, *, timeout, retries) -> None:
+        self._kw = {"timeout": timeout, "retries": retries}
+        self._direct = urllib3.PoolManager(**self._kw)
+        self._through: dict = {}
+
+    def _for(self, url: str):
+        parts = urlsplit(url)
+        if proxy_bypass_environment(parts.hostname or ""):
+            return self._direct
+        proxy_url = getproxies_environment().get(parts.scheme)
+        if not proxy_url:
+            return self._direct
+        if proxy_url not in self._through:
+            self._through[proxy_url] = _proxy_manager({"url": proxy_url}, **self._kw)
+        return self._through[proxy_url]
+
+    @property
+    def connection_pool_kw(self) -> dict:
+        """The settings every route shares — timeout and retries."""
+        return self._direct.connection_pool_kw
+
+    def request(self, method, url, **kwargs):
+        return self._for(url).request(method, url, **kwargs)
+
+    def urlopen(self, method, url, **kwargs):
+        return self._for(url).urlopen(method, url, **kwargs)
+
+    def clear(self) -> None:
+        self._direct.clear()
+        for manager in self._through.values():
+            manager.clear()
+
+
+def _proxy_manager(proxy: dict, *, timeout, retries):
+    """A ProxyManager for *proxy*, with its credentials as a header."""
     proxy_headers: dict = {}
     url      = proxy["url"]
     username = proxy.get("username")
