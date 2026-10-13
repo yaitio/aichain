@@ -31,7 +31,7 @@ _ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
                   "9:16", "16:9", "21:9")
 
 
-def _sanitize_google_schema(schema: object) -> object:
+def _sanitize_google_schema(schema: object, _root: dict | None = None, _depth: int = 0) -> object:
     """
     Convert a JSON Schema dict to a form accepted by Google's ``responseSchema``
     proto field.
@@ -55,9 +55,25 @@ def _sanitize_google_schema(schema: object) -> object:
     """
     if not isinstance(schema, dict):
         return schema
+    root = _root if _root is not None else schema
+    ref = schema.get("$ref")
+    if isinstance(ref, str) and ref.startswith("#/") and _depth < 32:
+        # Inlined: Google reads no $ref. Local refs only, and not for ever —
+        # a recursive schema stops at a depth no answer would reach.
+        target = root
+        for part in ref[2:].split("/"):
+            target = target.get(part) if isinstance(target, dict) else None
+        if isinstance(target, dict):
+            merged = {**target, **{k: v for k, v in schema.items() if k != "$ref"}}
+            return _sanitize_google_schema(merged, root, _depth + 1)
+
+    def down(value):
+        return _sanitize_google_schema(value, root, _depth + 1)
 
     result: dict = {}
     for key, value in schema.items():
+        if key in ("$defs", "definitions"):
+            continue                              # inlined where they are used
         if key == "additionalProperties":
             global _WARNED_STRIP
             if value is False and not _WARNED_STRIP:
@@ -76,13 +92,20 @@ def _sanitize_google_schema(schema: object) -> object:
             continue                              # strip
         if key == "type" and isinstance(value, list):
             non_null = [t for t in value if t != "null"]
-            result["type"] = non_null[0] if non_null else "string"
+            if len(non_null) > 1:
+                # Two types are an anyOf, not the first of them.
+                result["anyOf"] = [{"type": t} for t in non_null]
+            else:
+                result["type"] = non_null[0] if non_null else "string"
             if "null" in value:
                 result["nullable"] = True
         elif key == "properties" and isinstance(value, dict):
-            result[key] = {k: _sanitize_google_schema(v) for k, v in value.items()}
+            result[key] = {k: down(v) for k, v in value.items()}
         elif key == "items" and isinstance(value, dict):
-            result[key] = _sanitize_google_schema(value)
+            result[key] = down(value)
+        elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
+            # Followed too: an `additionalProperties` inside one was a 400.
+            result["anyOf" if key == "oneOf" else key] = [down(v) for v in value]
         else:
             result[key] = value
     if result.get("type") == "array" and "items" not in result:

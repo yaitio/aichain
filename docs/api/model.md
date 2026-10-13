@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../models/models.md).
 
 <!-- g:api -->
-[`Model`](#model) · [`Usage`](#usage) · [`Adaptation`](#adaptation) · [`UnsupportedOption`](#unsupportedoption) · [`portable_schema`](#portable_schema) · [`check_structure`](#check_structure) · [`ToolCall`](#toolcall) · [`ToolCallRequest`](#toolcallrequest) · [`tool_result_turn`](#tool_result_turn) · [`dangling_calls`](#dangling_calls)
+[`Model`](#model) · [`Usage`](#usage) · [`Adaptation`](#adaptation) · [`UnsupportedOption`](#unsupportedoption) · [`portable_schema`](#portable_schema) · [`check_structure`](#check_structure) · [`SchemaNotExpressible`](#schemanotexpressible) · [`ToolCall`](#toolcall) · [`ToolCallRequest`](#toolcallrequest) · [`tool_result_turn`](#tool_result_turn) · [`dangling_calls`](#dangling_calls)
 
 ---
 
@@ -343,6 +343,16 @@ membership, and array element types. Recurses through `properties` and
 - `value` (*any*) — What a model returned.
 - `schema` (*dict*) — The JSON Schema it was asked for.
 - `path` (*str, optional*, default `'$'`) — Where *value* sits, for the messages; `"$"` at the top.
+
+---
+
+## `SchemaNotExpressible`
+
+A schema that strict mode cannot represent, named at the point of use.
+
+Raised instead of letting the provider answer, because the provider's
+message points at the wire format rather than at the schema the caller
+wrote.
 
 ---
 

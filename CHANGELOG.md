@@ -133,6 +133,15 @@ where a fix is named below.
 
 ### Fixed
 
+- **A schema keeps its meaning on the way to each provider.** In OpenAI
+  strict mode an optional `$ref`, `anyOf` or untyped enum is now "it, or null",
+  and an optional enum may be null — they became required and not nullable,
+  so the model had to invent a value. An object with no properties raises
+  `SchemaNotExpressible` (now exported) instead of a 400. For Google, `anyOf`,
+  `oneOf`, `allOf` and `$defs` are followed, so `additionalProperties` inside
+  them no longer reaches the API (a 400); a local `$ref` is inlined; and a
+  union of types is an `anyOf`, where it became its first type.
+
 - **A part a provider cannot carry is left out and said.** Video, audio by
   URL and documents were dropped in silence on the OpenAI-compatible and
   Anthropic wires, and the model answered about an attachment it never saw;

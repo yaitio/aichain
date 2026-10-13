@@ -401,6 +401,12 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
             "OpenAI strict mode. Model it as an array of {key, value} "
             "objects, or pass strict=False."
         )
+    if schema.get("type") == "object" and not schema.get("properties") and ap is not False:
+        # A free object: strict mode closes every object, so it would accept
+        # only `{}` — and the provider said so with a 400.
+        raise SchemaNotExpressible(
+            f"{path}: an object with no properties cannot be expressed in OpenAI "
+            "strict mode; give it properties, or pass strict=False.")
 
     result: dict = {}
     for key, value in schema.items():
@@ -422,14 +428,21 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
     if isinstance(props, dict):
         result["additionalProperties"] = False
         was_required = set(result.get("required") or [])
-        for name, sub in props.items():
+        for name, sub in list(props.items()):
             if name in was_required or not isinstance(sub, dict):
                 continue
             t = sub.get("type")
+            if "enum" in sub and None not in sub["enum"]:
+                sub["enum"] = [*sub["enum"], None]   # null must be a value it may take
             if isinstance(t, str) and t != "null":
                 sub["type"] = [t, "null"]        # optional, strict spelling
             elif isinstance(t, list) and "null" not in t:
                 sub["type"] = [*t, "null"]
+            elif t is None:
+                # A $ref, an anyOf, an enum with no type: made required and
+                # not nullable, so the model had to invent a value. Optional
+                # is "it, or null".
+                props[name] = {"anyOf": [sub, {"type": "null"}]}
         result["required"] = list(props.keys())
     return result
 

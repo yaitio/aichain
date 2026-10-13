@@ -546,7 +546,7 @@ def tool_page_block(page: str) -> str:
 #: The rest of the API: one page per area, every public name on exactly one.
 API_PAGES = {
     "api/model.md": [("yait_aichain", n) for n in ("Model", "Usage", "Adaptation", "UnsupportedOption",
-                                                   "portable_schema", "check_structure")]
+                                                   "portable_schema", "check_structure", "SchemaNotExpressible")]
                     + [("yait_aichain.models", n) for n in ("ToolCall", "ToolCallRequest",
                                                             "tool_result_turn", "dangling_calls")],
     "api/skill.md": [("yait_aichain", "Skill")],

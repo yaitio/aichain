@@ -49,7 +49,7 @@ _install_module_hints()
 from .models import Model
 # Schema portability, public because every caller was writing it by hand:
 # the two provider families demand opposite forms of the same schema.
-from .models import portable_schema, check_structure
+from .models import portable_schema, check_structure, SchemaNotExpressible
 # What the library had to change about a request to fit a provider. Reachable
 # so a caller can log it, not only read the warning.
 from .models._adaptation import Adaptation, UnsupportedOption
@@ -87,7 +87,7 @@ from .clients import (
 #: What `from yait_aichain import *` brings: the names above, and not the
 #: subpackages their imports load along the way.
 __all__ = [
-    "Model", "portable_schema", "check_structure", "Adaptation", "UnsupportedOption",
+    "Model", "portable_schema", "check_structure", "SchemaNotExpressible", "Adaptation", "UnsupportedOption",
     "Budget", "BudgetExceeded", "Usage",
     "Skill", "Chain", "ChainResult", "Pool", "PoolResult", "PENDING", "RUNNING", "DONE", "FAILED",
     "Agent", "AgentResult",

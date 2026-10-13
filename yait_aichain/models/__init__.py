@@ -70,6 +70,7 @@ registry = SimpleNamespace(
 )
 
 from ._schema import portable_schema, check_structure
+from ..clients._families._openai_compat import SchemaNotExpressible
 # What an external driver of `Agent.step()` needs, public because `step()`'s
 # own error message tells the caller to use `tool_result_turn` — and until
 # 2.19.0 the only import path for it was the private `models._calls`.
@@ -79,6 +80,7 @@ __all__ = [
     "Model",
     "registry",
     "portable_schema",
+    "SchemaNotExpressible",
     "check_structure",
     "UNIVERSAL_OPTIONS",
     "ToolCall",
