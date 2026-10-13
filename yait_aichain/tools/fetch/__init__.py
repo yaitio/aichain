@@ -13,8 +13,8 @@ fetchFirecrawl   Firecrawl Scrape — main content and metadata; reached the mos
 fetchTavily      Tavily Extract — up to 20 URLs a call; text and title only.
 fetchExa         Exa Contents — up to 100 URLs a call, from Exa's cache; title, date, author.
 fetchParallel    Parallel Extract — up to 20 URLs a call; full content, title, date.
-fetchLocal       MarkItDown on this machine — free, respects robots.txt;
-                 needs ``pip install "yait-aichain[fetch]"``.
+fetchLocal       this machine, the standard library — free, respects robots.txt;
+                 a PDF needs ``pip install "yait-aichain[fetch]"``.
 
 ``fetch(service)`` makes one by the provider's name — ``fetch("firecrawl")`` —
 and is the way the documentation shows. ``Fetch`` is the base; a new provider

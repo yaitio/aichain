@@ -2,9 +2,8 @@
 tools.fetch._page
 =================
 
-What ``fetchLocal`` needs to fetch a page itself: a ``requests`` session that
-applies a timeout to every request, and the page's ``<head>`` read for its
-title, dates and author — the part MarkItDown drops.
+What ``fetchLocal`` reads from a page's ``<head>``: its title, dates and
+author, which a conversion of the body leaves out.
 
 Moved here from ``convertToMD`` in 3.8.0, when the convert tools left the
 library; ``fetchLocal`` was the one user inside it.
@@ -16,30 +15,12 @@ import json
 from html.parser import HTMLParser
 
 
-#: ``(connect, read)`` seconds for a URL. MarkItDown calls ``requests`` with
-#: no timeout at all, so without one a silent server is a call that never ends.
+#: ``(connect, read)`` seconds for a URL: without one a silent server is a
+#: call that never ends.
 DEFAULT_TIMEOUT = (10.0, 30.0)
 
-#: The ``Accept`` header MarkItDown sets on the session it builds itself —
-#: kept, since passing our own session would otherwise drop it.
+#: The ``Accept`` header a page fetch sends: Markdown first, where a site serves it.
 _ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1"
-
-
-def _session(timeout, headers=None):
-    """A ``requests`` session that applies *timeout* to every request it makes
-    unless the caller gave one, and sends *headers* on each."""
-    import requests
-
-    class _TimeoutSession(requests.Session):
-        def request(self, *args, **kwargs):
-            if timeout is not None:
-                kwargs.setdefault("timeout", timeout)
-            return super().request(*args, **kwargs)
-
-    session = _TimeoutSession()
-    session.headers.update({"Accept": _ACCEPT})
-    session.headers.update(headers or {})
-    return session
 
 
 # ----------------------------------------------------------------------
@@ -60,7 +41,7 @@ _DESC      = ("description", "og:description", "twitter:description")
 
 
 class _HeadReader(HTMLParser):
-    """Collects what MarkItDown throws away: ``<meta>``, ``<title>``, the
+    """Collects the head a body conversion leaves out: ``<meta>``, ``<title>``, the
     canonical link and JSON-LD blocks."""
 
     def __init__(self):
@@ -126,7 +107,7 @@ def _ld_name(value) -> str:
 def page_metadata(html: str) -> dict:
     """
     Title, publication and modification dates, author, description, site name
-    and canonical URL of an HTML page — the ``<head>`` MarkItDown drops.
+    and canonical URL of an HTML page — the ``<head>`` a body conversion leaves out.
 
     JSON-LD is read first, because a publisher who writes it means it; then
     the meta tags. Values are returned as the page states them, dates

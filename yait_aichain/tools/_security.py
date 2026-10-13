@@ -58,8 +58,7 @@ def assert_safe_url(url: str, *, allow_private: bool | None = None) -> None:
     example.com/``) — and, unless *allow_private* (defaulting to the
     ``AICHAIN_ALLOW_PRIVATE_URLS`` env flag), any host that resolves to an
     address that is not public. These are the classic SSRF and cloud-metadata
-    vectors. A redirect is a new URL: see `safe_request` and `safe_get`, which
-    check every hop.
+    vectors. A redirect is a new URL: see `safe_request`, which checks every hop.
     """
     assert_url_scheme(url)
     if "\\" in url:
@@ -96,7 +95,8 @@ _REDIRECTS = frozenset({301, 302, 303, 307, 308})
 MAX_REDIRECTS = 5
 
 
-def safe_request(http, method: str, url: str, *, allow_private: bool | None = None, **kwargs):
+def safe_request(http, method: str, url: str, *, allow_private: bool | None = None,
+                 cross_host: bool = False, **kwargs):
     """A urllib3 request whose every hop passes `assert_safe_url`.
 
     urllib3 follows redirects itself and checks nothing on the way, so a
@@ -105,48 +105,35 @@ def safe_request(http, method: str, url: str, *, allow_private: bool | None = No
     `MAX_REDIRECTS`, each target checked before it is asked; a 303 becomes a
     GET without a body, as browsers do.
     """
+    first = urlparse(url).netloc
     for _ in range(MAX_REDIRECTS + 1):
         assert_safe_url(url, allow_private=allow_private)
         response = http.request(method, url, redirect=False, **kwargs)
         location = response.headers.get("location") if response.status in _REDIRECTS else None
         if not location:
+            response.final_url = url
             return response
+        if not kwargs.get("preload_content", True):
+            response.drain_conn()
+            response.release_conn()
         nxt = urljoin(url, location)
         # To another host, never: the request carries whatever the caller
         # gave it — an `X-Api-Key`, a token in a header urllib3 does not know
         # to drop, a body a 307 would resend — and the host it was meant for
         # chose to send it elsewhere. Said, with the address, instead.
+        # A page fetch may follow (`cross_host=True`), with only its Accept
+        # header: example.com sending a reader to www.example.com is the web.
         if urlparse(nxt).netloc != urlparse(url).netloc:
-            raise ValueError(f"the server redirected to another host ({nxt}); not followed, "
-                             "so the request's headers and body stay with the host they were for")
+            if not cross_host or method != "GET":
+                raise ValueError(f"the server redirected to another host ({nxt}); not followed, "
+                                 "so the request's headers and body stay with the host they were for")
+            if urlparse(nxt).netloc != first:
+                kwargs["headers"] = {k: v for k, v in (kwargs.get("headers") or {}).items()
+                                     if k.lower() == "accept"}
         url = nxt
         if response.status == 303:
             method = "GET"
             kwargs.pop("body", None)
-    raise ValueError(f"more than {MAX_REDIRECTS} redirects, last to {url!r}")
-
-
-def _bare(session) -> dict:
-    """The session's headers with every one set by the caller replaced by None,
-    which `requests` reads as "do not send"; its own defaults stay."""
-    defaults = {"user-agent", "accept", "accept-encoding", "connection"}
-    return {k: None for k in session.headers if k.lower() not in defaults}
-
-
-def safe_get(session, url: str, **kwargs):
-    """`safe_request` for a ``requests`` session: every hop checked."""
-    first = urlparse(url).netloc
-    for _ in range(MAX_REDIRECTS + 1):
-        assert_safe_url(url)
-        # The session's own headers belong to the host they were set for: on
-        # any other host — one a redirect or a model chose — they are left off.
-        response = session.get(url, allow_redirects=False,
-                               **({} if urlparse(url).netloc == first else {"headers": _bare(session)}),
-                               **kwargs)
-        location = response.headers.get("location") if response.status_code in _REDIRECTS else None
-        if not location:
-            return response
-        url = urljoin(url, location)
     raise ValueError(f"more than {MAX_REDIRECTS} redirects, last to {url!r}")
 
 

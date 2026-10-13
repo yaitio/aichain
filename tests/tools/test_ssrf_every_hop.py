@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from yait_aichain.tools import _security
-from yait_aichain.tools._security import _public, assert_safe_url, safe_get, safe_request
+from yait_aichain.tools._security import _public, assert_safe_url, safe_request
 
 
 class TestTheAddress(unittest.TestCase):
@@ -61,13 +61,13 @@ class TestEveryHop(unittest.TestCase):
                          headers={"X-Api-Key": "secret"})
         self.assertEqual(len(asked), 1)
 
-    def test_a_sessions_headers_are_left_off_on_another_host(self):
-        session = MagicMock(headers={"Authorization": "Bearer s", "User-Agent": "ua"})
-        session.get.side_effect = [MagicMock(status_code=302, headers={"location": "https://b.example/"}),
-                                   MagicMock(status_code=200, headers={})]
-        safe_get(session, "https://a.example/")
-        self.assertNotIn("headers", session.get.call_args_list[0].kwargs)
-        self.assertEqual(session.get.call_args_list[1].kwargs["headers"], {"Authorization": None})
+    def test_a_page_fetch_follows_another_host_without_the_callers_headers(self):
+        http, _ = _answers((302, "https://b.example/"), (200, None))
+        safe_request(http, "GET", "https://a.example/", cross_host=True,
+                     headers={"Authorization": "Bearer s", "Accept": "text/html"})
+        sent = [c.kwargs.get("headers") for c in http.request.call_args_list]
+        self.assertEqual(sent[0]["Authorization"], "Bearer s")
+        self.assertEqual(sent[1], {"Accept": "text/html"})
 
     def test_a_redirect_to_the_metadata_service_is_refused(self):
         http, asked = _answers((302, "http://169.254.169.254/latest/meta-data/"))
@@ -85,13 +85,11 @@ class TestEveryHop(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "redirects"):
             safe_request(http, "GET", "https://example.com/")
 
-    def test_a_requests_session_is_held_the_same_way(self):
-        session = MagicMock()
-        session.get.return_value = MagicMock(status_code=301, headers={"location": "http://localhost/admin"})
+    def test_a_cross_host_page_fetch_is_held_the_same_way(self):
+        http, asked = _answers((301, "http://localhost/admin"))
         with self.assertRaisesRegex(ValueError, "non-public"):
-            safe_get(session, "https://example.com/")
-        self.assertFalse(session.get.call_args.kwargs["allow_redirects"])
-
+            safe_request(http, "GET", "https://example.com/", cross_host=True)
+        self.assertEqual(len(asked), 1)
 
 if __name__ == "__main__":
     unittest.main()

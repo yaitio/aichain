@@ -36,7 +36,7 @@ Chains and Agents identically.
 | Fetch | [`fetchTavily`](../api/tools/fetch.md#fetchtavily) | `fetchTavily` | Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown. | `TAVILY_API_KEY` | `read` |
 | Fetch | [`fetchExa`](../api/tools/fetch.md#fetchexa) | `fetchExa` | Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and author. | `EXA_API_KEY` | `read` |
 | Fetch | [`fetchParallel`](../api/tools/fetch.md#fetchparallel) | `fetchParallel` | Web pages' full content by Parallel Extract — up to 20 URLs a call, with title and date. | `PARALLEL_API_KEY` | `read` |
-| Fetch | [`fetchLocal`](../api/tools/fetch.md#fetchlocal) | `fetchLocal` | A web page's text fetched from this machine and converted by MarkItDown — free. | — | `read` |
+| Fetch | [`fetchLocal`](../api/tools/fetch.md#fetchlocal) | `fetchLocal` | A web page's text fetched from this machine and converted to Markdown — free. | — | `read` |
 | Speech | [`ttsOpenAI`](../api/tools/speech.md#ttsopenai) | `ttsOpenAI` | Text-to-speech via the OpenAI TTS API. | `OPENAI_API_KEY` | `draft` |
 | Speech | [`ttsGoogle`](../api/tools/speech.md#ttsgoogle) | `ttsGoogle` | Text-to-speech via Google Cloud Text-to-Speech, over its REST API. | `GOOGLE_AI_API_KEY`, `GOOGLE_API_KEY` | `draft` |
 | Speech | [`ttsXAI`](../api/tools/speech.md#ttsxai) | `ttsXAI` | Text-to-speech via the xAI TTS API. | `XAI_API_KEY` | `draft` |

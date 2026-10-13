@@ -308,55 +308,56 @@ class TestContract(unittest.TestCase):
             self.assertTrue(issubclass(cls, Fetch))
 
 
+HTML = (b'<html><head><title>Example Domain</title>'
+        b'<meta property="article:published_time" content="2026-09-30T10:00:00Z">'
+        b'<meta name="author" content="IANA"></head><body><h1>Example</h1><p>Hi there.</p></body></html>')
+
+
 def _local(robots=None, robots_status=200, page_status=200, robots_raises=False, **kw):
     """A fetchLocal whose network is a mock: robots.txt and one HTML page."""
     tool = fetchLocal(**kw)
 
-    def get(url, **_):
-        r = MagicMock()
+    def request(method, url, **_):
         if url.endswith("/robots.txt"):
             if robots_raises:
                 raise ConnectionError("no route to host")
-            r.status_code, r.text = robots_status, robots or ""
+            status, ctype, body = robots_status, "text/plain", (robots or "").encode()
         else:
-            r.status_code, r.url = page_status, url
-            r.headers = {"content-type": "text/html; charset=utf-8"}
-            r.encoding = "utf-8"
-            r.content = (b'<html><head><title>Example Domain</title>'
-                         b'<meta property="article:published_time" content="2026-09-30T10:00:00Z">'
-                         b'<meta name="author" content="IANA"></head><body><p>Hi</p></body></html>')
+            status, ctype, body = page_status, "text/html; charset=utf-8", HTML
+        r = MagicMock(status=status, headers={"content-type": ctype})
+        r.stream.return_value = iter([body])
         return r
 
-    tool._session = MagicMock()
-    tool._session.get.side_effect = get
-    tool._md = MagicMock()
-    tool._md.convert_response.return_value.text_content = TEXT
+    tool._http = MagicMock()
+    tool._http.request.side_effect = request
     return tool
 
 
+def _asked(tool):
+    return [c.args[1] for c in tool._http.request.call_args_list]
+
+
 @patch("yait_aichain.tools.fetch.local.assert_safe_url", lambda u: None)
-@patch("yait_aichain.tools._security.assert_safe_url", lambda u: None)
+@patch("yait_aichain.tools._security.assert_safe_url", lambda u, **k: None)
 class TestLocal(unittest.TestCase):
 
     def test_a_page_with_its_head(self):
         found = _local().run(OK)
         (p,) = found["pages"]
         self.assertEqual((p["title"], p["published"], p["author"], p["text"]),
-                         ("Example Domain", "2026-09-30", "IANA", TEXT))
+                         ("Example Domain", "2026-09-30", "IANA", "# Example\n\nHi there."))
         self.assertEqual((found["cost"], found["cost_basis"]), (0.0, "runs locally"))
 
     def test_robots_refusal_skips_the_page_without_requesting_it(self):
         tool = _local("User-agent: ClaudeBot\nDisallow: /\n")
         (p,) = tool.run(OK + "/article")["pages"]
         self.assertEqual(p["error"], "robots.txt disallows ClaudeBot")
-        asked = [c.args[0] for c in tool._session.get.call_args_list]
-        self.assertEqual(asked, [OK + "/robots.txt"])
+        self.assertEqual(_asked(tool), [OK + "/robots.txt"])
 
     def test_robots_is_read_once_per_host(self):
         tool = _local("User-agent: *\nAllow: /\n")
         tool.run([OK + "/a", OK + "/b"])
-        asked = [c.args[0] for c in tool._session.get.call_args_list]
-        self.assertEqual(asked.count(OK + "/robots.txt"), 1)
+        self.assertEqual(_asked(tool).count(OK + "/robots.txt"), 1)
 
     def test_rfc_9309_status_codes(self):
         self.assertEqual(_local(robots_status=404).run(OK)["pages"][0]["error"], "")
@@ -372,19 +373,33 @@ class TestLocal(unittest.TestCase):
         self.assertEqual(_local(page_status=403).run(OK)["pages"][0]["error"], "HTTP 403")
 
 
-class TestLocalNeedsMarkItDown(unittest.TestCase):
+class TestLocalNeedsNothingForHtml(unittest.TestCase):
+    """MarkItDown brought magika and onnxruntime to turn tags into text; HTML
+    is the standard library's now, and only a PDF needs anything."""
 
-    def test_says_how_to_install(self):
+    def test_it_is_built_without_any_extra(self):
         real = builtins.__import__
 
-        def no_markitdown(name, *a, **kw):
-            if name == "markitdown":
-                raise ImportError("no markitdown")
+        def no_extras(name, *a, **kw):
+            if name in ("markitdown", "requests", "pypdf"):
+                raise ImportError(f"no {name}")
             return real(name, *a, **kw)
 
-        with patch("builtins.__import__", no_markitdown):
+        with patch("builtins.__import__", no_extras):
+            fetchLocal()
+
+    def test_a_pdf_without_pypdf_says_how_to_install(self):
+        from yait_aichain.tools.fetch.local import _pdf_text
+        real = builtins.__import__
+
+        def no_pypdf(name, *a, **kw):
+            if name == "pypdf":
+                raise ImportError("no pypdf")
+            return real(name, *a, **kw)
+
+        with patch("builtins.__import__", no_pypdf):
             with self.assertRaisesRegex(ImportError, r'yait-aichain\[fetch\]'):
-                fetchLocal()
+                _pdf_text(b"%PDF-1.4")
 
 
 def _real(var):
@@ -459,17 +474,11 @@ class TestFetchKeepsWhatItBought(unittest.TestCase):
         self.assertEqual(tool.run("https://example.com/a")["pages"][0]["text"], "ok")
 
     def test_one_agent_name_is_one_agent(self):
-        try:
-            tool = fetchLocal(robots_agents="ClaudeBot")
-        except ImportError:
-            self.skipTest("markitdown not installed")
+        tool = fetchLocal(robots_agents="ClaudeBot")
         self.assertEqual(tool.robots_agents, ("ClaudeBot",))
 
     def test_an_unreachable_robots_txt_is_asked_again(self):
-        try:
-            tool = fetchLocal()
-        except ImportError:
-            self.skipTest("markitdown not installed")
-        with patch("yait_aichain.tools.fetch.local.safe_get", side_effect=ConnectionError("down")):
+        tool = fetchLocal()
+        with patch.object(tool, "_get", side_effect=ConnectionError("down")):
             self.assertIn("could not be reached", tool._refused_by_robots("https://example.com/x"))
         self.assertEqual(tool._robots, {})

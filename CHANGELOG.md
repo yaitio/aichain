@@ -219,12 +219,20 @@ where a fix is named below.
   only the SDK read, are gone, and a missing key is said at construction.
   Checked live 2026-10-13 up to Google's answer — the test key's project has
   neither API enabled, so no audio came back.
+- **`fetch("local")` needs nothing for HTML.** It converts a page to
+  Markdown with the standard library's `html.parser` — headings, paragraphs,
+  lists, links, emphasis, code and tables, without scripts, styles, forms or
+  hidden elements — and fetches it with urllib3, every hop checked, where it
+  used MarkItDown, which brought `magika` and `onnxruntime` (tens of megabytes
+  and a model loaded at import) and `requests`. The `fetch` extra now brings
+  only `pypdf`, for PDFs; a PDF fetched without it is a page whose error says
+  how to install it. A redirect to another host is followed for a page with
+  only the `Accept` header, as before. Checked live 2026-10-13 on example.com
+  and docs.python.org.
 - **What the remaining tools import is declared.** A new extra `audio`
   (`pydub`, with `audioop-lts` on 3.13+) for splitting a recording over a
-  provider's size limit; `fetch` declares the `requests` it uses; `all`
-  brings them all, and the ImportError names the extra. Not done here:
-  `fetch` still brings `markitdown` and its `onnxruntime`; the installation
-  page says how large that is.
+  provider's size limit; `all` brings every extra, and an ImportError names
+  the one it needs.
 
 - **Offline tests stay offline.** Fifteen `list_models` tests mocked
   `urllib3.PoolManager`, and under an `HTTPS_PROXY` the client built a

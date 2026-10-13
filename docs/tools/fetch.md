@@ -25,15 +25,15 @@ tool translates, the way the [search tools](search.md) work.
 A longer list is split into calls of what the provider takes; the pages come
 back in the order asked, duplicates once.
 
-**`fetchLocal` is not installed by default.** It runs
-[MarkItDown](https://github.com/microsoft/markitdown) on this machine, and MarkItDown comes only with the
-extra:
+**`fetchLocal` needs nothing installed for HTML.** It converts a page to
+Markdown on this machine with the standard library. A PDF needs `pypdf`,
+which comes with the extra:
 
 ```bash
 pip install "yait-aichain[fetch]"
 ```
 
-Constructing it without MarkItDown raises `ImportError` with that line.
+A PDF fetched without it is a page with that line as its error.
 
 ## Pages
 
@@ -105,7 +105,7 @@ ways:
   protection and articles readers see only with a subscription — how, the
   measurement did not establish. About half of what came back was still page
   furniture, `only_main_content` notwithstanding.
-- **MarkItDown on this machine** returned 21 in full: what the site serves an
+- **On this machine** (then through MarkItDown, since 4.0 the standard library) returned 21 in full: what the site serves an
   ordinary client. The whole page is converted, navigation and footers
   included.
 - **Exa and Tavily**, on the articles behind a paywall, returned the public

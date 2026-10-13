@@ -68,10 +68,10 @@ class TestFetchLocal(unittest.TestCase):
     def _tool(self, ctype, chunks):
         from yait_aichain.tools import fetchLocal
         tool = fetchLocal(respect_robots=False)
-        r = MagicMock(status_code=200, url="https://e.com", headers={"content-type": ctype})
-        r.iter_content.return_value = iter(chunks)
-        tool._session = MagicMock()
-        tool._session.get.return_value = r
+        r = MagicMock(status=200, headers={"content-type": ctype})
+        r.stream.return_value = iter(chunks)
+        tool._http = MagicMock()
+        tool._http.request.return_value = r
         return tool
 
     def test_an_archive_is_not_converted(self):

@@ -137,7 +137,7 @@ fetchParallel(
 
 ### `fetchLocal`
 
-A web page's text fetched from this machine and converted by MarkItDown — free.
+A web page's text fetched from this machine and converted to Markdown — free.
 
 | | |
 |---|---|
