@@ -125,7 +125,8 @@ class BFLClient(BaseClient):
         """Poll the (absolute) polling URL until Ready; return result.sample URL."""
         deadline = time.monotonic() + self._POLL_TIMEOUT
         while True:
-            payload = _json.loads(self._download(polling_url, headers)["data"])
+            payload = _json.loads(self._download(polling_url, headers,
+                                                 timeout=self._poll_timeout(deadline))["data"])
             status  = payload.get("status")
 
             if status == "Ready":

@@ -196,8 +196,16 @@ class GoogleClient(BaseClient):
     # ── transport ────────────────────────────────────────────────────
 
     def list_models(self) -> list[str]:
-        data = self._get("/models", self._auth_headers())
-        return [m["name"].removeprefix("models/") for m in json.loads(data)["models"]]
+        # Every page: the first one alone was fifty models.
+        out, token = [], None
+        for _ in range(50):
+            path = "/models?pageSize=1000" + (f"&pageToken={token}" if token else "")
+            page = json.loads(self._get(path, self._auth_headers()))
+            out += [m["name"].removeprefix("models/") for m in page.get("models") or []]
+            token = page.get("nextPageToken")
+            if not token:
+                break
+        return out
 
     # ── format ───────────────────────────────────────────────────────
     #: Native tool calling implemented: functionCall / functionResponse

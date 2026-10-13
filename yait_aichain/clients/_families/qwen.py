@@ -218,7 +218,8 @@ class QwenClient(OpenAIClient):
     def _poll_task(self, task_id: str, headers: dict) -> dict:
         deadline = time.monotonic() + self._POLL_TIMEOUT
         while True:
-            payload = _json.loads(self._get(_TASKS_PATH + task_id, headers))
+            payload = _json.loads(self._get(_TASKS_PATH + task_id, headers,
+                                            timeout=self._poll_timeout(deadline)))
             output = payload.get("output", {})
             status = output.get("task_status")
 

@@ -261,8 +261,11 @@ where a fix is named below.
   empty balance and a missing endpoint, where it answered False and sent
   people to rotate a key that worked. A billing word in a 5xx body is a server
   error, not an empty balance. An answer is read as an image by its shape, not
-  by having a `data` key. Not done here: `list_models` pagination and the
-  per-request timeout while polling.
+  by having a `data` key. `list_models` reads every page on Anthropic and
+  Google, where the first page alone was twenty and fifty models. A status
+  request while polling an async image task is bounded by the time left
+  before the deadline, at most 30 seconds, where the deadline bounded the
+  loop and one hung request waited the client's whole read timeout.
 
 - **An answer in several text blocks is the whole answer.** Claude splits an
   answer around citations and server tools, Gemini around code execution, and

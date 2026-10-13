@@ -530,6 +530,15 @@ class BaseClient:
             f"{type(self).__name__} must implement list_models()"
         )
 
+    @staticmethod
+    def _poll_timeout(deadline: float):
+        """One poll's own timeout: at most 30 seconds, and never past the
+        deadline. The deadline bounded the loop, not a request inside it — a
+        status request that hung waited the client's whole read timeout."""
+        import time
+        remaining = max(1.0, deadline - time.monotonic())
+        return urllib3.Timeout(connect=min(10.0, remaining), read=min(30.0, remaining))
+
     def check_auth(self) -> bool:
         """
         Verify that the configured API key is accepted by the provider.
@@ -560,10 +569,11 @@ class BaseClient:
     # Protected HTTP primitives
     # ------------------------------------------------------------------
 
-    def _get(self, path: str, headers: dict | None = None) -> bytes:
+    def _get(self, path: str, headers: dict | None = None, timeout=None) -> bytes:
         """GET ``{base_url}{path}``: the body on a 2xx, a typed `APIError` otherwise."""
+        extra = {"timeout": timeout} if timeout is not None else {}
         return request(self._http, "GET", self._base_url + path, headers=headers,
-                       retries=DEFAULT_IDEMPOTENT_RETRIES).data
+                       retries=DEFAULT_IDEMPOTENT_RETRIES, **extra).data
 
     def _post(self, path: str, data: dict, headers: dict) -> bytes:
         """POST *data* as JSON to ``{base_url}{path}``: the body, or a typed `APIError`."""
@@ -574,8 +584,9 @@ class BaseClient:
         content type with its boundary, so *headers* must not carry one."""
         return request(self._http, "POST", self._base_url + path, fields=fields, headers=headers).data
 
-    def _download(self, url: str, headers: dict | None = None) -> dict:
+    def _download(self, url: str, headers: dict | None = None, timeout=None) -> dict:
         """GET an absolute URL: ``{"data": bytes, "media_type": str}``."""
-        response = request(self._http, "GET", url, headers=headers)
+        extra = {"timeout": timeout} if timeout is not None else {}
+        response = request(self._http, "GET", url, headers=headers, **extra)
         return {"data": response.data,
                 "media_type": response.headers.get("Content-Type", "application/octet-stream")}

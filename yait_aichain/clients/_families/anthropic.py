@@ -126,8 +126,16 @@ class AnthropicClient(BaseClient):
         return {**super()._auth_headers(), "anthropic-version": _API_VERSION}
 
     def list_models(self) -> list[str]:
-        data = self._get("/v1/models", self._auth_headers())
-        return [m["id"] for m in json.loads(data)["data"]]
+        # Every page: the first one alone was twenty models.
+        out, after = [], None
+        for _ in range(50):
+            path = "/v1/models?limit=1000" + (f"&after_id={after}" if after else "")
+            page = json.loads(self._get(path, self._auth_headers()))
+            out += [m["id"] for m in page.get("data") or []]
+            if not page.get("has_more") or not page.get("last_id"):
+                break
+            after = page["last_id"]
+        return out
 
     # ── format ───────────────────────────────────────────────────────
     #: Native tool calling implemented: tool_use / tool_result blocks.
