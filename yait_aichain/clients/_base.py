@@ -157,6 +157,7 @@ from ._errors import (  # noqa: F401
     NetworkError,
     RateLimitError,
     AuthenticationError,
+    InsufficientCreditsError,
     InvalidRequestError,
     NotFoundError,
     ServerError,
@@ -534,9 +535,11 @@ class BaseClient:
         Verify that the configured API key is accepted by the provider.
 
         Calls ``list_models()`` and returns ``True`` on success.
-        Returns ``False`` for any 4xx response (invalid or revoked key).
-        Re-raises ``APIError`` for 5xx / network errors so callers can
-        distinguish a bad key from a provider outage.
+        Returns ``False`` when the key is refused (401, 403, or 400 where a
+        provider answers a bad key so). A rate limit, an empty balance, a
+        missing endpoint, a server error and a network error are raised: none
+        of them says the key is bad, and reading them as False sent people to
+        rotate a key that worked.
 
         Returns
         -------
@@ -546,8 +549,10 @@ class BaseClient:
         try:
             self.list_models()
             return True
+        except (RateLimitError, InsufficientCreditsError, NotFoundError):
+            raise
         except APIError as exc:
-            if 400 <= exc.status < 500:
+            if exc.status in (400, 401, 403):
                 return False
             raise
 

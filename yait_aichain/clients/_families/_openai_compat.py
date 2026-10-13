@@ -1079,6 +1079,10 @@ def _build_responses_api_request(
         "model":             model.name,
         "input":             input_messages,
         "max_output_tokens": model.max_tokens,
+        # Not kept by OpenAI: nothing here reads `previous_response_id`, and
+        # every conversation moved to this API was stored there by default.
+        # `extra={"store": True}` keeps it.
+        "store":             False,
     }
 
     instructions = "\n".join(system_texts)

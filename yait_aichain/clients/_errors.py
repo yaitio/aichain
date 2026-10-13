@@ -233,7 +233,9 @@ def error_from_status(
     # Billing is checked FIRST: an out-of-credits state arrives under several
     # codes (402 Payment Required, or a 403/429/400 with a credits/quota body)
     # and must not be misread as auth / rate-limit / bad-request.
-    if status == 402 or _looks_like_billing(message):
+    # The body is read only on a client error: a 5xx page that mentions
+    # "quota" is still a server failure, and retrying it may work.
+    if status == 402 or (400 <= status < 500 and _looks_like_billing(message)):
         return InsufficientCreditsError(status, message)
     if status == 429:
         return RateLimitError(status, message, _parse_retry_after(headers))

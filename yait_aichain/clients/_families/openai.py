@@ -435,7 +435,10 @@ class OpenAIClient(BaseClient):
     # ── format: provider response → our result ───────────────────────
     def parse_response(self, response, output, *, harmony: str | None = None) -> str | dict:
         p = self._provider
-        if "data" in response:
+        data = response.get("data")
+        # An image answer by its shape, not by a key: any JSON with `data` read as one.
+        if isinstance(data, list) and data and isinstance(data[0], dict) and (
+                "b64_json" in data[0] or "url" in data[0]):
             return _parse_image_generations_response(response)
         if p == "openai":
             if "choices" in response:

@@ -133,6 +133,16 @@ where a fix is named below.
 
 ### Fixed
 
+- **OpenAI stores nothing it was not asked to.** A Responses API request sends
+  `store: false`, where every conversation moved to that API was kept at
+  OpenAI by default though nothing here reads `previous_response_id`;
+  `extra={"store": True}` keeps it. `check_auth()` raises on a rate limit, an
+  empty balance and a missing endpoint, where it answered False and sent
+  people to rotate a key that worked. A billing word in a 5xx body is a server
+  error, not an empty balance. An answer is read as an image by its shape, not
+  by having a `data` key. Not done here: `list_models` pagination and the
+  per-request timeout while polling.
+
 - **An answer in several text blocks is the whole answer.** Claude splits an
   answer around citations and server tools, Gemini around code execution, and
   the Responses API may send several `output_text` parts; `run()` returned
