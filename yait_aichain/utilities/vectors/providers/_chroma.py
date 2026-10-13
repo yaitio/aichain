@@ -45,7 +45,7 @@ from __future__ import annotations
 import os
 
 from ....clients._errors import APIError
-from .._base import VectorBackend, VectorRecord
+from .._base import VectorBackend, VectorRecord, check_metric, normalise_score
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -65,13 +65,18 @@ def _columns(ids: list, *columns: list):
 
 
 def _normalise_score(distance: float, space: str) -> float:
-    """Convert a Chroma distance to a similarity score in [0, 1]."""
+    """A Chroma distance as the similarity every other backend gives.
+
+    Chroma answers a distance in each space: ``1 − cos`` for cosine,
+    ``1 − dot`` for ip, and the *squared* euclidean distance for l2. Each is
+    turned back into what the other backends return and scored by the one
+    shared rule.
+    """
     if space == "cosine":
-        return max(0.0, 1.0 - distance / 2.0)
+        return normalise_score(1.0 - distance, "cosine")
     if space == "ip":
-        return float(-distance)          # ip stores negated dot-product
-    # l2 / unknown
-    return 1.0 / (1.0 + distance)
+        return normalise_score(1.0 - distance, "dot")
+    return normalise_score(distance, "sqeuclidean")
 
 
 # ── ChromaBackend ──────────────────────────────────────────────────────────────
@@ -152,7 +157,9 @@ class ChromaBackend(VectorBackend):
             return self._collection_cache[name]
         data  = self._get(f"{self._prefix}/collections/{name}")
         cid   = data["id"]
-        space = (data.get("metadata") or {}).get("hnsw:space", "cosine")
+        # Chroma's own default is l2, and a collection created elsewhere
+        # without a space was read as cosine.
+        space = (data.get("metadata") or {}).get("hnsw:space") or "l2"
         self._collection_cache[name] = (cid, space)
         return cid, space
 
@@ -178,7 +185,7 @@ class ChromaBackend(VectorBackend):
         dimension:  int,
         metric:     str = "cosine",
     ) -> None:
-        space = _METRIC_MAP.get(metric, "cosine")
+        space = _METRIC_MAP[check_metric(metric, _METRIC_MAP, "Chroma")]
         body  = {
             "name":          collection,
             "metadata":      {"hnsw:space": space},
@@ -212,7 +219,8 @@ class ChromaBackend(VectorBackend):
         distances = (data.get("distances") or [[]])[0]
 
         return [VectorRecord(id=rid, text=doc or "", metadata=meta or {},
-                             score=_normalise_score(dist, space) if dist is not None else None)
+                             score=_normalise_score(dist, space) if dist is not None else None,
+                             raw_score=dist)
                 for rid, doc, meta, dist in _columns(ids, docs, metas, distances)]
 
     def upsert(

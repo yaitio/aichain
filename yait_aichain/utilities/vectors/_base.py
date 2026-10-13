@@ -70,9 +70,24 @@ def normalise_score(raw: float | None, metric: str) -> float | None:
         return None
     if metric == "cosine":
         return max(0.0, min(1.0, (float(raw) + 1.0) / 2.0))
-    if metric == "euclidean":
+    if metric in ("euclidean", "manhattan"):
         return 1.0 / (1.0 + max(0.0, float(raw)))
-    return float(raw)
+    if metric == "sqeuclidean":                 # Pinecone's and Chroma's l2: the square
+        return 1.0 / (1.0 + max(0.0, float(raw)) ** 0.5)
+    if metric == "dot":
+        return float(raw)
+    raise ValueError(f"no metric {metric!r}; one of {list(METRICS)}")
+
+
+#: The metrics a store may be created with; a backend takes those it has.
+#: An unknown one was created as cosine, and its scores read as cosine.
+METRICS = ("cosine", "euclidean", "dot", "manhattan")
+
+
+def check_metric(metric: str, accepted, who: str) -> str:
+    if metric not in accepted:
+        raise ValueError(f"{who} has no metric {metric!r}; it takes {sorted(accepted)}")
+    return metric
 
 
 class PartialUpsert(RuntimeError):
@@ -122,6 +137,8 @@ class VectorRecord:
         d: dict = {"id": self.id, "text": self.text, "metadata": self.metadata}
         if self.score is not None:
             d["score"] = self.score
+        if self.raw_score is not None:
+            d["raw_score"] = self.raw_score
         return d
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
@@ -356,6 +373,7 @@ class VectorStore:
         metric    : ``"cosine"`` | ``"euclidean"`` | ``"dot"``
             Distance metric used for similarity ranking.
         """
+        check_metric(metric, METRICS, "a vector store")
         self._backend.create_collection(self._collection, dimension, metric)
 
     def query(

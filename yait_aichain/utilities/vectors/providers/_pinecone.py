@@ -44,7 +44,7 @@ import os
 from urllib.parse import urlencode
 
 from ....clients._errors import APIError
-from .._base import VectorBackend, VectorRecord, record_from_payload
+from .._base import VectorBackend, VectorRecord, check_metric, record_from_payload
 
 
 # ── Metric mapping ─────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ class PineconeBackend(VectorBackend):
         # a property of the index, on the control plane. Without it `score`
         # would carry a cosine similarity in [-1, 1] on one collection and a
         # squared distance — lower is nearer — on another, under one name.
-        self._metric = metric
+        self._metric = check_metric(metric, _METRIC_MAP, "Pinecone")
         resolved_key = api_key or os.environ.get("PINECONE_API_KEY", "")
         if not resolved_key:
             raise ValueError(
@@ -180,7 +180,7 @@ class PineconeBackend(VectorBackend):
         body = {
             "name":      self._index,
             "dimension": dimension,
-            "metric":    _METRIC_MAP.get(metric, "cosine"),
+            "metric":    _METRIC_MAP[check_metric(metric, _METRIC_MAP, "Pinecone")],
             "spec": {
                 "serverless": {
                     "cloud":  self._cloud,
@@ -193,6 +193,16 @@ class PineconeBackend(VectorBackend):
         except APIError as exc:
             if exc.status != 409:                 # 409: it exists already, which is the goal
                 raise
+            # …provided it is the index asked for: one of another dimension
+            # took every write and answered nothing, and its own metric is
+            # the one its scores are on.
+            info = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}")
+            if info.get("dimension") not in (None, dimension):
+                raise ValueError(f"Pinecone index {self._index!r} exists with dimension "
+                                 f"{info.get('dimension')}, not {dimension}") from None
+            back = {v: k for k, v in _METRIC_MAP.items()}
+            metric = back.get(info.get("metric"), metric)
+        self._metric = metric
 
     def query(
         self,
@@ -220,7 +230,9 @@ class PineconeBackend(VectorBackend):
         # else defaults to; `raw_score` keeps the original either way, so a
         # caller who set a different metric and did not say so can still see
         # what came back.
-        return [record_from_payload(m["id"], m.get("metadata"), m.get("score"), self._metric)
+        # Pinecone's euclidean is the squared distance.
+        metric = "sqeuclidean" if self._metric == "euclidean" else self._metric
+        return [record_from_payload(m["id"], m.get("metadata"), m.get("score"), metric)
                 for m in data.get("matches", [])]
 
     def upsert(

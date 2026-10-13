@@ -125,6 +125,19 @@ where a fix is named below.
 
 ### Fixed
 
+- **A vector store's scores are read on the metric it was created with.**
+  `create(4, metric="euclidean")` on Qdrant and Pinecone built a euclidean
+  collection and scored it as cosine: an identical document scored 0.5 and a
+  far one 1.0, and a `> 0.8` threshold kept the worst. The backend now keeps
+  the metric it created, and on an existing collection or index reads the one
+  it has — and refuses one of another dimension, where it took every write.
+  Pinecone's and Chroma's euclidean is the squared distance and is scored as
+  such. Chroma's ip score was off by one and its default space, l2, was read
+  as cosine; its distances go through the same rule as the other backends'
+  and come back as `raw_score`, which `to_dict()` now carries. An unknown
+  metric is a `ValueError`, where it became cosine. Qdrant answers an
+  existing collection as success, as the others do.
+
 - **Embedding batches are sized by what a provider refuses.** A request was
   cut by count alone: 2,048 chunks of 400 tokens is 819k tokens against
   OpenAI's 300k, DashScope's `text-embedding-v3`/`v4` take ten rows where 25

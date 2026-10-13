@@ -45,7 +45,8 @@ from __future__ import annotations
 import os
 import uuid
 
-from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, record_from_payload
+from ....clients._errors import APIError
+from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, check_metric, record_from_payload
 
 def _point_id(rec_id: str | int) -> int | str:
     """Map an arbitrary record ID onto a Qdrant-acceptable point ID.
@@ -130,7 +131,7 @@ class QdrantBackend(VectorBackend):
             url     = url     or os.environ.get("QDRANT_URL", self._DEFAULT_URL),
             api_key = api_key or os.environ.get("QDRANT_API_KEY"),
         )
-        self._metric = metric
+        self._metric = check_metric(metric, _METRIC_MAP, "Qdrant")
 
     # ── Auth header override ───────────────────────────────────────────────────
 
@@ -152,14 +153,29 @@ class QdrantBackend(VectorBackend):
         dimension:  int,
         metric:     str = "cosine",
     ) -> None:
-        distance = _METRIC_MAP.get(metric, "Cosine")
+        distance = _METRIC_MAP[check_metric(metric, _METRIC_MAP, "Qdrant")]
         body     = {
             "vectors": {
                 "size":     dimension,
                 "distance": distance,
             }
         }
-        self._put(f"/collections/{collection}", body)
+        try:
+            self._put(f"/collections/{collection}", body)
+        except APIError as exc:
+            # 409 on current Qdrant; 400 "already exists" on older releases.
+            if not (exc.status == 409 or (exc.status == 400 and "exist" in str(exc).lower())):
+                raise
+            # It exists already, which is the goal — as on every other
+            # backend — and its own metric is the one its scores are on.
+            info = self._get(f"/collections/{collection}").get("result") or {}
+            vectors = ((info.get("config") or {}).get("params") or {}).get("vectors") or {}
+            if vectors.get("size") not in (None, dimension):
+                raise ValueError(f"Qdrant collection {collection!r} exists with dimension "
+                                 f"{vectors.get('size')}, not {dimension}") from None
+            back = {v: k for k, v in _METRIC_MAP.items()}
+            metric = back.get(vectors.get("distance"), metric)
+        self._metric = metric
 
     def query(
         self,
