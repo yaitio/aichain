@@ -65,6 +65,15 @@ STANDARD_OPTIONS = {
 _URL_SCHEMA = {"type": "array", "items": {"type": "string"},
                "description": "The pages' URLs, http or https — one or several."}
 
+
+def _norm(url: str) -> str:
+    """A URL as two spellings of one page agree: scheme and host lower-cased,
+    no fragment, no trailing slash."""
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(url.strip())
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"),
+                       parts.query, ""))
+
 class Fetch(Tool):
     """
     Base of the fetch tools: one record of a page, a provider per subclass.
@@ -147,14 +156,33 @@ class Fetch(Tool):
             if not u.lower().startswith(("http://", "https://")):
                 raise ValueError(f"{type(self).__name__} fetches http and https URLs; got {u!r}")
         opts = dict(options or {})
-        opts["max_chars"] = int(opts.get("max_chars") or DEFAULT_MAX_CHARS)
+        try:
+            opts["max_chars"] = int(opts.get("max_chars") or DEFAULT_MAX_CHARS)
+        except (TypeError, ValueError):
+            raise ValueError(f"max_chars is a whole number, not {opts.get('max_chars')!r}") from None
+        if opts["max_chars"] < 1:
+            # `-3` cut three characters from the end and kept the rest.
+            raise ValueError(f"max_chars is at least 1, not {opts['max_chars']}")
         notices: list = []
         total = {"usd": 0.0, "usage": {}, "basis": ""}
         got: dict = {}
         for i in range(0, len(wanted), self.max_batch):
             batch = wanted[i:i + self.max_batch]
             cost: dict = {}
-            got.update(self._fetch(batch, opts, notices, cost))
+            try:
+                got.update(self._fetch(batch, opts, notices, cost))
+            except Exception as exc:
+                # Nothing bought yet: the error is the answer — a bad key, no
+                # credit. After that, one batch failing threw away the pages
+                # the others had bought; they are kept, and this batch's
+                # pages carry the error.
+                if not got:
+                    raise
+                for u in batch:
+                    got[u] = self.page(u, error=f"{type(exc).__name__}: {exc}")
+                notices.append(f"a batch of {len(batch)} URL(s) failed ({type(exc).__name__}); "
+                               "the pages fetched before it are kept")
+                continue
             if "usd" not in cost:
                 cost.update(usd=self._LIST_PRICE * len(batch),
                             basis=f"published rate ({self._PRICE_SOURCE})")
@@ -162,9 +190,14 @@ class Fetch(Tool):
             total["basis"] = cost["basis"]
             for k, v in (cost.get("usage") or {}).items():
                 total["usage"][k] = total["usage"].get(k, 0) + v if isinstance(v, (int, float)) else v
+        # Matched by a normal form as well: a provider answering under the URL
+        # it settled on — a trailing slash, a lower-cased host — read as
+        # "nothing for this URL".
+        by_norm = {_norm(k): v for k, v in got.items()}
         pages = []
         for u in wanted:
-            p = got.get(u) or self.page(u, error=f"{self._PROVIDER} returned nothing for this URL")
+            p = (got.get(u) or by_norm.get(_norm(u))
+                 or self.page(u, error=f"{self._PROVIDER} returned nothing for this URL"))
             if p["text"] and len(p["text"]) > opts["max_chars"]:
                 p["text"] = p["text"][:opts["max_chars"]]
             pages.append(p)

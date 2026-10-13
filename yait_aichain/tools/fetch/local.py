@@ -29,6 +29,9 @@ No User-Agent is invented: the request goes out as ``python-requests`` unless
 
 from __future__ import annotations
 
+import codecs
+import time
+
 from ..._require import require
 
 from urllib.parse import urlsplit
@@ -48,6 +51,11 @@ ROBOTS_AGENTS = ("*", "ClaudeBot", "Claude-User", "anthropic-ai")
 _PAGE_TYPES = ("text/", "html", "xml", "json", "application/pdf")
 #: The most of one page fetchLocal reads.
 MAX_PAGE_BYTES = 10 << 20
+
+
+#: How long a robots.txt read is trusted, and how many hosts are remembered.
+ROBOTS_TTL = 3600.0
+ROBOTS_CACHE_SIZE = 256
 
 class fetchLocal(Fetch):
     """
@@ -86,7 +94,8 @@ class fetchLocal(Fetch):
         self._session = _session(timeout, headers)
         self._md = MarkItDown(requests_session=self._session)
         self.respect_robots = respect_robots
-        self.robots_agents = tuple(robots_agents)
+        # One name is one agent, not its letters.
+        self.robots_agents = (robots_agents,) if isinstance(robots_agents, str) else tuple(robots_agents)
         self._robots: dict = {}
         self._timeout, self._headers = timeout, dict(headers or {})
         self._named(name, description)
@@ -136,6 +145,10 @@ class fetchLocal(Fetch):
             meta: dict = {}
             if "html" in ctype:
                 charset = response.encoding if "charset=" in ctype else "utf-8"
+                try:
+                    codecs.lookup(charset or "utf-8")
+                except LookupError:
+                    charset = "utf-8"            # a charset Python has never heard of lost the page
                 meta = page_metadata(response.content.decode(charset or "utf-8", errors="replace"))
             text = self._md.convert_response(response).text_content
         except Exception as exc:                       # one page failing is a record, not a crash
@@ -147,7 +160,8 @@ class fetchLocal(Fetch):
         """Why robots.txt refuses *url*, or "" when it allows it."""
         parts = urlsplit(url)
         root = f"{parts.scheme}://{parts.netloc}"
-        if root not in self._robots:
+        cached = self._robots.get(root)
+        if cached is None or time.monotonic() - cached[0] > ROBOTS_TTL:
             parser = RobotFileParser()
             try:
                 r = safe_get(self._session, root + "/robots.txt")
@@ -158,10 +172,16 @@ class fetchLocal(Fetch):
                 else:
                     parser.parse(r.text.splitlines())
             except Exception as exc:
-                # The site did not answer at all: say so, rather than blame robots.txt.
-                parser = f"the site could not be reached ({type(exc).__name__}: {exc})"
-            self._robots[root] = parser
-        parser = self._robots[root]
+                # The site did not answer at all: say so, rather than blame
+                # robots.txt — and do not remember it, where one failed read
+                # kept the host unreachable until the process restarted.
+                return f"the site could not be reached ({type(exc).__name__}: {exc})"
+            if not parser.disallow_all:            # a 5xx is asked again next time, too
+                if len(self._robots) >= ROBOTS_CACHE_SIZE:
+                    self._robots.pop(next(iter(self._robots)))
+                self._robots[root] = (time.monotonic(), parser)
+        else:
+            parser = cached[1]
         if isinstance(parser, str):
             return parser
         if parser.disallow_all:

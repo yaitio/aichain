@@ -424,3 +424,51 @@ class TestOneMethodAndABatchableSchema(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFetchKeepsWhatItBought(unittest.TestCase):
+    """A failed batch threw away the pages already bought; a page answered
+    under a trailing slash read as missing; `max_chars=-3` cut from the end;
+    one robots agent was a set of letters; a failed robots.txt read was
+    remembered for the life of the process."""
+
+    def test_max_chars_is_at_least_one(self):
+        with self.assertRaises(ValueError):
+            _tool(fetchExa).run("https://example.com/a", {"max_chars": -3})
+
+    def test_a_later_batch_failing_keeps_the_earlier_pages(self):
+        tool = _tool(fetchExa)
+        tool.max_batch = 1
+        calls = {"n": 0}
+
+        def fetch_batch(batch, opts, notices, cost):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("HTTP 500")
+            return {batch[0]: tool.page(batch[0], text="ok")}
+        tool._fetch = fetch_batch
+        out = tool.run(["https://example.com/a", "https://example.com/b"])
+        self.assertEqual(out["pages"][0]["text"], "ok")
+        self.assertIn("HTTP 500", out["pages"][1]["error"])
+
+    def test_a_page_under_another_spelling_is_found(self):
+        tool = _tool(fetchExa)
+        tool._fetch = lambda batch, opts, notices, cost: {
+            "https://Example.com/a/": tool.page("https://Example.com/a/", text="ok")}
+        self.assertEqual(tool.run("https://example.com/a")["pages"][0]["text"], "ok")
+
+    def test_one_agent_name_is_one_agent(self):
+        try:
+            tool = fetchLocal(robots_agents="ClaudeBot")
+        except ImportError:
+            self.skipTest("markitdown not installed")
+        self.assertEqual(tool.robots_agents, ("ClaudeBot",))
+
+    def test_an_unreachable_robots_txt_is_asked_again(self):
+        try:
+            tool = fetchLocal()
+        except ImportError:
+            self.skipTest("markitdown not installed")
+        with patch("yait_aichain.tools.fetch.local.safe_get", side_effect=ConnectionError("down")):
+            self.assertIn("could not be reached", tool._refused_by_robots("https://example.com/x"))
+        self.assertEqual(tool._robots, {})

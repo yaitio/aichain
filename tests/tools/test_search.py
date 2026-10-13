@@ -584,3 +584,11 @@ class TestADayThatDoesNotExist(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOneDomainIsOneDomain(unittest.TestCase):
+    """`domains="hbr.org"` became `site:h OR site:b OR …` on every provider."""
+
+    def test_a_string_where_a_list_belongs(self):
+        tool, _, _ = _search(searchExa, {"domains": "hbr.org"})
+        self.assertEqual(_sent(tool)["includeDomains"], ["hbr.org"])

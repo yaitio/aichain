@@ -133,6 +133,18 @@ where a fix is named below.
 
 ### Fixed
 
+- **Search and fetch read one value as one value, and keep what they paid
+  for.** A string where a search option takes a list is a list of one, where
+  `domains="hbr.org"` became `site:h OR site:b …` on all six providers, and
+  `fetchLocal(robots_agents="ClaudeBot")` is one agent, not its letters. A
+  robots.txt that could not be read is not remembered — one failure kept the
+  host unreachable until restart — and reads are kept an hour, for at most 256
+  hosts. A fetch batch that fails after others succeeded keeps their pages and
+  marks its own, where it threw them all away; a page answered under another
+  spelling of its URL is found, where a trailing slash read as "nothing for
+  this URL". An unknown charset decodes as UTF-8 instead of losing the page,
+  and `max_chars` below 1 is refused, where `-3` cut from the end.
+
 - **A tool's key may be resolved per request, as a model's is.** Every tool
   and vector backend takes `api_key=` as a string or as a callable asked with
   the run's `RunContext` on each request, where a callable was sent as

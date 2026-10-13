@@ -244,6 +244,12 @@ class Search(Tool):
         if not isinstance(input, str) or not input.strip():
             raise ValueError(f"{type(self).__name__} needs a query — it was empty")
         opts = dict(options or {})
+        # A string where the schema says a list is one item: `domains="hbr.org"`
+        # became `site:h OR site:b OR …` on every provider.
+        declared = ((self.parameters.get("properties") or {}).get("options") or {}).get("properties") or {}
+        for key, spec in declared.items():
+            if (spec or {}).get("type") == "array" and isinstance(opts.get(key), str):
+                opts[key] = [opts[key]]
         notices: list = []
         for key in [k for k in opts if k in self.declines and opts[k] not in (None, "", [])]:
             self._notice(notices, f"{key} is not supported by {self.name} and was not applied: "
