@@ -118,6 +118,12 @@ where a fix is named below.
 
 ### Fixed
 
+- **A step that fails without a message has failed.** Success was read from
+  the error's text, and `TimeoutError()`, a bare `assert` and
+  `RuntimeError()` render as `""`: a Chain under `stop`, `skip` or `collect`
+  returned `success=True, error=None` beside the failure's record, and a
+  Pool item read as succeeded. An error with no message is recorded as its
+  type, and a Chain reads failure from the failure record.
 - **A pause is neither a failure nor a finished step.** `SuspendedResult` is
   falsy, so a Pool reported "Agent failed: unknown error" for an item whose
   agent had parked — losing the run id and orphaning its document — and a

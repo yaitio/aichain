@@ -790,7 +790,7 @@ class Chain:
                     # The type and the traceback, not just the message:
                     # `KeyError('tenant')` renders as `'tenant'`, which reads
                     # as a value rather than a fault.
-                    "error":      str(exc),
+                    "error":      str(exc) or type(exc).__name__,
                     "failure":    _describe(exc),
                 })
 
@@ -869,7 +869,9 @@ class Chain:
 
     @staticmethod
     def _result(doc, history, accumulated, usage_total, last_output) -> ChainResult:
-        failed = [r for r in history if r.get("error")]
+        # By the failure record, not by its message: `TimeoutError()` and a
+        # bare `assert` have an empty one, and the chain reported success.
+        failed = [r for r in history if r.get("failure") or r.get("error")]
         error = (f"step {failed[0]['step']} ({failed[0]['name']}): {failed[0]['error']}"
                  if failed else None)
         return ChainResult(output=last_output, success=not failed, error=error,

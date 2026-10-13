@@ -455,7 +455,9 @@ class Pool:
                     # Type and traceback beside the message: a
                     # `KeyError('tenant')` renders as `'tenant'`, which in a
                     # run record reads as a value rather than a fault.
-                    "error":    str(exc),
+                    # Never empty: `TimeoutError()` and a bare `assert` have
+                    # no message, and an empty error read as no error.
+                    "error":    str(exc) or type(exc).__name__,
                     "failure":  _describe(exc),
                     "duration": duration,
                 })
