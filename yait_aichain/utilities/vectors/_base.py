@@ -26,6 +26,8 @@ Neither needs VectorStore + backend constructed by hand.
 
 from __future__ import annotations
 
+from ...tools._key import ApiKey
+
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -207,6 +209,8 @@ class VectorBackend(ABC):
     the caller does not pass them explicitly.  Subclasses document the
     specific variable names.
     """
+
+    _api_key = ApiKey()            # a string, or resolved per request — see tools._key
 
     provider: str = ""
     #: How a ``filter`` is written for this backend, shown to a model.

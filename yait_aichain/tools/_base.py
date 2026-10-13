@@ -54,6 +54,8 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
+
+from ._key import ApiKey
 from typing import Any
 
 
@@ -274,6 +276,9 @@ class Tool:
     # alternative is finding out at the moment the pause is needed and the
     # place to keep it does not exist.
     suspends:    bool = False
+    #: The key: a string, or a callable asked with the run's context on each
+    #: request — see `_key.ApiKey`.
+    _api_key = ApiKey()
 
     # ------------------------------------------------------------------
     # Public API

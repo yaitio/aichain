@@ -133,6 +133,14 @@ where a fix is named below.
 
 ### Fixed
 
+- **A tool's key may be resolved per request, as a model's is.** Every tool
+  and vector backend takes `api_key=` as a string or as a callable asked with
+  the run's `RunContext` on each request, where a callable was sent as
+  `Bearer <function …>` and answered 401 — a multi-tenant RAG had to build its
+  tools per request or bill every tenant to one key. A resolver that returns
+  nothing for a tenant is an error, never a fall-back to another key; a key
+  that is neither a string nor a callable is refused at construction.
+
 - **A decision tool fails closed.** A question the provider did not answer is
   an error naming it, where it was a probability of `None` in a run that
   succeeded. A provider that reports no usage gives a cost of `None`, "not
