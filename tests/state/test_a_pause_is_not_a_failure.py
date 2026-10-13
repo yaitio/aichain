@@ -60,8 +60,8 @@ class TestASuspendedResultReadsLikeAResult(unittest.TestCase):
 
     def test_the_common_fields(self):
         r = SuspendedResult(run_id="r", awaiting={"reason": "approve?"})
-        self.assertEqual((r.success, r.suspended, r.output, r.cost, r.tokens_used, bool(r)),
-                         (False, True, None, None, 0, False))
+        self.assertEqual((r.success, r.suspended, r.cost, r.tokens_used, bool(r)),
+                         (False, True, None, 0, False))
         self.assertIn("approve?", r.error)
 
 

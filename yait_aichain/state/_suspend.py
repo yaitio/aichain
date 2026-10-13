@@ -66,16 +66,15 @@ class SuspendedResult:
     document: dict  = field(default_factory=dict)
 
     #: The fields every result has, so code written against `AgentResult` or
-    #: `ChainResult` reads a pause without a special case: not a success, no
-    #: output yet, and nothing failed — ``suspended`` says which of those
-    #: falsy results this is.
+    #: `ChainResult` reads a pause without a special case: not a success, and
+    #: nothing failed — ``suspended`` says which of those falsy results this
+    #: is. ``output`` is left out on purpose: reading it says to resume, where
+    #: None would read as an answer of nothing.
     success   = False
     suspended = True
-    output    = None
     usage     = None
     cost      = None
     tokens_used = 0
-    history: tuple = ()
 
     @property
     def error(self) -> str:

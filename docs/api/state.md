@@ -92,12 +92,7 @@ Raised by a suspend tool to pause the current run.
 ## `SuspendedResult`
 
 ```python
-SuspendedResult(
-    run_id: str,
-    awaiting: dict = <factory>,
-    document: dict = <factory>,
-    history: tuple = (),
-)
+SuspendedResult(run_id: str, awaiting: dict = <factory>, document: dict = <factory>)
 ```
 
 Returned by `run()` / `resume()` when the run paused instead of

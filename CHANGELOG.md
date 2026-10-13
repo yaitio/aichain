@@ -127,7 +127,8 @@ where a fix is named below.
   name, and a `Suspend` from a function or a Skill step — re-run without its
   signal on resume, so it paused for ever — is refused: only a tool step is
   given the signal. `SuspendedResult` carries `success`, `suspended`,
-  `output`, `error`, `usage`, `cost` and `tokens_used` like every result.
+  `error`, `usage`, `cost` and `tokens_used` like every result; reading
+  `output` still says to resume.
 - **A Chain's or a Pool's budget holds without editing the steps.** A Chain
   lent its budget by writing it onto each step's `max_cost` and restoring it
   afterwards, and a Pool did the same on the runner — but a Pool's copies of
