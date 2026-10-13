@@ -31,7 +31,7 @@ import time
 
 from .._base import BaseClient
 from .._errors import TaskFailedError
-from ._openai_compat import _image_sources, _parse_image_generations_response, _last_user_text
+from ._openai_compat import _edit_sources, _parse_image_generations_response, _last_user_text
 
 # BFL polling statuses that are terminal failures (anything but Ready / pending).
 _FAILED_STATUSES = frozenset(
@@ -98,10 +98,10 @@ class BFLClient(BaseClient):
             body["seed"] = fmt["seed"]
 
         # An input image (Kontext) switches generation → edit. Up to 4 references.
-        sources = _image_sources(messages)
+        sources = _edit_sources(messages, "bfl", name)
         if sources:
             body["input_image"] = _flux_image_value(sources[0])
-            for i, extra in enumerate(sources[1:4], start=2):
+            for i, extra in enumerate(sources[1:], start=2):
                 body[f"input_image_{i}"] = _flux_image_value(extra)
 
         return f"/v1/{name}", body

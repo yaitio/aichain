@@ -29,6 +29,9 @@ accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 # range and is clamped; anything else is a set and is refused, with the list
 # named — better than paying for a round trip to be told
 # "Invalid value: 'ultra-max-supreme'".
+# The most images an edit takes; more are left out and said (gpt-image edits take up to sixteen images; dall-e-2 one).
+max_input_images = 16
+
 [provider.options.values]
 quality            = ["low", "medium", "high", "auto"]
 background         = ["transparent", "opaque", "auto"]

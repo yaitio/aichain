@@ -288,8 +288,10 @@ where a fix is named below.
   format is read from its MIME type — `audio/mpeg` went as `"mpeg"` — and
   Claude, which takes no audio, is no longer sent it as a document (a 400). A
   tool's media follow-up no longer holds `null` for a part it could not encode
-  (a 400). Not done here: image-edit models that take fewer input images than
-  given still take the first ones in silence.
+  (a 400). An image edit given more images than it takes sends the newest
+  and declines the rest, where Recraft took the first one, xAI the first
+  three and BFL the first four — the oldest in the conversation — in
+  silence; each provider's limit is `max_input_images` in its data.
 
 - **A gpt-oss stream decides as its run does.** Where harmony parsing exists
   for — a private gpt-oss without a server-side parser — `Agent.stream()`

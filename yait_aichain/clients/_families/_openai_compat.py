@@ -842,6 +842,26 @@ def _image_sources(messages: list) -> list:
     ]
 
 
+def _edit_sources(messages: list, provider: str, model_name: str, limit: int | None = None) -> list:
+    """The images an edit sends: the newest *limit* of them — the provider's
+    `max_input_images` unless given — and a `declined` for the rest. The oldest
+    were taken, in silence: a third image on Recraft was dropped and the edit
+    ran on the first one in the conversation."""
+    from ...models._adaptation import Adaptation, DECLINED, record
+    from ...models._data import PROVIDERS
+    sources = _image_sources(messages)
+    if limit is None:
+        limit = ((PROVIDERS.get(provider) or {}).get("provider", {}).get("options", {})
+                 .get("max_input_images"))
+    if limit is not None and len(sources) > limit:
+        record(Adaptation(kind=DECLINED, option="images", asked=len(sources), sent=limit,
+                          model=model_name,
+                          why=f"this edit takes at most {limit} image(s); the newest were sent and "
+                              f"{len(sources) - limit} earlier one(s) left out"))
+        sources = sources[-limit:]
+    return sources
+
+
 def _image_source_to_data_uri(src: dict) -> str:
     """A URL source → its URL; a base64/file source → a ``data:`` URI."""
     if src.get("kind") == "url":
@@ -881,7 +901,8 @@ def _build_image_edits_request(
     ``dall-e-2`` takes a single ``image``. ``response_format`` is omitted
     (gpt-image returns b64 natively).
     """
-    sources = _image_sources(messages)
+    sources = _edit_sources(messages, "openai", model.name,
+                            None if model.name.startswith(_GPT_IMAGE) else 1)
     if not sources:
         raise ValueError("image edit requires at least one input image part")
 
@@ -937,11 +958,10 @@ def _build_xai_image_edit_request(
     ``response_format:"b64_json"`` yields base64 directly — so
     ``_parse_image_generations_response`` consumes it unchanged.
     """
-    sources = _image_sources(messages)
+    sources = _edit_sources(messages, "xai", model.name)
     if not sources:
         raise ValueError("image edit requires at least one input image part")
-    imgs = [{"url": _image_source_to_data_uri(s), "type": "image_url"}
-            for s in sources[:3]]                      # xAI Imagine: up to 3 source images
+    imgs = [{"url": _image_source_to_data_uri(s), "type": "image_url"} for s in sources]
     body = {"model": model.name, "prompt": _last_user_text(messages),
             "response_format": "b64_json"}
     # Shape control works on this path too — measured 2026-09-09, an edit with

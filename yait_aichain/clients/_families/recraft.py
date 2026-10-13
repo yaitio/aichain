@@ -25,7 +25,7 @@ import base64
 
 from ._openai_compat import (
     _detect_image_mime,
-    _image_sources,
+    _edit_sources,
     _messages_have_image,
     _parse_image_generations_response,
     _last_user_text,
@@ -97,7 +97,7 @@ def _build_recraft_generation_request(name, messages, output, path):
 
 def _build_recraft_edit_request(name, messages, output, path):
     """Multipart imageToImage body — sentinel consumed by ``OpenAIClient.send``."""
-    sources = _image_sources(messages)
+    sources = _edit_sources(messages, "recraft", name)
     if not sources:
         raise ValueError("image edit requires at least one input image part")
     src = sources[0]
@@ -131,7 +131,7 @@ def _build_recraft_vectorize_request(messages, output, path):
     image is converted as-is (distinct from imageToImage, which is a content
     *variation*). Sentinel consumed by ``OpenAIClient.send`` → ``_post_form``.
     """
-    sources = _image_sources(messages)
+    sources = _edit_sources(messages, "recraft", "vectorize", limit=1)
     if not sources:
         raise ValueError("vectorize requires exactly one input image")
     src = sources[0]

@@ -27,6 +27,9 @@ images_path      = "/v1/images/generations"
 format_accepts = ["size", "aspect_ratio"]
 accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
 
+# The most images an edit takes; more are left out and said (Imagine edits take up to three source images).
+max_input_images = 3
+
 [provider.defaults]
 temperature = 1.0
 max_tokens  = 16384

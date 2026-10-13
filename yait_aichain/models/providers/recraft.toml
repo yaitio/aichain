@@ -30,6 +30,9 @@ format_accepts = ["size", "aspect_ratio", "fidelity"]
 # How much of the original survives. This API asks the opposite question —
 # `strength`, how much to change — so the value is inverted on the way out.
 # Measured: strength 0.05 left a blue square blue, 0.95 replaced it.
+# The most images an edit takes; more are left out and said (imageToImage takes one image).
+max_input_images = 1
+
 [provider.options.values]
 fidelity = [0.0, 1.0]
 accepts = []
