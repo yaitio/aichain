@@ -17,6 +17,16 @@
   The release build is one script, run on every push as well, and it fails
   when the wheel does not carry the pages.
 
+### Fixed
+
+- A lead agent reads what each worker is for. `Agent(description=...)` is
+  documented as "what a lead agent reads when choosing a worker" and was stored
+  and never read: the `delegate` schema carried the names alone, so a lead
+  choosing between `worker0` and `worker1` guessed, and a wrong guess cost a
+  whole worker run. Each worker's description now rides in the schema beside
+  its name, and a worker with no name or no description is said once when the
+  lead is built.
+
 ## [4.1.0] — 2026-10-14
 
 ### Added

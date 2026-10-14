@@ -343,8 +343,13 @@ def _delegate_schema(team) -> dict:
     if isinstance(team, list):
         names = [getattr(w, "name", None) or f"worker{i}"
                  for i, w in enumerate(team)]
+        # What each worker is for, beside its name. `description` was stored
+        # and never read, so the lead chose between `worker0` and `worker1`
+        # by guessing — a whole worker run lost on every wrong guess.
+        roster = "; ".join(f"{n}: {getattr(w, 'description', None) or 'no description given'}"
+                           for n, w in zip(names, team))
         props["worker"] = {"type": "string", "enum": names,
-                           "description": "which worker takes it"}
+                           "description": f"which worker takes it — {roster}"}
         required.append("worker")
     else:                                              # "auto"
         props["instructions"] = {"type": "string",
@@ -613,6 +618,15 @@ class Agent:
             names = [getattr(w, "name", None) or f"worker{i}" for i, w in enumerate(self.team)]
             raise ValueError(f"two workers share a name in {names}; delegate picks a worker by "
                              "name, and the model could reach only one of them")
+        if isinstance(self.team, list):
+            blind = [getattr(w, "name", None) or f"worker{i}"
+                     for i, w in enumerate(self.team)
+                     if not getattr(w, "name", None) or not getattr(w, "description", None)]
+            if blind:
+                warnings.warn(
+                    f"worker(s) {blind} have no name or no description; the lead picks a "
+                    "worker by what these say, so without them the choice is a guess. "
+                    "Give each worker Agent(name=..., description=...).", stacklevel=2)
 
     # ── Public API ───────────────────────────────────────────────────────
 
