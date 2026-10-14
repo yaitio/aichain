@@ -19,6 +19,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from yait_aichain.agent import Agent, check, cost_budget, nudge, step_count   # noqa: E402
 from yait_aichain.agent._agent import _action                                 # noqa: E402
+from yait_aichain.state._run import AgentRun                                  # noqa: E402
 from yait_aichain.models import Model                                         # noqa: E402
 from yait_aichain.models._calls import ToolCall                               # noqa: E402
 from test_loop import Echo, _calls, _model                                    # noqa: E402
@@ -57,7 +58,7 @@ class TestNudgeLatch(unittest.TestCase):
                       stop_when=[step_count(5), nudge(lambda s: True, "once")])
         state = agent.new_state()
         agent.nudges(state)
-        resumed = {**agent.new_state(), **Agent._portable_state(state)}
+        resumed = {**agent.new_state(), **AgentRun.portable(state)}
         self.assertEqual(agent.nudges(resumed), [])
 
 

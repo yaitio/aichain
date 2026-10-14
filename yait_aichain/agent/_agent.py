@@ -54,6 +54,7 @@ from ..models import Model
 from ..models._adaptation import Adaptation
 from ..skills import Skill
 from ..utilities._base import Utility
+from ..state._run import AgentRun, active, opened
 from ..state import StateStore
 from ..tools._base import charged
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
@@ -557,20 +558,12 @@ class Agent:
         #: is left here rather than mixed into a stream of events.
         self.last_result: AgentResult | None = None
 
-        # `Event.run_id` has been a declared field since M3 and the agent
-        # never filled it. Without it two concurrent invocations — which is
-        # the ordinary case for the serverless target — write into one stream
-        # that cannot be demultiplexed afterwards.
-        self._run_id: str | None = None
-
-        # Whether a consumer is walking this run. Set for the duration of
-        # `stream()` and never by `run()`: streaming costs the fallback chain,
-        # and paying that for an observer who cannot see the pieces anyway
-        # would be trading reliability for nothing.
-        self._streaming = False
-
-        #: The approval request between going out and being answered.
-        self._pending = None
+        # Everything one invocation owns — its id, a parked document, a
+        # pending approval, whether it streams, the hooks it reports to —
+        # lives on its `AgentRun` (state/_run.py), not here: one agent serves
+        # concurrent runs. Outside a run, `_idle` stands in, so the external
+        # seams (`step()`, a direct `_do_delegate`) behave as before.
+        self._idle: AgentRun | None = None
         self.permissions  = permissions
         # Who answers when the policy says "approve". A callable taking an
         # ApprovalRequest and returning truthy to proceed. The library cannot
@@ -592,9 +585,6 @@ class Agent:
                 "process, or store=FileStore(path) — or your own StateStore — "
                 "to resume from another one. A serverless invocation cannot "
                 "hold the wait, so the run has to outlive it.")
-        #: The document id while a parked run is carried, so a second pause
-        #: overwrites the first instead of leaking a second run id.
-        self._doc_id: str | None = None
         # A ceiling in money for everything this agent spends, shared with the
         # Skills it builds and with any worker it delegates to. `cost_budget`
         # in `stop_when` stops the loop between turns; this stops a call from
@@ -605,8 +595,9 @@ class Agent:
         self.name         = name
         self.description  = description
         self.verbose      = verbose
-        # How deep in a delegation this agent sits, and how deep it may go.
-        # Not parameters: only `delegate` sets them, on the worker it makes.
+        # How deep in a delegation this agent's runs start, and how deep they
+        # may go. Not parameters: a run carries its own depth (`AgentRun`),
+        # and `delegate` hands a worker its lead's plus one.
         self._depth       = 0
         self._max_depth   = 5
 
@@ -648,7 +639,8 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
-        return self._fork()._run(task, variables)
+        with self._opened():
+            return self._run(task, variables)
 
     def _run(self, task: str, variables: dict | None = None) -> AgentResult:
         journal, messages, state = self._begin(task, variables)
@@ -687,29 +679,27 @@ class Agent:
         variables : dict | None, optional
             Data the caller already holds, given to the model with the task.
         """
-        run = self._fork()
         self.last_result = None
+        ended: dict = {}
         # A context of its own, copied when the stream is made — not when it
         # is first read. A generator runs in whichever context advances it:
         # Starlette advances each step in a fresh copy, so the beacon board
         # was gone from the second step on; and two streams advanced in turn
-        # in one thread set and reset the same variables out of order.
+        # in one thread set and reset the same variables out of order. The
+        # run is opened inside it, so it is this stream's from the first step.
         from .._bound import bound
-        return bound(run._stream(task, variables),
-                     on_end=lambda: setattr(self, "last_result", run.last_result))
+        return bound(self._stream(task, variables, ended),
+                     on_end=lambda: setattr(self, "last_result", ended.get("result")))
 
-    def _stream(self, task: str, variables: dict | None = None):
-        journal, messages, state = self._begin(task, variables)
-        self.last_result = None
+    def _stream(self, task: str, variables: dict | None = None, ended: dict | None = None):
+        with self._opened() as run:
+            journal, messages, state = self._begin(task, variables)
 
-        sink: list = []
-        # Appended for the duration and removed in `finally`: a hook left
-        # behind on the instance would go on collecting into a list nobody
-        # drains, which is a leak that only shows up under load.
-        collect = sink.append          # bound once, so `remove` finds it
-        self.hooks.append(collect)
-        self._streaming = True
-        try:
+            sink: list = []
+            # On the run's own hooks, which end with it: a collector left on
+            # the agent would go on collecting into a list nobody drains.
+            run.hooks.append(sink.append)
+            run.streaming = True
             with collecting_beacons() as board:
                 self._emit("run.started", payload={"task": task, "mode": self.mode})
                 while sink:
@@ -718,11 +708,8 @@ class Agent:
                 result = self._finished(result, journal, board)
             while sink:
                 yield sink.pop(0)
-            self.last_result = result
-        finally:
-            self._streaming = False
-            with contextlib.suppress(ValueError):    # already gone; fine
-                self.hooks.remove(collect)
+            if ended is not None:
+                ended["result"] = result
 
     def arm(self, reason: str = "", resume_with: dict | None = None, *,
             hint: dict | None = None,
@@ -765,7 +752,7 @@ class Agent:
                     "hint": hint, "at": "start"}
         doc = self._save_parked(
             {"messages": [], "journal": [],
-             "state": self._portable_state(self.new_state()),
+             "state": AgentRun.portable(self.new_state()),
              "variables": dict(variables or {})},
             awaiting)
         self._emit("run.armed", payload={"run_id": doc.run_id,
@@ -812,7 +799,8 @@ class Agent:
                 raise TypeError("resume needs the answer the run waited for: "
                                 "agent.resume(run_id, signal=…)")
             signal = None
-        return self._fork()._resume(run_id, signal)
+        with self._opened():
+            return self._resume(run_id, signal)
 
     def _resume(self, run_id: str, signal=None) -> AgentResult | SuspendedResult:
         from ..state import RunDocument
@@ -846,7 +834,7 @@ class Agent:
             # that happens to have been waiting for its input.
             task, seeded = self._task_from_signal(signal, parked, doc)
             journal, messages, state = self._begin(task, seeded)
-            self._doc_id = run_id
+            self._live.doc_id = run_id
             self._emit("run.started", payload={"task": task, "mode": self.mode,
                                                "run_id": run_id})
             with collecting_beacons() as board:
@@ -862,8 +850,8 @@ class Agent:
         state.update(doc.variables.get("state") or {})
         start_run(self, spent=state.get("cost") or 0.0)  # the parked part was spent already
 
-        self._run_id = doc.variables.get("run_id") or uuid.uuid4().hex
-        self._doc_id = run_id
+        self._live.id = doc.variables.get("run_id") or uuid.uuid4().hex
+        self._live.doc_id = run_id
         call_id      = parked.get("call_id") or ""
         if parked.get("at") == "after":
             # Interrupted after the parked call was answered: its result is in
@@ -913,11 +901,10 @@ class Agent:
             result = self._loop(messages, state, journal)
         if _interrupted(result):
             self._save_parked(
-                {"messages": messages, "state": self._portable_state(state),
-                 "journal": journal.to_list(), "run_id": self._run_id},
+                self._live.parked(messages, state, journal),
                 {"at": "after", "reason": result.error or result.stopped_by or ""},
                 run_id=run_id)
-            self._doc_id = None              # kept on purpose: `_finished` must not delete it
+            self._live.doc_id = None         # kept on purpose: `_finished` must not delete it
         return self._finished(result, journal, board)
 
     # ── Externally driven: one turn at a time ────────────────────────────
@@ -1078,11 +1065,12 @@ class Agent:
         state : dict | None, optional
             The same working state passed to ``step()``.
         """
-        return self._fork()._execute_gated(call, state)
+        with self._opened():
+            return self._execute_gated(call, state)
 
     def _execute_gated(self, call, state: dict | None = None):
-        # The permission gate keeps its pending request on the instance between
-        # asking and answering; a fork keeps two drivers' requests apart.
+        # The permission gate keeps its pending request on the run between
+        # asking and answering; a run of its own keeps two drivers' apart.
         state = state if state is not None else self.new_state()
         denial = self._ask_permission(call, state)
         if denial is _AWAITING:
@@ -1093,32 +1081,42 @@ class Agent:
 
     # ── The loop ─────────────────────────────────────────────────────────
 
-    def _fork(self) -> Agent:
-        """This agent for one run: the same configuration, its own run state.
+    def _opened(self, depth: int | None = None, parent_id: str | None = None):
+        """Open a run of this agent: its id, hooks and depth are its own.
 
-        A run keeps its id, its parked document, its pending approval, its
-        stream flag and the hooks it emits to; all of them lived on the agent,
-        and one agent serves concurrent runs — a module-level agent in a warm
-        Lambda, a Pool's items, a `delegate` worker. Approvals crossed (a call
-        approved for one run executed in another), one tenant's stream carried
-        another's events, and a run read another's id. A shallow copy keeps the
-        configuration shared — tools, model, policy, store, a shared `Budget` —
-        and gives each run the rest.
+        Replaces `_fork()`, which copied the whole agent per run to keep runs
+        apart. The configuration — tools, model, policy, store, a shared
+        `Budget` — stays where it was; the run gets the rest.
         """
-        run = copy.copy(self)
-        run.hooks = list(self.hooks)
-        run._run_id = run._doc_id = run._pending = None
-        run._streaming = False
-        run.last_result = None
-        return run
+        waiting = active(self)
+        if waiting is not None and waiting.id is None and depth is None:
+            # Opened for this run by whoever starts it — `delegate`, with the
+            # depth and the parent — and not begun yet: this is that run.
+            return contextlib.nullcontext(waiting)
+        return opened(AgentRun(
+            owner=self, hooks=list(self.hooks),
+            depth=self._depth if depth is None else depth,
+            max_depth=self._max_depth, parent_id=parent_id))
+
+    @property
+    def _live(self) -> AgentRun:
+        """This agent's current run — or, outside one, the idle stand-in that
+        holds what the instance used to hold, with the agent's own hooks."""
+        run = active(self)
+        if run is not None:
+            return run
+        if self._idle is None:
+            self._idle = AgentRun(owner=self, hooks=self.hooks,
+                                  depth=self._depth, max_depth=self._max_depth)
+        return self._idle
 
     def _begin(self, task: str, variables: dict | None):
         """A run's first moments, for `run()` and `stream()` alike: a fresh
         journal, the opening messages, working state, a new run id — and no
         document of an earlier run, which a finishing run would otherwise
         delete or overwrite."""
-        self._run_id = uuid.uuid4().hex
-        self._doc_id = None
+        self._live.id = uuid.uuid4().hex
+        self._live.doc_id = None
         start_run(self)
         return Journal(), self.opening(task, variables, ground_rules=True), self.new_state()
 
@@ -1266,7 +1264,7 @@ class Agent:
                                                   f"{type(exc).__name__}: {exc}")
                     yield from drain()
                     return parked
-                failure, self._failure = self._failure, None
+                failure, self._live.failure = self._live.failure, None
                 if not error:
                     # What a `verified()` gate reads: the last change not yet
                     # looked at. Any later call that succeeds clears it.
@@ -1345,8 +1343,6 @@ class Agent:
                 messages.append({"role": "user",
                                  "parts": [{"type": "text", "text": note}]})
                 yield from drain()
-
-    _failure: dict | None = None
 
     def _callback_failed(self, state: dict, where: str, exc: BaseException) -> AgentResult:
         """One handling for every caller-supplied callback that raises — a check,
@@ -1536,7 +1532,7 @@ class Agent:
             raise
         except Exception as exc:
             from .._errors_policy import describe
-            self._failure = describe(exc)
+            self._live.failure = describe(exc)
             return None, f"{type(exc).__name__}: {exc}"
 
     def _do_tool(self, call, state: dict | None = None) -> Any:
@@ -1610,22 +1606,21 @@ class Agent:
             # know: it was read as "allowed". Anything but yes is no.
             return f"tool {tool.name!r}: the policy answered {decision!r}, which is not a decision"
 
-        self._pending = ApprovalRequest(
+        self._live.pending = ApprovalRequest(
             # A copy all the way down: an approver that edits what it was
             # shown would change the call it approved.
             tool=tool.name, risk=risk, arguments=copy.deepcopy(dict(call.arguments or {})),
-            call_id=getattr(call, "id", "") or "", agent=self.name or "", run_id=self._run_id or "")
+            call_id=getattr(call, "id", "") or "", agent=self.name or "", run_id=self._live.id or "")
         self._emit("approval.requested", name=tool.name,
                    step=(state or {}).get("steps"),
-                   payload={"id": self._pending.call_id, "tool": tool.name,
-                            "risk": risk, "arguments": self._pending.arguments,
+                   payload={"id": self._live.pending.call_id, "tool": tool.name,
+                            "risk": risk, "arguments": self._live.pending.arguments,
                             "agent": self.name or ""})
         return _AWAITING
 
     def _resolve_permission(self, state: dict | None = None):
         """Ask, then say what the answer was. Returns a denial, or None."""
-        request = self._pending
-        self._pending = None
+        request, self._live.pending = self._live.pending, None
         if self.approve is None:
             granted = False
             reason  = (f"no approver is attached. Pass Agent(approve=...) to "
@@ -1748,8 +1743,8 @@ class Agent:
         if not self.team:
             raise ValueError("this agent has no team; delegate is unavailable "
                              "unless team= is set")
-        if self._depth >= self._max_depth:
-            raise RuntimeError(f"maximum delegation depth {self._max_depth} reached")
+        if self._live.depth >= self._live.max_depth:
+            raise RuntimeError(f"maximum delegation depth {self._live.max_depth} reached")
 
         task = args.get("task") or ""
         if isinstance(self.team, list):
@@ -1757,17 +1752,15 @@ class Agent:
             if worker is None:
                 raise ValueError(f"no worker named {args.get('worker')!r}. "
                                  f"Available: {sorted(self._worker_map)}")
-            # A run of its own, one level down: a listed worker sat at depth 0
-            # whatever delegated to it, and the depth guard never fired.
-            worker = worker._fork()
-            worker._depth, worker._max_depth = self._depth + 1, self._max_depth
+            # A run of its own, one level down (below): a listed worker sat at
+            # depth 0 whatever delegated to it, and the depth guard never fired.
         else:                                            # "auto"
             worker = Agent(
                 # Without the tools that park a run: a worker's pause has
                 # nowhere to go — `delegate` waits for an answer, not a resume.
                 self.model, tools=[t for t in self.tools if not getattr(t, "suspends", False)],
                 instructions=args.get("instructions", ""),
-                stop_when=self.stop_when, hooks=self.hooks,
+                stop_when=self.stop_when, hooks=self._live.hooks,
                 # The approver travels with the policy: a worker that
                 # inherited the rules and not the answerer would refuse every
                 # gated call, which reads as the policy being stricter for
@@ -1776,10 +1769,11 @@ class Agent:
                 max_cost=self.max_cost,
                 verbose=self.verbose,
             )
-            worker._depth, worker._max_depth = self._depth + 1, self._max_depth
+            worker._max_depth = self._live.max_depth
 
         self._log(1, f"  ▽  delegate → {getattr(worker, 'name', None) or 'worker'}")
-        child = worker.run(task)
+        with worker._opened(depth=self._live.depth + 1, parent_id=self._live.id):
+            child = worker.run(task)
         state["tokens"] += child.tokens_used
         if child.cost is not None:
             state["cost"] = (state["cost"] or 0.0) + child.cost
@@ -1825,12 +1819,12 @@ class Agent:
         self._emit("run.finished", payload={"success": result.success,
                                             "stopped_by": result.stopped_by},
                    usage=result.tokens_used, error=result.error)
-        if self._doc_id is not None:
+        if self._live.doc_id is not None:
             # The parked run reached its end; the store holds suspended runs
             # only, and a document left behind is a run a trigger can wake a
             # second time.
-            self.store.delete(self._doc_id)
-            self._doc_id = None
+            self.store.delete(self._live.doc_id)
+            self._live.doc_id = None
         return result
 
     def _park(self, susp, call, reply, messages, state, journal):
@@ -1855,12 +1849,11 @@ class Agent:
         awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with),
                     "tool": call.name, "arguments": _copy(dict(call.arguments or {}))}
         doc = self._save_parked(
-            {"messages": messages, "state": self._portable_state(state),
-             "journal": journal.to_list(), "run_id": self._run_id},
+            self._live.parked(messages, state, journal),
             {**awaiting, "hint": susp.hint, "call_id": call.id,
              "tool": call.name, "arguments": dict(call.arguments or {})},
-            run_id=self._doc_id)                 # parked again: one identifier
-        self._doc_id = doc.run_id
+            run_id=self._live.doc_id)            # parked again: one identifier
+        self._live.doc_id = doc.run_id
 
         self._emit("run.suspended", name=call.name, step=state.get("steps"),
                    payload={"run_id": doc.run_id, "tool": call.name,
@@ -1923,21 +1916,6 @@ class Agent:
         except Exception as exc:
             return None, f"{type(exc).__name__}: {exc}"
 
-    @staticmethod
-    def _portable_state(state: dict) -> dict:
-        """The counters that survive a pause, and only those.
-
-        The journal travels beside this, in its own serialised form. What is
-        dropped is dropped on purpose: `adaptations` are per-request notices
-        about what went on the wire, and do not describe the conversation,
-        which is what resumes. The nudge latch is kept, so a resumed run does
-        not repeat a nudge it already gave.
-        """
-        out = {k: state.get(k) for k in ("steps", "tokens", "cost", "plan", "plan_calls")}
-        # The latch travels: dropped, a resumed run said its nudge again.
-        out["nudged"] = sorted(state.get("nudged") or ())
-        return out
-
     def _note_unfinished(self, journal, state, why: str) -> None:
         """A ceiling reached with a plan outstanding is a plan not finished."""
         if not state.get("plan"):
@@ -1967,7 +1945,7 @@ class Agent:
         that asks for a tool and says nothing produces none of the three,
         rather than an empty pair a consumer has to filter.
         """
-        if not self._streaming:
+        if not self._live.streaming:
             return skill.run()
 
         message_id = uuid.uuid4().hex[:12]
@@ -1992,24 +1970,24 @@ class Agent:
 
     def _stamping_hooks(self) -> list:
         """The caller's hooks, each seeing this run's id on every event."""
-        if not self.hooks or self._run_id is None:
-            return self.hooks
+        hooks, run_id = self._live.hooks, self._live.id
+        if not hooks or run_id is None:
+            return hooks
         import dataclasses
-
-        run_id = self._run_id
 
         def stamp(event):
             if getattr(event, "run_id", None) is None:
                 event = dataclasses.replace(event, run_id=run_id)
-            for hook in self.hooks:
+            for hook in hooks:
                 emit([hook], event)
 
         return [stamp]
 
     def _emit(self, etype: str, **fields) -> None:
-        if self.hooks:
+        hooks = self._live.hooks
+        if hooks:
             fields.setdefault("name", self.name)
-            emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
+            emit(hooks, Event(type=etype, run_id=self._live.id, **fields))
 
     def _log(self, level: int, message: str = "") -> None:
         # This agent's verbosity, not the process's: the line goes to the

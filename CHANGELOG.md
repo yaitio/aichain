@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.2.1] — 2026-10-15
+
+### Changed
+
+- A run's data lives on the run. An agent kept its id, a parked document, a
+  pending approval, its stream flag and its hooks on itself, and `_fork()`
+  copied the whole agent per run to keep concurrent runs apart. They are on
+  an `AgentRun` now (`state/_run.py`), current in a `ContextVar`, and the agent
+  is only what it was configured as; `_fork()` is gone. A worker's run starts
+  one level below its lead's and names it as its parent. No public behaviour
+  changes — the step seam's `state` is the same JSON dict.
+- What survives a pause is decided in one place, `AgentRun.parked()`.
+
+### Fixed
+
+- An unchecked change made before a pause is checked after it. The working
+  counter `verified()` reads was not among those a parked run kept, so a run
+  that changed something, paused and resumed answered without the check.
+
 ## [4.2.0] — 2026-10-15
 
 ### Added
