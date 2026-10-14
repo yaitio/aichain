@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import fetch, search, embed
 """
 
-__version__ = "4.1.0"
+__version__ = "4.2.0"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
