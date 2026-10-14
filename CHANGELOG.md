@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.2.2] — 2026-10-15
+
+### Changed
+
+- One place decides and runs a tool call: `yait_aichain/_dispatch.py`. The
+  agent's loop, its `execute()` seam and the built-ins it runs (`pool`,
+  `delegate`, `write_plan`) go through `Dispatcher` — `prepare()` returns
+  `Ready`, `Denied(reason)` or `NeedsApproval(request)`, `answer()` asks the
+  approver, `execute()` runs — where six agent methods held the same steps.
+  No behaviour changes. A Chain step and a Pool item still run their tools
+  outside it, and a test names them, so the next one cannot arrive unseen.
+
 ## [4.2.1] — 2026-10-15
 
 ### Changed

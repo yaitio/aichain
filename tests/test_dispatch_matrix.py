@@ -217,5 +217,29 @@ class TestPathsOutsideTheLoop(unittest.TestCase):
         self.assertEqual(nuke.ran, 0)
 
 
+
+class TestOnePlaceRunsATool(unittest.TestCase):
+    """The invariant itself, read off the source: `charged(...)` is how a tool
+    is run, and it is called from `_dispatch.py` and from the paths not yet
+    routed through it. A new caller fails this; so does a path that was
+    routed and is still listed."""
+
+    #: Where a tool runs outside the dispatcher, and the phase that removes it.
+    NOT_YET = {
+        "chain/_chain.py": "phase 3",
+        "pool/_pool.py": "phase 3",
+    }
+
+    def test_only_the_dispatcher_runs_a_tool(self):
+        import re
+        from pathlib import Path
+        package = Path(__file__).resolve().parents[1] / "yait_aichain"
+        callers = {str(p.relative_to(package)) for p in package.rglob("*.py")
+                   if "__pycache__" not in p.parts
+                   and re.search(r"(?<!def )\bcharged\(", p.read_text())}
+        self.assertEqual(callers - {"_dispatch.py"} - {"tools/_base.py"}, set(self.NOT_YET),
+                         "a tool runs outside the dispatcher, or a routed path is still listed")
+
+
 if __name__ == "__main__":
     unittest.main()

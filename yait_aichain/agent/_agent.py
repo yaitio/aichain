@@ -48,15 +48,16 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
-from .._budget import Budget, as_budget, lend, start_run
+from .._budget import Budget, as_budget, start_run
 from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models import Model
 from ..models._adaptation import Adaptation
 from ..skills import Skill
 from ..utilities._base import Utility
 from ..state._run import AgentRun, active, opened
+from .._dispatch import Denied, Dispatcher, NeedsApproval
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
 from ..state import StateStore
-from ..tools._base import charged
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
 from .._console import console
@@ -377,10 +378,6 @@ def _delegate_schema(team) -> dict:
 MAX_POOL_ITEMS = 200
 MAX_POOL_FLOWS = 8
 
-#: Returned by `_ask_permission` when a request has gone out and the answer
-#: has not been asked for yet. A string would be a denial and None a pass, so
-#: the third state needs a value of its own.
-_AWAITING = object()
 
 
 
@@ -1072,12 +1069,10 @@ class Agent:
         # The permission gate keeps its pending request on the run between
         # asking and answering; a run of its own keeps two drivers' apart.
         state = state if state is not None else self.new_state()
-        denial = self._ask_permission(call, state)
-        if denial is _AWAITING:
-            denial = self._resolve_permission(state)
-        if denial:
-            return None, denial
-        return self._execute(call, state)
+        step = self._dispatch.decide(call, state)
+        if isinstance(step, Denied):
+            return None, step.reason
+        return self._dispatch.execute(call, state)
 
     # ── The loop ─────────────────────────────────────────────────────────
 
@@ -1232,13 +1227,13 @@ class Agent:
                                     "agent": self.name or ""})
                 yield from drain()
 
-                denial = self._ask_permission(call, state)
-                if denial is _AWAITING:
+                step = self._dispatch.prepare(call, state)
+                if isinstance(step, NeedsApproval):
                     # The request reaches the consumer *here*, before anyone
                     # is asked — which is the whole point of splitting it.
                     yield from drain()
                     try:
-                        denial = self._resolve_permission(state)
+                        step = self._dispatch.answer(step, state)
                     except Exception as exc:
                         messages.append(tool_result_turn(call.id, prompts.result_message(
                             None, f"approval failed: {type(exc).__name__}: {exc}")))
@@ -1247,8 +1242,8 @@ class Agent:
                     yield from drain()
 
                 try:
-                    result, error = ((None, denial) if denial
-                                     else self._execute(call, state))
+                    result, error = ((None, step.reason) if isinstance(step, Denied)
+                                     else self._dispatch.execute(call, state))
                 except Suspend as susp:
                     try:
                         parked = self._park(susp, call, reply, messages,
@@ -1269,7 +1264,7 @@ class Agent:
                     # What a `verified()` gate reads: the last change not yet
                     # looked at. Any later call that succeeds clears it.
                     from ..tools._permissions import risk_of
-                    acted = self._gated_tool(call)
+                    acted = self._dispatch.gated_tool(call)
                     if acted is not None and risk_of(acted, dict(call.arguments or {})) in _EFFECTS:
                         state["unverified"] = call.name
                     elif state.get("unverified"):
@@ -1514,47 +1509,19 @@ class Agent:
 
     # ── Executing one call ───────────────────────────────────────────────
 
-    def _execute(self, call, state: dict) -> tuple[Any, str | None]:
-        """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
-        try:
-            if call.name == "pool":
-                return self._do_pool(call.arguments, state), None
-            if call.name == "delegate":
-                return self._do_delegate(call.arguments, state), None
-            if call.name == "write_plan":
-                return self._do_plan(call.arguments, state), None
-            return self._do_tool(call, state), None
-        except Suspend:
-            # Not a failure, and the one exception this must not flatten: the
-            # tool is saying the world has to answer before the run goes on.
-            # Flattened into a tool result, the pause would read to the model
-            # as an error and the run would carry on as if nothing was owed.
-            raise
-        except Exception as exc:
-            from .._errors_policy import describe
-            self._live.failure = describe(exc)
-            return None, f"{type(exc).__name__}: {exc}"
-
-    def _do_tool(self, call, state: dict | None = None) -> Any:
-        if _depth(call.arguments) > MAX_ARGUMENT_DEPTH:
-            # Told to the model, which made it: 450 levels raised RecursionError
-            # copying the history on the next turn and ended the run unseen.
-            raise ValueError(f"the arguments are nested more than {MAX_ARGUMENT_DEPTH} levels deep; "
-                             "send a flatter structure")
-        tool = self._tool_map.get(call.name)
-        if tool is None:
-            raise ValueError(f"no tool named {call.name!r}. "
-                             f"Available: {sorted(self._tool_map)}")
-        kwargs = call.arguments or {}
-        # No permission check here: the loop resolved it before calling, so
-        # a second one would put the question to a person twice.
-        if (problem := tool.check_args(kwargs)) is not None:
-            raise ValueError(problem)
-        if self.verbose or _logger.isEnabledFor(logging.INFO):   # serialised only to be shown
-            self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
-        # Under this agent's budget and every one around it.
-        with lend(self.max_cost):
-            return charged(tool, lambda: tool.run(**kwargs))
+    @property
+    def _dispatch(self) -> Dispatcher:
+        """Where this agent's calls are decided and run (`_dispatch.py`).
+        Built per use from the configuration, so a changed policy or approver
+        on the agent is the one asked."""
+        return Dispatcher(
+            tools=self._tool_map,
+            builtins={"pool": self._do_pool, "delegate": self._do_delegate,
+                      "write_plan": self._do_plan},
+            gated=self._gated_tool,
+            permissions=self.permissions, approve=self.approve, max_cost=self.max_cost,
+            emit=self._emit, who=self.name or "", run=lambda: self._live,
+            log_call=self._log_call)
 
     def _gated_tool(self, call):
         """The tool a call will run, which the policy decides on. For `pool`
@@ -1565,98 +1532,9 @@ class Agent:
             return self._tool_map.get((call.arguments or {}).get("tool") or "")
         return self._tool_map.get(call.name)
 
-    def _ask_permission(self, call, state: dict | None = None):
-        """Consult the policy before a tool runs. Returns a denial, or None.
-
-        **At the loop boundary, not inside the call**, and split from the
-        answer: the loop hands `approval.requested` to a streaming consumer
-        *before* the approver is asked, which is what lets a UI show a person
-        the question. Inside the call, the request and the decision would
-        arrive together, after the fact.
-
-        Emitted even when there is nobody to ask. A consumer needs to see
-        that a decision was required, and the refusing case is where that
-        matters most: otherwise the call simply fails and nothing says it was
-        governance rather than a broken tool.
-        """
-        tool = self._gated_tool(call)
-        if tool is None or not self.permissions:
-            return None
-        if _depth(call.arguments) > MAX_ARGUMENT_DEPTH:
-            # Refused before the approver's deep copy would raise on it.
-            return (f"tool {tool.name!r}: the arguments are nested more than "
-                    f"{MAX_ARGUMENT_DEPTH} levels deep; send a flatter structure")
-        from ..tools._permissions import ALLOW, APPROVE, DENY, ApprovalRequest
-
-        # The call's arguments are the pool's own for `pool`: the policy is asked
-        # about the tool it fans out, which takes them one entry at a time.
-        arguments = None if call.name == "pool" else dict(call.arguments or {})
-        try:
-            decision = self.permissions.decide(tool, arguments)
-        except TypeError:
-            decision = self.permissions.decide(tool)          # a policy of another make
-        if decision == ALLOW:
-            return None
-        from ..tools._permissions import risk_of
-        risk = risk_of(tool, arguments)
-        if decision == DENY:
-            return f"tool {tool.name!r} denied by policy"
-        if decision != APPROVE:
-            # A policy of another make answering a word this gate does not
-            # know: it was read as "allowed". Anything but yes is no.
-            return f"tool {tool.name!r}: the policy answered {decision!r}, which is not a decision"
-
-        self._live.pending = ApprovalRequest(
-            # A copy all the way down: an approver that edits what it was
-            # shown would change the call it approved.
-            tool=tool.name, risk=risk, arguments=copy.deepcopy(dict(call.arguments or {})),
-            call_id=getattr(call, "id", "") or "", agent=self.name or "", run_id=self._live.id or "")
-        self._emit("approval.requested", name=tool.name,
-                   step=(state or {}).get("steps"),
-                   payload={"id": self._live.pending.call_id, "tool": tool.name,
-                            "risk": risk, "arguments": self._live.pending.arguments,
-                            "agent": self.name or ""})
-        return _AWAITING
-
-    def _resolve_permission(self, state: dict | None = None):
-        """Ask, then say what the answer was. Returns a denial, or None."""
-        request, self._live.pending = self._live.pending, None
-        if self.approve is None:
-            granted = False
-            reason  = (f"no approver is attached. Pass Agent(approve=...) to "
-                       f"decide per call, or set the policy rule for "
-                       f"{request.risk!r} to 'allow' if this class does not "
-                       "need gating here.")
-        else:
-            from ..tools._permissions import ApprovalDecision
-            answer  = self.approve(request)
-            # Only a yes that says yes: `bool("denied")` and
-            # `bool({"approved": False})` both approved the call.
-            if not isinstance(answer, (bool, ApprovalDecision)):
-                raise TypeError(f"an approver answers True, False or ApprovalDecision(granted, "
-                                f"reason); it answered {type(answer).__name__} {answer!r}")
-            granted = bool(answer)
-            # An `ApprovalDecision` carries why; a bare False does not, and a
-            # UI showing "not approved" and nothing else has thrown away the
-            # only part a person can act on.
-            reason  = getattr(answer, "reason", "") or (
-                "" if granted else "not approved")
-
-        self._emit("approval.decided", name=request.tool,
-                   step=(state or {}).get("steps"),
-                   payload={"id": request.call_id, "tool": request.tool,
-                            "risk": request.risk, "granted": granted,
-                            "reason": reason, "agent": self.name or ""})
-        if granted:
-            return None
-        # A refusal is a result, not a crash: every tool call coming back with
-        # something is what keeps the model's history well-formed, and a
-        # denied call the model never hears about is one it will simply make
-        # again. `tool_call.ended` then carries this as its error, which is
-        # the terminal event a consumer needs in order to stop waiting.
-        head = ("needs approval and" if self.approve is None
-                else "was not approved:")
-        return f"tool {request.tool!r} ({request.risk}) {head} {reason}"
+    def _log_call(self, tool, kwargs) -> None:
+        if self.verbose or _logger.isEnabledFor(logging.INFO):   # serialised only to be shown
+            self._log(1, f"  ⚙  {tool.name}({_safe(kwargs)})")
 
     def _do_plan(self, args: dict, state: dict) -> str:
         items = args.get("items") or []
@@ -2020,21 +1898,6 @@ def _copy(value):
         return copy.deepcopy(value)
     except Exception:
         return value
-
-
-#: The deepest a call's arguments may nest.
-MAX_ARGUMENT_DEPTH = 64
-
-
-def _depth(value, level: int = 0) -> int:
-    """How deep *value* nests, counted no further than one past the limit."""
-    if level > MAX_ARGUMENT_DEPTH:
-        return level
-    if isinstance(value, dict):
-        return max([_depth(v, level + 1) for v in value.values()] or [level + 1])
-    if isinstance(value, (list, tuple)):
-        return max([_depth(v, level + 1) for v in value] or [level + 1])
-    return level
 
 
 def _action(call) -> str:
