@@ -26,6 +26,11 @@
   whole worker run. Each worker's description now rides in the schema beside
   its name, and a worker with no name or no description is said once when the
   lead is built.
+- `Pool(description=...)` is documented as what it is: a label kept for the
+  caller, read by nothing in the library. Found by a new check that every
+  constructor parameter stored on an object is read somewhere, or listed with
+  the reason nothing needs to — the check that would have caught the
+  `Agent(description=...)` defect above.
 
 ## [4.1.0] — 2026-10-14
 

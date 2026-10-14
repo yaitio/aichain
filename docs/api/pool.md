@@ -34,8 +34,10 @@ Parallel execution of one runner across many items.
   `"raise"`    — re-raise immediately; other tasks may still finish.
   `"collect"`  — record the error; result for that item is `None`.
   `"skip"`     — same as `"collect"` but emits a `RuntimeWarning`.
-- `name` (*str | None, optional*, default `None`)
-- `description` (*str | None, optional*, default `None`)
+- `name` (*str | None, optional*, default `None`) — A label for this pool, kept on it as `pool.name`.
+- `description` (*str | None, optional*, default `None`) — Kept on the pool as `pool.description` for your own code. The library
+  reads nothing from it — a pool is not offered to a model, and it is
+  not saved — so it changes no behaviour.
 - `max_cost` (*float | Budget | None, optional*, default `None`) — One ceiling in dollars for every item; an item that would begin past
   it fails with the budget's reason, handled by `on_error`.
 

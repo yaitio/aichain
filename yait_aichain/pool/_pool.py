@@ -157,7 +157,11 @@ class Pool:
         ``"collect"``  — record the error; result for that item is ``None``.
         ``"skip"``     — same as ``"collect"`` but emits a ``RuntimeWarning``.
     name : str | None, optional
+        A label for this pool, kept on it as ``pool.name``.
     description : str | None, optional
+        Kept on the pool as ``pool.description`` for your own code. The library
+        reads nothing from it — a pool is not offered to a model, and it is
+        not saved — so it changes no behaviour.
     max_cost : float | Budget | None, optional
         One ceiling in dollars for every item; an item that would begin past
         it fails with the budget's reason, handled by ``on_error``.
