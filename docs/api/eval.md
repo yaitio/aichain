@@ -203,19 +203,14 @@ Report.reject(
 ) -> dict[str, str]
 ```
 
-Mark cells whose data is not worth reporting, and say why.
-
-Thresholds are shares of the arm's attempts — absolute counts of two
-and five rejected a large clean run for noise and passed a small
-broken one. Each call decides afresh: an arm rejected under one
-threshold is not left rejected under the next.
+Mark cells whose data is not worth reporting, and say why. Thresholds are
+shares of the arm's attempts, decided afresh on each call.
 
 **Parameters**
 
 - `max_empty` (*float, optional*, default `0.1`) — The share of attempts that may come back with no output.
 - `max_errors` (*float, optional*, default `0.2`) — The share of attempts that may raise.
-- `max_abstained` (*float, optional*, default `0.2`) — The share of attempts a judge could not read; past it the cell is
-  rejected rather than reported on a shrunken denominator.
+- `max_abstained` (*float, optional*, default `0.2`) — The share of attempts a judge could not read; past it the cell is rejected.
 
 ### `Report.abstentions()`
 
@@ -261,11 +256,8 @@ Report.pass_k(arm: str, k: int | None = None, group: str = '') -> float
 
 The chance a case is solved on **every** one of k trials, by case.
 
-`k` defaults to the report's number of trials, the same for every
-arm. Estimated from all of a case's trials, not its first k: with c
-passes in n trials it is C(c, k) / C(n, k), the estimator τ²-bench
-uses, so Pass^1 is the mean. A case with fewer than k trials is left
-out — under-sampled is not wrong — and no case at all is NaN, not 0.
+Estimated from all of a case's trials as C(c, k) / C(n, k), so Pass^1 is the
+mean; a case with fewer than k trials is left out, and no case at all is NaN.
 
 **Parameters**
 
@@ -281,13 +273,8 @@ Report.flips(arm: str, group: str = '') -> float
 
 Share of cases the arm did **not** answer the same way every time.
 
-This is the shape that a mean and a `Pass^k` both hide. Two arms can
-land on the same mean with one solving a fixed half of the set every
-time and the other solving a different half each run; only the second
-is unreliable, and only this number says so.
-
-Zero means perfectly reproducible — including reproducibly wrong,
-which is why it is read next to the mean and never on its own.
+Zero is perfectly reproducible — reproducibly wrong included — so read it
+beside the mean, never alone.
 
 **Parameters**
 
@@ -315,18 +302,9 @@ cost, which `cost` leaves out.
 Report.paired(a: str, b: str, group: str = '') -> dict
 ```
 
-Compare two arms on the cases they both attempted.
-
-Unpaired comparison wastes most of a small set: at 30 cases the
-standard error of a proportion is ≈0.09, so nothing under ~0.18
-separates. Pairing discards the cases both arms agree on — which carry
-no information about the difference — and counts only the discordant
-ones, where the whole signal lives.
-
-`only_a` and `only_b` are those counts. Under the null they are
-equal, so `p` is an exact two-sided binomial test on them; with fewer
-than ~6 discordant pairs no honest test can reject anything, and the
-function says so in `enough`.
+Compare two arms on the cases they both attempted, counting only the
+discordant ones: `only_a`, `only_b`, an exact two-sided binomial `p`, and
+`enough` false below six discordant pairs.
 
 **Parameters**
 
@@ -349,16 +327,8 @@ Report.controls(
 ) -> dict
 ```
 
-Check the instrument before believing it.
-
-`oracle` is the harness fed known-correct answers and `noise` the
-same harness fed known-wrong ones. The oracle must score near 1.0 and
-the noise near 0.0; anything else means the metric is broken rather
-than the system, and every comparison built on it is biased in a
-direction nobody can see.
-
-Half an hour to run, and it is the only check here that can tell you
-the numbers themselves are worthless.
+Check the instrument before believing it: the oracle must score at least
+*floor* and the noise at most *ceiling*, or the metric itself is broken.
 
 **Parameters**
 
@@ -477,17 +447,8 @@ judge(
 
 An LLM decides. Use when the answer is prose and no rule can check it.
 
-The judge is part of the instrument, not part of the system under test, so
-two things follow. It must be **the same model and prompt across every
-arm** — a judge swapped mid-run makes the arms incomparable in a way that
-leaves no trace in the numbers. And it must be **checked before it is
-trusted**: run the oracle and noise controls from `_report`, which
-feed it known-correct and known-wrong answers. A judge that does not score
-the oracle near 1.0 is measuring something other than correctness.
-
-An unparseable verdict raises. That is deliberate: the alternative is to
-guess, and guessing "pass" raises every arm at once, which reads as a good
-result rather than as a broken judge.
+Keep the same model and prompt across every arm, and check it with the oracle
+and noise controls first. An unparseable verdict is an `abstain`.
 
 **Parameters**
 
@@ -510,21 +471,8 @@ pairwise(
 
 A judge compares the candidate with the champion, **in both orderings**.
 
-LLM judges have a documented preference for whichever answer they read
-first, and a single-ordering comparison measures that preference as much
-as it measures quality. So the pair is put twice, A/B and B/A, and the
-candidate wins only by winning both. A disagreement between the two
-orderings *is* the position bias showing itself, and it resolves **to the
-champion**: the burden is on the challenger, which is what keeps a
-best-so-far from drifting on noise.
-
-The champion is `case.expect` — the same field `judge` reads as
-the reference.
-
-`extra` carries what each ordering said, so a run can report how often
-they disagreed. That number is the judge's own reliability, measured for
-free while grading, and a pair of orderings that disagree half the time
-means the comparison is a coin toss wearing a rubric.
+The candidate wins only by winning both; a disagreement goes to the champion,
+`case.expect`, and `extra` carries what each ordering said.
 
 **Parameters**
 

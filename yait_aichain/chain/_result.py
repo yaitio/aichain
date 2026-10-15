@@ -40,8 +40,8 @@ class ChainResult(Spend):
     run_id : str
         The run document's id.
     renamed : dict
-        Keys an output used to be found under, mapped to its key now —
-        ``{"result": "fetch"}`` while the pre-4.2.7 key still works.
+        An output's old keys mapped to its key now — ``{"result": "fetch"}``;
+        reading an old key still works and warns.
     """
 
     output:    Any

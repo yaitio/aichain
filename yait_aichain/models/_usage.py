@@ -227,32 +227,23 @@ CACHE_READ_MULTIPLIER   = 0.10
 def estimate_cost(usage: Usage, model_name: str,
                   cache_ttl: str = "5m", provider: str | None = None) -> float | None:
     """
-    Estimate USD cost of *usage* for *model_name*, or ``None`` if the model
-    has no price per token in the provider data.
+    Estimate the USD cost of *usage* for *model_name*; ``None`` without a
+    per-token price (a ``per_image`` model is priced by its image tool).
 
-    Cached tokens are priced at their own rates. Folding them into the input
-    line would overstate a long conversation's cost by close to an order of
-    magnitude, since almost all of a cached turn is reused prefix.
+    Cached tokens have their own rates. Beside ``input`` and ``output`` (USD
+    per 1M), ``price`` may carry ``image_input``, ``cache_read`` and
+    ``long_context = {above, input, output}``.
 
-    *cache_ttl* selects the write premium. The response says how many tokens
-    were stored but not for how long, so the lifetime has to come from the
-    caller that asked for it; an unknown value is priced as the cheaper 5m
-    rather than raising, since a cost estimate should never break a call.
-
-    ``price`` may carry, beside ``input`` and ``output`` (USD per 1M):
-
-    * ``image_input`` — an image sent *in*, where it is dearer than text.
-      Without it an edit sending reference images is billed at the text rate:
-      measured on a real call, 22% under.
-    * ``cache_read`` — a reused prefix, where it is not the usual tenth of the
-      input rate. Claude 5.5 reads at a twentieth and Fable 5.1 at a fortieth;
-      priced at a tenth, a cached Fable 5.1 loop reads up to four times dear.
-    * ``long_context = {above, input, output}`` — the rates once the prompt
-      passes *above* tokens. Claude Haiku 5.5 charges five times as much past
-      100K, which is the difference between a cheap call and one that is not.
-
-    A model priced only ``per_image`` has no token rate and returns ``None``
-    here; the image tool prices it by the picture.
+    Parameters
+    ----------
+    usage : Usage
+        The counts to price.
+    model_name : str
+        The model, as named in the provider data.
+    cache_ttl : str, optional
+        ``"5m"`` or ``"1h"``: the cache-write premium; anything else is 5m.
+    provider : str | None, optional
+        Whose price list to read; by the bare name when omitted.
     """
     price = _price_of(model_name, provider)
     if price is None or "input" not in price or "output" not in price:

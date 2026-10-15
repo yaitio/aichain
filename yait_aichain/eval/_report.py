@@ -70,12 +70,8 @@ class Report:
     def reject(self, *, max_empty: float = 0.1, max_errors: float = 0.2,
                max_abstained: float = 0.2) -> dict[str, str]:
         """
-        Mark cells whose data is not worth reporting, and say why.
-
-        Thresholds are shares of the arm's attempts — absolute counts of two
-        and five rejected a large clean run for noise and passed a small
-        broken one. Each call decides afresh: an arm rejected under one
-        threshold is not left rejected under the next.
+        Mark cells whose data is not worth reporting, and say why. Thresholds are
+        shares of the arm's attempts, decided afresh on each call.
 
         Parameters
         ----------
@@ -84,8 +80,7 @@ class Report:
         max_errors : float, optional
             The share of attempts that may raise.
         max_abstained : float, optional
-            The share of attempts a judge could not read; past it the cell is
-            rejected rather than reported on a shrunken denominator.
+            The share of attempts a judge could not read; past it the cell is rejected.
         """
         self._rejected = {}
         for arm, rows in self._by_arm().items():
@@ -178,11 +173,8 @@ class Report:
         """
         The chance a case is solved on **every** one of k trials, by case.
 
-        ``k`` defaults to the report's number of trials, the same for every
-        arm. Estimated from all of a case's trials, not its first k: with c
-        passes in n trials it is C(c, k) / C(n, k), the estimator τ²-bench
-        uses, so Pass^1 is the mean. A case with fewer than k trials is left
-        out — under-sampled is not wrong — and no case at all is NaN, not 0.
+        Estimated from all of a case's trials as C(c, k) / C(n, k), so Pass^1 is the
+        mean; a case with fewer than k trials is left out, and no case at all is NaN.
 
         Parameters
         ----------
@@ -208,13 +200,8 @@ class Report:
         """
         Share of cases the arm did **not** answer the same way every time.
 
-        This is the shape that a mean and a ``Pass^k`` both hide. Two arms can
-        land on the same mean with one solving a fixed half of the set every
-        time and the other solving a different half each run; only the second
-        is unreliable, and only this number says so.
-
-        Zero means perfectly reproducible — including reproducibly wrong,
-        which is why it is read next to the mean and never on its own.
+        Zero is perfectly reproducible — reproducibly wrong included — so read it
+        beside the mean, never alone.
 
         Parameters
         ----------
@@ -256,18 +243,9 @@ class Report:
     # ── comparison ───────────────────────────────────────────────────────
     def paired(self, a: str, b: str, group: str = "") -> dict:
         """
-        Compare two arms on the cases they both attempted.
-
-        Unpaired comparison wastes most of a small set: at 30 cases the
-        standard error of a proportion is ≈0.09, so nothing under ~0.18
-        separates. Pairing discards the cases both arms agree on — which carry
-        no information about the difference — and counts only the discordant
-        ones, where the whole signal lives.
-
-        ``only_a`` and ``only_b`` are those counts. Under the null they are
-        equal, so ``p`` is an exact two-sided binomial test on them; with fewer
-        than ~6 discordant pairs no honest test can reject anything, and the
-        function says so in ``enough``.
+        Compare two arms on the cases they both attempted, counting only the
+        discordant ones: ``only_a``, ``only_b``, an exact two-sided binomial ``p``, and
+        ``enough`` false below six discordant pairs.
 
         Parameters
         ----------
@@ -300,16 +278,8 @@ class Report:
                  arm: str = "", oracle_arm: str = "", noise_arm: str = "",
                  floor: float = 0.95, ceiling: float = 0.05) -> dict:
         """
-        Check the instrument before believing it.
-
-        ``oracle`` is the harness fed known-correct answers and ``noise`` the
-        same harness fed known-wrong ones. The oracle must score near 1.0 and
-        the noise near 0.0; anything else means the metric is broken rather
-        than the system, and every comparison built on it is biased in a
-        direction nobody can see.
-
-        Half an hour to run, and it is the only check here that can tell you
-        the numbers themselves are worthless.
+        Check the instrument before believing it: the oracle must score at least
+        *floor* and the noise at most *ceiling*, or the metric itself is broken.
 
         Parameters
         ----------

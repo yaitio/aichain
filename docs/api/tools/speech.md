@@ -160,7 +160,7 @@ result = ttsXAI()(
 
 ### `ttsQwen`
 
-Text-to-speech via the Alibaba DashScope Qwen3-TTS API.
+Text-to-speech via the Alibaba DashScope Qwen3-TTS API; the audio URL it answers with is downloaded and saved locally.
 
 | | |
 |---|---|

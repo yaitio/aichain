@@ -19,22 +19,17 @@ _JSON_TYPES = {
 
 def portable_schema(schema: object, target: str) -> object:
     """
-    Return *schema* in the form *target* accepts.
+    Return *schema* in the form *target* accepts; the original is untouched.
 
-    ``target`` is a provider family: ``"openai"`` (strict mode) or
-    ``"google"``. The original is never modified.
-
-    Neither direction is lossless, and one shape has no strict equivalent at
-    all — a map with arbitrary keys. For ``"openai"`` that raises rather than
-    being mangled, because the provider's own message points at the wire
-    format instead of at the schema the caller wrote.
+    Not lossless. A map with arbitrary keys has no strict equivalent, and
+    for ``"openai"`` it raises instead of being mangled.
 
     Parameters
     ----------
     schema : dict
         A JSON Schema.
     target : str
-        The provider family it must be sent to, e.g. ``"google"``.
+        The provider family: ``"openai"`` (strict mode) or ``"google"``.
     """
     if target == "openai":
         from ..clients._families._openai_compat import _sanitize_openai_schema
@@ -49,11 +44,8 @@ def check_structure(value: object, schema: object, path: str = "$") -> list[str]
     """
     Compare *value* against *schema*, returning one message per violation.
 
-    An empty list means nothing was found — not that the value is valid under
-    the full specification. Checked: declared types, required properties,
-    unexpected properties when ``additionalProperties`` is false, enum
-    membership, and array element types. Recurses through ``properties`` and
-    ``items``.
+    Empty means nothing found, not full validity: types, required and
+    unexpected properties, enums and array items are checked, recursively.
 
     Parameters
     ----------

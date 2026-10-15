@@ -30,8 +30,7 @@ class Event:
     ----------
     type : str
         Dotted event name, e.g. ``"llm_call.started"``, ``"tool_call.ended"``,
-        ``"tool_call.started"``, ``"step.started"`` (a **Chain** step;
-        the agent's tool events were spelled this way before 2.7.0).
+        ``"step.started"`` (a **Chain** step).
     run_id : str | None
         Identifier of the run this event belongs to.
     step : int | None
@@ -39,19 +38,9 @@ class Event:
     name : str | None
         Tool or model name, when applicable.
     payload : dict
-        Event-specific extra fields. For ``tool_call.*`` this carries what a
-        program needs to **reconstruct** the turn rather than describe it:
-        ``id`` (so concurrent calls in one turn can be told apart),
-        ``arguments`` on started, and the tool's **raw** result on ended.
-
-        The result travels by value, and that is a deliberate choice about
-        what an ``Event`` is. A rendering of it cannot be recovered
-        downstream — units, column metadata, the difference between *no rows*
-        and *the tool declined* are all gone once it is prose — and a handle
-        instead would need a lifetime and a place to live, which is hostile to
-        the serverless niche this library targets: the process that issued the
-        handle may be gone. Events are therefore no longer uniformly small;
-        ``Event.__repr__`` omits the payload so a log stays readable.
+        Event-specific fields. ``tool_call.*`` carries the call ``id``, the
+        ``arguments`` on started and the tool's **raw** result, by value, on
+        ended; ``Event.__repr__`` leaves the payload out.
     usage : int | None
         Token delta attributable to this event, when known.
     cost : float | None

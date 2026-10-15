@@ -38,59 +38,22 @@ A loop that holds one growing conversation and acts on the world.
 - `model` (*Model*) — The model that drives the loop.
 - `tools` (*list[Tool], optional*, default `None`) — What it may call.
 - `instructions` (*str, optional*, default `''`) — The standing brief — goes into the stable prefix.
-- `mode` (*"agile" | "waterfall"*, default `'agile'`) — `"agile"` decides at every step. `"waterfall"` writes a plan at
-  step 0 (via the `write_plan` tool) and holds to it.
-- `team` (*dict | list[Agent] | None*, default `None`) — Who else may do work: `{"members": [...], "extend": bool, "max": N,
-  "max_delegations": N}`. `members` are agents and chains the lead
-  hands tasks to, each read by its `name` and `description`; a chain
-  takes its inputs by name, as its `input_schema()` lists them.
-  `extend: True` lets the lead add a member when none fits — one role,
-  by its instructions, made once and reused; `max` bounds the team,
-  added members included; `max_delegations` bounds the delegations of
-  one run. A list is the
-  members. `None` removes `delegate`. `"auto"` (`{"extend":
-  True}`) is deprecated since 4.2.9.
-- `planner_model` (*Model, optional*, default `None`) — `waterfall` only: the model that writes the plan. The freeze makes
-  the plan the highest-leverage tokens of the run — everything after
-  merely executes it — so it may deserve deliberation the execution
-  turns do not need. Turns before the plan is recorded go to this model;
-  every turn after goes to `model`. Think while planning, act without
-  deliberating.
-- `stop_when` (*list, optional*, default `None`) — Conditions from this module. Defaults to `[step_count(30)]` —
-  a backstop, not a plan.
-- `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` at every step boundary; `stream()` yields
-  the same events.
-- `policy` (*dict | PermissionPolicy | None, optional*, default `None`) — Everything that decides what happens to a call, in one place:
-
-  ```python
-  {"rules":   {"read": "allow", "external": "approve", "destructive": "deny"},
-   "default": "approve",        # a class no rule names
-   "approve": "park",           # or "deny", or a function
-   "interceptors": [...]}
-  ```
-
-  `rules` map a tool's risk class to `allow`, `approve` or
-  `deny`. `approve` says who answers an `approve`: `"park"` parks
-  the run with the question — `resume(run_id, signal={"approved":
-  True})` runs the call, and needs a `store`; `"deny"` refuses it; a
-  function given an `ApprovalRequest` answers `True`, `False` or
-  `ApprovalDecision`. `interceptors` act on each call before and
-  after it runs — see `Interceptor`. Keys are
-  checked when the agent is built. A `PermissionPolicy` or a dict of
-  rules is the `rules` alone. With no policy every tool runs.
-- `permissions` (*PermissionPolicy | None, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"rules": ...}`. Removed in 5.0.
-- `approve` (*callable, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"approve": ...}`. Removed in 5.0.
-- `store` (*StateStore, optional*, default `None`) — Where a run parked by a `wait()` or `gate()` in the agent's tools
-  is kept until `resume()`. Required when such a tool is given.
-- `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars for the whole run; a model call that would begin
-  past it ends the run with `success=False` and the reason in
-  `.error`.
-- `name` (*str | None, optional*, default `None`) — How this agent is named as a worker in another agent's `team` and in
-  events.
-- `description` (*str | None, optional*, default `None`) — What it does — what a lead agent reads when choosing a worker.
-- `verbose` (*int, optional*, default `0`) — `0` is silent, `1` logs each step, `2` logs everything, through the
-  `yait_aichain` logger.
-- `interceptors` (*list | None, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"interceptors": [...]}`. Removed in 5.0.
+- `mode` (*"agile" | "waterfall"*, default `'agile'`) — `"agile"` decides at every step; `"waterfall"` plans at step 0 and holds to it.
+- `team` (*dict | list[Agent] | None*, default `None`) — `{"members": [agents, chains], "extend": bool, "max": N, "max_delegations": N}`;
+  a list is the members, `None` removes `delegate`; `"auto"` is deprecated.
+- `planner_model` (*Model, optional*, default `None`) — `waterfall` only: the model that writes the plan; `model` runs it.
+- `stop_when` (*list, optional*, default `None`) — Conditions from this module. Defaults to `[step_count(30)]`.
+- `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` at every step boundary.
+- `policy` (*dict | PermissionPolicy | None, optional*, default `None`) — `{"rules": {risk: "allow"|"approve"|"deny"}, "default": ..., "approve":
+  "park"|"deny"|fn, "interceptors": [...]}`, or the rules alone; none runs all.
+- `permissions` (*PermissionPolicy | None, optional*, default `None`) — Deprecated; goes in 5.0, use `policy={"rules": ...}`.
+- `approve` (*callable, optional*, default `None`) — Deprecated; goes in 5.0, use `policy={"approve": ...}`.
+- `store` (*StateStore, optional*, default `None`) — Where a parked run is kept until `resume()`; needed by `wait()`/`gate()`.
+- `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars for the run; past it the run ends `success=False`.
+- `name` (*str | None, optional*, default `None`) — This agent's name as a worker in another's `team` and in events.
+- `description` (*str | None, optional*, default `None`) — What it does — what a lead reads when choosing a worker.
+- `verbose` (*int, optional*, default `0`) — `0` silent, `1` each step, `2` everything, to the `yait_aichain` logger.
+- `interceptors` (*list | None, optional*, default `None`) — Deprecated; goes in 5.0, use `policy={"interceptors": [...]}`.
 
 ### `Agent.run()`
 
@@ -117,24 +80,10 @@ Agent.stream(task: str, variables: dict | None = None)
 
 Run *task* and yield each `Event` as it happens.
 
-`run()` is untouched and returns the same result it always did;
-this is the same loop walked instead of exhausted. Three things are
-worth knowing before reaching for it:
-
-* **Events, not tokens.** A turn in an agent loop is usually a tool
-  call, not prose, so token deltas would be empty for most of a run
-  and would arrive interleaved with decisions in no useful order.
-  What a caller actually wants to show is what the agent is *doing* —
-  which is what the event channel already carries. `Skill.stream` is
-  the one for text.
-* **The result is not yielded**, because a stream of one type is
-  easier to consume than a stream of two. It lands on
-  `last_result` when the generator finishes, with the journal
-  attached, exactly as `run()` would have returned it.
-* **Abandoning the generator abandons the run.** A `break` out of the
-  loop leaves the agent mid-turn; the temporary hook is still removed
-  (that much is guaranteed), but no result is produced and no
-  `run.finished` is emitted. Exhaust it, or accept that.
+The same loop as `run()`, walked instead of exhausted. It yields events, not
+tokens — `Skill.stream` is the one for text. The result is not yielded: it
+lands on `last_result` when the generator finishes. Abandoning the generator
+abandons the run, with no result and no `run.finished`.
 
 **Parameters**
 
@@ -155,25 +104,14 @@ Agent.arm(
 
 Create the run **without starting it**, and return it parked.
 
-The run exists before it has a task: a `run_id`, a document in the
-store, and a declared shape for the signal that will start it. That is
-a subscription — what a trigger waits on, and what a person is shown a
-form for — and it is the same object a pause mid-run produces, so
-"an email arrived", "the human pressed start" and "the gate was
-approved" all arrive as `resume(run_id, signal)`.
-
-Nothing is scheduled here. `hint` is recorded for whatever does the
-waking: `{"on": "email.received"}`, `{"wake_at": "..."}`.
-
-The signal carries the task: a string is the task, a dict gives it
-under `"task"` and every other key seeds the conversation the way
-`run(task, variables=...)` does.
+`resume(run_id, signal)` starts it: a string is the task, or a dict gives
+it under `"task"` and its other keys seed the conversation.
 
 **Parameters**
 
 - `reason` (*str, optional*, default `''`) — What the run waits for, shown to whoever starts it.
 - `resume_with` (*dict | None, optional*, default `None`) — The shape of the signal that starts it.
-- `hint` (*dict | None, optional*, default `None`) — Recorded for whatever does the waking; the engine schedules nothing.
+- `hint` (*dict | None, optional*, default `None`) — Recorded for whatever does the waking, such as `{"on": "email.received"}`.
 - `variables` (*dict | None, optional*, default `None`) — Data the run starts with, beside what the signal brings.
 
 ### `Agent.resume()`
@@ -184,27 +122,19 @@ Agent.resume(run_id: str, signal=<required>) -> AgentResult | SuspendedResult
 
 Continue a run this agent parked, delivering *signal* as the answer.
 
-The pause and this call are the same seam the externally driven path
-already has: a parked run is a history whose last tool call has no
-result, and *signal* is that result. Nothing is restored that was not
-written down — the conversation **is** the state, which is why 2.0
-removed the agent's snapshot mechanism and why none is needed here.
-
-Idempotent in the way a trigger needs: a `run_id` the store no
-longer holds raises `KeyError`, so an at-least-once delivery can
-read that as "already handled" instead of running the tail twice.
-
-Returns an `AgentResult` when the run finishes, or another
-`SuspendedResult` when it parks again — under the same
-`run_id`, so a caller tracks one identifier for the whole
-conversation however many times it waits.
-
 **Parameters**
 
 - `run_id` (*str*) — The parked run, as the `SuspendedResult` named it.
-- `signal` (*any, optional*, default `<required>`) — The answer the run waited for — the result of the tool call that
-  parked it. For a run made by `arm()`, a string is the task, or a dict
-  gives it under `"task"`.
+- `signal` (*any, optional*, default `<required>`) — The result of the tool call that parked the run; for an `arm()` run,
+  the task (a string, or a dict with `"task"`).
+
+**Returns**
+
+- `AgentResult | SuspendedResult` — The finished run, or the run parked again under the same `run_id`.
+
+**Raises**
+
+- `KeyError` — *run_id* is not in the store — already resumed, or never parked.
 
 ### `Agent.new_state()`
 
@@ -227,19 +157,12 @@ Agent.opening(
 
 The two messages a run starts from: the stable prefix and the task.
 
-`ground_rules` injects the "plain text ends the run" rule, and it
-belongs to whoever owns the loop: `run()` passes True because in its
-loop a text reply really does end the run. An external driver calling
-`opening()`/`step()` owns its own loop — there a plain reply is an
-ordinary turn, so the default is clean instructions and the driver
-states its own framing.
-
 **Parameters**
 
 - `task` (*str*) — What to do, in words.
 - `variables` (*dict | None, optional*, default `None`) — Data the caller already holds, given with the task.
-- `ground_rules` (*bool, optional*, default `False`) — Add the rule that a plain-text reply ends the run. `run()` sets it;
-  a driver that owns its own loop usually does not.
+- `ground_rules` (*bool, optional*, default `False`) — Add the rule that a plain-text reply ends the run. `run()` sets it; a
+  driver that owns its own loop usually does not.
 
 ### `Agent.step()`
 
@@ -249,40 +172,20 @@ Agent.step(messages: list, state: dict | None = None)
 
 Ask for the next decision and return it **without executing it**.
 
-Returns a `ToolCallRequest` when the model asked
-to act, or a string — the answer. The caller appends the reply (via
-`.as_turn()`) and whatever the world answered, then calls again.
-
-**Some calls are the agent's own, not the world's**: `pool`,
-`write_plan` and `delegate` exist only inside this library, so a
-driver that hands every call to its environment gets "tool not found"
-back for each. Ask `owns` and run those through `execute`.
-Measured 2026-10-14: the τ²-bench adapter did not, and 962 of its
-aichain arms' calls — every plan and every fan-out — failed that way.
-
-**The obligation in that sentence is now checked.** A history holding
-a tool call nobody answered is malformed, and the providers disagree
-about it in the worst way: three reject the request, Google is looser,
-and a self-hosted OpenAI-compatible server validates nothing and
-templates it through, so the model meets its own unanswered call and
-improvises — differently each time. Provider interchangeability is
-this library's main promise and that is a place it did not hold.
-
-Raising here buys three things and costs one. It makes the providers
-agree; it turns an intermittent, unbounded behaviour into the same
-named failure every time, since the condition that produces a
-dangling call is itself intermittent; and it fails locally, before
-the network, pointing at the caller rather than at a provider's
-wording. What it does not buy is a better score — on a benchmark a
-crash can rank below a model muddling through. This is an instrument
-for reliability, not for accuracy.
+Returns a `ToolCallRequest` when the model asked to act,
+or a string — the answer. The caller appends the reply (`.as_turn()`) and a
+result for every call, then calls again; `owns` names the calls that go
+to `execute`.
 
 **Parameters**
 
-- `messages` (*list*) — The conversation so far — `opening()`'s two messages, then each
-  reply and each tool result in turn.
-- `state` (*dict | None, optional*, default `None`) — The run's working state between calls, kept by the caller; the plan in
-  `waterfall` mode lives here.
+- `messages` (*list*) — The conversation so far — `opening()`'s two messages, then each reply
+  and each tool result in turn.
+- `state` (*dict | None, optional*, default `None`) — The run's working state, kept by the caller; holds the `waterfall` plan.
+
+**Raises**
+
+- `ValueError` — When a tool call already in *messages* has no result.
 
 ### `Agent.stopped()`
 
@@ -379,42 +282,24 @@ cost. `bool(result)` is `result.success`.
 - `mode` (*str*) — `"agile"` or `"waterfall"`.
 - `steps_taken` (*int*) — Model turns taken.
 - `tokens_used` (*int*) — Tokens across every model call of the run, input and output together.
-- `cost` (*float | None*, default `None`) — Dollars, priced per model from the registry; `None` when nothing
-  could be priced, never an invented zero. A run picked up with
-  `resume()` includes what it spent before the pause.
-- `stopped_by` (*str | None*, default `None`) — What ended the run: `"answered"`, `"check:<name>"`,
-  `"step_count"`, `"token_budget"`, `"cost_budget"`,
-  `"truncated"` (a reply cut at `max_tokens` — raise it; an answer
-  cut there is kept as `output` and is not a success),
-  `"context_overflow"` (the history is past the model's window),
-  `"park_failed"` (the store refused the parked run),
-  `"llm_error"` (the model call failed otherwise),
-  `"condition_error"` (a check, ceiling, nudge or approver of the
-  caller's raised; `error` says which), or the name of an error.
+- `cost` (*float | None*, default `None`) — Dollars, resumed parts included; `None` when nothing could be priced.
+- `stopped_by` (*str | None*, default `None`) — `"answered"`, `"check:<name>"`, `"step_count"`, `"token_budget"`, `"cost_budget"`,
+  `"truncated"` (cut at `max_tokens`; not a success), `"context_overflow"`, `"park_failed"`,
+  `"llm_error"`, `"condition_error"` (a caller's callable raised), or an error's name.
 - `plan` (*list[dict]*, default `<factory>`) — In `waterfall` mode, the plan it wrote — `{"goal": …}` per step.
-- `adaptations` (*list*, default `<factory>`) — What the library changed in this run's requests to fit the provider,
-  each an `Adaptation`; empty when nothing was.
-- `history` (*list[dict]*, default `<factory>`) — Empty for an agent, kept so every result has the same fields; an
-  agent's record is `journal`.
-- `memory` (*dict*, default `<factory>`) — Always empty; the agent keeps no memory store. Removed in 5.0.
+- `adaptations` (*list*, default `<factory>`) — Each `Adaptation` the library made to fit the provider.
+- `history` (*list[dict]*, default `<factory>`) — Empty for an agent, kept so every result has the same fields.
+- `memory` (*dict*, default `<factory>`) — Always empty; deprecated, goes in 5.0.
 - `error` (*str | None*, default `None`) — Why it failed, when it did.
-- `journal` (*list[dict]*, default `<factory>`) — What was attempted, in order, each entry with its outcome and the
-  evidence behind it — `check` for a fact the code verified,
-  `model_claim` for the model's word.
-- `acceptance` (*Acceptance | None*, default `None`) — What the answer rests on: `checked`, `claimed` or `unsupported`,
-  with a fingerprint of the evidence, so `still_holds()` can tell when
-  it has changed.
-- `beacons` (*list*, default `<factory>`) — Beacons raised during the run, including by delegated workers — a
-  blocker, a question, a contract that changed.
+- `journal` (*list[dict]*, default `<factory>`) — What was attempted, each with its outcome and evidence (`check` or `model_claim`).
+- `acceptance` (*Acceptance | None*, default `None`) — What the answer rests on — `checked`, `claimed` or `unsupported`.
+- `beacons` (*list*, default `<factory>`) — Beacons raised during the run, delegated workers' included.
 
 **Examples**
 
 ```python
-result = agent.run("Research fusion energy and summarise it in French")
-if result:
-    print(result.output, result.cost, result.stopped_by)
-else:
-    print("failed:", result.error)
+result = agent.run("Summarise fusion energy in French")
+print(result.output if result else result.error, result.cost)
 ```
 
 ### `AgentResult.usage`
@@ -496,21 +381,8 @@ nudge(predicate, message, name: str = 'nudge')
 
 A condition that **speaks** instead of ending the run.
 
-`stop_when` knew two kinds, and both ended the run: a ceiling ("hit it,
-fail") and a check ("met it, succeed"). A stall needs neither. It needs
-"change approach", and the loop had no way to say that — so a stuck run
-either spun until a ceiling stopped it or was stopped early by a ceiling
-set too low to let a real run finish.
-
-When *predicate(state)* is true a user turn carrying *message* is
-appended and the loop carries on. It enters the conversation as an
-ordinary, logged message — not an invisible edit to the system prompt —
-so a reader of the transcript can see exactly what the model was told
-and when. *message* may be a string or a callable of `state`.
-
-It fires **once per streak**: while the predicate stays true it stays
-quiet, and it re-arms when the predicate clears. A reminder repeated
-every turn is how a reminder stops being read.
+When *predicate(state)* is true, *message* is appended as a user turn and the
+loop carries on — once per streak, re-armed when the predicate clears.
 
 **Parameters**
 
@@ -566,16 +438,9 @@ verified(message: str | None = None, name: str = 'verified')
 
 Before the run answers, ask once for a check of what it changed.
 
-The commonest agent failure there is: "done" with nothing run. When the
-model answers after a call that changed something — a write, an external
-call, a delete — and no call has succeeded since to look at the result,
-its answer is held, *message* is put to it as a user turn, and the loop
-goes on. Once per run: a model that answers again is believed, and the
-record says it was asked.
-
-Only a call clears it — a read, a test run, anything that succeeds after
-the change. The model saying it checked does not, because that is the
-claim the gate exists to test.
+An answer after a `write`/`external`/`financial`/`destructive` call is
+held and *message* is put to the model, unless a later call succeeded. Once per
+run; only a call clears it, never the model saying it checked.
 
 **Parameters**
 
@@ -661,11 +526,7 @@ let a model re-wording its report look like the facts moving.
 beacon(kind: str, message: str, *, source: str = '') -> Beacon
 ```
 
-Signal whoever is waiting on this run.
-
-Callable from anywhere inside a run — a tool, a nested agent, a pool item
-— without a parameter, because the board is ambient for the duration of
-the run, exactly as `RunContext` is.
+Signal whoever is waiting on this run, from anywhere inside it.
 
 **Parameters**
 
@@ -769,31 +630,13 @@ Journal.is_repeating(last_k: int = 5) -> bool
 
 True when the last *last_k* attempts stopped carrying new information.
 
-`has_progress` catches a run that is *failing*; this catches one
-that is *succeeding pointlessly*. An agent can keep issuing calls that
-return cleanly — bisecting past the resolution of its own instrument,
-re-asking a question already answered — and every entry is an honest
-`done`. Nothing in the outcomes distinguishes that from real work.
+It fires when every attempt in a full window states the same intent or issues
+the identical action — exact repetition only, so a working search is not
+interrupted. It reports and does not stop; `has_progress` catches failing.
 
-Two signals, both requiring a full window and both deliberately strict,
-because a false positive would interrupt an agent that is genuinely
-working:
+**Parameters**
 
-* every attempt in the window states the same intent, or
-* every attempt in the window issues the identical action.
-
-This reports; it does not stop. The judgement of whether a repeated
-approach is still worth pursuing belongs to the caller.
-
-**What this deliberately does not do.** A fuzzier version — flagging
-intents that merely *resemble* each other — was measured against three
-real runs and rejected. An agent bisecting past its instrument's
-resolution scored a median word-overlap of 0.73 between consecutive
-intents; a textbook binary search that finished correctly scored 0.64.
-The two are not separable, because restating "probe the midpoint of
-X–Y" every turn is what a healthy search looks like. Any threshold in
-that gap is fitted to one example and would interrupt working runs, so
-only exact repetition is reported.
+- `last_k` (*int, optional*, default `5`) — The window, in entries; fewer entries than this is never repeating.
 
 ### `Journal.progress_summary()`
 
@@ -803,22 +646,13 @@ Journal.progress_summary(limit: int = 12) -> str
 
 Render the observation trail for the next action prompt.
 
-Every recent attempt appears, whatever its outcome, with **what was
-tried** and **what came back**. Both halves are needed. A summary of
-intents alone is useless to a loop that has to decide its next move from
-feedback; and an observation without the candidate that produced it is
-just as bad — "4 problems remain" cannot be acted on when the draft that
-had 4 problems is nowhere to be seen. Failures earn their place here
-too: a failed probe still returned information.
+Each recent attempt shows what was tried and what came back, failures
+included; successes are marked `verified` or `claimed` by evidence kind.
+Both halves are clipped — keep a large result in memory via `artifact`.
 
-Both halves are bounded, so a genuinely large artifact will still be
-clipped. That is what `artifact` is for: put it in memory, which the
-action prompt renders separately and does not roll off after
-*limit* entries.
+**Parameters**
 
-Successes are additionally marked by evidence kind, so the model can see
-which of its "achievements" nothing ever verified. What has been ruled
-out is rendered separately by `do_not_redo`.
+- `limit` (*int, optional*, default `12`) — How many of the latest entries to render.
 
 ### `Journal.do_not_redo()`
 

@@ -225,100 +225,42 @@ def _check_name(name) -> None:
 class Model:
     """
     A configured model: provider resolved from the name, settings from data,
-    format + transport delegated to the matching family client.
+    format and transport delegated to the matching family client.
 
-    ``Model(name, options, client_options, api_key)`` resolves *name* to a
-    provider (via the ``providers/`` data), merges that provider's default
-    generation parameters, and attaches a ready-to-use family client.  There
-    is a single ``Model`` class — no per-provider subclasses; the provider is
-    available as ``model._provider``.
+    One ``Model`` class serves every provider; the provider is
+    ``model._provider``.
 
     Parameters
     ----------
     name : str
-        Model identifier, e.g. ``"gpt-4o"``, ``"claude-sonnet-4-5"``,
-        ``"gemini-2.0-flash"``, ``"grok-3"``, ``"sonar-pro"``.
-
+        Model identifier, e.g. ``"gpt-4o"``, ``"claude-sonnet-4-5"``.
     options : dict | None, optional
-        Override any subset of the model's default generation parameters.
-        Supported keys (all optional):
-
-        ================  ========  =======================================
-        Key               Type      Description
-        ================  ========  =======================================
-        ``temperature``   float     Sampling temperature.
-        ``max_tokens``    int       Maximum output tokens.
-        ``top_p``         float     Nucleus-sampling probability mass.
-        ``top_k``         int       Top-K sampling (provider-dependent).
-        ``cache_control`` bool|int  Prompt caching. True marks the
-                          |str      second-to-last message; an int names
-                                    the message the stable prefix ends at;
-                                    ``"last"`` marks the newest block, for
-                                    agent loops whose history ends in a
-                                    tool turn.
-        ``cache_ttl``     str       How long the mark lives: ``"5m"``
-                                    (default) or ``"1h"``.
-        ``reasoning``     str|None  Universal reasoning depth (see below).
-        ================  ========  =======================================
-
-        **reasoning** takes ``None``, ``"none"``, ``"low"``, ``"medium"`` or
-        ``"high"`` — the levels a provider's ``reasoning_map`` declares, and a
-        level it lacks is refused here, naming the ones it has. Each family
-        translates the level to its own wire: a token budget, an effort word,
-        a thinking switch, or a different model. What each provider does with
-        it, and with every other option, is the generated table in
-        ``docs/reference/parameters.md``; what this request did is in
-        ``last_adaptations``.
-
+        Overrides of the defaults: ``temperature``, ``max_tokens``, ``top_p``,
+        ``top_k``, ``reasoning`` (``"none"``/``"low"``/``"medium"``/``"high"``),
+        ``cache_control`` (True, a message index, or ``"last"`` for an agent
+        loop), ``cache_ttl`` (``"5m"``/``"1h"``), ``extra`` (fields sent
+        verbatim). Per provider: ``docs/reference/parameters.md``.
     client_options : dict | None, optional
-        Override settings for the underlying HTTP client.
-        Supported keys (all optional):
-
-        ===========  ========================  ==========================
-        Key          Type                      Description
-        ===========  ========================  ==========================
-        ``url``      str                       Base URL override.
-        ``timeout``  ``urllib3.Timeout``       Custom connect/read timeout.
-        ``retries``  ``urllib3.Retry``         Custom retry policy.
-        ``proxy``    dict                      Proxy config (see BaseClient).
-        ===========  ========================  ==========================
-
+        HTTP client settings: ``url`` (base URL), ``timeout``
+        (``urllib3.Timeout``), ``retries`` (``urllib3.Retry``), ``proxy`` (dict).
     api_key : str | None, optional
-        Provider API key.  When omitted it is read from the provider's
-        environment variable (e.g. ``OPENAI_API_KEY``), named in the provider
-        data.  Raises ``ValueError`` if neither is found.
+        Provider key; read from the provider's environment variable when
+        omitted. ``ValueError`` if neither is found.
     on_unsupported : str, optional
-        What happens when a provider cannot do an option it was asked:
-        ``"warn"`` (the default) adapts or drops it and says so in
-        ``last_adaptations``; ``"requirements"`` raises for the losses that
-        leave a result looking right and silently wrong — ``seed``, ``size``,
-        ``aspect_ratio``, ``background``, ``fidelity``, ``output_format``,
-        ``compression``; ``"raise"`` raises for any.
+        ``"warn"`` (default) adapts and records in ``last_adaptations``;
+        ``"requirements"`` raises only for losses that leave a result looking
+        right (``seed``, ``size``, ``aspect_ratio``, ...); ``"raise"`` for any.
 
     Attributes
     ----------
-    name          : str
-    temperature   : float
-    max_tokens    : int
-    top_p         : float | None
-    top_k         : int | None
-    cache_control : bool | int | "last"
-    reasoning     : str | None  (None | "low" | "medium" | "high")
-    client        : family client (ready to use)
+    name, temperature, max_tokens, top_p, top_k, cache_control, reasoning
+        The resolved settings.
+    client : family client, ready to use.
 
     Examples
     --------
-    >>> m = Model("gpt-4o")
-    >>> m._provider
-    'openai'
-
-    >>> m = Model("claude-sonnet-4-5", options={"temperature": 0.5, "reasoning": "high"})
-    >>> m.temperature
+    >>> Model("claude-sonnet-4-5", options={"temperature": 0.5}).temperature
     0.5
-
-    >>> m = Model("gemini-2.0-flash", client_options={"proxy": {"url": "http://corp-proxy:3128"}})
-    >>> m.client._base_url
-    'https://generativelanguage.googleapis.com/v1beta'
     """
 
     # ------------------------------------------------------------------
@@ -512,20 +454,10 @@ class Model:
     def effective_options(self) -> dict:
         """What sampling this model actually runs with, asked for or not.
 
-        Provider defaults are not a shared baseline and never were:
-        ``temperature`` starts at 0.0 on DeepSeek, 0.2 on Perplexity, 0.7 on
-        Qwen and 1.0 on OpenAI, Google, Kimi and xAI; ``max_tokens`` spans
-        2048 to 32768; ``top_k`` has a value on Google alone. Two models
-        compared with no options set are therefore not one variable apart,
-        which is exactly the mistake this library tells its users not to make.
-
-        Converging them was considered and rejected: a library-wide default
-        overrides a number each provider chose for its own model, and it
-        would change every existing caller's output to fix a comparison only
-        some of them are making. Publishing the fact is the honest half —
-        ``defaults`` in the provider data, this property at runtime, and a
-        table in ``docs/reference/parameters.md``. A measurement run records
-        this beside its results and its arms are comparable or visibly not.
+        Provider defaults differ (``temperature`` from 0.0 to 1.0,
+        ``max_tokens`` from 2048 to 32768), so two models compared with no
+        options set are not one variable apart: record this beside a
+        measurement. The defaults per provider: ``docs/reference/parameters.md``.
         """
         return {
             "temperature":   self.temperature,
@@ -557,25 +489,18 @@ class Model:
     def to_request(self, messages: list, output: dict,
                    tools: "list | None" = None) -> "tuple[str, dict]":
         """
-        Translate substituted universal *messages* + *output* spec into the
-        provider's native ``(path, body)`` pair, by delegating to the family
-        client that owns this provider's wire format.
-
-        *tools* is a list of function-calling schemas (what ``Tool.schema()``
-        returns) declared to the provider natively. Families that have not
-        implemented the tool wire format refuse loudly here — silently sending
-        a request without the declared tools would produce a model that simply
-        never calls anything, with no error anywhere.
+        Translate universal *messages* + *output* into the provider's native
+        ``(path, body)`` pair, through the family client.
 
         Parameters
         ----------
         messages : list
-            Universal messages, placeholders already filled: ``{"role", "parts"}``
-            with typed parts.
+            Universal messages, placeholders filled: ``{"role", "parts"}``.
         output : dict
             The output spec: ``{"modalities": [...], "format": {"type": …}}``.
         tools : list | None, optional
-            Function-calling schemas, as ``Tool.schema()`` returns them.
+            Function-calling schemas (``Tool.schema()``); a family without a
+            tool wire format refuses them rather than send a request without.
         """
         path, body, _ = self.build(messages, output, tools)
         return path, body
@@ -583,10 +508,8 @@ class Model:
     def build(self, messages: list, output: dict, tools: list | None = None):
         """`to_request`, and what building changed: ``(path, body, adaptations)``.
 
-        The adaptations are this request's, returned with it. One Model is
-        shared — by a Pool's threads, by tenants — so a fact about one call
-        left on the object (`last_adaptations`, kept as a mirror) is read by
-        whichever call looks next.
+        The adaptations belong to this request; ``last_adaptations`` is only a
+        mirror, unsafe on a model shared between threads.
 
         Parameters
         ----------
@@ -695,33 +618,24 @@ class Model:
         """
         Yield the answer in pieces as the provider produces it.
 
-        Not every provider can. An image endpoint has nothing to deliver
-        progressively, and two of OpenAI's own paths speak a different event
-        vocabulary that is not wired yet. The question that decides the
-        design is what to do then, and it is the same question 2.3.0 answered
-        for options: **the request still goes, and the caller is told.** So a
-        provider that cannot stream returns the whole answer as one piece and
-        records a ``declined`` — because a caller who asked to stream and got
-        one chunk at the end has something that looks like it worked.
-        ``on_unsupported="raise"`` raises on it; ``"requirements"`` does not,
-        since the answer itself is whole.
-
-        When the stream ends, the generator returns a :class:`StreamOutcome`
-        — the whole result, the usage the provider reported, and what was
-        adapted — for ``yield from`` to receive. ``last_stream_usage``,
-        ``last_stream_result`` and ``last_adaptations`` mirror it on the
-        model, for a single caller; the library reads the outcome, because a
-        shared model's attributes belong to whichever stream wrote last.
+        A provider that cannot stream returns the whole answer as one piece
+        and records a ``declined`` adaptation (``on_unsupported="raise"``
+        raises on it).
 
         Parameters
         ----------
         messages : list
-            Universal messages, placeholders already filled: ``{"role", "parts"}``
-            with typed parts.
+            Universal messages, placeholders filled: ``{"role", "parts"}``.
         output : dict
             The output spec: ``{"modalities": [...], "format": {"type": …}}``.
         tools : list | None, optional
             Function-calling schemas, as ``Tool.schema()`` returns them.
+
+        Returns
+        -------
+        StreamOutcome
+            On exhaustion, for ``yield from``: result, usage, adaptations.
+            ``last_stream_usage``/``last_stream_result`` mirror it.
         """
         from ._adaptation import Adaptation, DECLINED, collect
 

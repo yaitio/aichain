@@ -1,7 +1,7 @@
 {
   "name": "yait-aichain",
   "description": "The provider-agnostic AI toolkit for Python \u2014 pipelines, fan-outs and tool-using agents on any model provider.",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "author": {
     "name": "YAIT"
   }

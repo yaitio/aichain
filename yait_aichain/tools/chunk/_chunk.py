@@ -393,16 +393,14 @@ class Chunk(Tool):
         input:   str,
         options: dict | None = None,
     ) -> list[dict]:
-        """
-        Chunk *input* text and return a list of chunk dicts.
+        """Chunk *input* text and return a list of chunk dicts.
 
         Parameters
         ----------
         input : str
             Text to chunk.  Returns ``[]`` for empty or whitespace-only input.
         options : dict | None
-            Takes no keys. ``max_chars``, ``overlap_chars`` and
-            ``merge_peers`` are settings of the tool and raise here.
+            Takes no keys; ``max_chars`` and the other settings raise here.
 
         Returns
         -------

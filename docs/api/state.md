@@ -83,7 +83,7 @@ Raised by a suspend tool to pause the current run.
   `{"approved": "bool"}`. Informational — the engine does not enforce
   it; the tool validates the signal on resume.
 - `hint` (*dict | None*, default `None`) — Optional hint for an external scheduler/trigger about how/when to
-  resume (e.g. `{"wake_at": "2026-06-15T09:00"}` or
+  resume (e.g. `{"wake_at": "<ISO time>"}` or
   `{"on": "payment.confirmed"}`). The engine only parks the run and
   records the hint; it never schedules anything itself.
 

@@ -29,86 +29,29 @@ Parallel execution of one runner across many items.
 
 **Parameters**
 
-- `runner` (*Skill | Tool | Chain | Agent*) — The runner applied to every item.
-- `items` (*list[dict]*) — One variable dict per task.  Each dict is merged with the shared
-  `variables` passed to `run` (item values win on conflicts).
+- `runner` (*Skill | Tool | Chain | Agent*) — The runner applied to every item; an Agent takes its task from `"task"`.
+- `items` (*list[dict]*) — One variable dict per task, merged over the shared `variables` of `run`.
 - `max_flows` (*int, optional*, default `10`) — Maximum number of parallel worker threads (default 10).
-- `on_error` (*`"raise"` | `"collect"` | `"skip"`*, default `'collect'`) — How to handle a task that raises an exception:
-
-  `"raise"`    — re-raise immediately; other tasks may still finish.
-  `"collect"`  — record the error; result for that item is `None`.
-  `"skip"`     — same as `"collect"` but emits a `RuntimeWarning`.
+- `on_error` (*`"raise"` | `"stop"` | `"skip"` | `"collect"`*, default `'collect'`) — A failing item propagates, stops new items, warns, or is recorded
+  silently (the default); a failed item's output is `None`.
 - `name` (*str | None, optional*, default `None`) — A label for this pool, kept on it as `pool.name`.
-- `description` (*str | None, optional*, default `None`) — Kept on the pool as `pool.description` for your own code. The library
-  reads nothing from it — a pool is not offered to a model, and it is
-  not saved — so it changes no behaviour.
-- `max_cost` (*float | Budget | None, optional*, default `None`) — One ceiling in dollars for every item; an item that would begin past
-  it fails with the budget's reason, handled by `on_error`.
-- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool runner is decided under, item by item — a
-  `PermissionPolicy`, a dict of rules, or `{"rules": {...},
-  "default": ...}`. A refused item fails under `on_error`. Inside an
-  agent's tool call the agent's rules hold too, the stricter word winning.
-- `approve` (*callable | None, optional*, default `None`) — Answers an item the policy wants a person for, as `Agent(approve=)`
-  does. Absent, such an item is refused — or asked of the approver of an
-  agent this pool runs inside.
+- `description` (*str | None, optional*, default `None`) — Kept as `pool.description` for your own code; the library reads nothing from it.
+- `max_cost` (*float | Budget | None, optional*, default `None`) — One ceiling in dollars shared by every item; past it an item fails under `on_error`.
+- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool runner is decided under, item by item; inside an agent,
+  the stricter wins.
+- `approve` (*callable | None, optional*, default `None`) — Answers an item the policy wants a person for; absent, the item is refused.
 - `interceptors` (*list | None, optional*, default `None`) — Act on each tool item before and after it runs, as on an `Agent`.
-- `hooks` (*list | None, optional*, default `None`) — Callables given an `Event`: `run.started` and `run.finished` for
-  the fan-out, `step.started` and `step.ended` for each item, its
-  index as the step. Observation only, as on a `Chain`.
+- `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` — `run.*` for the fan-out, `step.*` per item.
 
 **Examples**
 
-Parse every file in a directory:
-
 ```python
-from yait_aichain.tools import fetch
-from yait_aichain.pool import Pool
-
-files = [{"source": f} for f in os.listdir("./docs")]
-pool  = Pool(fetch("local"), items=files, max_flows=5)
-texts = pool.run()   # list[str], same order as files
+pool = Pool(summarize_skill, items=[{"article": a} for a in articles], max_flows=8)
+summaries = pool.run(variables={"language": "English"})
 ```
 
-Fetch 20 URLs in parallel:
-
-```python
-from yait_aichain.tools import fetch
-from yait_aichain.pool import Pool
-
-pool    = Pool(fetch("local"), items=[{"source": u} for u in urls])
-pages   = pool.run()
-```
-
-Shared variables merged into every item:
-
-```python
-pool = Pool(
-    summarize_skill,
-    items     = [{"article": a} for a in articles],
-    max_flows = 8,
-)
-summaries = pool.run(variables={"language": "English", "length": "short"})
-```
-
-Use a Chain as runner (per-item multi-step pipeline):
-
-```python
-per_item = Chain(steps=[fetch_tool, analyze_skill])
-pool     = Pool(per_item, items=[{"url": u} for u in urls])
-results  = pool.run()
-```
-
-Concurrency note
-----------------
-All worker threads call `run()` on the **same** runner instance.
-Skill, Tool, and Chain runners are safe: their `run()` keeps state
-local (Chain's `history`/`accumulated` attributes reflect the most
-recently finished item — use the Pool results as the source of truth).
-An **Agent** runner keeps the run in flight on the instance — the run id
-its events are stamped with, `last_result`, a parked run's document — so
-concurrent items overwrite each other's. Each item's result is its own;
-for events and parking that can be told apart, give each item its own
-Agent.
+Concurrent items share the runner instance: give each item its own Agent when
+its events or parked runs must be told apart.
 
 ### `Pool.run()`
 
@@ -120,14 +63,12 @@ Execute the runner for every item in parallel.
 
 **Parameters**
 
-- `variables` (*dict | None, optional*, default `None`) — Shared variables merged into every item's variable dict.
-  Item-level values take precedence on key conflicts.
+- `variables` (*dict | None, optional*, default `None`) — Shared variables merged into every item; an item's own values win.
 
 **Returns**
 
-- `PoolResult` — The outputs in item order — iterable and indexable — with
-  `.success`, `.error`, `.history`, `.usage` and `.cost`.
-  A failed or unstarted item's output is `None`.
+- `PoolResult` — The outputs in item order (`None` for a failed or unstarted item),
+  with `.success`, `.error`, `.history`, `.usage` and `.cost`.
 
 **Raises**
 

@@ -33,10 +33,8 @@ class Step:
         This step's error policy, over the chain's: ``"raise"``, ``"stop"``,
         ``"skip"`` or ``"collect"``.
     spread : bool | None, optional
-        A dict output's fields are also put among the chain's variables, as
-        every dict output was before 4.2.7. ``None`` keeps that for now, with a
-        warning; ``True`` keeps it on purpose; ``False`` keeps the dict under
-        its key alone.
+        ``True`` also puts a dict output's fields among the chain's variables;
+        ``False`` keeps the dict under its key alone; ``None`` spreads, with a warning.
     options : dict | None, optional
         An Agent step's options: ``task_key``, ``output_field``.
     """

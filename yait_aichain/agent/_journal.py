@@ -247,31 +247,14 @@ class Journal:
         """
         True when the last *last_k* attempts stopped carrying new information.
 
-        :meth:`has_progress` catches a run that is *failing*; this catches one
-        that is *succeeding pointlessly*. An agent can keep issuing calls that
-        return cleanly — bisecting past the resolution of its own instrument,
-        re-asking a question already answered — and every entry is an honest
-        ``done``. Nothing in the outcomes distinguishes that from real work.
+        It fires when every attempt in a full window states the same intent or issues
+        the identical action — exact repetition only, so a working search is not
+        interrupted. It reports and does not stop; :meth:`has_progress` catches failing.
 
-        Two signals, both requiring a full window and both deliberately strict,
-        because a false positive would interrupt an agent that is genuinely
-        working:
-
-        * every attempt in the window states the same intent, or
-        * every attempt in the window issues the identical action.
-
-        This reports; it does not stop. The judgement of whether a repeated
-        approach is still worth pursuing belongs to the caller.
-
-        **What this deliberately does not do.** A fuzzier version — flagging
-        intents that merely *resemble* each other — was measured against three
-        real runs and rejected. An agent bisecting past its instrument's
-        resolution scored a median word-overlap of 0.73 between consecutive
-        intents; a textbook binary search that finished correctly scored 0.64.
-        The two are not separable, because restating "probe the midpoint of
-        X–Y" every turn is what a healthy search looks like. Any threshold in
-        that gap is fitted to one example and would interrupt working runs, so
-        only exact repetition is reported.
+        Parameters
+        ----------
+        last_k : int, optional
+            The window, in entries; fewer entries than this is never repeating.
         """
         if len(self._entries) < last_k:
             return False                   # not enough evidence to judge
@@ -287,22 +270,14 @@ class Journal:
         """
         Render the observation trail for the next action prompt.
 
-        Every recent attempt appears, whatever its outcome, with **what was
-        tried** and **what came back**. Both halves are needed. A summary of
-        intents alone is useless to a loop that has to decide its next move from
-        feedback; and an observation without the candidate that produced it is
-        just as bad — "4 problems remain" cannot be acted on when the draft that
-        had 4 problems is nowhere to be seen. Failures earn their place here
-        too: a failed probe still returned information.
+        Each recent attempt shows what was tried and what came back, failures
+        included; successes are marked ``verified`` or ``claimed`` by evidence kind.
+        Both halves are clipped — keep a large result in memory via ``artifact``.
 
-        Both halves are bounded, so a genuinely large artifact will still be
-        clipped. That is what ``artifact`` is for: put it in memory, which the
-        action prompt renders separately and does not roll off after
-        *limit* entries.
-
-        Successes are additionally marked by evidence kind, so the model can see
-        which of its "achievements" nothing ever verified. What has been ruled
-        out is rendered separately by :meth:`do_not_redo`.
+        Parameters
+        ----------
+        limit : int, optional
+            How many of the latest entries to render.
         """
         items = self._entries[-limit:]
         if not items:

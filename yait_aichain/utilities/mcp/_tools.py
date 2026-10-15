@@ -283,11 +283,9 @@ class MCPTool(Tool):
     """
     A single tool from an MCP server, exposed as a standard aichain Tool.
 
-    ``MCPTool`` opens a connection to the MCP server, calls the specified
-    tool, and closes the connection on every ``run()`` call.  The usual
-    way to get one is ``MCP(server).tool(name)``, which discovers the
-    server's tools once.  Build an ``MCPTool`` directly when you already
-    know the tool name and want to skip the discovery round-trip.
+    Every ``run()`` opens a connection, calls the tool and closes it. The
+    usual way to get one is ``MCP(server).tool(name)``; build it directly to
+    skip discovery when the name is known.
 
     Parameters
     ----------
@@ -296,62 +294,31 @@ class MCPTool(Tool):
     description : str
         Human-readable description (shown to agents choosing tools).
     server : str | dict | object
-        MCP server specification, in any form :class:`MCP` accepts
-        (a path or command, a URL, or a dict).
+        MCP server, in any form :class:`MCP` accepts (path, command, URL, dict).
     parameters : dict | None, optional
-        JSON Schema describing the tool's input arguments.  Used by
-        Chains and Agents to match accumulated variables to tool inputs.
-        When omitted a permissive schema is used that accepts any keyword
-        arguments.
+        JSON Schema of the arguments; omitted, any keyword is accepted.
     headers : dict | None, optional
         HTTP headers for HTTP / SSE transports.
     env : dict | None, optional
-        Environment variables for a STDIO server, added to a minimal
-        inherited set (``PATH``, ``HOME``, ``USER`` and the like) — not to
-        the whole process environment, so a key in your shell reaches the
-        server only when it is passed here.
+        Variables for a STDIO server, added to a minimal set (``PATH``,
+        ``HOME``…) — not the whole process environment.
     cwd : str | None, optional
         Working directory for STDIO subprocess servers.
     transport : str | None, optional
-        Force transport: ``"http"``, ``"streamable"``, ``"sse"`` or
-        ``"stdio"``. Auto-detected from *server* when omitted.
+        ``"http"``, ``"streamable"``, ``"sse"`` or ``"stdio"``; auto-detected.
     call_timeout : float | None, optional
-        Seconds one call may take, 300 by default; ``None`` waits
-        indefinitely.
+        Seconds one call may take, 300 by default; ``None`` waits indefinitely.
     risk : str, optional
-        The risk class a permission policy reads. ``"privileged"`` when
-        omitted: what another server's tool does is unknown here, and the
-        unknown goes to a person, not through. Discovery sets it from the
-        server's annotations — see :func:`risk_from_annotations`.
+        The risk class a permission policy reads; ``"privileged"`` when
+        omitted — see :func:`risk_from_annotations`.
 
     Examples
     --------
     ::
 
-        from yait_aichain.utilities.mcp import MCPTool
-
-        # ── HTTP server ────────────────────────────────────────────────
-        tool = MCPTool(
-            name        = "get_weather",
-            description = "Get current weather for a city.",
-            server      = "https://weather.example.com/mcp",
-        )
+        tool = MCPTool("get_weather", "Get current weather for a city.",
+                       server="https://weather.example.com/mcp")
         result = tool.run({"city": "Tokyo"})
-
-        # ── STDIO subprocess ───────────────────────────────────────────
-        tool = MCPTool(
-            name        = "list_files",
-            description = "List files in a directory.",
-            server      = {"command": "python", "args": ["./fs_server.py"]},
-        )
-        result = tool.run({"path": "/tmp"})
-
-        # ── Use in a Chain step ────────────────────────────────────────
-        from yait_aichain.chain import Chain
-        chain = Chain(steps=[
-            (tool, "files"),
-        ])
-        chain.run(variables={"path": "/home"})
     """
 
     def __init__(
@@ -401,30 +368,22 @@ class MCPTool(Tool):
         /,
         **kwargs: Any,
     ) -> Any:
-        """
-        Call the MCP tool and return its result.
+        """Call the MCP tool and return its result.
 
         Parameters
         ----------
         input : dict | str | None, optional
-            Tool arguments as a dict.  A bare string is treated as a
-            single ``"input"`` field, for Chain steps that pass a plain
-            string.
+            Tool arguments as a dict; a bare string is a single ``"input"`` field.
         options : dict | None, optional
-            None. A call's timeout is the tool's ``call_timeout`` setting;
-            options given here are an error that says so.
+            None; the timeout is the tool's ``call_timeout`` setting.
         **kwargs
-            Individual argument values, merged with *input*; an argument
-            given in both is an error.  This is the form used by Chains and
-            agents. *input* and *options* are positional only, so a server
-            argument named ``input``, ``options`` or ``name`` is passed here
-            like any other: ``tool.run(input={"a": 1})`` sends ``input``.
+            Arguments by name, merged with *input*. *input* and *options* are
+            positional only, so ``tool.run(input={"a": 1})`` sends ``input``.
 
         Returns
         -------
         str | dict | list | Any
-            The tool result.  ``str`` for plain text, ``dict``/``list``
-            for structured data, ``None`` for empty responses.
+            Text, structured data, or ``None`` for an empty response.
 
         Raises
         ------
@@ -559,11 +518,7 @@ def _hint(annotations: Any, snake: str, camel: str) -> bool | None:
 def risk_from_annotations(annotations: Any) -> str:
     """The risk class an MCP tool's annotations claim.
 
-    MCP lets a server describe each tool: ``readOnlyHint``,
-    ``destructiveHint``, ``openWorldHint``. They are the server's word, which
-    the specification itself calls untrusted — so only an explicit hint lowers
-    the class, and a tool the server says nothing about is ``privileged``:
-    a permission policy sends it to a person. ``MCP(server, risk={...})`` puts
+    Only an explicit hint lowers the class; ``MCP(server, risk={...})`` puts
     the caller's word over the server's.
 
     ============================================  ===============

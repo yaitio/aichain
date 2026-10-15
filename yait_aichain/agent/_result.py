@@ -31,52 +31,34 @@ class AgentResult:
     tokens_used : int
         Tokens across every model call of the run, input and output together.
     cost : float | None
-        Dollars, priced per model from the registry; ``None`` when nothing
-        could be priced, never an invented zero. A run picked up with
-        ``resume()`` includes what it spent before the pause.
+        Dollars, resumed parts included; ``None`` when nothing could be priced.
     stopped_by : str | None
-        What ended the run: ``"answered"``, ``"check:<name>"``,
-        ``"step_count"``, ``"token_budget"``, ``"cost_budget"``,
-        ``"truncated"`` (a reply cut at ``max_tokens`` — raise it; an answer
-        cut there is kept as ``output`` and is not a success),
-        ``"context_overflow"`` (the history is past the model's window),
-        ``"park_failed"`` (the store refused the parked run),
-        ``"llm_error"`` (the model call failed otherwise),
-        ``"condition_error"`` (a check, ceiling, nudge or approver of the
-        caller's raised; ``error`` says which), or the name of an error.
+        ``"answered"``, ``"check:<name>"``, ``"step_count"``, ``"token_budget"``, ``"cost_budget"``,
+        ``"truncated"`` (cut at ``max_tokens``; not a success), ``"context_overflow"``, ``"park_failed"``,
+        ``"llm_error"``, ``"condition_error"`` (a caller's callable raised), or an error's name.
     plan : list[dict]
         In ``waterfall`` mode, the plan it wrote — ``{"goal": …}`` per step.
     adaptations : list
-        What the library changed in this run's requests to fit the provider,
-        each an ``Adaptation``; empty when nothing was.
+        Each ``Adaptation`` the library made to fit the provider.
     history : list[dict]
-        Empty for an agent, kept so every result has the same fields; an
-        agent's record is ``journal``.
+        Empty for an agent, kept so every result has the same fields.
     memory : dict
-        Always empty; the agent keeps no memory store. Removed in 5.0.
+        Always empty; deprecated, goes in 5.0.
     error : str | None
         Why it failed, when it did.
     journal : list[dict]
-        What was attempted, in order, each entry with its outcome and the
-        evidence behind it — ``check`` for a fact the code verified,
-        ``model_claim`` for the model's word.
+        What was attempted, each with its outcome and evidence (``check`` or ``model_claim``).
     acceptance : Acceptance | None
-        What the answer rests on: ``checked``, ``claimed`` or ``unsupported``,
-        with a fingerprint of the evidence, so ``still_holds()`` can tell when
-        it has changed.
+        What the answer rests on — ``checked``, ``claimed`` or ``unsupported``.
     beacons : list
-        Beacons raised during the run, including by delegated workers — a
-        blocker, a question, a contract that changed.
+        Beacons raised during the run, delegated workers' included.
 
     Examples
     --------
     ::
 
-        result = agent.run("Research fusion energy and summarise it in French")
-        if result:
-            print(result.output, result.cost, result.stopped_by)
-        else:
-            print("failed:", result.error)
+        result = agent.run("Summarise fusion energy in French")
+        print(result.output if result else result.error, result.cost)
     """
 
     success:     bool

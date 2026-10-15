@@ -385,27 +385,19 @@ class VectorStore:
         n:      int = 5,
         filter: dict | None = None,
     ) -> list[VectorRecord]:
-        """
-        Semantic similarity search.
-
-        Embeds *text* (requires an embedder) and returns the *n* most
-        similar records, sorted by descending similarity score.
+        """Semantic similarity search: the *n* records most similar to *text*.
 
         Parameters
         ----------
-        text   : str          — query string
+        text   : str          — query string (needs an embedder)
         n      : int          — number of results (default 5)
         filter : dict | None  — provider-native metadata filter
 
         Returns
         -------
         list[VectorRecord]
-            Records with ``score`` in [0, 1], highest = most similar, on
-            every backend and every metric. ``raw_score`` carries what the
-            backend actually returned. The one exception is the ``dot``
-            metric, which is unbounded and scale-dependent: it is passed
-            through and says so, because a fabricated bound would look
-            comparable when it is not.
+            Most similar first; ``score`` in [0, 1] on every backend except
+            for the unbounded ``dot`` metric, ``raw_score`` as the backend gave it.
         """
         vector = self._embed_query(text)
         return self._backend.query(self._collection, vector, n=n, filter=filter)
@@ -419,20 +411,10 @@ class VectorStore:
     _UPSERT_MAX_BYTES: int = 1_500_000
 
     def upsert(self, records: list[dict], batch_size: int | None = None) -> int:
-        """
-        Insert or update records.
+        """Insert or update records: dicts of ``id``, ``text``, optional
+        ``metadata`` and ``vector`` (required without an embedder).
 
-        Each dict must have:
-          ``id``       : str            — unique identifier
-          ``text``     : str            — document content
-          ``metadata`` : dict           — optional payload / metadata
-          ``vector``   : list[float]    — optional pre-computed vector
-                                          (required when no embedder is set)
-
-        Records are embedded and written a batch at a time — at most
-        *batch_size* records (default 50) and about 1.5 MB each — so a
-        failure at batch k keeps the k − 1 batches already paid for and
-        written. The error says how many were.
+        Written in batches of *batch_size* (default 50); a failed one keeps those before it.
 
         Returns
         -------
@@ -442,8 +424,7 @@ class VectorStore:
         Raises
         ------
         PartialUpsert
-            When a batch fails; ``written`` counts the records stored before
-            it, and the cause is chained.
+            When a batch fails; ``written`` counts the records stored before it.
         """
         step = self._UPSERT_BATCH_SIZE if batch_size is None else batch_size
         if isinstance(step, bool) or not isinstance(step, int) or step <= 0:

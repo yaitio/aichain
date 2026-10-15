@@ -159,11 +159,9 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     """
     Append a ``declined`` for every option in *asked* that left no trace.
 
-    An option counts as arrived when a site recorded it explicitly — a
-    translation or a conversion — or when its value appears somewhere in the
-    built body. Nothing else needs a rule: the options a provider never reads
-    are precisely the ones that leave no mark, and they are the majority of
-    what used to disappear quietly.
+    An option arrived when a site recorded it (a translation or conversion)
+    or its value appears in the built body; options a provider never reads
+    leave no mark, and are reported here.
     """
     spoken = {a.option for a in made}
     # Nothing left to look for: no walk of the body, which on an agent's turn

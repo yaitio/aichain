@@ -69,21 +69,8 @@ def nudge(predicate, message, name: str = "nudge"):
     """
     A condition that **speaks** instead of ending the run.
 
-    `stop_when` knew two kinds, and both ended the run: a ceiling ("hit it,
-    fail") and a check ("met it, succeed"). A stall needs neither. It needs
-    "change approach", and the loop had no way to say that — so a stuck run
-    either spun until a ceiling stopped it or was stopped early by a ceiling
-    set too low to let a real run finish.
-
-    When *predicate(state)* is true a user turn carrying *message* is
-    appended and the loop carries on. It enters the conversation as an
-    ordinary, logged message — not an invisible edit to the system prompt —
-    so a reader of the transcript can see exactly what the model was told
-    and when. *message* may be a string or a callable of `state`.
-
-    It fires **once per streak**: while the predicate stays true it stays
-    quiet, and it re-arms when the predicate clears. A reminder repeated
-    every turn is how a reminder stops being read.
+    When *predicate(state)* is true, *message* is appended as a user turn and the
+    loop carries on — once per streak, re-armed when the predicate clears.
 
     Parameters
     ----------
@@ -110,16 +97,9 @@ def verified(message: str | None = None, name: str = "verified"):
     """
     Before the run answers, ask once for a check of what it changed.
 
-    The commonest agent failure there is: "done" with nothing run. When the
-    model answers after a call that changed something — a write, an external
-    call, a delete — and no call has succeeded since to look at the result,
-    its answer is held, *message* is put to it as a user turn, and the loop
-    goes on. Once per run: a model that answers again is believed, and the
-    record says it was asked.
-
-    Only a call clears it — a read, a test run, anything that succeeds after
-    the change. The model saying it checked does not, because that is the
-    claim the gate exists to test.
+    An answer after a ``write``/``external``/``financial``/``destructive`` call is
+    held and *message* is put to the model, unless a later call succeeded. Once per
+    run; only a call clears it, never the model saying it checked.
 
     Parameters
     ----------

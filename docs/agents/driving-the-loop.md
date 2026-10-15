@@ -50,6 +50,13 @@ gives the same outcome, and the failure happens on your machine, before the
 network, with a message that points at your code instead of at a provider's
 wording.
 
+## Some calls are the agent's own
+
+`pool`, `write_plan` and `delegate` exist only inside this library. A driver
+that hands every call to its own environment gets "tool not found" back for
+each of them, and the plan or the fan-out silently never happens. Ask
+`agent.owns(call)` and run those through `agent.execute(call, state)`.
+
 ## Why the pieces are shaped this way
 
 - **The conversation is the state.** `messages` is a list of plain dicts, and

@@ -53,33 +53,24 @@ def VectorDB(
     Parameters
     ----------
     provider : str
-        Backend name: ``"chroma"``, ``"pinecone"``, or ``"qdrant"``.
-        Aliases: ``"chromadb"``.
+        Backend name: ``"chroma"`` (or ``"chromadb"``), ``"pinecone"``, ``"qdrant"``.
     collection : str
-        Collection (Chroma/Qdrant) or namespace (Pinecone) used for all
-        operations.  It is the store's setting; a tool call cannot change it.
+        Collection (Chroma/Qdrant) or namespace (Pinecone); a store setting.
     embedder : Embedder | None, optional
-        An embedder, as made by ``embed(...)``, used to auto-vectorise
-        text on ``upsert()`` and ``query()``.  When ``None``, callers must
-        supply pre-computed ``vector`` fields in their records.
+        Vectorises text on ``upsert()`` and ``query()``; ``None`` means records
+        carry their own ``vector``.
     url : str | None, optional
-        Base URL of the server.  Overrides the provider's environment variable
-        default (``CHROMA_URL``, ``QDRANT_URL``).
+        Server base URL; overrides ``CHROMA_URL`` / ``QDRANT_URL``.
     api_key : str | None, optional
-        API key.  Overrides the provider's environment variable
-        (``CHROMA_API_KEY``, ``PINECONE_API_KEY``, ``QDRANT_API_KEY``).
+        Overrides ``CHROMA_API_KEY`` / ``PINECONE_API_KEY`` / ``QDRANT_API_KEY``.
     **kwargs
-        Additional provider-specific arguments forwarded to the backend
-        constructor.  Common extras:
-          ``index``  (str)  — Pinecone index name
-          ``cloud``  (str)  — Pinecone cloud (default ``"aws"``)
-          ``region`` (str)  — Pinecone region (default ``"us-east-1"``)
+        Forwarded to the backend: Pinecone's ``index``, ``cloud`` (``"aws"``)
+        and ``region`` (``"us-east-1"``).
 
     Returns
     -------
     VectorStore
-        Ready-to-use store with ``create``, ``query``, ``upsert``, ``fetch``,
-        ``delete``, and ``count`` methods.
+        With ``create``, ``query``, ``upsert``, ``fetch``, ``delete`` and ``count``.
 
     Raises
     ------
@@ -90,14 +81,8 @@ def VectorDB(
     --------
     ::
 
-        from yait_aichain.utilities.vectors import VectorDB
-        from yait_aichain.tools import embed
-
-        store = VectorDB(
-            "chroma",
-            collection = "docs",
-            embedder   = embed("openai", model="text-embedding-3-small"),
-        )
+        store = VectorDB("chroma", collection="docs",
+                         embedder=embed("openai", model="text-embedding-3-small"))
     """
     key = provider.lower().strip()
     cls = _PROVIDER_MAP.get(key)

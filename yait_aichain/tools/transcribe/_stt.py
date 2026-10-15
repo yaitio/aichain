@@ -171,19 +171,15 @@ class _OpenAICompatSTT(Transcription):
                                retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Transcribe the audio file at *input* path.
+        """Transcribe the audio file at *input* path.
 
         Parameters
         ----------
         input : str
-            Path to the audio file.  Supported: mp3, mp4, mpeg, mpga,
-            m4a, wav, webm.
+            Path to the audio file: mp3, mp4, mpeg, mpga, m4a, wav or webm.
         options : dict | None, optional
-            ``language``   — ISO-639-1 or BCP-47 code, e.g. ``"en"``.
-            ``timestamps`` — ``True`` for word-level timestamps (JSON output).
-            ``prompt``     — context hint for accuracy.
-            ``format``     — ``"text"`` (default) or ``"json"``.
+            ``language`` — e.g. ``"en"``; ``timestamps`` — word-level, as JSON;
+            ``prompt`` — a context hint; ``format`` — ``"text"`` (default) or ``"json"``.
 
         Returns
         -------
@@ -412,17 +408,15 @@ class sttGoogle(Transcription):
                                retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Transcribe the audio file at *input* path.
+        """Transcribe the audio file at *input* path.
 
         Parameters
         ----------
         input : str
             Path to the audio file.
         options : dict | None, optional
-            ``language``   — BCP-47 code, e.g. ``"en-US"``.  Default: ``"en-US"``.
-            ``timestamps`` — ``True`` for word-level timestamps (JSON output).
-            ``format``     — ``"text"`` (default) or ``"json"``.
+            ``language`` — BCP-47, default ``"en-US"``; ``timestamps`` — word-level,
+            as JSON; ``format`` — ``"text"`` (default) or ``"json"``.
 
         Returns
         -------

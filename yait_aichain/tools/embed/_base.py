@@ -132,12 +132,6 @@ class Embedder(Tool):
     * ``api_key``  — override the environment variable
     * ``dimensions``, ``batch_size`` — settings of the embedder; a call takes only ``input_type``
 
-    Public methods
-    --------------
-    :meth:`embed`   — core low-level method; keyword-argument interface.
-    :meth:`run`     — standard ``run(input, options=None)`` wrapper around embed.
-    :meth:`batch`   — like run() but asserts the input is always a list.
-
     Examples
     --------
     Subclassing::
@@ -251,24 +245,18 @@ class Embedder(Tool):
         **refused: Any,
     ) -> EmbeddingResult:
         """
-        Embed one or more texts and return an :class:`EmbeddingResult`.
-
-        The input is automatically chunked into batches of at most
-        ``batch_size`` (default: the provider's ``_MAX_BATCH``).  Results are
-        assembled in the original order, so ``result.embeddings[i]``
-        always corresponds to ``texts[i]``.
+        Embed one or more texts and return an :class:`EmbeddingResult`, in
+        batches of at most ``batch_size``, in the order given.
 
         Parameters
         ----------
         texts : str | list[str]
             A single string or a list of strings to embed.
         input_type : ``"query"`` | ``"document"`` | None, optional
-            Semantic hint passed to the provider.  Improves retrieval quality
-            for providers that distinguish query and document embeddings
-            (Cohere, Voyage, Google v1).  OpenAI ignores it.
+            Hint for providers that embed queries and documents differently.
         **refused
-            ``dimensions`` and ``batch_size`` here are an error that says where
-            they belong — the embedder — and any other key is an error too.
+            Any key here is an error; ``dimensions`` and ``batch_size`` belong
+            to the embedder.
 
         Returns
         -------
@@ -281,26 +269,6 @@ class Embedder(Tool):
             On invalid input (empty list, non-string items).
         RuntimeError
             On non-2xx HTTP responses from the provider API.
-
-        Examples
-        --------
-        On-demand (single text)::
-
-            result = embedder.embed("What is gradient descent?")
-            vector = result.embeddings[0]       # list[float]
-
-        Batch (list of texts — auto-chunked if needed)::
-
-            result = embedder.embed(
-                ["query A", "query B", "query C"],
-                input_type="query",
-            )
-            vectors = result.embeddings         # list[list[float]]
-
-        Large list with custom chunk size (useful for rate-limiting)::
-
-            embedder = embed("openai", model="text-embedding-3-small", batch_size=32)
-            result   = embedder.embed(my_10k_list)
         """
         # ── Normalise input ───────────────────────────────────────────
         if isinstance(texts, str):
@@ -361,19 +329,14 @@ class Embedder(Tool):
 
     def run(self, input: str | list[str], options: dict | None = None) -> EmbeddingResult:
         """
-        Embed one text (or a short list) and return an EmbeddingResult.
-
-        This is the standard tool interface; a long list is split into
-        requests of at most the provider's batch size.
+        Embed one text or a list and return an EmbeddingResult.
 
         Parameters
         ----------
         input : str | list[str]
             A single string or a list of strings to embed.
         options : dict | None, optional
-            Takes one key, ``input_type`` — ``"query"`` | ``"document"`` |
-            ``None``. ``dimensions`` and ``batch_size`` are settings of the
-            embedder and raise here, as does any other key.
+            Takes one key, ``input_type``; any other key raises.
 
         Returns
         -------

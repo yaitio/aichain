@@ -41,6 +41,14 @@ a thousand items with `max_flows=10` run ten at a time. The right number is
 set by the provider's rate limit, not by the machine — past it, calls start
 coming back 429 and the retries cost more time than the parallelism saved.
 
+Every worker calls `run()` on the **same** runner. A Skill, a Tool or a Chain
+keeps its run local, so that is safe — a Chain's `history` attribute shows
+whichever item finished last, so read the pool's results instead. An **Agent**
+keeps the run in flight on the instance — the run id its events carry,
+`last_result`, a parked run's document — so concurrent items overwrite each
+other's. Each item's result is still its own; for events and parking that can
+be told apart, give each item its own Agent.
+
 ## When an item fails
 
 <!-- g:policy -->

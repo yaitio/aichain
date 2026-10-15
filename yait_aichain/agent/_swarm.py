@@ -93,11 +93,7 @@ def collecting_beacons():
 
 
 def beacon(kind: str, message: str, *, source: str = "") -> Beacon:
-    """Signal whoever is waiting on this run.
-
-    Callable from anywhere inside a run — a tool, a nested agent, a pool item
-    — without a parameter, because the board is ambient for the duration of
-    the run, exactly as `RunContext` is.
+    """Signal whoever is waiting on this run, from anywhere inside it.
 
     Parameters
     ----------

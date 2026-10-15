@@ -254,8 +254,7 @@ class ttsOpenAI(_OpenAISpeech):
     ------
     alloy · ash · coral · echo · fable · nova · onyx · sage · shimmer
 
-    Note: the OpenAI TTS API accepts up to 4 096 characters per request.
-    For longer texts, split into paragraphs and call ``run()`` per chunk.
+    The API takes up to 4 096 characters a request; split longer texts.
 
     Parameters
     ----------
@@ -268,19 +267,7 @@ class ttsOpenAI(_OpenAISpeech):
     --------
     ::
 
-        from yait_aichain.tools import speech
-
         tool = speech("openai", model="tts-1-hd", output_dir="audio/")
-
-        # Call-style — returns ToolResult, never raises
-        result = tool(
-            input="Hello, world!",
-            options={"voice": "nova"},
-        )
-        if result:
-            print("Saved to:", result.output)
-
-        # Direct run — returns path str, raises on error
         path = tool.run(input="Hello!", options={"voice": "echo"})
     """
 
@@ -364,21 +351,15 @@ class ttsGoogle(Speech):
                                retries=urllib3.Retry(total=2, backoff_factor=0.5))
 
     def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Synthesise *input* text and save to an audio file.
+        """Synthesise *input* text and save to an audio file.
 
         Parameters
         ----------
         input : str
             Text to synthesise.
         options : dict | None, optional
-            ``voice``       — Google voice name, e.g. ``"en-US-Neural2-A"``.
-                              When omitted the API picks the default for the
-                              language.
-            ``language``    — BCP-47 language code.  Default: ``"en-US"``.
-            ``speed``       — speaking rate.  0.25–4.0, default 1.0.
-            ``format``      — ``"mp3"`` (default), ``"wav"``, ``"opus"``,
-                              ``"flac"``.
+            ``voice`` (default: the language's own), ``language`` (``"en-US"``),
+            ``speed`` (0.25–4.0, 1.0), ``format`` (``mp3``, ``wav``, ``opus``, ``flac``).
 
         Returns
         -------
@@ -450,12 +431,8 @@ class ttsXAI(_OpenAISpeech):
 
 class ttsQwen(Speech):
     """
-    Text-to-speech via the Alibaba DashScope Qwen3-TTS API.
-
-    Uses the native DashScope multimodal generation endpoint
-    (``POST /api/v1/services/aigc/multimodal-generation/generation``).
-    The API returns a temporary presigned audio URL (valid 24 h) which is
-    downloaded and saved locally.
+    Text-to-speech via the Alibaba DashScope Qwen3-TTS API; the audio URL it
+    answers with is downloaded and saved locally.
 
     Models
     ------
@@ -465,12 +442,6 @@ class ttsQwen(Speech):
     Voices include ``Cherry`` (the default), ``Ethan``, ``Nofish``,
     ``Jennifer``, ``Ryan``; see the DashScope docs for the full list. The
     answer is WAV, the one format this tool writes.
-
-    Region
-    ------
-    The base URL is derived from the ``region`` setting, else
-    ``DASHSCOPE_REGION`` (ap|us|cn|hk).  Default: ``"ap"``
-    (``dashscope-intl.aliyuncs.com``).
 
     Parameters
     ----------
@@ -489,11 +460,7 @@ class ttsQwen(Speech):
         from yait_aichain.tools import speech
 
         tool = speech("qwen", region="us")
-
-        path = tool.run(
-            input="Hello from Qwen TTS!",
-            options={"voice": "Cherry"},
-        )
+        path = tool.run(input="Hello from Qwen TTS!", options={"voice": "Cherry"})
     """
 
     name           = "ttsQwen"
@@ -539,16 +506,14 @@ class ttsQwen(Speech):
         return resolve_qwen_base_url(self._region)
 
     def run(self, input: str, options: dict | None = None) -> str:
-        """
-        Synthesise *input* text and save to an audio file.
+        """Synthesise *input* text and save to an audio file.
 
         Parameters
         ----------
         input : str
             Text to synthesise.
         options : dict | None, optional
-            ``voice``       — voice name.  Default: ``"Cherry"``.
-            ``format``      — ``"wav"``, the one this endpoint answers in.
+            ``voice`` — default ``"Cherry"``; ``format`` — ``"wav"``, the only one.
 
         Returns
         -------

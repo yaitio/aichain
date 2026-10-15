@@ -1,0 +1,1702 @@
+{
+ "yait_aichain.tools.chunk._chunk.Chunk": {
+  "name": "vector_chunk",
+  "description": "Split text into overlapping chunks for embedding and vector-store ingestion.  Handles plain text and Markdown, preserving headings, code blocks, and tables intact where possible.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The text to chunk."
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.embed._cohere.EmbeddingCohere": {
+  "name": "embedCohere",
+  "description": "Embed texts as vectors with Cohere's doc-model. Returns a summary — the vectors go to the code that called it, not into the conversation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The texts to embed — or one text."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "input_type": {
+       "type": "string",
+       "enum": [
+        "query",
+        "document"
+       ],
+       "description": "What the texts are, for providers that embed the two differently."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.embed._google.EmbeddingGoogle": {
+  "name": "embedGoogle",
+  "description": "Embed texts as vectors with Google's doc-model. Returns a summary — the vectors go to the code that called it, not into the conversation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The texts to embed — or one text."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "input_type": {
+       "type": "string",
+       "enum": [
+        "query",
+        "document"
+       ],
+       "description": "What the texts are, for providers that embed the two differently."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.embed._openai.EmbeddingOpenAI": {
+  "name": "embedOpenAI",
+  "description": "Embed texts as vectors with OpenAI's doc-model. Returns a summary — the vectors go to the code that called it, not into the conversation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The texts to embed — or one text."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "input_type": {
+       "type": "string",
+       "enum": [
+        "query",
+        "document"
+       ],
+       "description": "What the texts are, for providers that embed the two differently."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.embed._qwen.EmbeddingQwen": {
+  "name": "embedQwen",
+  "description": "Embed texts as vectors with Qwen's doc-model. Returns a summary — the vectors go to the code that called it, not into the conversation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The texts to embed — or one text."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "input_type": {
+       "type": "string",
+       "enum": [
+        "query",
+        "document"
+       ],
+       "description": "What the texts are, for providers that embed the two differently."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.embed._voyage.EmbeddingVoyage": {
+  "name": "embedVoyage",
+  "description": "Embed texts as vectors with Voyage's doc-model. Returns a summary — the vectors go to the code that called it, not into the conversation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The texts to embed — or one text."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "input_type": {
+       "type": "string",
+       "enum": [
+        "query",
+        "document"
+       ],
+       "description": "What the texts are, for providers that embed the two differently."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.fetch.exa.fetchExa": {
+  "name": "fetchExa",
+  "description": "Fetch a web page with Exa and return its text, with title, date and author.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The pages' URLs, http or https — one or several."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "max_chars": {
+       "type": "integer",
+       "description": "Most characters of text per page (default 20 000)."
+      },
+      "max_age_hours": {
+       "type": "integer",
+       "description": "Use a cached copy younger than this (0 fetches fresh, -1 cache only; at most 720)."
+      }
+     }
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ "yait_aichain.tools.fetch.firecrawl.fetchFirecrawl": {
+  "name": "fetchFirecrawl",
+  "description": "Fetch a web page with Firecrawl and return its main content as Markdown, with title, date and author where the page declares them.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The pages' URLs, http or https — one or several."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "max_chars": {
+       "type": "integer",
+       "description": "Most characters of text per page (default 20 000)."
+      },
+      "only_main_content": {
+       "type": "boolean",
+       "description": "Drop navigation, headers and footers (default true)."
+      }
+     }
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ "yait_aichain.tools.fetch.local.fetchLocal": {
+  "name": "fetchLocal",
+  "description": "Fetch a web page from this machine and return its text as Markdown, with title, date and author where the page declares them.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The pages' URLs, http or https — one or several."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "max_chars": {
+       "type": "integer",
+       "description": "Most characters of text per page (default 20 000)."
+      }
+     }
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ "yait_aichain.tools.fetch.parallel.fetchParallel": {
+  "name": "fetchParallel",
+  "description": "Fetch a web page with Parallel and return its full content as Markdown, with title and date.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The pages' URLs, http or https — one or several."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "max_chars": {
+       "type": "integer",
+       "description": "Most characters of text per page (default 20 000)."
+      },
+      "max_age_seconds": {
+       "type": "integer",
+       "description": "Fetch a page live when the cached copy is older than this (600 or more). Slower."
+      }
+     }
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ "yait_aichain.tools.fetch.tavily.fetchTavily": {
+  "name": "fetchTavily",
+  "description": "Fetch a web page with Tavily and return its text as Markdown.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The pages' URLs, http or https — one or several."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional settings.",
+     "properties": {
+      "max_chars": {
+       "type": "integer",
+       "description": "Most characters of text per page (default 20 000)."
+      },
+      "extract_depth": {
+       "type": "string",
+       "enum": [
+        "basic",
+        "advanced"
+       ],
+       "description": "'basic' (default); 'advanced' reaches tables and embedded content at twice the price."
+      }
+     }
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ "yait_aichain.tools.general._wait.Wait": {
+  "name": "wait",
+  "description": "Pause the run until an external signal arrives.",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": []
+  }
+ },
+ "yait_aichain.tools.image._tool.Image": {
+  "name": "imageOpenai",
+  "description": "Make an image with openai's gpt-image-1.5 — from a prompt, or by editing the images given. Returns where the image was saved, or that it went back to the code.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "What to draw, or what to change in the images given."
+    },
+    "images": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Images to edit or take as reference — file paths or URLs. None to generate."
+    },
+    "options": {
+     "type": "object",
+     "description": "How to draw it.",
+     "properties": {
+      "size": {
+       "type": "string",
+       "description": "Pixels, e.g. '1024x1024'; converted to the nearest shape where a provider takes a ratio."
+      },
+      "aspect_ratio": {
+       "type": "string",
+       "description": "e.g. '16:9'; converted to a size where a provider takes pixels."
+      },
+      "quality": {
+       "type": "string",
+       "description": "The provider's quality tier, e.g. 'low', 'medium', 'high'."
+      },
+      "background": {
+       "type": "string",
+       "description": "'transparent' where the model can, else 'opaque'."
+      },
+      "output_format": {
+       "type": "string",
+       "description": "png, jpeg or webp."
+      },
+      "compression": {
+       "type": "integer",
+       "description": "0-100, for jpeg and webp."
+      },
+      "seed": {
+       "type": "integer",
+       "description": "For a repeatable image where the provider honours it."
+      },
+      "fidelity": {
+       "type": "string",
+       "description": "How closely an edit keeps its input: 'low' or 'high'."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.rerank._cohere.RerankCohere": {
+  "name": "rerankCohere",
+  "description": "Put documents in order of how well they answer a query, with Cohere's doc-model; returns them best first, each with its score.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The documents to put in order — texts, or records with a 'text' field."
+    },
+    "options": {
+     "type": "object",
+     "description": "What to order them by.",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "The question the documents should answer."
+      },
+      "top_n": {
+       "type": "integer",
+       "description": "How many to return, best first (default: all)."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    }
+   },
+   "required": [
+    "input",
+    "options"
+   ]
+  }
+ },
+ "yait_aichain.tools.rerank._qwen.RerankQwen": {
+  "name": "rerankQwen",
+  "description": "Put documents in order of how well they answer a query, with Qwen's doc-model; returns them best first, each with its score.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The documents to put in order — texts, or records with a 'text' field."
+    },
+    "options": {
+     "type": "object",
+     "description": "What to order them by.",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "The question the documents should answer."
+      },
+      "top_n": {
+       "type": "integer",
+       "description": "How many to return, best first (default: all)."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    }
+   },
+   "required": [
+    "input",
+    "options"
+   ]
+  }
+ },
+ "yait_aichain.tools.rerank._voyage.RerankVoyage": {
+  "name": "rerankVoyage",
+  "description": "Put documents in order of how well they answer a query, with Voyage's doc-model; returns them best first, each with its score.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "The documents to put in order — texts, or records with a 'text' field."
+    },
+    "options": {
+     "type": "object",
+     "description": "What to order them by.",
+     "properties": {
+      "query": {
+       "type": "string",
+       "description": "The question the documents should answer."
+      },
+      "top_n": {
+       "type": "integer",
+       "description": "How many to return, best first (default: all)."
+      }
+     },
+     "required": [
+      "query"
+     ]
+    }
+   },
+   "required": [
+    "input",
+    "options"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.brave.searchBrave": {
+  "name": "searchBrave",
+  "description": "Search the web with Brave. Returns titles, URLs, dates and a description of each page.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "safe_search": {
+       "type": "string",
+       "enum": [
+        "off",
+        "moderate",
+        "strict"
+       ],
+       "description": "Adult-content filter. Default 'moderate'."
+      },
+      "extra_snippets": {
+       "type": "boolean",
+       "description": "Up to five more passages from each page. Default false."
+      },
+      "result_filter": {
+       "type": "string",
+       "description": "Comma-separated result types: discussions, faq, infobox, news, query, summarizer, videos, web, locations."
+      },
+      "freshness": {
+       "type": "string",
+       "description": "Brave's own time filter — 'pd', 'pw', 'pm', 'py' or 'YYYY-MM-DDtoYYYY-MM-DD'; wins over recency and the dates."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.exa.searchExa": {
+  "name": "searchExa",
+  "description": "Search the web with Exa, a search engine built for agents. Returns titles, URLs, dates and the passages of each page most relevant to the query.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'. Not applied here: Exa has no language filter."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "exclude_domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Leave out results from these domains."
+      },
+      "category": {
+       "type": "string",
+       "enum": [
+        "company",
+        "publication",
+        "news",
+        "personal site",
+        "financial report",
+        "people"
+       ],
+       "description": "Focus on one kind of page."
+      },
+      "search_type": {
+       "type": "string",
+       "enum": [
+        "instant",
+        "fast",
+        "auto",
+        "deep-lite",
+        "deep",
+        "deep-reasoning"
+       ],
+       "description": "'auto' (default) balances quality and speed; 'instant'/'fast' trade quality for latency; the 'deep' modes search iteratively and cost more."
+      },
+      "highlight_chars": {
+       "type": "integer",
+       "description": "Most characters of highlights per result (default 1000); 0 turns them off."
+      },
+      "text_chars": {
+       "type": "integer",
+       "description": "Also return each page's text, cut to this many characters. Off by default — highlights usually carry the answer."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.firecrawl.searchFirecrawl": {
+  "name": "searchFirecrawl",
+  "description": "Search the web with Firecrawl. Returns titles, URLs and a description of each page; can return each page's content as Markdown.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'. Not applied here: Firecrawl has no language filter."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "exclude_domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Leave out results from these host names. Not with domains."
+      },
+      "categories": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "research",
+         "pdf",
+         "developer",
+         "gov"
+        ]
+       },
+       "description": "Restrict to research sites, PDFs, the developer index or the government index ('gov' combines with nothing else)."
+      },
+      "sources": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "web",
+         "news"
+        ]
+       },
+       "description": "Where to search: 'web' (default) and/or 'news'."
+      },
+      "location": {
+       "type": "string",
+       "description": "A place to search from, e.g. 'Berlin,Germany'."
+      },
+      "safe": {
+       "type": "boolean",
+       "description": "Filter explicit content."
+      },
+      "tbs": {
+       "type": "string",
+       "description": "Firecrawl's raw time filter, e.g. 'qdr:w' or 'sbd:1,qdr:m'; wins over recency and the dates."
+      },
+      "text_chars": {
+       "type": "integer",
+       "description": "Also return each page's content as Markdown, cut to this many characters. Scraping costs extra credits."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.parallel.searchParallel": {
+  "name": "searchParallel",
+  "description": "Search the web with Parallel, a search engine built for agents. Returns titles, URLs, dates and the excerpts of each page that serve the goal of the search.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD. Not applied here: Parallel filters from a start date only."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'. Not applied here: Parallel has no language filter."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "objective": {
+       "type": "string",
+       "description": "The goal of the search in natural language; default: the query."
+      },
+      "search_queries": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Short keyword queries, three to six words, to run beside the query."
+      },
+      "mode": {
+       "type": "string",
+       "enum": [
+        "turbo",
+        "fast",
+        "basic",
+        "advanced"
+       ],
+       "description": "'advanced' (default) is the most thorough; 'turbo' the fastest."
+      },
+      "exclude_domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Leave out these domains or domain/path prefixes. Not with domains."
+      },
+      "max_chars_total": {
+       "type": "integer",
+       "description": "Upper bound on characters of excerpts across all results."
+      },
+      "max_age_seconds": {
+       "type": "integer",
+       "description": "Fetch a page live when the cached copy is older than this (600 or more). Slower."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.perplexity.searchPerplexity": {
+  "name": "searchPerplexity",
+  "description": "Search the web with Perplexity. Returns titles, URLs, dates and a substantive passage from each page.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "after_date": {
+       "type": "string",
+       "description": "Perplexity's own MM/DD/YYYY lower bound; wins over start_date."
+      },
+      "before_date": {
+       "type": "string",
+       "description": "Perplexity's own MM/DD/YYYY upper bound; wins over end_date."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.search.tavily.searchTavily": {
+  "name": "searchTavily",
+  "description": "Search the web with Tavily. Returns titles, URLs, dates and the passages of each page chosen for the query.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The search query, in natural language."
+    },
+    "options": {
+     "type": "object",
+     "description": "Optional search filters.",
+     "properties": {
+      "max_results": {
+       "type": "integer",
+       "description": "How many results to return (default 10)."
+      },
+      "recency": {
+       "type": "string",
+       "enum": [
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+       ],
+       "description": "Only pages published within this window."
+      },
+      "start_date": {
+       "type": "string",
+       "description": "Only pages published on or after this date, YYYY-MM-DD."
+      },
+      "end_date": {
+       "type": "string",
+       "description": "Only pages published on or before this date, YYYY-MM-DD."
+      },
+      "country": {
+       "type": "string",
+       "description": "ISO 3166-1 alpha-2 country code, e.g. 'GB'."
+      },
+      "language": {
+       "type": "string",
+       "description": "ISO 639-1 language code, e.g. 'en'."
+      },
+      "domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "topic": {
+       "type": "string",
+       "enum": [
+        "general",
+        "news",
+        "finance"
+       ],
+       "description": "What to search: 'general' (default), 'news' or 'finance'."
+      },
+      "search_depth": {
+       "type": "string",
+       "enum": [
+        "ultra-fast",
+        "fast",
+        "basic",
+        "advanced"
+       ],
+       "description": "'basic' (default); 'advanced' is more relevant and costs two credits."
+      },
+      "chunks_per_source": {
+       "type": "integer",
+       "description": "Passages per page, 1 to 3 (default 3)."
+      },
+      "exclude_domains": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Leave out results from these domains."
+      },
+      "exact_match": {
+       "type": "boolean",
+       "description": "Only pages containing the quoted phrases of the query exactly."
+      },
+      "safe_search": {
+       "type": "boolean",
+       "description": "Filter adult content."
+      },
+      "filter_by_published_date": {
+       "type": "boolean",
+       "description": "Drop pages outside the date window — and pages with no date."
+      },
+      "filter_by_language": {
+       "type": "boolean",
+       "description": "Make language a filter rather than a ranking boost."
+      },
+      "text_chars": {
+       "type": "integer",
+       "description": "Also return each page as Markdown, cut to this many characters."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.speech._tts.Speech": {
+  "name": "speech",
+  "description": "Synthesise speech from text using a TTS model.  Returns the absolute path to the saved audio file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Text to synthesise into speech."
+    },
+    "options": {
+     "type": "object",
+     "description": "TTS options.",
+     "properties": {
+      "voice": {
+       "type": "string",
+       "description": "Voice name or ID (provider-specific)."
+      },
+      "speed": {
+       "type": "number",
+       "description": "Playback speed multiplier.  0.25–4.0, default 1.0."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "mp3",
+        "wav",
+        "opus",
+        "flac",
+        "pcm"
+       ],
+       "description": "Audio output format.  Default: mp3."
+      },
+      "language": {
+       "type": "string",
+       "description": "BCP-47 language code, e.g. 'en-US'.  Google only — it is required there and the other endpoints have no such field, so they do not declare this option at all."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.speech._tts.ttsGoogle": {
+  "name": "ttsGoogle",
+  "description": "Synthesise speech from text using a TTS model.  Returns the absolute path to the saved audio file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Text to synthesise into speech."
+    },
+    "options": {
+     "type": "object",
+     "description": "TTS options.",
+     "properties": {
+      "voice": {
+       "type": "string",
+       "description": "Voice name or ID (provider-specific)."
+      },
+      "speed": {
+       "type": "number",
+       "description": "Playback speed multiplier.  0.25–4.0, default 1.0."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "mp3",
+        "wav",
+        "opus",
+        "flac",
+        "pcm"
+       ],
+       "description": "Audio output format.  Default: mp3."
+      },
+      "language": {
+       "type": "string",
+       "description": "BCP-47 language code, e.g. 'en-US'.  Google only — it is required there and the other endpoints have no such field, so they do not declare this option at all."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.speech._tts.ttsOpenAI": {
+  "name": "ttsOpenAI",
+  "description": "Synthesise speech from text using a TTS model.  Returns the absolute path to the saved audio file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Text to synthesise into speech."
+    },
+    "options": {
+     "type": "object",
+     "description": "TTS options.",
+     "properties": {
+      "voice": {
+       "type": "string",
+       "description": "Voice name or ID (provider-specific)."
+      },
+      "speed": {
+       "type": "number",
+       "description": "Playback speed multiplier.  0.25–4.0, default 1.0."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "mp3",
+        "wav",
+        "opus",
+        "flac",
+        "pcm"
+       ],
+       "description": "Audio output format.  Default: mp3."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.speech._tts.ttsQwen": {
+  "name": "ttsQwen",
+  "description": "Synthesise speech from text using a TTS model.  Returns the absolute path to the saved audio file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Text to synthesise into speech."
+    },
+    "options": {
+     "type": "object",
+     "description": "TTS options.",
+     "properties": {
+      "voice": {
+       "type": "string",
+       "description": "Voice name or ID (provider-specific)."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "mp3",
+        "wav",
+        "opus",
+        "flac",
+        "pcm"
+       ],
+       "description": "Audio output format.  Default: mp3."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.speech._tts.ttsXAI": {
+  "name": "ttsXAI",
+  "description": "Synthesise speech from text using a TTS model.  Returns the absolute path to the saved audio file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Text to synthesise into speech."
+    },
+    "options": {
+     "type": "object",
+     "description": "TTS options.",
+     "properties": {
+      "voice": {
+       "type": "string",
+       "description": "Voice name or ID (provider-specific)."
+      },
+      "speed": {
+       "type": "number",
+       "description": "Playback speed multiplier.  0.25–4.0, default 1.0."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "mp3",
+        "wav",
+        "opus",
+        "flac",
+        "pcm"
+       ],
+       "description": "Audio output format.  Default: mp3."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.transcribe._stt.Transcription": {
+  "name": "transcription",
+  "description": "Transcribe an audio file to text using an STT model.  Input is a file path; output is the transcript string.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Path to the audio file to transcribe."
+    },
+    "options": {
+     "type": "object",
+     "description": "STT options.",
+     "properties": {
+      "language": {
+       "type": "string",
+       "description": "Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'.  Improves accuracy.  Auto-detected when omitted."
+      },
+      "timestamps": {
+       "type": "boolean",
+       "description": "Include word-level timestamps.  When True the output is a JSON string.  Default: false."
+      },
+      "prompt": {
+       "type": "string",
+       "description": "Context hint — domain vocabulary or spelling guidance.  Supported by OpenAI and xAI."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "text",
+        "json"
+       ],
+       "description": "Output format.  ``text`` (default) — plain transcript.  ``json`` — includes timestamps and segment metadata."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.transcribe._stt.sttGoogle": {
+  "name": "sttGoogle",
+  "description": "Transcribe an audio file to text using an STT model.  Input is a file path; output is the transcript string.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Path to the audio file to transcribe."
+    },
+    "options": {
+     "type": "object",
+     "description": "STT options.",
+     "properties": {
+      "language": {
+       "type": "string",
+       "description": "Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'.  Improves accuracy.  Auto-detected when omitted."
+      },
+      "timestamps": {
+       "type": "boolean",
+       "description": "Include word-level timestamps.  When True the output is a JSON string.  Default: false."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "text",
+        "json"
+       ],
+       "description": "Output format.  ``text`` (default) — plain transcript.  ``json`` — includes timestamps and segment metadata."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.tools.transcribe._stt.sttOpenAI": {
+  "name": "sttOpenAI",
+  "description": "Transcribe an audio file to text using an STT model.  Input is a file path; output is the transcript string.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Path to the audio file to transcribe."
+    },
+    "options": {
+     "type": "object",
+     "description": "STT options.",
+     "properties": {
+      "language": {
+       "type": "string",
+       "description": "Language hint (ISO-639-1 or BCP-47), e.g. 'en', 'en-US'.  Improves accuracy.  Auto-detected when omitted."
+      },
+      "timestamps": {
+       "type": "boolean",
+       "description": "Include word-level timestamps.  When True the output is a JSON string.  Default: false."
+      },
+      "prompt": {
+       "type": "string",
+       "description": "Context hint — domain vocabulary or spelling guidance.  Supported by OpenAI and xAI."
+      },
+      "format": {
+       "type": "string",
+       "enum": [
+        "text",
+        "json"
+       ],
+       "description": "Output format.  ``text`` (default) — plain transcript.  ``json`` — includes timestamps and segment metadata."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.shell._browse.LocalBrowseTool": {
+  "name": "local_browse",
+  "description": "List the contents of a local directory as a tree. Use this to explore the filesystem and understand project structure.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Directory path to list. Relative to sandbox root. Default: root itself."
+    },
+    "options": {
+     "type": "object",
+     "description": "Browse options.",
+     "properties": {
+      "depth": {
+       "type": "integer",
+       "description": "How many directory levels to show (default 2)."
+      },
+      "pattern": {
+       "type": "string",
+       "description": "Glob pattern to filter files, e.g. '*.py'."
+      },
+      "show_hidden": {
+       "type": "boolean",
+       "description": "Include hidden files and directories (default false)."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.shell._read.LocalReadTool": {
+  "name": "local_read",
+  "description": "Read the contents of a local file. Supports reading a specific line range for large files.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Path to the file to read (relative to sandbox root)."
+    },
+    "options": {
+     "type": "object",
+     "description": "Read options.",
+     "properties": {
+      "start_line": {
+       "type": "integer",
+       "description": "First line to return, 1-indexed (default 1)."
+      },
+      "end_line": {
+       "type": "integer",
+       "description": "Last line to return, inclusive (default: all)."
+      },
+      "encoding": {
+       "type": "string",
+       "description": "File encoding (default utf-8)."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.shell._run.LocalRunTool": {
+  "name": "local_run",
+  "description": "Execute a shell command or Python file within the sandbox directory. Returns stdout, stderr, and the return code. Use this to run scripts, tests, or any CLI tool.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Shell command to execute, e.g. 'ls -la' or 'python script.py'. If a .py file path is given, it runs with the current Python."
+    },
+    "options": {
+     "type": "object",
+     "description": "Execution options.",
+     "properties": {
+      "timeout": {
+       "type": "integer",
+       "description": "Max seconds before the process is killed (default 30)."
+      },
+      "cwd": {
+       "type": "string",
+       "description": "Working directory (relative to sandbox root, default: root)."
+      },
+      "python": {
+       "type": "boolean",
+       "description": "Force execution with the current Python interpreter."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.shell._write.LocalWriteTool": {
+  "name": "local_write",
+  "description": "Write content to a local file. Creates the file (and any parent directories) if they do not exist. Can overwrite or append.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "Content to write to the file."
+    },
+    "options": {
+     "type": "object",
+     "description": "Write options.",
+     "properties": {
+      "path": {
+       "type": "string",
+       "description": "Destination file path (relative to sandbox root)."
+      },
+      "mode": {
+       "type": "string",
+       "enum": [
+        "w",
+        "a"
+       ],
+       "description": "'w' to overwrite (default), 'a' to append."
+      },
+      "encoding": {
+       "type": "string",
+       "description": "File encoding (default utf-8)."
+      }
+     },
+     "required": [
+      "path"
+     ]
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.vectors._delete.VectorDeleteTool": {
+  "name": "vector_delete",
+  "description": "Remove documents from the vector store by ID or metadata filter.  Pass IDs for targeted deletion or a filter dict for bulk removal.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "description": "List of document IDs to delete, or null to delete by filter only.",
+     "oneOf": [
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "options": {
+     "type": "object",
+     "description": "Delete options.",
+     "properties": {
+      "filter": {
+       "type": "object",
+       "description": "Provider-native metadata filter for bulk deletion."
+      }
+     }
+    }
+   }
+  }
+ },
+ "yait_aichain.utilities.vectors._fetch.VectorFetchTool": {
+  "name": "vector_fetch",
+  "description": "Retrieve specific documents from the vector store by ID.  Returns full text and metadata without similarity ranking.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "List of document IDs to retrieve."
+    },
+    "options": {
+     "type": "object",
+     "description": "Fetch options.",
+     "properties": {}
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.vectors._query.VectorQueryTool": {
+  "name": "vector_query",
+  "description": "Semantic similarity search — embed the query text and return the most relevant documents from the vector store.  Use this as the retrieval step in any RAG pipeline.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "The query text to search for semantically similar documents."
+    },
+    "options": {
+     "type": "object",
+     "description": "Search configuration.",
+     "properties": {
+      "n": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100,
+       "description": "Number of results to return (default 5)."
+      },
+      "filter": {
+       "type": "object",
+       "description": "Provider-native metadata filter applied before ranking."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
+ "yait_aichain.utilities.vectors._upsert.VectorUpsertTool": {
+  "name": "vector_upsert",
+  "description": "Insert or update documents in the vector store.  Text is embedded automatically when an embedder is configured.  Use this as the ingestion step before RAG retrieval.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "array",
+     "description": "List of records to insert or update.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "description": "Unique document identifier."
+       },
+       "text": {
+        "type": "string",
+        "description": "Document text content."
+       },
+       "metadata": {
+        "type": "object",
+        "description": "Optional key-value metadata / payload."
+       },
+       "vector": {
+        "type": "array",
+        "items": {
+         "type": "number"
+        },
+        "description": "Optional pre-computed embedding vector.  When present, auto-embedding is skipped for this record."
+       }
+      },
+      "required": [
+       "id",
+       "text"
+      ]
+     }
+    },
+    "options": {
+     "type": "object",
+     "description": "Upsert options.",
+     "properties": {}
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ }
+}

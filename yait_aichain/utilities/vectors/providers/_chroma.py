@@ -62,27 +62,10 @@ class ChromaBackend(VectorBackend):
 
     Examples
     --------
-    Local server::
-
-        from yait_aichain.utilities.vectors import VectorDB
-        from yait_aichain.tools import embed
-
-        store = VectorDB(
-            "chroma",
-            collection = "my_docs",
-            embedder   = embed("openai", model="text-embedding-3-small"),
-            url        = "http://localhost:8000",
-        )
-
     Chroma Cloud::
 
-        store = VectorDB(
-            "chroma",
-            collection = "my_docs",
-            embedder   = embed("openai", model="text-embedding-3-small"),
-            url        = "https://api.trychroma.com",
-            api_key    = "ch-...",
-        )
+        store = VectorDB("chroma", collection="my_docs", embedder=embed("openai"),
+                         url="https://api.trychroma.com", api_key="ch-...")
     """
 
     provider    = "chroma"

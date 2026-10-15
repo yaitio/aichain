@@ -249,11 +249,9 @@ def recorded(model: Model, reply: str = "ok"):
     """
     Put a real `Model` on a canned transport and record what it sends.
 
-    Inside the block every call answers *reply* in the provider's own response
-    shape, with 10 input and 5 output tokens, and nothing reaches the network.
-    The model keeps its name, options, adaptations and price, so
-    ``effective_options``, ``last_adaptations`` and the cost are the library's
-    real answers. Buffered calls only; a stream inside the block raises.
+    Every call in the block answers *reply* (10 input, 5 output tokens) in the
+    provider's own shape, offline; options, adaptations and cost stay the
+    library's real answers. Buffered calls only; a stream raises.
 
     Parameters
     ----------
@@ -269,7 +267,7 @@ def recorded(model: Model, reply: str = "ok"):
 
     Examples
     --------
-    >>> model = Model("gpt-5.5", options={"temperature": 0.2})
+    >>> model = Model("gpt-5.5")
     >>> with recorded(model) as rec:
     ...     Skill(model, prompt="Hi").run()
     >>> rec.requests[0].body["model"]

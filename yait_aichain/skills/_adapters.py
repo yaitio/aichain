@@ -88,14 +88,8 @@ def normalize_input(input_: dict) -> dict:
     """
     Return a normalised deep copy of *input_*, filling in implicit defaults.
 
-    Part shortcuts (applied per message):
-
-    * A plain ``str`` part → ``{"type": "text", "text": <string>}``
-    * A dict part with a ``"text"`` key but no ``"type"`` key → ``"type"``
-      is set to ``"text"`` automatically.
-
-    Media parts (those with a ``"source"`` key) and parts that already have
-    a ``"type"`` field are passed through unchanged.
+    A plain ``str`` part, or a dict with ``"text"`` and no ``"type"``, becomes
+    ``{"type": "text", "text": ...}``; media and typed parts pass unchanged.
 
     Parameters
     ----------
@@ -106,24 +100,6 @@ def normalize_input(input_: dict) -> dict:
     -------
     dict
         Normalised copy ready for :func:`validate_input`.
-
-    Examples
-    --------
-    ::
-
-        normalize_input({
-            "messages": [
-                {"role": "system", "parts": ["Be concise."]},
-                {"role": "user",   "parts": [{"text": "Explain {topic}."}]},
-            ]
-        })
-        # →
-        {
-            "messages": [
-                {"role": "system", "parts": [{"type": "text", "text": "Be concise."}]},
-                {"role": "user",   "parts": [{"type": "text", "text": "Explain {topic}."}]},
-            ]
-        }
     """
     if not isinstance(input_, dict):
         validate_input(input_)                  # raises, naming the shape expected
@@ -154,14 +130,8 @@ def normalize_output(output: "dict | None") -> dict:
     """
     Return a normalised output dict, filling in implicit defaults.
 
-    Passing ``None`` or ``{}`` produces the plain-text default::
-
-        {"modalities": ["text"], "format": {"type": "text"}}
-
-    Missing ``"modalities"`` defaults to ``["text"]``.
-    Missing ``"format"`` defaults to ``{"type": "text"}``.
-    A ``"format"`` dict that is present but lacks a ``"type"`` key has
-    ``"type"`` set to ``"text"``.
+    ``None``, ``{}`` and any missing part default to plain text:
+    ``{"modalities": ["text"], "format": {"type": "text"}}``.
 
     Parameters
     ----------
@@ -172,22 +142,6 @@ def normalize_output(output: "dict | None") -> dict:
     -------
     dict
         Normalised dict ready for :func:`validate_output`.
-
-    Examples
-    --------
-    ::
-
-        normalize_output(None)
-        # → {"modalities": ["text"], "format": {"type": "text"}}
-
-        normalize_output({})
-        # → {"modalities": ["text"], "format": {"type": "text"}}
-
-        normalize_output({"format": {"type": "json"}})
-        # → {"modalities": ["text"], "format": {"type": "json"}}
-
-        normalize_output({"modalities": ["image"], "format": {"type": "image"}})
-        # → {"modalities": ["image"], "format": {"type": "image"}}
     """
     if not output:
         return {"modalities": ["text"], "format": {"type": "text"}}

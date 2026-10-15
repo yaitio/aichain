@@ -103,36 +103,19 @@ class _Files:
 
     def save(self, path: str) -> None:
         """
-        Serialise this chain to a YAML file at *path*.
-
-        The file stores everything needed to recreate the chain:
-
-        * Chain-level metadata — ``name``, ``description``, ``variables``
-        * Each step's ``output_key`` and ``input_map``
-        * For **Skill** steps — the model name, input template, output spec,
-          variables, and options (same fields as ``Skill.save()``)
-        * For **Tool** steps — the fully-qualified class path
-          (``"module.ClassName"``) and any serialisable ``init_args``
-
-        API keys are **never** written to the file; :meth:`load` resolves
-        them from environment variables at load time.
+        Serialise this chain to a YAML file at *path* — metadata, each step's key and
+        input map, a Skill's model and template, a tool's class path and init args.
+        API keys are never written; :meth:`load` reads them from the environment.
 
         Parameters
         ----------
         path : str
-            Destination file path.  Parent directories are created
-            automatically if they do not exist.
+            Destination file path; parent directories are created.
 
         Raises
         ------
         ImportError
             If PyYAML is not installed.
-
-        Example
-        -------
-        ::
-
-            chain.save("chains/analyse_and_translate.yaml")
         """
         if self.policy is not None and not (hasattr(self.policy, "rules")
                                             and hasattr(self.policy, "default")):
@@ -266,60 +249,31 @@ class _Files:
         trusted: bool = False,
     ) -> Chain:
         """
-        Load a chain from a YAML file previously created by :meth:`save`.
-
-        .. warning::
-            A chain file names tool classes by import path and instantiates
-            them — loading one therefore imports and runs code. By default
-            only classes under ``yait_aichain`` are allowed; pass
-            ``trusted=True`` ONLY for files you created or fully control.
-
-        Each step is reconstructed from the serialised data:
-
-        * **Skill** steps — the model is re-created via
-          :class:`~models.Model` (API key resolved from the environment
-          unless *api_key* is supplied), then a :class:`~skills.Skill` is
-          instantiated from the stored template.
-        * **Tool** steps — the class is imported by its stored module path
-          and instantiated with the stored ``init_args``; API keys are
-          resolved from environment variables automatically.
+        Load a chain from a YAML file :meth:`save` wrote; loading imports and runs the
+        tool classes it names, so only ``yait_aichain`` classes unless *trusted*.
 
         Parameters
         ----------
         path : str
             The YAML file ``save()`` wrote.
         api_key : str | None, optional
-            A key for every Skill step's model; each reads its own provider's from
-            the environment otherwise.
+            A key for every Skill step's model; otherwise each reads its own from the environment.
         trusted : bool, optional
-            Allow tool classes outside ``yait_aichain`` to be imported. Loading a
-            chain file runs the code it names; pass ``True`` only for files you
-            wrote or control.
+            Allow tool classes outside ``yait_aichain`` — only for files you wrote or control.
 
         Returns
         -------
         Chain
-            A fully initialised :class:`Chain` ready to call :meth:`run`.
+            The chain, ready to :meth:`run`.
 
         Raises
         ------
         FileNotFoundError
             If *path* does not exist.
         ImportError
-            If PyYAML is not installed, or a tool's module cannot be imported.
+            If PyYAML is missing, or a tool's module cannot be imported.
         ValueError
-            If a step's ``kind`` is unrecognised, or a required API key is
-            missing.
-
-        Example
-        -------
-        ::
-
-            from yait_aichain.chain import Chain
-
-            chain  = Chain.load("chains/analyse_and_translate.yaml")
-            result = chain.run(variables={"topic": "AI safety",
-                                          "language": "French"})
+            If a step's ``kind`` is unrecognised, or a required API key is missing.
         """
         from .. import _yaml
         data = _yaml.read(path, "Chain.load()", ("steps",))

@@ -57,10 +57,8 @@ ScriptedModel.build(messages, output, tools=None)
 
 `to_request`, and what building changed: `(path, body, adaptations)`.
 
-The adaptations are this request's, returned with it. One Model is
-shared — by a Pool's threads, by tenants — so a fact about one call
-left on the object (`last_adaptations`, kept as a mirror) is read by
-whichever call looks next.
+The adaptations belong to this request; `last_adaptations` is only a
+mirror, unsafe on a model shared between threads.
 
 **Parameters**
 
@@ -76,30 +74,20 @@ ScriptedModel.stream(messages, output, tools=None)
 
 Yield the answer in pieces as the provider produces it.
 
-Not every provider can. An image endpoint has nothing to deliver
-progressively, and two of OpenAI's own paths speak a different event
-vocabulary that is not wired yet. The question that decides the
-design is what to do then, and it is the same question 2.3.0 answered
-for options: **the request still goes, and the caller is told.** So a
-provider that cannot stream returns the whole answer as one piece and
-records a `declined` — because a caller who asked to stream and got
-one chunk at the end has something that looks like it worked.
-`on_unsupported="raise"` raises on it; `"requirements"` does not,
-since the answer itself is whole.
-
-When the stream ends, the generator returns a `StreamOutcome`
-— the whole result, the usage the provider reported, and what was
-adapted — for `yield from` to receive. `last_stream_usage`,
-`last_stream_result` and `last_adaptations` mirror it on the
-model, for a single caller; the library reads the outcome, because a
-shared model's attributes belong to whichever stream wrote last.
+A provider that cannot stream returns the whole answer as one piece
+and records a `declined` adaptation (`on_unsupported="raise"`
+raises on it).
 
 **Parameters**
 
-- `messages` (*list*) — Universal messages, placeholders already filled: `{"role", "parts"}`
-  with typed parts.
+- `messages` (*list*) — Universal messages, placeholders filled: `{"role", "parts"}`.
 - `output` (*dict*) — The output spec: `{"modalities": [...], "format": {"type": …}}`.
 - `tools` (*list | None, optional*, default `None`) — Function-calling schemas, as `Tool.schema()` returns them.
+
+**Returns**
+
+- `StreamOutcome` — On exhaustion, for `yield from`: result, usage, adaptations.
+  `last_stream_usage`/`last_stream_result` mirror it.
 
 ---
 
@@ -126,11 +114,9 @@ recorded(model: Model, reply: str = 'ok')
 
 Put a real `Model` on a canned transport and record what it sends.
 
-Inside the block every call answers *reply* in the provider's own response
-shape, with 10 input and 5 output tokens, and nothing reaches the network.
-The model keeps its name, options, adaptations and price, so
-`effective_options`, `last_adaptations` and the cost are the library's
-real answers. Buffered calls only; a stream inside the block raises.
+Every call in the block answers *reply* (10 input, 5 output tokens) in the
+provider's own shape, offline; options, adaptations and cost stay the
+library's real answers. Buffered calls only; a stream raises.
 
 **Parameters**
 
@@ -144,7 +130,7 @@ real answers. Buffered calls only; a stream inside the block raises.
 
 **Examples**
 
->>> model = Model("gpt-5.5", options={"temperature": 0.2})
+>>> model = Model("gpt-5.5")
 >>> with recorded(model) as rec:
 ...     Skill(model, prompt="Hi").run()
 >>> rec.requests[0].body["model"]

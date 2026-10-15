@@ -28,67 +28,37 @@ Chain(
 
 Steps in a fixed order, sharing one set of variables.
 
-A step is a `Skill`, a tool, an `Agent`, or a plain function or a
-utility's method, in any order. A Skill reads any variable in its prompt;
-a tool or a function gets the arguments its schema or signature names,
-filled from the variables or from the step's mapping. Each step's output
-is stored under its key — the runner's name unless one is given — and a
-dict is read whole or by path, `"page.body"`.
+A step is a `Skill`, a tool, an `Agent`, or a function, in any order; each
+gets the variables its prompt, schema or signature names, and its output is
+stored under its key, read whole or by path (`"page.body"`).
 
 ```python
-chain = Chain(steps=[
-    (summarise,          "summary"),
-    (translate,          "french"),
-    (count_words,        "length", {"text": "Title: {french}"}),
-    (shout,              "loud"),
-], max_cost=0.05)
+chain = Chain(steps=[(summarise, "summary"), (translate, "french")], max_cost=0.05)
 result = chain.run(variables={"text": "…"})
 result["french"], result.output, result.cost
 ```
 
 **Parameters**
 
-- `steps` (*list*) — The steps, in order. Each is a runner on its own, or a tuple:
-  `(runner, output_key)`; `(runner, output_key, input_map)`, where
-  *input_map* maps an argument name to a variable's name or to a
-  `"{template}"` the chain fills in; or `(runner, output_key,
-  input_map, options)`. For an Agent step, *options* takes
-  `task_key` (the variable holding its task, default `"task"`) and
-  `output_field` (the `AgentResult` attribute stored, default
-  `"output"`). A bare runner, or `(runner, input_map)`, is stored
-  under the runner's name; a `Step` says the rest.
+- `steps` (*list*) — Runners, or tuples `(runner, key[, input_map[, options]])` or `(runner,
+  input_map)`; an Agent's *options* take `task_key` and `output_field`.
 - `variables` (*dict | None, optional*, default `None`) — Default variables for every `run()`; call-time values win.
 - `name` (*str | None, optional*, default `None`) — A label, shown in events and when the chain is a step elsewhere.
 - `description` (*str | None, optional*, default `None`) — What the chain does.
-- `on_step_error` (*str, optional*, default `'raise'`) — What a failed step does to the run: `"raise"` (the default)
-  propagates it, `"stop"` ends the run without raising, `"skip"`
-  records it, warns and goes on, `"collect"` does the same without
-  the warning.
-- `store` (*StateStore, optional*, default `None`) — Where a paused run is kept. The default is process-local, so a run
-  that waits for a person or a webhook needs `FileStore(...)` or
-  another persistent store to be resumed from another process.
+- `on_step_error` (*str, optional*, default `'raise'`) — `"raise"` (default), `"stop"` without raising, `"skip"` with a
+  warning, or `"collect"` silently.
+- `store` (*StateStore, optional*, default `None`) — Where a paused run is kept; a persistent one to resume in another process.
 - `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` at every step boundary.
-- `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars for the whole chain, shared by every step; a
-  step that would begin past it is refused with `BudgetExceeded`.
-- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool step is decided under — a `PermissionPolicy`, a
-  dict of rules, or `{"rules": {...}, "default": ...}`. A refused step
-  fails the way any step fails, under `on_step_error`. Inside an
-  agent's tool call the agent's rules hold too, and the stricter word
-  of the two is the one taken.
-- `approve` (*callable | None, optional*, default `None`) — Answers a step the policy wants a person for: given an
-  `ApprovalRequest`, returns `True`, `False` or an
-  `ApprovalDecision`. Absent, such a step is refused — or asked of the
-  approver of an agent this chain runs inside.
-- `interceptors` (*list | None, optional*, default `None`) — Act on a tool step before and after it runs, as on an `Agent`; each
-  change goes out as an `interceptor.changed` event.
-- `inputs` (*dict | None, optional*, default `None`) — A description for an input the steps do not describe themselves —
-  `{"language": "Target language, e.g. French"}` — read by
-  `input_schema`.
+- `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars shared by every step; past it, `BudgetExceeded`.
+- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool step is decided under; inside an agent, the stricter wins.
+- `approve` (*callable | None, optional*, default `None`) — Answers a step the policy wants a person for; absent, the step is refused.
+- `interceptors` (*list | None, optional*, default `None`) — Act on a tool step before and after it runs, as on an `Agent`.
+- `inputs` (*dict | None, optional*, default `None`) — Descriptions for inputs the steps do not describe, read by `input_schema`.
 
 **Raises**
 
-- `ValueError` — If *steps* is empty, a tuple has an unsupported shape, or
-  *on_step_error* is not one of the four.
+- `ValueError` — If *steps* is empty, a tuple has an unsupported shape, or *on_step_error*
+  is not one of the four.
 
 ### `Chain.run()`
 
@@ -105,26 +75,21 @@ Execute all steps in order and return a `ChainResult`.
 
 **Parameters**
 
-- `variables` (*dict | None, optional*, default `None`) — Variables for this invocation.  Merged with `self.variables`;
-  call-time values win.
-- `on_step_error` (*str | None, optional*, default `None`) — Override the instance-level `on_step_error` for this call only.
-  Must be `"raise"`, `"stop"`, `"skip"` or `"collect"` when
-  provided.
-- `context` (*RunContext, optional*, default `None`) — The tenant and metadata of this request, ambient for every step; a
+- `variables` (*dict | None, optional*, default `None`) — Variables for this invocation, merged over `self.variables`.
+- `on_step_error` (*str | None, optional*, default `None`) — Overrides the chain's `on_step_error` for this call; deprecated, goes in
+  5.0 — set it on the chain or on a `Step`.
+- `context` (*RunContext, optional*, default `None`) — The tenant and metadata of this request, ambient for every step;
   `Model(api_key=callable)` resolves its key from it.
 
 **Returns**
 
-- `ChainResult` — `.output` is the last successful step's output, `result["key"]`
-  any step's output by its key, `.success` whether every step
-  completed. A `SuspendedResult` instead when a step
-  paused the run.
+- `ChainResult` — `.output` the last step's, `result["key"]` any step's, `.success`
+  whether all completed; a `SuspendedResult` when a step paused the run.
 
 **Raises**
 
-- `RuntimeError, clients._base.APIError, …` — Any step exception, when `on_step_error` is `"raise"`
-  (the default).
-- `ValueError` — If *on_step_error* override value is not recognised.
+- `Exception` — A step's own exception, when `on_step_error` is `"raise"`.
+- `ValueError` — If the *on_step_error* override is not recognised.
 
 ### `Chain.arm()`
 
@@ -141,26 +106,14 @@ Chain.arm(
 
 Create the run **without starting it**, and return it parked.
 
-The run exists before it runs: it has a `run_id`, a durable document
-in the store, the variables it was seeded with, and a declared shape
-for the signal that will start it. That is a subscription — the thing
-a trigger waits on and a person is shown a form for — expressed as the
-same object every other pause produces, so a webhook, a cron tick and
-a human clicking *start* all end in `resume(run_id, signal)`.
-
-The engine still schedules nothing. `hint` is recorded for whatever
-does: `{"on": "order.created"}`, `{"wake_at": "2026-06-15T09:00"}`.
-
-On resume the signal **seeds the variables** rather than being handed
-to a step, because nothing has run yet and there is no suspended tool
-to complete.
+The run has a `run_id` and a document in the store before it runs;
+`resume(run_id, signal)` starts it, and the signal seeds the variables.
 
 **Parameters**
 
 - `reason` (*str, optional*, default `''`) — What the run waits for, shown to whoever starts it.
 - `resume_with` (*dict | None, optional*, default `None`) — The shape of the signal that starts it — a JSON-Schema-like description.
-- `hint` (*dict | None, optional*, default `None`) — Recorded for whatever does the waking: `{"on": "order.created"}`,
-  `{"wake_at": "…"}`. The engine schedules nothing.
+- `hint` (*dict | None, optional*, default `None`) — Recorded for whatever does the waking (`{"on": "order.created"}`).
 - `variables` (*dict | None, optional*, default `None`) — Variables the run is seeded with before the signal adds its own.
 - `context` (*RunContext, optional*, default `None`) — The request's tenant and metadata, kept with the run.
 
@@ -176,60 +129,36 @@ Chain.resume(
 ) -> ChainResult | None
 ```
 
-Resume a previously suspended run.
-
-Loads the run document from the store, re-invokes the suspended step
-with *signal*, and continues from the first step that is not yet
-`done` — already-completed steps are never re-run (their outputs are
-in the document's variables).
-
-Idempotent: a `run_id` no longer in the store (already resumed to
-completion, or unknown) raises `KeyError` so an at-least-once trigger
-can treat that as "already handled".
+Resume a parked run: the suspended step is re-invoked with *signal*, and steps
+already done are never re-run.
 
 **Parameters**
 
 - `run_id` (*str*) — The parked run, as the `SuspendedResult` named it.
 - `signal` (*any, optional*, default `None`) — The answer the run waited for. A dict is merged into the variables.
-- `on_step_error` (*str | None, optional*, default `None`) — Overrides the chain's policy for the rest of this run.
-- `context` (*RunContext, optional*, default `None`) — The tenant and metadata for the resumed part; the stored one when
-  omitted.
+- `on_step_error` (*str | None, optional*, default `None`) — Overrides the chain's policy for the rest of this run; deprecated, goes in
+  5.0 — set it on the chain or on a `Step`.
+- `context` (*RunContext, optional*, default `None`) — The tenant and metadata for the resumed part; the stored one when omitted.
+
+**Raises**
+
+- `KeyError` — *run_id* is not in the store — already resumed, or never parked.
 
 ### `Chain.accumulated`
 
-Snapshot of the full accumulated variable dict after the most recent
-`run()` call.  Includes all initial variables, step outputs, and any
-keys written by Tools that return dicts.
+The variables after the most recent `run()` — initial ones, step outputs and
+keys tools wrote; deprecated, goes in 5.0 — read `result.variables`.
 
-Returns a shallow copy; modifying it does not affect internal state.
-Returns an empty dict before the first `run()`.
-
-Typical use — assembling a sectional document after all steps complete:
-
-```python
-result = chain.run(variables=initial_vars)
-document = assemble_document(result.variables, sections)
-```
-
-Deprecated since 4.2.8: the result of the run carries the same, as
-`result.variables`, and does not change when the chain runs again.
-Removed in 5.0.
+A shallow copy; empty before the first `run()`.
 
 ### `Chain.history`
 
-Step records from the most recent `run()` call.
+Step records from the most recent `run()`; deprecated, goes in 5.0 — read
+`result.history`.
 
-Returns a shallow copy; modifying it does not affect the chain's state.
-Returns an empty list before the first `run()`.
-
-Each record contains:
-
-`step`       — 0-based step index
-`kind`       — `"skill"`, `"tool"`, `"agent"` or `"call"`
-`name`       — runner name (or `"step_N"` if unnamed)
-`input`      — accumulated variable dict *before* this step ran
-`output`     — raw output (`str` or `dict`)
-`output_key` — variable name used to store a `str` output
+Each record holds `step` (0-based), `kind` (`"skill"`, `"tool"`,
+`"agent"` or `"call"`), `name`, `input` (the variables before the
+step), `output` and `output_key`. A copy; empty before the first run.
 
 ### `Chain.input_schema()`
 
@@ -258,34 +187,17 @@ a caller or a model filling it has only its name to go on:
 Chain.save(path: str)
 ```
 
-Serialise this chain to a YAML file at *path*.
-
-The file stores everything needed to recreate the chain:
-
-* Chain-level metadata — `name`, `description`, `variables`
-* Each step's `output_key` and `input_map`
-* For **Skill** steps — the model name, input template, output spec,
-  variables, and options (same fields as `Skill.save()`)
-* For **Tool** steps — the fully-qualified class path
-  (`"module.ClassName"`) and any serialisable `init_args`
-
-API keys are **never** written to the file; `load` resolves
-them from environment variables at load time.
+Serialise this chain to a YAML file at *path* — metadata, each step's key and
+input map, a Skill's model and template, a tool's class path and init args.
+API keys are never written; `load` reads them from the environment.
 
 **Parameters**
 
-- `path` (*str*) — Destination file path.  Parent directories are created
-  automatically if they do not exist.
+- `path` (*str*) — Destination file path; parent directories are created.
 
 **Raises**
 
 - `ImportError` — If PyYAML is not installed.
-
-**Examples**
-
-```python
-chain.save("chains/analyse_and_translate.yaml")
-```
 
 ### `Chain.load()`
 
@@ -293,56 +205,24 @@ chain.save("chains/analyse_and_translate.yaml")
 Chain.load(path: str, api_key: str | None = None, *, trusted: bool = False) -> Chain
 ```
 
-Load a chain from a YAML file previously created by `save`.
-
-.. warning:
-
-```python
-A chain file names tool classes by import path and instantiates
-them — loading one therefore imports and runs code. By default
-only classes under ``yait_aichain`` are allowed; pass
-``trusted=True`` ONLY for files you created or fully control.
-```
-
-Each step is reconstructed from the serialised data:
-
-* **Skill** steps — the model is re-created via
-  `Model` (API key resolved from the environment
-  unless *api_key* is supplied), then a `Skill` is
-  instantiated from the stored template.
-* **Tool** steps — the class is imported by its stored module path
-  and instantiated with the stored `init_args`; API keys are
-  resolved from environment variables automatically.
+Load a chain from a YAML file `save` wrote; loading imports and runs the
+tool classes it names, so only `yait_aichain` classes unless *trusted*.
 
 **Parameters**
 
 - `path` (*str*) — The YAML file `save()` wrote.
-- `api_key` (*str | None, optional*, default `None`) — A key for every Skill step's model; each reads its own provider's from
-  the environment otherwise.
-- `trusted` (*bool, optional*, default `False`) — Allow tool classes outside `yait_aichain` to be imported. Loading a
-  chain file runs the code it names; pass `True` only for files you
-  wrote or control.
+- `api_key` (*str | None, optional*, default `None`) — A key for every Skill step's model; otherwise each reads its own from the environment.
+- `trusted` (*bool, optional*, default `False`) — Allow tool classes outside `yait_aichain` — only for files you wrote or control.
 
 **Returns**
 
-- `Chain` — A fully initialised `Chain` ready to call `run`.
+- `Chain` — The chain, ready to `run`.
 
 **Raises**
 
 - `FileNotFoundError` — If *path* does not exist.
-- `ImportError` — If PyYAML is not installed, or a tool's module cannot be imported.
-- `ValueError` — If a step's `kind` is unrecognised, or a required API key is
-  missing.
-
-**Examples**
-
-```python
-from yait_aichain.chain import Chain
-
-chain  = Chain.load("chains/analyse_and_translate.yaml")
-result = chain.run(variables={"topic": "AI safety",
-                              "language": "French"})
-```
+- `ImportError` — If PyYAML is missing, or a tool's module cannot be imported.
+- `ValueError` — If a step's `kind` is unrecognised, or a required API key is missing.
 
 ---
 
@@ -375,8 +255,8 @@ The outcome of one chain run.
   under its key. `result["key"]` reads from here.
 - `usage` (*Usage | None*, default `None`) — Tokens and cost summed across the steps that reported them.
 - `run_id` (*str*, default `''`) — The run document's id.
-- `renamed` (*dict*, default `<factory>`) — Keys an output used to be found under, mapped to its key now —
-  `{"result": "fetch"}` while the pre-4.2.7 key still works.
+- `renamed` (*dict*, default `<factory>`) — An output's old keys mapped to its key now — `{"result": "fetch"}`;
+  reading an old key still works and warns.
 
 ### `ChainResult.cost`
 
@@ -417,9 +297,7 @@ One step of a `Chain`.
   (`"page.body"`), or a template.
 - `on_error` (*str | None, optional*, default `None`) — This step's error policy, over the chain's: `"raise"`, `"stop"`,
   `"skip"` or `"collect"`.
-- `spread` (*bool | None, optional*, default `None`) — A dict output's fields are also put among the chain's variables, as
-  every dict output was before 4.2.7. `None` keeps that for now, with a
-  warning; `True` keeps it on purpose; `False` keeps the dict under
-  its key alone.
+- `spread` (*bool | None, optional*, default `None`) — `True` also puts a dict output's fields among the chain's variables;
+  `False` keeps the dict under its key alone; `None` spreads, with a warning.
 - `options` (*dict | None, optional*, default `<factory>`) — An Agent step's options: `task_key`, `output_field`.
 <!-- /g:api -->

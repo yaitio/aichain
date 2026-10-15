@@ -210,26 +210,9 @@ def split_media_result(msg: dict) -> tuple[dict, dict | None]:
 def dangling_calls(messages: list) -> list:
     """Ids of tool calls in *messages* that no later turn answers.
 
-    A conversation in which the model asked for a tool and never heard back
-    is malformed, and providers disagree about it in the worst possible way:
-    OpenAI's chat completions, the Responses API and Anthropic all reject the
-    request; Google keys results by name and is looser; a self-hosted
-    OpenAI-compatible server — vLLM, llama.cpp, mlx — validates nothing at
-    all and templates whatever it was handed, so the model meets its own
-    unanswered call and improvises. It repeats it, apologises, or invents the
-    result, differently each time.
-
-    That is run-to-run variance manufactured by us, and it is worst where it
-    is least visible: the condition that produces a dangling call — a tool
-    that raised, a result lost across an invocation boundary — is itself
-    intermittent, so the same input behaves differently on different trials.
-
-    ``run()`` cannot produce one: it appends a result turn for every call in
-    a reply, failed ones included. The externally driven seam can, because
-    ``step()`` hands the obligation to the caller and nothing checked that
-    they met it — and that seam is precisely what a benchmark harness and a
-    serverless driver use, which is where a result crosses a process boundary
-    and can be lost.
+    Providers disagree about an unanswered call (some reject, a self-hosted
+    server lets the model improvise), so ``Agent.step()`` refuses one; a
+    driver can ask first. See ``docs/agents/driving-the-loop.md``.
 
     Parameters
     ----------
@@ -266,17 +249,8 @@ def tool_result_turn(call_id: str, result, is_error: bool = False) -> dict:
     """
     One call's result as a universal ``tool`` turn.
 
-    A result is normally text, and anything that is not a string is
-    serialised. The exception is media: a tool that returns a media part — or
-    a list mixing media parts and strings — hands those through as parts
-    instead of describing them as JSON. Without this an agent that renders
-    something cannot look at what it rendered, and a vision loop has to be
-    lifted out of the agent into a separate Skill.
-
-    Providers disagree about whether a tool result may carry an image, so the
-    parts are carried here and each family decides on the wire: Anthropic puts
-    them inside the tool result, the others send them as a following user
-    message.
+    A non-string result is serialised to text, except media parts (alone or
+    in a list), carried as parts for each family to place on its wire.
 
     Parameters
     ----------
@@ -285,9 +259,7 @@ def tool_result_turn(call_id: str, result, is_error: bool = False) -> dict:
     result : any
         What the tool returned; a non-string is rendered as text.
     is_error : bool, optional
-        The call failed and *result* is its error: Anthropic marks it
-        `is_error` and Gemini answers it as an error, where an "ERROR:"
-        prefix was all that told it from what a tool printed.
+        The call failed and *result* is its error, marked as such on the wire.
     """
     if is_error:
         text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)

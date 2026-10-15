@@ -180,18 +180,16 @@ class RerankBase(Tool):
         *,
         top_n: int | None = None,
     ) -> RerankResult:
-        """
-        Rerank *documents* by relevance to *query*.
+        """Rerank *documents* by relevance to *query*.
 
         Parameters
         ----------
         query : str
             The search query.
         documents : list[str | dict]
-            Documents to rerank.  Accepts plain strings or dicts with a
-            ``"text"`` key, such as the output of ``Vectors(...).query``.
+            Strings, or dicts with a ``"text"`` key (``Vectors(...).query`` output).
         top_n : int | None, optional
-            Return only the top *N* results.  ``None`` returns all.
+            Return only the top *N* results; ``None`` returns all.
 
         Returns
         -------
@@ -244,22 +242,19 @@ class RerankBase(Tool):
         input:   list[str | dict],
         options: dict | None = None,
     ) -> list[dict]:
-        """
-        Standard Tool interface for use in Chains and Agents.
+        """Rerank *input* by relevance to ``options["query"]``.
 
         Parameters
         ----------
         input : list[str | dict]
             Documents to rerank (same format as :meth:`rerank`).
         options : dict | None
-            ``query``  str — the search query (required)
-            ``top_n``  int — number of results to return (default: all)
+            ``query`` (required) and ``top_n`` (default: all).
 
         Returns
         -------
         list[dict]
-            JSON-serialisable ranked results (same as
-            :attr:`RerankResult.results`).
+            The ranked results, as :attr:`RerankResult.results`.
         """
         opts  = options or {}
         query = opts.get("query")

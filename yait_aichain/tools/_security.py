@@ -45,7 +45,7 @@ def assert_safe_url(url: str, *, allow_private: bool | None = None) -> None:
 
     Blocks non-http(s) schemes (e.g. ``file:``, ``gopher:``), a URL carrying
     credentials or a backslash — the two places where this parser and the one
-    that opens the connection disagree about the host (``http://127.0.0.1\\@
+    that opens the connection disagree about the host (``http://localhost\\@
     example.com/``) — and, unless *allow_private* (defaulting to the
     ``AICHAIN_ALLOW_PRIVATE_URLS`` env flag), any host that resolves to an
     address that is not public. These are the classic SSRF and cloud-metadata
@@ -90,11 +90,9 @@ def safe_request(http, method: str, url: str, *, allow_private: bool | None = No
                  cross_host: bool = False, **kwargs):
     """A urllib3 request whose every hop passes `assert_safe_url`.
 
-    urllib3 follows redirects itself and checks nothing on the way, so a
-    public URL answering ``302 Location: http://169.254.169.254/`` reached the
-    metadata service. Redirects are followed here instead, at most
-    `MAX_REDIRECTS`, each target checked before it is asked; a 303 becomes a
-    GET without a body, as browsers do.
+    Redirects are followed here rather than by urllib3, at most
+    `MAX_REDIRECTS`, each target checked before it is asked — a public URL
+    may redirect to a metadata address; a 303 becomes a GET without a body.
     """
     first = urlparse(url).netloc
     for _ in range(MAX_REDIRECTS + 1):

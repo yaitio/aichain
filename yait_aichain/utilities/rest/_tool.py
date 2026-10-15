@@ -87,107 +87,44 @@ def risk_for_method(method: str) -> str:
 
 class RestApiTool(Tool):
     """
-    A single REST endpoint exposed as a library Tool.
-
-    ``REST(...).endpoint(...)`` builds one with the API's base URL, auth and
-    headers filled in; construct it directly for a lone endpoint.
+    A single REST endpoint exposed as a library Tool; ``REST(...).endpoint(...)``
+    builds one with the API's base URL, auth and headers filled in.
 
     Parameters
     ----------
     name : str
-        Unique machine-readable identifier.  Used as the tool's function
-        name when registered with an Agent.
+        Unique identifier; the function name a model sees.
     description : str
-        One-sentence description.  This is what an LLM reads to decide
-        whether to use the tool.
+        What the endpoint does; what a model reads to decide whether to use it.
     method : str
-        HTTP method: ``"GET"``, ``"POST"``, ``"PUT"``, ``"PATCH"``,
-        ``"DELETE"``.  Case-insensitive.
+        HTTP method, case-insensitive: ``GET``, ``POST``, ``PUT``, ``PATCH``, ``DELETE``.
     url : str
-        Endpoint URL.  May contain ``{field_name}`` placeholders for path
-        parameters, e.g. ``"https://api.example.com/items/{id}"``.
+        Endpoint URL; ``{field}`` placeholders are path parameters.
     path_params : list[str], optional
-        Field names whose values are substituted into ``{…}`` placeholders
-        in *url*.
+        Fields substituted into the ``{…}`` placeholders of *url*.
     query_params : list[str], optional
-        Field names appended to the URL as query-string parameters.
+        Fields appended to the URL as query-string parameters.
     body_params : list[str], optional
-        Field names serialised as a JSON object in the request body.
-        Values may be any JSON-serialisable type (str, int, dict, list …).
+        Fields serialised as a JSON object in the request body.
     required_params : list[str], optional
-        Subset of the above that are required.  Agents and validators use
-        this list; ``run()`` does not enforce it — missing required fields
-        simply produce an incomplete request.
+        The required ones, for agents and validators; ``run()`` does not enforce it.
     headers : dict | None, optional
         Static request headers merged into every call.
     auth : dict | None, optional
-        Authentication strategy.  See module docstring for supported types
-        and fields.
+        Authentication: ``bearer``, ``cookie``, ``api_key``, ``basic`` or ``query``.
     content_type : str, optional
-        ``Content-Type`` header for requests with a body.
-        Default: ``"application/json"``.
+        ``Content-Type`` of a request with a body; ``"application/json"`` by default.
     response_field : str | None, optional
-        When set, ``run()`` returns ``response[response_field]`` instead of
-        the full response dict.  Useful for extracting a single key from a
-        wrapper object (e.g. ``response_field="token"`` for ``{"token": …}``).
+        Return ``response[response_field]`` instead of the whole response.
     risk : str | None, optional
-        The risk class a permission policy reads. Omitted, it follows the
-        method: ``GET``, ``HEAD`` and ``OPTIONS`` change nothing and are
-        ``read``; ``DELETE`` is ``destructive``; ``POST``, ``PUT`` and
-        ``PATCH`` change something on another service and are ``external``.
-        Say otherwise when you know better — a ``POST`` that only searches is
-        ``read``.
+        Omitted, it follows the method: ``GET`` read, ``DELETE`` destructive, else external.
 
     Examples
     --------
-    Parameterless GET::
+    ::
 
-        ping = RestApiTool(
-            name        = "ping",
-            description = "Check API health.",
-            method      = "GET",
-            url         = "https://restful-booker.herokuapp.com/ping",
-        )
-        result = ping.run()
-
-    GET with path parameter::
-
-        get_booking = RestApiTool(
-            name        = "get_booking",
-            description = "Retrieve a booking by ID.",
-            method      = "GET",
-            url         = "https://restful-booker.herokuapp.com/booking/{bookingid}",
-            path_params = ["bookingid"],
-            required_params = ["bookingid"],
-        )
-        booking = get_booking.run(input={"bookingid": 1})
-
-    POST with JSON body and Bearer auth from env::
-
-        create_item = RestApiTool(
-            name        = "create_item",
-            description = "Create a new item.",
-            method      = "POST",
-            url         = "https://api.example.com/items",
-            body_params = ["name", "price", "category"],
-            required_params = ["name", "price"],
-            auth        = {"type": "bearer", "env": "EXAMPLE_API_KEY"},
-        )
-
-    Cookie-based auth with token from a previous Chain step::
-
-        delete_booking = RestApiTool(
-            name        = "delete_booking",
-            description = "Delete a booking (auth required).",
-            method      = "DELETE",
-            url         = "https://restful-booker.herokuapp.com/booking/{bookingid}",
-            path_params = ["bookingid"],
-            required_params = ["bookingid", "token"],
-            auth        = {"type": "cookie", "cookie_name": "token",
-                           "token_field": "token"},
-        )
-        # In a Chain: accumulated["bookingid"] and accumulated["token"] are
-        # passed automatically as individual kwargs.
+        get = RestApiTool("get_booking", "Retrieve a booking by ID.", "GET",
+                          "https://api.example.com/booking/{id}", path_params=["id"])
     """
 
     def __init__(
@@ -306,30 +243,23 @@ class RestApiTool(Tool):
         /,
         **kwargs: Any,
     ) -> dict | list | str:
-        """
-        Execute the configured REST endpoint and return the response.
+        """Execute the configured REST endpoint and return the response.
 
         Parameters
         ----------
         input : dict | str | None, optional
-            Field values as a dict.  A string value is treated as a
-            single ``"input"`` field, for Chain steps that pass a plain
-            string.
+            Field values as a dict; a bare string is a single ``"input"`` field.
         options : dict | None, optional
-            None. Headers and the timeout are settings of the tool; options
-            given here are an error that says so.
+            None; headers and the timeout are settings of the tool.
         **kwargs
-            Individual field values, merged with *input*; a field given in
-            both is an error.  This is the form used by Chains and agents.
-            *input* and *options* are positional only, so a field named
-            ``input`` or ``options`` is passed here like any other.
+            Fields by name, merged with *input*; *input* and *options* are
+            positional only, so a field named ``input`` is passed here.
 
         Returns
         -------
         dict | list | str
-            Parsed JSON response (dict or list), or raw text string when
-            the response is not valid JSON.  When *response_field* is set,
-            returns ``response[response_field]`` from a dict response.
+            Parsed JSON, or the raw text when it is not JSON; with
+            *response_field*, that field of a dict response.
 
         Raises
         ------

@@ -220,8 +220,8 @@ def error_from_status(
     """
     Build the most specific ``APIError`` subclass for *status*.
 
-    ``headers`` (optional) is the response header mapping, used to read
-    ``Retry-After`` for rate-limit errors.
+    ``headers`` (optional) is the response header mapping; a rate-limit
+    error reads ``Retry-After`` from it.
     """
     if status == 0:
         return NetworkError(status, message)

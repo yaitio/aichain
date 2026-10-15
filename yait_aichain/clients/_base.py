@@ -55,19 +55,10 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
     """
     Build the urllib3 manager used for all HTTP in the library.
 
-    Shared by ``BaseClient`` (model APIs) and every tool client, so a single
-    proxy configuration applies everywhere. An explicit *proxy* dict wins;
-    otherwise the standard ``HTTPS_PROXY`` / ``HTTP_PROXY`` environment
-    variables are honoured (urllib3 does not read them on its own).
-
-    *proxy* shape::
-
-        {"url": "http://host:3128", "username": "u", "password": "p"}
-
-    Basic ``Proxy-Authorization`` is added when username + password are given,
-    or when the URL carries them — ``http://user:pass@host:3128``, which is how
-    ``HTTPS_PROXY`` usually holds credentials. urllib3 does not read the userinfo
-    of a proxy URL, so without this every such proxy answers 407.
+    An explicit *proxy* (``{"url", "username", "password"}``) wins; otherwise
+    ``HTTPS_PROXY`` / ``HTTP_PROXY`` are honoured. Basic
+    ``Proxy-Authorization`` is added from the username and password, or from
+    a ``http://user:pass@host`` URL, which urllib3 alone would answer with 407.
     """
     if proxy is None:
         if not _proxy_from_env():
@@ -161,41 +152,24 @@ class BaseClient:
     """
     Provider-agnostic HTTP transport for AI provider APIs.
 
-    Wraps urllib3 and provides:
-      - Optional proxy support with Basic auth
-      - JSON POST / multipart POST / binary GET helpers
-      - Abstract ``_auth_headers()`` and ``list_models()`` that every
-        subclass must implement
-      - Concrete ``check_auth()`` that delegates to ``list_models()``
-
-    Each subclass declares a ``BASE_URL`` class constant.  The caller may
-    override it per-instance via the ``url`` parameter (useful for
-    enterprise gateways, Azure OpenAI, etc.).
+    Wraps urllib3 with proxy support and JSON, multipart and binary helpers.
+    Subclasses declare ``BASE_URL`` and implement ``_auth_headers()`` and
+    ``list_models()``; ``check_auth()`` delegates to the latter.
 
     Parameters
     ----------
     api_key : str
-        Secret key used to authenticate against the provider.
+        Secret key that authenticates against the provider.
     url : str | None, optional
-        Override the provider base URL.  Defaults to ``cls.BASE_URL``.
-        Trailing slash is stripped automatically.
+        Override the provider base URL (``cls.BASE_URL``); a trailing slash is
+        stripped. For gateways, Azure OpenAI and the like.
     timeout : urllib3.Timeout, optional
         Connect + read timeout.  Defaults to ``DEFAULT_TIMEOUT``.
     retries : urllib3.Retry, optional
         Retry policy.  Defaults to ``DEFAULT_RETRIES``.
     proxy : dict | None, optional
-        Route all traffic through this proxy.
-
-        Expected shape::
-
-            {
-                "url":      "http://proxy.host:3128",  # required
-                "username": "user",                    # optional
-                "password": "secret",                  # optional
-            }
-
-        When both ``username`` and ``password`` are present the
-        ``Proxy-Authorization: Basic …`` header is added automatically.
+        ``{"url": ..., "username": ..., "password": ...}``; the last two
+        optional, and together they add ``Proxy-Authorization: Basic``.
     """
 
     # Subclasses must override this.
@@ -382,22 +356,13 @@ class BaseClient:
         """
         Fragments of tool calls carried by one event.
 
-        Each fragment is ``{"slot", "id", "name", "arguments"}``, and any of
-        the last three may be absent — that is the whole difficulty. A call
-        does not arrive as a call: an id and a name land once, then the
-        arguments trickle in as pieces of a JSON **string** across many
-        events, and two calls in one turn interleave.
+        Each fragment is ``{"slot", "id", "name", "arguments"}``; any of the
+        last three may be absent, and arguments arrive as pieces of a JSON
+        string. ``slot`` is the provider's own index for the call, never the
+        arrival order, which interleaves when a turn makes several calls.
 
-        ``slot`` is what keeps them apart. It is the provider's own index for
-        the call, never the order the fragments arrived in: OpenAI numbers
-        them and Anthropic uses its content-block index, precisely because
-        arrival order does not identify anything once there is more than one
-        call. Keying on arrival order splices two calls' arguments into one
-        unparseable string, and the recovery from unparseable arguments is an
-        empty dict — so the tool runs, with nothing, and the run continues.
-
-        Returning None means "this family does not stream tool calls", which
-        is different from "this event carried none" (an empty list).
+        None means the family does not stream tool calls; an empty list means
+        this event carried none.
         """
         return None
 

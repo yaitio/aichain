@@ -75,7 +75,7 @@ What the factory returns, with the schema a model is shown.
 
 ### `RestApiTool`
 
-A single REST endpoint exposed as a library Tool.
+A single REST endpoint exposed as a library Tool; `REST(...).endpoint(...)` builds one with the API's base URL, auth and headers filled in.
 
 | | |
 |---|---|

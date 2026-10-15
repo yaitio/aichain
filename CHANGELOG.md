@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.5.1] — 2026-10-15
+
+### Changed
+
+- Public docstrings keep what a reader needs — what it does, every parameter,
+  what it returns and raises, one short example — and leave history and design
+  reasoning out: 1 088 lines fewer, and the API reference with them, with no
+  parameter dropped from a page and no line of code changed. Docstrings longer
+  than their kind allows: 76 → 28; docstrings that tell history: 23 → 5.
+- `tests/test_tool_schemas_do_not_drift.py`: what a model is shown for every
+  tool the library ships — name, description, parameters — is held to a
+  snapshot, so a reworded docstring cannot change a prompt unnoticed. It
+  matches 4.3.0's.
+
+### Fixed
+
+- Docstrings that disagreed with the code: `judge` said an unparseable
+  verdict raises, and it abstains; `Pool`'s `on_error` left out `"stop"`;
+  `Chain.run`'s `on_step_error=` was not marked deprecated, which it is.
+- `Journal.is_repeating(last_k)`, `Journal.progress_summary(limit)` and
+  `estimate_cost` have their parameters described.
+
 ## [4.5.0] — 2026-10-15
 
 ### Added

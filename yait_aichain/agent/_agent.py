@@ -117,70 +117,35 @@ class Agent(_Loop, _Builtins):
     instructions : str, optional
         The standing brief — goes into the stable prefix.
     mode : "agile" | "waterfall"
-        ``"agile"`` decides at every step. ``"waterfall"`` writes a plan at
-        step 0 (via the ``write_plan`` tool) and holds to it.
+        ``"agile"`` decides at every step; ``"waterfall"`` plans at step 0 and holds to it.
     team : dict | list[Agent] | None
-        Who else may do work: ``{"members": [...], "extend": bool, "max": N,
-        "max_delegations": N}``. ``members`` are agents and chains the lead
-        hands tasks to, each read by its ``name`` and ``description``; a chain
-        takes its inputs by name, as its ``input_schema()`` lists them.
-        ``extend: True`` lets the lead add a member when none fits — one role,
-        by its instructions, made once and reused; ``max`` bounds the team,
-        added members included; ``max_delegations`` bounds the delegations of
-        one run. A list is the
-        members. ``None`` removes ``delegate``. ``"auto"`` (``{"extend":
-        True}``) is deprecated since 4.2.9.
+        ``{"members": [agents, chains], "extend": bool, "max": N, "max_delegations": N}``;
+        a list is the members, ``None`` removes ``delegate``; ``"auto"`` is deprecated.
     planner_model : Model, optional
-        ``waterfall`` only: the model that writes the plan. The freeze makes
-        the plan the highest-leverage tokens of the run — everything after
-        merely executes it — so it may deserve deliberation the execution
-        turns do not need. Turns before the plan is recorded go to this model;
-        every turn after goes to ``model``. Think while planning, act without
-        deliberating.
+        ``waterfall`` only: the model that writes the plan; ``model`` runs it.
     stop_when : list, optional
-        Conditions from this module. Defaults to ``[step_count(30)]`` —
-        a backstop, not a plan.
+        Conditions from this module. Defaults to ``[step_count(30)]``.
     hooks : list | None, optional
-        Callables given an ``Event`` at every step boundary; ``stream()`` yields
-        the same events.
+        Callables given an ``Event`` at every step boundary.
     policy : dict | PermissionPolicy | None, optional
-        Everything that decides what happens to a call, in one place::
-
-            {"rules":   {"read": "allow", "external": "approve", "destructive": "deny"},
-             "default": "approve",        # a class no rule names
-             "approve": "park",           # or "deny", or a function
-             "interceptors": [...]}
-
-        ``rules`` map a tool's risk class to ``allow``, ``approve`` or
-        ``deny``. ``approve`` says who answers an ``approve``: ``"park"`` parks
-        the run with the question — ``resume(run_id, signal={"approved":
-        True})`` runs the call, and needs a ``store``; ``"deny"`` refuses it; a
-        function given an ``ApprovalRequest`` answers ``True``, ``False`` or
-        ``ApprovalDecision``. ``interceptors`` act on each call before and
-        after it runs — see :class:`~yait_aichain.Interceptor`. Keys are
-        checked when the agent is built. A ``PermissionPolicy`` or a dict of
-        rules is the ``rules`` alone. With no policy every tool runs.
+        ``{"rules": {risk: "allow"|"approve"|"deny"}, "default": ..., "approve":
+        "park"|"deny"|fn, "interceptors": [...]}``, or the rules alone; none runs all.
     permissions : PermissionPolicy | None, optional
-        Deprecated since 4.2.9 — ``policy={"rules": ...}``. Removed in 5.0.
+        Deprecated; goes in 5.0, use ``policy={"rules": ...}``.
     approve : callable, optional
-        Deprecated since 4.2.9 — ``policy={"approve": ...}``. Removed in 5.0.
+        Deprecated; goes in 5.0, use ``policy={"approve": ...}``.
     store : StateStore, optional
-        Where a run parked by a ``wait()`` or ``gate()`` in the agent's tools
-        is kept until ``resume()``. Required when such a tool is given.
+        Where a parked run is kept until ``resume()``; needed by ``wait()``/``gate()``.
     max_cost : float | Budget | None, optional
-        A ceiling in dollars for the whole run; a model call that would begin
-        past it ends the run with ``success=False`` and the reason in
-        ``.error``.
+        A ceiling in dollars for the run; past it the run ends ``success=False``.
     name : str | None, optional
-        How this agent is named as a worker in another agent's ``team`` and in
-        events.
+        This agent's name as a worker in another's ``team`` and in events.
     description : str | None, optional
-        What it does — what a lead agent reads when choosing a worker.
+        What it does — what a lead reads when choosing a worker.
     verbose : int, optional
-        ``0`` is silent, ``1`` logs each step, ``2`` logs everything, through the
-        ``yait_aichain`` logger.
+        ``0`` silent, ``1`` each step, ``2`` everything, to the ``yait_aichain`` logger.
     interceptors : list | None, optional
-        Deprecated since 4.2.9 — ``policy={"interceptors": [...]}``. Removed in 5.0.
+        Deprecated; goes in 5.0, use ``policy={"interceptors": [...]}``.
     """
 
     MODES = ("agile", "waterfall")
@@ -361,24 +326,10 @@ class Agent(_Loop, _Builtins):
         """
         Run *task* and yield each :class:`~.._events.Event` as it happens.
 
-        ``run()`` is untouched and returns the same result it always did;
-        this is the same loop walked instead of exhausted. Three things are
-        worth knowing before reaching for it:
-
-        * **Events, not tokens.** A turn in an agent loop is usually a tool
-          call, not prose, so token deltas would be empty for most of a run
-          and would arrive interleaved with decisions in no useful order.
-          What a caller actually wants to show is what the agent is *doing* —
-          which is what the event channel already carries. `Skill.stream` is
-          the one for text.
-        * **The result is not yielded**, because a stream of one type is
-          easier to consume than a stream of two. It lands on
-          ``last_result`` when the generator finishes, with the journal
-          attached, exactly as ``run()`` would have returned it.
-        * **Abandoning the generator abandons the run.** A `break` out of the
-          loop leaves the agent mid-turn; the temporary hook is still removed
-          (that much is guaranteed), but no result is produced and no
-          `run.finished` is emitted. Exhaust it, or accept that.
+        The same loop as ``run()``, walked instead of exhausted. It yields events, not
+        tokens — ``Skill.stream`` is the one for text. The result is not yielded: it
+        lands on ``last_result`` when the generator finishes. Abandoning the generator
+        abandons the run, with no result and no ``run.finished``.
 
         Parameters
         ----------
@@ -423,19 +374,8 @@ class Agent(_Loop, _Builtins):
         """
         Create the run **without starting it**, and return it parked.
 
-        The run exists before it has a task: a ``run_id``, a document in the
-        store, and a declared shape for the signal that will start it. That is
-        a subscription — what a trigger waits on, and what a person is shown a
-        form for — and it is the same object a pause mid-run produces, so
-        "an email arrived", "the human pressed start" and "the gate was
-        approved" all arrive as ``resume(run_id, signal)``.
-
-        Nothing is scheduled here. ``hint`` is recorded for whatever does the
-        waking: ``{"on": "email.received"}``, ``{"wake_at": "..."}``.
-
-        The signal carries the task: a string is the task, a dict gives it
-        under ``"task"`` and every other key seeds the conversation the way
-        ``run(task, variables=...)`` does.
+        ``resume(run_id, signal)`` starts it: a string is the task, or a dict gives
+        it under ``"task"`` and its other keys seed the conversation.
 
         Parameters
         ----------
@@ -444,7 +384,7 @@ class Agent(_Loop, _Builtins):
         resume_with : dict | None, optional
             The shape of the signal that starts it.
         hint : dict | None, optional
-            Recorded for whatever does the waking; the engine schedules nothing.
+            Recorded for whatever does the waking, such as ``{"on": "email.received"}``.
         variables : dict | None, optional
             Data the run starts with, beside what the signal brings.
         """
@@ -470,29 +410,23 @@ class Agent(_Loop, _Builtins):
         """
         Continue a run this agent parked, delivering *signal* as the answer.
 
-        The pause and this call are the same seam the externally driven path
-        already has: a parked run is a history whose last tool call has no
-        result, and *signal* is that result. Nothing is restored that was not
-        written down — the conversation **is** the state, which is why 2.0
-        removed the agent's snapshot mechanism and why none is needed here.
-
-        Idempotent in the way a trigger needs: a ``run_id`` the store no
-        longer holds raises ``KeyError``, so an at-least-once delivery can
-        read that as "already handled" instead of running the tail twice.
-
-        Returns an :class:`AgentResult` when the run finishes, or another
-        :class:`~..state.SuspendedResult` when it parks again — under the same
-        ``run_id``, so a caller tracks one identifier for the whole
-        conversation however many times it waits.
-
         Parameters
         ----------
         run_id : str
             The parked run, as the ``SuspendedResult`` named it.
         signal : any, optional
-            The answer the run waited for — the result of the tool call that
-            parked it. For a run made by ``arm()``, a string is the task, or a dict
-            gives it under ``"task"``.
+            The result of the tool call that parked the run; for an ``arm()`` run,
+            the task (a string, or a dict with ``"task"``).
+
+        Returns
+        -------
+        AgentResult | SuspendedResult
+            The finished run, or the run parked again under the same ``run_id``.
+
+        Raises
+        ------
+        KeyError
+            *run_id* is not in the store — already resumed, or never parked.
         """
         if signal is _UNSET:
             # A run kept after a failure is retried with no answer; a run
@@ -628,13 +562,6 @@ class Agent(_Loop, _Builtins):
         """
         The two messages a run starts from: the stable prefix and the task.
 
-        ``ground_rules`` injects the "plain text ends the run" rule, and it
-        belongs to whoever owns the loop: ``run()`` passes True because in its
-        loop a text reply really does end the run. An external driver calling
-        ``opening()``/``step()`` owns its own loop — there a plain reply is an
-        ordinary turn, so the default is clean instructions and the driver
-        states its own framing.
-
         Parameters
         ----------
         task : str
@@ -642,8 +569,8 @@ class Agent(_Loop, _Builtins):
         variables : dict | None, optional
             Data the caller already holds, given with the task.
         ground_rules : bool, optional
-            Add the rule that a plain-text reply ends the run. ``run()`` sets it;
-            a driver that owns its own loop usually does not.
+            Add the rule that a plain-text reply ends the run. ``run()`` sets it; a
+            driver that owns its own loop usually does not.
         """
         opening = task
         if variables:
@@ -664,42 +591,23 @@ class Agent(_Loop, _Builtins):
         """
         Ask for the next decision and return it **without executing it**.
 
-        Returns a :class:`~models._calls.ToolCallRequest` when the model asked
-        to act, or a string — the answer. The caller appends the reply (via
-        ``.as_turn()``) and whatever the world answered, then calls again.
-
-        **Some calls are the agent's own, not the world's**: ``pool``,
-        ``write_plan`` and ``delegate`` exist only inside this library, so a
-        driver that hands every call to its environment gets "tool not found"
-        back for each. Ask :meth:`owns` and run those through :meth:`execute`.
-        Measured 2026-10-14: the τ²-bench adapter did not, and 962 of its
-        aichain arms' calls — every plan and every fan-out — failed that way.
-
-        **The obligation in that sentence is now checked.** A history holding
-        a tool call nobody answered is malformed, and the providers disagree
-        about it in the worst way: three reject the request, Google is looser,
-        and a self-hosted OpenAI-compatible server validates nothing and
-        templates it through, so the model meets its own unanswered call and
-        improvises — differently each time. Provider interchangeability is
-        this library's main promise and that is a place it did not hold.
-
-        Raising here buys three things and costs one. It makes the providers
-        agree; it turns an intermittent, unbounded behaviour into the same
-        named failure every time, since the condition that produces a
-        dangling call is itself intermittent; and it fails locally, before
-        the network, pointing at the caller rather than at a provider's
-        wording. What it does not buy is a better score — on a benchmark a
-        crash can rank below a model muddling through. This is an instrument
-        for reliability, not for accuracy.
+        Returns a :class:`~models._calls.ToolCallRequest` when the model asked to act,
+        or a string — the answer. The caller appends the reply (``.as_turn()``) and a
+        result for every call, then calls again; :meth:`owns` names the calls that go
+        to :meth:`execute`.
 
         Parameters
         ----------
         messages : list
-            The conversation so far — ``opening()``'s two messages, then each
-            reply and each tool result in turn.
+            The conversation so far — ``opening()``'s two messages, then each reply
+            and each tool result in turn.
         state : dict | None, optional
-            The run's working state between calls, kept by the caller; the plan in
-            ``waterfall`` mode lives here.
+            The run's working state, kept by the caller; holds the ``waterfall`` plan.
+
+        Raises
+        ------
+        ValueError
+            When a tool call already in *messages* has no result.
         """
         if unanswered := dangling_calls(messages):
             raise ValueError(

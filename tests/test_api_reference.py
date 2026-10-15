@@ -39,7 +39,7 @@ RISK_AND_DECISION_CONSTANTS = {"READ", "DRAFT", "WRITE", "EXTERNAL", "FINANCIAL"
 
 #: Parameters (of a constructor, function or method on an API page) that no
 #: docstring describes. Lowered as they are written, never raised.
-UNDOCUMENTED_CEILING = 52
+UNDOCUMENTED_CEILING = 50
 
 
 def _covered() -> tuple:
