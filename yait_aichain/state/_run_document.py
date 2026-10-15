@@ -1,19 +1,10 @@
 """
-state._run_document — RunDocument
-=================================
+state._run_document — RunDocument, the JSON snapshot of one run.
 
-A self-contained, JSON-serialisable snapshot of one run. Holds three things:
-
-* ``variables`` — the key-value data, the single source of truth (filled as
-  steps produce named outputs);
-* ``steps`` — per-step control state: ``status`` (+ optional ``suspend`` and an
-  optional observability ``log``); the value of any step's output already lives
-  in ``variables``;
-* ``definition`` — the serialised scenario (e.g. ``Chain.save`` output) so a run
-  can be resumed from this one artifact alone.
-
-Resume continues from the first non-terminal step; ``done`` / ``skipped`` /
-``failed`` steps are never re-run.
+``variables`` is the single source of truth for data, ``steps`` holds each
+step's status, ``definition`` the serialised scenario so a run resumes from
+this one artifact. Resume continues from the first non-terminal step.
+See docs/pipelines/pause-and-resume.md.
 """
 
 from __future__ import annotations

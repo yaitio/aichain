@@ -1,32 +1,6 @@
 """
-tools.rerank._voyage — RerankVoyage
-===================================
-
-Wraps the Voyage AI Rerank API (``POST /v1/rerank``).
-
-Supported models
-----------------
-  rerank-2       Latest; strong across all domains; default choice
-  rerank-2-lite  Faster and cheaper; good for high-throughput pipelines
-
-API reference
--------------
-POST https://api.voyageai.com/v1/rerank
-
-Request body
-  model            : str
-  query            : str
-  documents        : list[str]
-  top_k            : int | None    (Voyage uses top_k, not top_n)
-
-Response
-  data[].index           — original document index
-  data[].relevance_score — float, higher = more relevant
-  usage.total_tokens     — token count
-
-Environment variable
---------------------
-VOYAGE_API_KEY
+``RerankVoyage``: the Voyage AI Rerank API (``POST /v1/rerank``), where
+``top_n`` is sent as ``top_k``. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations

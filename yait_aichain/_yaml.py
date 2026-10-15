@@ -2,9 +2,9 @@
 Saved files: written whole or not at all, read back only if they are the shape
 they claim.
 
-`yaml.dump` wrote Python tuples as `!!python/tuple`, which `safe_load` then
-refused to read; a write interrupted half-way left half a file; and an empty
-file loaded as None and failed later with an AttributeError.
+Tuples are written as lists so ``safe_load`` reads them, a write goes through a
+temporary file so an interruption leaves no half file, and a file that holds no
+mapping is refused at read rather than failing later.
 """
 
 from __future__ import annotations

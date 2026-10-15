@@ -1,22 +1,8 @@
-"""
-skills._skill
-=============
-
-``Skill`` — the universal task runner.
-
-A Skill binds a :class:`~models.Model` to:
-
-  * a provider-agnostic input template (messages with ``{placeholder}``
-    variables)
-  * a declared output format (``text`` / ``json`` / ``json_schema``)
-  * an optional set of default variable values
-
-Calling ``skill.run()`` substitutes variables, delegates serialisation to
-the model's own ``to_request()`` method, executes the HTTP request via the
-model's attached client, then delegates deserialisation to ``from_response()``.
-
-Skills can be persisted to YAML with :meth:`Skill.save` and reloaded with
-the :meth:`Skill.load` class method.
+"""``Skill``: one model call made reusable — a Model, an input template with
+``{placeholder}`` variables, a declared output format and default variables.
+``run()`` substitutes, builds the request through the Model, sends it and
+parses the reply; ``save()``/``load()`` keep it as YAML.
+See docs/pipelines/skills.md.
 """
 
 
@@ -356,12 +342,9 @@ class Skill:
             emit(self.hooks, Event(type=etype, **fields))
 
     def _started(self, model) -> float:
-        """Check the budget, announce the call, and return its start time.
-
-        Before the call, not after: the length of a reply is not known until
-        it is paid for, so a budget bounds "do not begin another call" and
-        never "do not exceed by a cent".
-        """
+        """Check the budget, announce the call, return its start time. Before the
+        call: a reply's length is unknown until paid for, so a budget bounds
+        beginning another call, never exceeding by a cent."""
         for budget in in_force(self.max_cost):
             budget.check(f"{model.name} for skill {self.name or '(unnamed)'}")
         self._emit("llm_call.started", name=model.name)
@@ -527,8 +510,8 @@ class Skill:
             finished = True
         finally:
             # A caller that stops reading — a closed connection, a `break` —
-            # ends the generator with GeneratorExit, which skipped the charge
-            # and the ended event: a cancelled stream was never recorded.
+            # ends the generator with GeneratorExit, which would skip the
+            # charge and the ended event.
             if not finished and self._open_call is not None:
                 self._ended(model, self._open_call, error="abandoned")
             self._open_call = None
@@ -638,17 +621,9 @@ class Skill:
         max_retries: int,
         retry_delay: float,
     ) -> "str | dict":
-        """
-        Run *messages* against a single model.
-
-        Single-shot when there are no ``assistant`` generate markers. With
-        markers (multi-turn directed reasoning), each
-        marker — and the implicit final generate after a trailing ``user`` turn
-        — is one model call; each reply is appended to the running context so
-        later turns see it. The last call uses the skill's real output format;
-        intermediate calls are plain text (they only feed the context).
-        ``last_usage`` is the sum across turns; ``history`` holds each reply.
-        """
+        """Run *messages* on one model: a call per generate marker (and after a
+        trailing user turn), each reply appended for the next; only the last
+        uses the real output format. ``last_usage`` sums, ``history`` keeps each."""
         if not any(adapters.is_generate_marker(m) for m in messages):
             try:
                 result, usage, made = self._call_once(
@@ -667,7 +642,7 @@ class Skill:
         seq: list = [("gen",) if adapters.is_generate_marker(m) else ("msg", m)
                      for m in messages]
         # Any turns after the last marker are a final question, whoever speaks
-        # them: they were dropped, and the caller got the draft before them.
+        # them, and get a reply of their own.
         if seq and seq[-1][0] == "msg":
             seq.append(("gen",))
         last_gen = max(k for k, s in enumerate(seq) if s[0] == "gen")
@@ -710,11 +685,9 @@ class Skill:
         max_retries: int,
         retry_delay: float,
     ) -> "tuple[str | dict, Usage, list]":
-        """One model call with transient retries: ``(result, usage, adaptations)``.
-
-        The adaptations come back with the request that made them; reading
-        them off a Model shared between calls read another call's.
-        """
+        """One model call with transient retries: ``(result, usage, adaptations)``,
+        the adaptations returned with their request, since a shared Model's
+        record may already be another call's."""
         _tools = getattr(self, "_tools", None)
         own = isinstance(model, Model)
         if own:
@@ -737,8 +710,7 @@ class Skill:
                 # A cost estimate is the last thing that should abort a call
                 # that already succeeded.
                 # Priced as the model that answered: a swap sends the request
-                # to another model at another rate, and the budget counted it
-                # at the one asked for.
+                # to another model at another rate.
                 usage    = attach_cost(extract_usage(response), _priced_as(model, made),
                                        getattr(model, "cache_ttl", "5m"),
                 getattr(model, "_provider", None))
@@ -748,8 +720,8 @@ class Skill:
                     result = (model.from_response(response, output, tools_sent=bool(_tools)) if own
                               else model.from_response(response, output))
                 except Exception as exc:
-                    # Paid for and unparseable: the usage was lost with the
-                    # exception, and no ended event said the call happened.
+                    # Paid for and unparseable: the usage rides the exception
+                    # and an ended event says the call happened.
                     self._ended(model, t0, usage, error=exc)
                     exc._aichain_usage = usage
                     raise

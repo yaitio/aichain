@@ -1,17 +1,7 @@
 """
-tools.speech
-============
-
-Text read aloud into an audio file — one format of options, a provider per
-tool. ``speech(service)`` makes one by the provider's name; the classes
-behind it share the base :class:`Speech`.
-
-Tools
------
-ttsOpenAI   OpenAI ``gpt-4o-mini-tts`` and ``tts-1``.
-ttsGoogle   Google Gemini TTS.
-ttsXAI      xAI.
-ttsQwen     Qwen (DashScope); takes ``region``.
+Text read aloud into an audio file: ``speech(service)`` makes a tool by the
+provider's name (``SERVICES``); the classes behind it share :class:`Speech`.
+See docs/tools/media.md.
 """
 
 from ._tts import Speech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI

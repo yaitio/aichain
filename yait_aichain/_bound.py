@@ -1,14 +1,10 @@
 """
 yait_aichain._bound — a generator that runs in the context it was made in.
 
-A generator runs in whichever context advances it. Starlette's
-``iterate_in_threadpool`` advances each ``next()`` in a fresh copy of the
-caller's context, so a stream lost from its second step what its first had
-set — the beacon board, the tenant — and a stream made inside ``with
-using(ctx)`` and read after it had no tenant at all. Two streams advanced in
-turn in one thread set and reset the same variables out of order.
-
-``bound`` captures the context when the stream is *made* and advances the
+A generator runs in whichever context advances it: Starlette's
+``iterate_in_threadpool`` gives each ``next()`` a fresh copy of the caller's
+context, so what one step set (the beacon board, the tenant) is gone at the
+next. ``bound`` captures the context when the stream is made and advances the
 generator inside it, every step, closing included.
 """
 

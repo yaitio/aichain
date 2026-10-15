@@ -18,11 +18,6 @@ _skip_log = logging.getLogger("yait_aichain.chain")
 
 from .._template import _PLACEHOLDER_RE, placeholder_names, substitute_placeholders
 
-# One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
-# is a silent `skip`: a chain of a hundred generated steps that expects a few
-# to fail should not have to choose between a warning per failure and no
-# record at all.
-
 # Default options applied to every Agent step unless overridden.
 _AGENT_DEFAULT_OPTIONS: dict = {
     "task_key":     "task",
@@ -39,8 +34,7 @@ def _usage_to_dict(usage) -> dict:
     """Serialise a ``Usage`` (or None) for the run document."""
     if not usage:
         return {}
-    # Every field: four of the seven were kept, and the cache and image counts
-    # were lost at a pause.
+    # Every field, or the cache and image counts would be lost at a pause.
     from dataclasses import asdict
     return asdict(usage)
 
@@ -48,36 +42,14 @@ def _usage_to_dict(usage) -> dict:
 
 
 def _build_tool_kwargs(tool, accumulated: dict, input_map: dict) -> dict:
-    """
-    Build the ``**kwargs`` dict to pass to ``tool.run()``.
-
-    A parameter the step's *input_map* does not mention takes the variable of
-    the same name, when there is one, and is otherwise left to the tool's own
-    default. A parameter it does mention is filled from its value:
-
-      * ``"draft"`` — a variable's name: that variable's value;
-      * ``"Draw {topic} in watercolor"`` — a template: the variables
-        substituted, as a Skill substitutes its prompt;
-      * ``"{candidates}"`` — one placeholder alone: the variable's value itself,
-        so a list stays a list;
-      * ``{"query": "{question}", "top_n": 5}`` — a dict, resolved key by key:
-        templates are filled, and anything else — a number, a plain string — is
-        a literal.
-
-    A name or a template naming a variable the chain does not have, and a
-    parameter the tool does not take, are errors that say which.
-
-    Parameters
-    ----------
-    tool       : Tool instance whose ``.parameters`` schema is inspected.
-    accumulated: Current accumulated variable dict.
-    input_map  : ``{"tool_param": value}`` — see above.
-    """
+    """The ``**kwargs`` for ``tool.run()``: an unmapped parameter takes the variable
+    of its name; a mapped one its source — a name, a path, a template, a lone
+    placeholder (the value itself), or a dict resolved key by key."""
     from ..tools._base import _open
     props  = tool.parameters.get("properties", {})
     name   = getattr(tool, "name", None) or type(tool).__name__
-    # A tool with no properties took any mapping and dropped it; an open
-    # schema takes what it is given, and anything else refuses a stranger.
+    # An open schema takes what it is given; any other refuses a stranger
+    # rather than drop it.
     if not _open(tool.parameters) and (unknown := [k for k in input_map if k not in props]):
         raise ValueError(f"the step maps {unknown} into {name!r}, which takes {sorted(props)}")
     kwargs = {}
@@ -99,13 +71,8 @@ def _callable_name(f) -> str:
 
 
 def _build_call_kwargs(f, accumulated: dict, input_map: dict) -> tuple[list, dict]:
-    """
-    The arguments for a function or a method step: each parameter its
-    signature names, filled as a tool's are (see `_build_tool_kwargs`); a
-    required one the chain cannot fill is an error naming it. Positional-only
-    parameters — `len(obj, /)` — go positionally, where they went by name and
-    the call failed.
-    """
+    """A function or method step's arguments, filled as a tool's are; a required one
+    the chain cannot fill is an error, and positional-only ones go positionally."""
     import inspect
     params = {n: p for n, p in inspect.signature(f).parameters.items()
               if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)}

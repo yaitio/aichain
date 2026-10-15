@@ -1,47 +1,10 @@
 """
-tools.rerank._base
-==================
+``RerankResult``, the return type of every reranking call, and ``RerankBase``,
+the base class of every provider.
 
-RerankResult  — uniform return type for every reranking call.
-RerankBase    — abstract base class for all provider implementations.
-
-Design
-------
-Every concrete reranker:
-  1. Sets ``provider`` and ``_ENV_KEY`` class attributes.
-  2. Calls ``super().__init__(model, api_key=api_key)`` in ``__init__``.
-  3. Implements ``_rerank_request(query, documents, top_n)``
-     which sends one API request and returns
-     ``(results, total_tokens, metadata)`` where ``results`` is a list of
-     ``{"index": int, "text": str, "score": float}`` dicts sorted by
-     descending score.
-
-Everything above that layer — document normalisation, run() interface,
-result assembly — is provided by this base class.
-
-Document normalisation
-----------------------
-All rerankers accept documents as:
-  • ``list[str]``       — plain text strings
-  • ``list[dict]``      — dicts with a ``"text"`` key, such as the output
-                          of ``Vectors(...).query``
-
-The original dict fields (``id``, ``metadata``, etc.) are preserved and
-merged back into the result so the caller never loses context.
-
-run() interface
----------------
-``run(input, options)`` follows the standard Tool contract:
-  ``input``   : list[str | dict]  — documents to rerank
-  ``options`` : dict
-      ``query``  str  — the search query  (required)
-      ``top_n``  int  — how many results to return (default: all)
-
-This makes the reranker a drop-in Chain step after a vector search::
-
-    (kb.query, "candidates", {"input": "{question}"}),
-    (reranker, "top5",       {"input": "{candidates}",
-                              "options": {"query": "{question}", "top_n": 5}}),
+A provider sets ``provider`` and ``_ENV_KEY`` and implements
+``_rerank_request``; the base normalises the documents, merges a record's own
+fields back into its result and provides ``run()``. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations
@@ -177,8 +140,8 @@ class RerankBase(Tool):
         **kwargs: Any,
     ) -> None:
         if kwargs:
-            # A setting here that belongs to the call would otherwise be
-            # dropped: the reranker would return every document, and say nothing.
+            # A call's option given here would be dropped, and every document
+            # returned in silence.
             hint = (" — top_n and query are options of the call: .run(docs, {\"query\": …, \"top_n\": …})"
                     if set(kwargs) & {"top_n", "query"} else "")
             raise TypeError(f"{type(self).__name__} takes model, api_key, name and description; "
@@ -238,8 +201,7 @@ class RerankBase(Tool):
         if isinstance(query, bool) or not isinstance(query, str) or not query.strip():
             raise ValueError(f"{type(self).__name__}: rerank needs a query — options={{'query': …}}")
         if isinstance(documents, (str, bytes)) or isinstance(documents, Mapping):
-            # A string is a sequence of characters, and was sent as one
-            # document per character.
+            # A string is a sequence of characters: one document per character.
             raise TypeError(f"{type(self).__name__}: documents is a list of documents, "
                             f"not one {type(documents).__name__}")
         if top_n is not None:
@@ -312,25 +274,8 @@ class RerankBase(Tool):
         documents: list[str],
         top_n:     int | None,
     ) -> tuple[list[dict], int | None, dict]:
-        """
-        Send a single reranking API request.
-
-        Must be implemented by every subclass.
-
-        Parameters
-        ----------
-        query     : str         — the query string
-        documents : list[str]   — plain-text documents (already normalised)
-        top_n     : int | None  — max results, or None for all
-
-        Returns
-        -------
-        tuple[list[dict], int | None, dict]
-          * results      — ``[{"index": int, "text": str, "score": float}, ...]``
-                           sorted by descending score
-          * total_tokens — token count, or None
-          * metadata     — provider extras dict
-        """
+        """One request over plain-text documents. Returns ``(results, total_tokens or
+        None, metadata)``, results ``{index, text, score}`` by descending score."""
         raise NotImplementedError(
             f"{type(self).__name__} must implement _rerank_request()"
         )
@@ -341,15 +286,8 @@ class RerankBase(Tool):
         self,
         documents: list[str | dict],
     ) -> tuple[list[str], list[dict | None]]:
-        """
-        Extract plain text strings from *documents*.
-
-        Returns
-        -------
-        texts     : list[str]          — text for each document
-        originals : list[dict | None]  — original dict (or None for str inputs)
-                    used to merge fields back after reranking
-        """
+        """The text of each document, and its record (``None`` for a string) to
+        merge back into the result."""
         texts:     list[str]        = []
         originals: list[dict | None] = []
         for doc in documents:
@@ -364,9 +302,9 @@ class RerankBase(Tool):
 
     @staticmethod
     def _ranked(items: list, documents: list) -> list[dict]:
-        """``{index, text, score}`` by descending score, the text being the one
-        sent — every provider answers with an index and a relevance_score, so
-        none is asked to send the documents back."""
+        """``{index, text, score}`` by descending score, with the text that was sent:
+        every provider answers with an index and a relevance_score, so none is asked
+        to send the documents back."""
         out = [{"index": i["index"], "text": documents[i["index"]], "score": i["relevance_score"]}
                for i in items]
         return sorted(out, key=lambda x: x["score"], reverse=True)

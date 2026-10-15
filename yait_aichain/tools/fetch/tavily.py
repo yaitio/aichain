@@ -1,25 +1,10 @@
-"""
-tools.fetch.tavily — fetchTavily
-================================
-
-Tavily Extract behind the common :class:`~tools.fetch.Fetch` record.
-
-Endpoint  : POST https://api.tavily.com/extract
-Auth      : ``Authorization: Bearer tvly-…``
-Docs      : https://docs.tavily.com/documentation/api-reference/endpoint/extract
-            — answer checked live 2026-10-09.
-
-Up to 20 URLs a call; a URL that fails comes back in ``failed_results`` and is
-a page with ``error`` here. Tavily returns the text and a title and **no date
-or author** — those fields stay empty. ``extract_depth: "advanced"`` reaches
-more (tables, embedded content) at twice the price.
-
-**Price.** One credit per five successful URLs (basic), read from the answer —
-so a call with fewer than five reports 0 until the count reaches five.
-
-Environment variable
---------------------
-``TAVILY_API_KEY``
+"""Tavily Extract (``POST https://api.tavily.com/extract``, Bearer) behind the
+common :class:`~tools.fetch.Fetch` record. Up to 20 URLs a call; a URL in
+``failed_results`` is a page with ``error`` here. Text and title only, no date
+or author. One credit per five successful URLs, read from the answer, so a
+call with fewer than five reports 0. Key: ``TAVILY_API_KEY``.
+See docs/tools/fetch.md and
+https://docs.tavily.com/documentation/api-reference/endpoint/extract.
 """
 
 from __future__ import annotations

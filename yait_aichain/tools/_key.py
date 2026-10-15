@@ -1,13 +1,9 @@
-"""
-tools._key — a tool's API key, resolved for the request being made.
+"""A tool's API key, resolved for the request being made.
 
-``Model(api_key=callable)`` resolves its key per request from the ambient
-``RunContext``. A tool froze whatever it was given: a callable was sent as
-``Bearer <function …>`` and answered 401, so a multi-tenant RAG had to build
-its tools per request or bill every tenant to one key. ``ApiKey`` is the
-model clients' rule for tools: a string is the key, a callable is asked each
-time with the current context, and an empty answer is an error rather than a
-fall-back to another tenant's key.
+``ApiKey`` follows ``Model(api_key=callable)``: a string is the key, a
+callable is asked each time with the current ``RunContext``, and an empty
+answer is an error rather than a fall-back to another tenant's key.
+See docs/tools/index.md.
 """
 
 from __future__ import annotations

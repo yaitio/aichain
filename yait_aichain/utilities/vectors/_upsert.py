@@ -1,35 +1,6 @@
-"""
-utilities.vectors._upsert
-=========================
-
-VectorUpsertTool — insert or update documents in a vector store.
-
-Typical use: ingestion pipeline step that indexes new content before
-the RAG query step can retrieve it.
-
-Usage
------
-::
-
-    from yait_aichain.utilities.vectors import VectorDB, VectorUpsertTool
-    from yait_aichain.tools import embed
-
-    store = VectorDB(
-        "qdrant",
-        collection = "docs",
-        embedder   = embed("openai", model="text-embedding-3-small"),
-    )
-    tool = VectorUpsertTool(store)
-
-    # Standalone
-    result = tool.run([
-        {"id": "doc_1", "text": "LLMs use KV cache …", "metadata": {"source": "arxiv"}},
-        {"id": "doc_2", "text": "Attention is all you need …"},
-    ])
-    # → {"upserted": 2}
-
-    # Inside a Chain (receives a list of dicts from a previous step)
-    (tool, "upsert_result", {"input": "{parsed_documents}"})
+"""``VectorUpsertTool``: insert or update records — ``{"id", "text",
+"metadata"}`` dicts, embedded on the way in when the store has an embedder —
+answering ``{"upserted": n}``. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

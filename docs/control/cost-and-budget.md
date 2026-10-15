@@ -75,6 +75,9 @@ budget.spent, budget.remaining
 
 A `Budget` passed to several primitives is shared between them, and safe under
 a `Pool`'s parallel items — a budget a race can overspend is not a budget.
+Safe means the sum is right, not that the ceiling is exact: a call already in
+flight when the ceiling is reached still finishes, so a `Pool` with sixteen
+workers can overshoot by up to sixteen calls.
 
 ## Choosing a model by price
 

@@ -1,23 +1,6 @@
-"""
-utilities.shell._base
-=====================
-
-Shared sandbox enforcement for the four tools of :class:`Shell`.
-
-Every tool receives a ``root_dir`` — the Shell's folder — at construction time.
-All path operations are validated against it — any attempt to
-navigate above the root raises ``PermissionError``.
-
-Path resolution rules
----------------------
-1. Relative paths are resolved relative to ``root_dir``.
-2. Absolute paths must start with ``root_dir`` (after symlink resolution).
-3. Path traversal (``../../``) is caught after ``os.path.realpath()``.
-
-Default ``root_dir``
----------------------
-When omitted, ``root_dir`` defaults to ``os.getcwd()`` — the current
-working directory at the time the tool is instantiated.
+"""The sandbox the Shell tools share: every path is resolved against the root
+(symlinks and ``..`` followed by ``realpath``) and one that escapes it raises
+``PermissionError``. See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -47,24 +30,13 @@ class SandboxedTool:
         self.root = os.path.realpath(root_dir or os.getcwd())
 
     def _serialise_init_args(self) -> dict:
-        """The folder, which a saved chain kept nothing of: reloaded, the tool
-        moved to the loader's working directory."""
+        """The folder, saved so a reloaded tool does not move to the loader's
+        working directory."""
         return {"root_dir": self.root}
 
     def _resolve(self, path: str) -> str:
-        """
-        Resolve *path* relative to the sandbox root and validate it.
-
-        Returns
-        -------
-        str
-            Absolute resolved path, guaranteed to be inside the sandbox.
-
-        Raises
-        ------
-        PermissionError
-            When the resolved path escapes the sandbox root.
-        """
+        """*path* resolved against the root, absolute and inside it, or
+        ``PermissionError``."""
         if os.path.isabs(path):
             resolved = os.path.realpath(path)
         else:

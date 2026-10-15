@@ -1,32 +1,6 @@
-"""
-utilities.vectors._query
-========================
-
-VectorQueryTool — semantic similarity search (main RAG tool).
-
-It embeds the query text and returns the most relevant documents from the
-vector store. ``Vectors`` builds one as ``kb.query``, the tool an agent gets.
-
-Usage
------
-::
-
-    from yait_aichain.utilities.vectors import VectorDB, VectorQueryTool
-    from yait_aichain.tools import embed
-
-    store = VectorDB(
-        "chroma",
-        collection = "knowledge_base",
-        embedder   = embed("openai", model="text-embedding-3-small"),
-    )
-    tool = VectorQueryTool(store)
-
-    # Standalone
-    results = tool.run("how does KV caching work?", {"n": 5})
-    # → [{"id": "...", "text": "...", "score": 0.91, "metadata": {...}}, ...]
-
-    # Inside a Chain step — output_key "context" flows into the next Skill
-    (tool, "context", {"input": "{user_question}"})
+"""``VectorQueryTool``: similarity search — embed the query text, return the
+nearest records with a score in [0, 1]. ``Vectors`` builds one as ``kb.query``,
+the tool an agent gets. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

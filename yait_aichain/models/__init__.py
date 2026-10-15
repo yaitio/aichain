@@ -1,41 +1,8 @@
-"""
-models
-======
+"""The model layer: ``Model``, the data-driven ``registry``, and the call types.
 
-Public API for the aichain 2.0 model layer.
-
-Typical usage
--------------
-::
-
-    from yait_aichain.models import Model
-
-    # Auto-detected provider — returns the correct subclass
-    gpt    = Model("gpt-4o")
-    sonnet = Model("claude-sonnet-4-5")
-    gemini = Model("gemini-2.0-flash")
-    grok   = Model("grok-3")
-    sonar  = Model("sonar-pro")
-
-    # Override generation parameters
-    fast = Model("gpt-4o-mini", options={"temperature": 0.3, "max_tokens": 2048})
-
-    # Override client settings (proxy, timeout, custom URL)
-    corp = Model("gpt-4o", client_options={"proxy": {"url": "http://proxy:3128"}})
-
-    # Explicit API key (falls back to env var when omitted)
-    model = Model("claude-sonnet-4-5", api_key="sk-ant-...")
-
-    # Query the model registry
-    from yait_aichain.models import registry
-    registry.models(task="text-to-image")           # all text-to-image models
-    registry.providers(task="text-to-image")        # ["google", "openai", "xai"]
-    registry.tasks("gpt-4o")                        # ["image-to-text", "text-to-text"]
-    registry.is_supported("gpt-image-1", "text-to-image")  # True
-
-There is one ``Model`` class: the provider is resolved from the model name
-(against the ``providers/`` data) and the matching family client handles the
-wire format.  There are no per-provider Model subclasses.
+There is one ``Model`` class; the provider is resolved from the model name
+against the ``providers/`` data and a family client speaks its wire format.
+See docs/models/models.md and docs/reference/model-registry.md.
 """
 
 from types import SimpleNamespace
@@ -72,8 +39,7 @@ registry = SimpleNamespace(
 from ._schema import portable_schema, check_structure
 from ..clients._families._openai_compat import SchemaNotExpressible
 # What an external driver of `Agent.step()` needs, public because `step()`'s
-# own error message tells the caller to use `tool_result_turn` — and until
-# 2.19.0 the only import path for it was the private `models._calls`.
+# own error message tells the caller to use `tool_result_turn`.
 from ._calls import ToolCall, ToolCallRequest, tool_result_turn, dangling_calls
 
 __all__ = [

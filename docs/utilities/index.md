@@ -55,7 +55,17 @@ kb = Vectors("chroma", collection="tickets", description="last year's support ti
 
 Backends: `chroma`, `pinecone`, `qdrant`. `description` is required — it is how
 the search tool tells a model what it searches, and an agent with two
-knowledge bases cannot tell them apart without it. → [API: Vectors](../api/utilities/vectors.md)
+knowledge bases cannot tell them apart without it.
+
+| Backend | Where it is | Key | Also |
+|---|---|---|---|
+| `chroma` (or `chromadb`) | `url=` or `CHROMA_URL`, default `http://localhost:8000` | `CHROMA_API_KEY`, for Chroma Cloud | `CHROMA_TENANT`, `CHROMA_DATABASE` |
+| `pinecone` | `index=` or `PINECONE_INDEX`; the collection is a namespace | `PINECONE_API_KEY`, required | `cloud`, `region` for a new index (`aws`, `us-east-1`) |
+| `qdrant` | `url=` or `QDRANT_URL`, default `http://localhost:6333` | `QDRANT_API_KEY`, for Qdrant Cloud | |
+
+Each is spoken over its REST API, with no vendor SDK installed. A record's
+text is kept in the backend's metadata, so `fetch` and `query` give it back.
+A `filter` is the backend's own filter format, passed through as it is. → [API: Vectors](../api/utilities/vectors.md)
 
 ### Shell — a folder
 
@@ -70,6 +80,11 @@ Agent(model, tools=[sh.browse, sh.read])               # read-only
 | `browse`, `read` | `read` | look inside the folder |
 | `write` | `write` | change a file inside the folder |
 | `run` | `privileged` | run any command — the folder is where it **starts**, not a boundary |
+
+The folder defaults to the working directory when the Shell is made. For
+`browse`, `read` and `write` it is a boundary: a path is resolved against it,
+symlinks and `..` followed, and one that lands outside raises
+`PermissionError`.
 
 `run` has the host process's rights: a command can use absolute paths, reach
 the network, delete. With a [permission policy](../control/permissions.md) it
@@ -95,6 +110,23 @@ An endpoint's risk class follows its method: `GET` is `read`, `DELETE` is
 `destructive`, `POST`, `PUT` and `PATCH` are `external` — they change
 something on a service the library does not own. `risk="read"` on a `POST`
 that only searches says otherwise.
+
+An endpoint declares where each field goes — `path_params` into `{field}` in
+the path, `query_params` after `?`, `body_params` into the JSON body — and a
+field the call does not give is left out. `run()` takes the values as a dict
+or as keyword arguments, which is how a chain passes them; a field given both
+ways is an error. A JSON response comes back as a `dict` or `list` (in a chain
+a dict's keys become variables), anything else as a `str`, and
+`response_field` picks one key out of a dict. A failed call raises the typed
+`APIError` a model call would.
+
+| `auth["type"]` | Sends | The secret from |
+|---|---|---|
+| `bearer` | `Authorization: Bearer <value>` | one of `token` (a value or a callable), `token_field` (a field your code or a chain fills, never the model — wrap it in `state.Secret` so a paused chain does not store it) or `env` |
+| `cookie` | `Cookie: <cookie_name>=<value>`, `cookie_name` defaulting to `token` | as for `bearer` |
+| `api_key` | the value in `header`, default `X-Api-Key` | as for `bearer` |
+| `basic` | `Authorization: Basic …` | `username_env` and `password_env` |
+| `query` | `?<param>=<value>` in the URL, `param` defaulting to `key` | as for `bearer` |
 → [API: REST](../api/utilities/rest.md)
 
 ### MCP — a server
@@ -108,13 +140,29 @@ Agent(model, tools=deepwiki.tools)                     # or deepwiki.tool("ask_w
 
 The server is asked for its tools on first use, not when the utility is made.
 Each tool keeps the name, description and schema the server gives it.
-`connect_timeout` bounds reaching the server, `call_timeout` one call.
+`connect_timeout` bounds reaching the server and listing its tools (60 s),
+`call_timeout` one call (300 s); `None` waits indefinitely. `filter=[...]`
+keeps only the tools named, and `prefix="wiki_"` names them `wiki_…` for an
+agent holding two servers whose tools share names — `tool()`, `call()` and
+`risk=` still take the server's own names.
+
+| `server` | Transport |
+|---|---|
+| `"./server.py"`, `"python server.py …"`, `{"command": "npx", "args": [...]}` | a STDIO subprocess (`env=`, `cwd=`) |
+| `"https://example.com/mcp"`, `{"url": "https://…"}` | Streamable HTTP (`headers=` for auth) |
+| a URL ending in `/sse` | the legacy SSE transport |
+
+It needs `pip install fastmcp`. The calls are synchronous: the library runs
+one background event loop for every MCP tool, so a tool works from Jupyter or
+inside a web server's loop as anywhere else, and a STDIO server is not
+restarted for each call.
 
 Each tool's risk class comes from the server's annotations — `readOnlyHint`
 makes it `read`, `destructiveHint` makes it `destructive` — and is
 `privileged` where the server says nothing, so a policy sends it to a person.
 The annotations are the server's word; `risk={"ask_wiki_question": "read"}`
-puts yours over it.
+puts yours over it, and `trust_annotations=False` ignores them, so every tool
+is `privileged` unless `risk=` says otherwise.
 → [API: MCP](../api/utilities/mcp.md)
 
 ---

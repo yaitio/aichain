@@ -1,24 +1,7 @@
-"""
-tools.fetch
-===========
-
-A web page's text from its URL — one record of a page for every provider, the
-way ``tools.search`` works. A search finds the link; a fetch brings the page.
-``run()`` returns the page as text for a model; ``fetch()`` takes one URL or a
-list and returns the records for code.
-
-Tools
------
-fetchFirecrawl   Firecrawl Scrape — main content and metadata; reached the most in our measurement.
-fetchTavily      Tavily Extract — up to 20 URLs a call; text and title only.
-fetchExa         Exa Contents — up to 100 URLs a call, from Exa's cache; title, date, author.
-fetchParallel    Parallel Extract — up to 20 URLs a call; full content, title, date.
-fetchLocal       this machine, the standard library — free, respects robots.txt;
-                 a PDF needs ``pip install "yait-aichain[fetch]"``.
-
-``fetch(service)`` makes one by the provider's name — ``fetch("firecrawl")`` —
-and is the way the documentation shows. ``Fetch`` is the base; a new provider
-is a subclass that implements ``_fetch``, and an entry in ``SERVICES``.
+"""A web page's text from its URL, one record of a page for every provider:
+``fetchFirecrawl``, ``fetchTavily``, ``fetchExa``, ``fetchParallel`` and
+``fetchLocal``, made with ``fetch(service)``. A new provider subclasses
+``Fetch``, implements ``_fetch`` and joins ``SERVICES``. See docs/tools/fetch.md.
 """
 
 from ._base     import Fetch

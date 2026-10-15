@@ -1,16 +1,9 @@
-"""
-What one attempt looks like, on disk and in memory.
+"""What one attempt looks like, on disk and in memory.
 
-The whole package is built on one rule: **every number is computed from these
-records, never from a running tally.** A tally is written once and read many
-times, so an error in it is invisible; a record can be recounted, and was —
-a report parser once returned 0.878 where the raw data held 0.798, and the
-difference was found only because the raw data still existed.
-
-That is also why ``Record`` is a plain dict on disk. Anything that reads JSON
-lines can recount our numbers, and we can recount anyone else's: the τ²-bench
-runs and the byheart retrieval bench both produce their own shapes, and
-``Report.of()`` takes them once they are mapped onto these keys.
+Every number is computed from these records, never from a running tally, and
+a ``Record`` is a plain dict on disk so anything that reads JSON lines can
+recount it — and ``Report.of()`` can recount anyone else's.
+See docs/control/eval.md.
 """
 
 from __future__ import annotations
@@ -209,7 +202,7 @@ def adapt(rows: Iterable[dict], **keys) -> Iterator[Record]:
         mapped.setdefault("case", "")
         mapped.setdefault("trial", 0)
         # Other people's rows say "false" and "3": read as what they mean,
-        # where the string "false" was a pass.
+        # since the string "false" is truthy.
         if "ok" in mapped:
             mapped["ok"] = _as_bool(mapped["ok"])
         for key, kind in (("trial", int), ("score", float), ("tokens", int), ("seconds", float)):

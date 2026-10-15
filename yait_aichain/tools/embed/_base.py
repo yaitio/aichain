@@ -1,48 +1,11 @@
 """
-tools.embed._base
-=================
+``EmbeddingResult``, the return type of every embedding call, and
+``Embedder``, the base class of every provider.
 
-``EmbeddingResult`` — uniform return type for every embedding call.
-``Embedder``        — abstract base class for all provider implementations.
-
-Design
-------
-Every concrete embedder:
-
-  1. Sets three class attributes:
-       provider   : str   — canonical provider name ("openai", "cohere", …)
-       _ENV_KEY   : str   — environment variable holding the API key
-       _MAX_BATCH : int   — maximum texts per single API request
-
-  2. Implements ``_embed_chunk(texts, *, input_type, dimensions, **options)``
-     which sends one request and returns ``(embeddings, total_tokens)``.
-
-The base ``embed()`` method handles everything above that layer:
-normalisation, chunking, fan-out across batches, result assembly.
-
-The convenience methods ``run()`` and ``batch()`` wrap ``embed()`` with the
-standard ``run(input, options=None)`` interface every tool has.
-
-Universal input_type values
----------------------------
-  ``"query"``     — short retrieval query; providers map to their native term
-  ``"document"``  — document / passage; providers map to their native term
-  ``None``        — no hint; provider default is used
-
-Batch behaviour
----------------
-``embed()`` auto-chunks the input list into slices of at most
-``batch_size`` (default: the provider's ``_MAX_BATCH``).  Each slice becomes
-one API request.  Results are concatenated in order so the output
-``embeddings[i]`` always corresponds to ``texts[i]``.
-
-To process a list larger than any single provider limit:
-
-    result = embedder.embed(my_100k_list)   # sends ceil(100k/limit) requests
-
-To cap the slice size for rate-limiting purposes:
-
-    embedder = embed("openai", model="text-embedding-3-small", batch_size=32)
+A provider sets ``provider``, ``_ENV_KEY`` and ``_MAX_BATCH`` and implements
+``_embed_chunk``; the base normalises input, splits it into requests the
+provider accepts and reassembles the vectors in order.
+See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations
@@ -344,8 +307,7 @@ class Embedder(Tool):
             texts = [texts]
         if not texts:
             raise ValueError("texts must not be empty")
-        # A chunk() dict whole was a 400, None was embedded as "None", and ""
-        # was a request the provider refused.
+        # A chunk() record gives its text; None and "" are refused, not sent.
         texts = [text_of(t, type(self).__name__) for t in texts]
         if blank := [i for i, t in enumerate(texts) if not t.strip()]:
             raise ValueError(f"{type(self).__name__}: text {blank[:5]} is empty; "
@@ -358,8 +320,8 @@ class Embedder(Tool):
         for chunk in self._batches(texts):
             vecs, tok, metadata = self._embed_chunk(
                 chunk, input_type=input_type, dimensions=self.dimensions)
-            # Google answering with no `embeddings` gave zero vectors, and a
-            # successful result that paired nothing with anything.
+            # A reply short of vectors (Google can omit `embeddings`) is an
+            # error, not a result that pairs nothing with anything.
             if len(vecs) != len(chunk) or any(not v for v in vecs):
                 raise RuntimeError(f"{type(self).__name__}: {len(chunk)} texts sent, "
                                    f"{sum(1 for v in vecs if v)} vectors returned")
@@ -441,30 +403,8 @@ class Embedder(Tool):
         dimensions: int | None,
         **options:  Any,
     ) -> tuple[list[list[float]], int | None, dict]:
-        """
-        Embed a single chunk of texts.
-
-        Must be implemented by every subclass.  The chunk is guaranteed to
-        have at most ``_MAX_BATCH`` items.
-
-        Parameters
-        ----------
-        texts : list[str]
-            The texts to embed (guaranteed non-empty, length ≤ _MAX_BATCH).
-        input_type : str | None
-            Universal input type hint (``"query"`` / ``"document"`` / ``None``).
-        dimensions : int | None
-            Desired output dimensionality, or ``None`` for provider default.
-        **options
-            Any provider-specific keyword arguments.
-
-        Returns
-        -------
-        tuple[list[list[float]], int | None, dict]
-            * ``embeddings``   — list of float vectors, one per text
-            * ``total_tokens`` — token count reported by provider, or ``None``
-            * ``metadata``     — provider-specific extras dict
-        """
+        """One request for a non-empty slice no larger than the provider takes.
+        Returns ``(vectors, total_tokens or None, metadata)``, one vector per text."""
         raise NotImplementedError(
             f"{type(self).__name__} must implement _embed_chunk()"
         )
@@ -474,14 +414,7 @@ class Embedder(Tool):
     # ------------------------------------------------------------------
 
     def _request(self, url: str, body: dict, extra_headers: dict | None = None) -> dict:
-        """
-        POST *body* as JSON to *url* and return the parsed response dict.
-
-        Raises
-        ------
-        RuntimeError
-            On any non-2xx HTTP status.
-        """
+        """POST *body* as JSON and return the parsed reply; RuntimeError on non-2xx."""
         return request_json(self._http, "POST", url, json=body,
                             headers={"Accept": "application/json", **(extra_headers or {})},
                             what=f"{self.provider} Embeddings API")
@@ -498,14 +431,9 @@ class Embedder(Tool):
 
 
 class _OpenAIShaped(Embedder):
-    """The OpenAI embeddings wire, which Voyage and DashScope speak too: model
-    and input in; ``data[].embedding`` by index and ``usage.total_tokens`` out.
-
-    A provider on it is data: its ``_URL``, the name of its dimension field,
-    whether it asks for floats, and whether it forwards ``input_type``.
-    ``dimensions`` is already refused for a fixed-length model when the
-    embedder is made, so it is sent whenever it is set.
-    """
+    """The OpenAI embeddings wire, which Voyage and DashScope speak too. A provider
+    on it is data: ``_URL``, its dimension field, floats or not, ``input_type`` or not.
+    ``dimensions`` is sent whenever set: a fixed-length model refused it at construction."""
 
     _URL: str = ""
     _DIMS_FIELD: str = "dimensions"

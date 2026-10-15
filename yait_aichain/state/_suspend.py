@@ -1,10 +1,9 @@
 """
-state._suspend — Suspend / SuspendedResult
-===========================================
+state._suspend — Suspend and SuspendedResult, the pause primitive.
 
-The pause primitive. A *suspend tool* raises :class:`Suspend` to park the run
-until an external signal arrives; the engine catches it (at any nesting depth),
-persists the run document, and returns a :class:`SuspendedResult`.
+A tool raises :class:`Suspend` to park the run until a signal arrives; the
+engine catches it at any depth, persists the document and returns a
+:class:`SuspendedResult`. See docs/pipelines/pause-and-resume.md.
 """
 
 from __future__ import annotations

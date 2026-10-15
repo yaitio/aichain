@@ -1,32 +1,8 @@
-"""
-models._base
-============
+"""``Model``: a name resolved to a provider, settings from the provider data,
+format and transport delegated to that provider's family client.
 
-``Model`` is both the **factory** and the **base class** for every
-provider-specific model.
-
-Factory usage (recommended)
----------------------------
-::
-
-    model = Model("gpt-4o")
-    model = Model("claude-sonnet-4-5", options={"temperature": 0.3})
-    model = Model("gemini-2.0-flash", api_key="AIza...")
-    model = Model("grok-3", client_options={"proxy": {"url": "http://proxy:3128"}})
-
-Provider detection is based on well-known model-name prefixes:
-
-  ============  ============================================
-  Provider      Prefixes / patterns
-  ============  ============================================
-  OpenAI        ``gpt-``, ``o<digit>``, ``dall-e-``,
-                ``text-embedding-``, ``whisper-``, ``tts-``
-  Anthropic     ``claude-``
-  Google AI     ``gemini-``
-  xAI           ``grok-``
-  Perplexity    ``sonar``, ``r1-1776``
-  Kimi          ``kimi-``
-  ============  ============================================
+Also the data-driven registry queries (``models``, ``providers``, ``tasks``,
+``is_supported``). See docs/models/models.md.
 """
 
 import os
@@ -46,15 +22,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseClient":
-    """
-    Construct the family client that owns *provider*'s wire format + transport.
-
-    The provider's data file names its client family (``[provider].client``):
-    one of ``openai`` / ``anthropic`` / ``google`` / ``perplexity`` / ``qwen``.
-    The client receives the whole provider data dict, so it knows its
-    endpoints, base URL and quirk branches; per-call model settings arrive in
-    ``params`` later.
-    """
+    """The family client named by ``[provider].client``, given the whole
+    provider data; per-call model settings arrive later in ``params``."""
     data  = PROVIDERS[provider]
     ctype = data["provider"]["client"]
 
@@ -115,16 +84,9 @@ _PROVIDER_KEYS = frozenset(PROVIDERS)
 
 
 def _split_provider_prefix(name: str) -> "tuple[str | None, str]":
-    """
-    Split an explicit ``"provider/model"`` identifier.
-
-    Returns ``(provider_key, model_name)`` when *name* starts with a known
-    provider prefix (e.g. ``"openai/gpt-4o"`` → ``("openai", "gpt-4o")``),
-    otherwise ``(None, name)`` — leaving auto-detection to ``_resolve_provider``.
-
-    An explicit prefix also lets you use a custom model name the regex can't
-    recognise, e.g. ``Model("openai/ft:gpt-4o:org:abc")``.
-    """
+    """``"openai/gpt-4o"`` → ``("openai", "gpt-4o")``; ``(None, name)`` when the
+    head is not a known provider. The prefix is how a custom name the patterns
+    cannot recognise is routed."""
     if "/" in name:
         head, _, tail = name.partition("/")
         if head.lower() in _PROVIDER_KEYS and tail:
@@ -138,14 +100,9 @@ _UNLISTED_SAID: set = set()
 
 
 def _note_unlisted(name: str, provider: str) -> None:
-    """Say once that *name* was routed by its prefix alone.
-
-    `Model("grok-imagine-image-pro")` matched `grok-` and went to xAI, which
-    had no such model; nothing said the registry did not know it either. A
-    retired name and a typo look exactly like this, so the closest listed
-    names are offered. An explicit `provider/name` is the caller saying they
-    mean it, and is not reported.
-    """
+    """Say once that *name* was routed by its prefix alone, with the closest
+    listed names: a retired name and a typo look exactly like this. An explicit
+    `provider/name` means it, and is not reported."""
     if (provider, name) in _UNLISTED_SAID:
         return
     _UNLISTED_SAID.add((provider, name))
@@ -197,13 +154,9 @@ class StreamOutcome:
 
 
 def _merge_usage(into: "dict | None", incoming: dict) -> dict:
-    """Combine two usage envelopes of the same shape, field by field.
-
-    Two levels is all the shape has — an envelope key (`usage` /
-    `usageMetadata`) over a flat block of counts — and a provider that
-    reports a field twice means the later value, not the sum: Anthropic's
-    `message_delta` restates `output_tokens` as it grows.
-    """
+    """Combine two usage envelopes (envelope key over a flat block of counts).
+    A field reported twice means the later value, not the sum: Anthropic's
+    `message_delta` restates `output_tokens` as it grows."""
     merged = {k: dict(v) for k, v in (into or {}).items()}
     for key, block in incoming.items():
         if isinstance(block, dict):
@@ -214,18 +167,9 @@ def _merge_usage(into: "dict | None", incoming: dict) -> dict:
 
 
 class _ToolCallAssembly:
-    """Collects tool-call fragments from a stream into whole calls.
-
-    Two rules, and both were learned from what breaks without them:
-
-    * **Slot, not arrival order.** Providers interleave the fragments of
-      several calls in one turn, and the index is the only thing that says
-      which is which.
-    * **Arguments are concatenated, then parsed once.** Parsing on the way
-      sees truncated JSON on every fragment but the last. Parsing is left to
-      the same builder the buffered path uses, so a malformed argument string
-      fails identically whether it was streamed or not.
-    """
+    """Tool-call fragments from a stream, assembled by slot (providers interleave
+    calls), arguments concatenated and parsed once by the buffered path's own
+    builder, so a malformed one fails the same either way."""
 
     def __init__(self) -> None:
         self._slots: dict = {}
@@ -406,20 +350,13 @@ class Model:
         defaults = prov["defaults"]
 
         # ── resolve API key (env var named in the provider data) ──────
-        # auth = "none" marks a provider whose key is optional rather than
-        # required — a local server usually runs open, but accepts a Bearer
-        # token when started with --api-key. So the key is still *resolved*
-        # (passed or from env) and still sent when present; only the "you
-        # must have one" gate is lifted.
-        # A callable key is resolved per request rather than here, and that
-        # is the whole of multi-tenant support. One `Model` serves every
-        # tenant; the key belongs to whichever run is in flight, so resolving
-        # at construction would bind the first tenant's credential to every
-        # later one. The callable is handed the current `RunContext` — which
-        # is emphatically *not* where the secret lives: that object is
-        # serialised into the run document and `FileStore` writes it to disk,
-        # so it carries the tenant's **name** and the caller looks the key up
-        # from it.
+        # auth = "none": the key is optional, not absent — a local server
+        # usually runs open but accepts a Bearer token, so it is still
+        # resolved and sent when present.
+        # A callable key is resolved per request: one `Model` serves every
+        # tenant, and resolving here would bind the first tenant's key to all.
+        # It is handed the `RunContext`, which is written to disk with the run
+        # document, so it carries the tenant's name and never the secret.
         self._resolve_key = api_key if callable(api_key) else None
         resolved_key = "" if self._resolve_key else (
             api_key or os.getenv(prov["env_key"]))
@@ -435,36 +372,23 @@ class Model:
         self._api_key = resolved_key
 
         # ── merge options with provider defaults (from data) ──────────
-        # A copy: the caller's dict is theirs. Popping `extra` out of it made
-        # the second Model built from the same options lose its provider
-        # fields — the A/B arm that differs by one thing differed by two.
+        # A copy: popping `extra` from the caller's dict would strip it from
+        # the next Model built from the same options.
         opts = dict(options or {})
         # What the caller asked for, apart from what the defaults supply. Only
         # these are reported when an option does not survive to the wire: a
         # default that a provider ignores is not something anybody chose.
-        # `extra` is excluded on purpose: `note_absent` reports an option the
-        # caller asked for that left no trace, and every `extra` field is by
-        # definition outside the vocabulary that mechanism speaks. Reporting
-        # them would be the library commenting on a wheel it handed over.
+        # `extra` is excluded: its fields are outside the vocabulary
+        # `note_absent` reports on.
         self._asked = {k: v for k, v in opts.items() if k != "extra"}
 
-        # An option this library has no word for is a mistake, not a request,
-        # and the place to say so is here, where it was written: a misspelt
-        # `temperatur` accepted and ignored would cost a whole run to notice.
+        # An unknown option is a mistake, refused where it was written: a
+        # misspelt `temperatur` ignored would cost a whole run to notice.
         from ._options import UNIVERSAL_OPTIONS
-        # `extra` is the escape hatch a closed vocabulary needs, and refusing
-        # to have one is how a library that promises portability starts
-        # costing people the thing they came for. Perplexity's
-        # `search_domain_filter` has no universal meaning and never will:
-        # nobody else has a search index. Without a way to send it, the
-        # answer to "how do I filter by domain?" was "not through this
-        # library", and a caller who needs it drops the whole abstraction.
-        #
-        # It is deliberately not part of the vocabulary. Everything inside it
-        # goes on the wire **verbatim and unchecked**, so nothing here
-        # translates it, nothing declines it, and no notice is emitted — the
-        # caller took the wheel and the library says so once, in the
-        # docstring, rather than pretending to supervise.
+        # `extra` is the escape hatch a closed vocabulary needs (Perplexity's
+        # `search_domain_filter` has no universal meaning). It goes on the
+        # wire verbatim and unchecked: nothing translates, declines or
+        # reports it.
         extra = opts.pop("extra", None)
         if extra is not None and not isinstance(extra, dict):
             raise ValueError(
@@ -482,9 +406,8 @@ class Model:
                 "provider has goes in options={'extra': {...}}, which travels "
                 "verbatim and unchecked."
             )
-        # Checked here, before any request: `temperature="0.3"`, `max_tokens=-1`
-        # and 1.7 on a model declared 0–1 went to the provider and came back
-        # 400 after the round trip, while the docs promised a clamp.
+        # Checked before any request, so a wrong type or range fails here
+        # rather than as a 400 after the round trip.
         self._clamped: list = []
         for name, (kind, low, high) in _SAMPLING.items():
             if name not in opts:
@@ -505,10 +428,8 @@ class Model:
         self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
         self.top_p         = opts.get("top_p",         defaults.get("top_p"))
         self.top_k         = opts.get("top_k",         defaults.get("top_k"))
-        # Prompt caching. The option has been accepted and documented since
-        # before 1.6.1 but reached nothing but ``__repr__``; it is wired to the
-        # family clients here. Off by default: a cache breakpoint costs 1.25x
-        # to store, so it only pays back when the same prefix is sent again.
+        # Prompt caching, off by default: a cache breakpoint costs 1.25x to
+        # store, so it only pays back when the same prefix is sent again.
         # True marks the second-to-last message; an int names the message the
         # stable prefix ends at, for callers that know where that is.
         # ``"last"`` marks the newest block, for agent loops (see the
@@ -525,13 +446,10 @@ class Model:
             self.cache_control = cc
         else:
             self.cache_control = cc if isinstance(cc, int) and not isinstance(cc, bool) else bool(cc)
-        # How long the stored prefix lives. Which one is right is a property of
-        # the caller's cadence, not of the library: a write costs 1.25x at five
-        # minutes and 2x at an hour, against 0.1x per read, so 5m pays back on
-        # the second read and 1h on the third. A caller invoking a skill every
-        # few minutes misses the 5m window every time and pays the write
-        # premium forever at a hit rate of zero — worse than not caching — so
-        # the choice has to be reachable even though the default stays 5m.
+        # How long the stored prefix lives depends on the caller's cadence: a
+        # write costs 1.25x at 5m and 2x at 1h against 0.1x per read, and a
+        # caller every few minutes misses a 5m window every time — worse than
+        # not caching. So 1h is reachable though 5m stays the default.
         ttl = opts.get("cache_ttl", defaults.get("cache_ttl", "5m"))
         if ttl not in ("5m", "1h"):
             raise ValueError(
@@ -539,11 +457,9 @@ class Model:
             )
         self.cache_ttl = ttl
 
-        # Valid levels come from the provider's own reasoning_map — that map is
-        # the single source of truth for what this provider can express. The
-        # previous hardcoded (low, medium, high) was a second copy of it, and
-        # the day openai gained "none" the copy rejected a value the provider
-        # itself accepts.
+        # Valid levels come from the provider's own reasoning_map, the single
+        # source of truth: a second copy here would reject a level the
+        # provider gains.
         reasoning = opts.get("reasoning", None)
         rmap      = dict(prov.get("reasoning_map", {}))
         # A provider that switches thinking off rather than naming a level for
@@ -558,13 +474,8 @@ class Model:
             )
         self.reasoning = reasoning
 
-        # What to do when an option cannot be honoured here. The library
-        # will not decide this: dropping `temperature` yields a different
-        # answer, dropping `seed` or `size` yields one that looks right and
-        # is not, and whether that is fatal depends on the caller and not on
-        # the option. 'warn' sends the request without it, 'requirements'
-        # raises for the second class only, 'raise' for any loss. See
-        # models._adaptation.STRICTNESS.
+        # Whether a lost option is fatal is the caller's call, not the
+        # library's; see models._adaptation.STRICTNESS.
         from ._adaptation import STRICTNESS
         if on_unsupported not in STRICTNESS:
             raise ValueError(
@@ -625,13 +536,8 @@ class Model:
             "cache_control": self.cache_control,
             "cache_ttl":     self.cache_ttl,
             "_asked":        dict(self._asked),
-            # `extra` emits no warning and no adaptation — the caller took
-            # the wheel — but it does go on the wire, so a measurement run
-            # that records what its arms sent must be able to see it. Leaving
-            # it out would make two arms differing only by an `extra` field
-            # look identical in the record, which is the exact failure the
-            # notice channel exists to prevent, arriving by the one door that
-            # channel does not watch.
+            # `extra` is reported nowhere else, but it goes on the wire: left
+            # out, two arms differing only by it would record as identical.
             "extra":         dict(self.extra),
         }
 
@@ -697,8 +603,7 @@ class Model:
         return self._built(messages, output, tools=tools or None)
 
     def _gate_tools(self, tools) -> None:
-        """One gate for both paths: a stream given tools on a family that has
-        none reached the family's builder and failed there, or not at all."""
+        """One tools gate for the buffered and the streamed path."""
         self._sent_tools = bool(tools)
         if tools and not self.client.supports_tools:
             raise ValueError(
@@ -708,20 +613,15 @@ class Model:
             )
 
     def _finish(self, made: list, output: dict, body) -> None:
-        """The tail every request passes through, buffered or streamed:
-        `extra` on top, what was asked and not sent noted, the adaptations
-        announced and stored, then enforced. The stream had its own copy,
-        which dropped `extra` while `effective_options` said it was sent."""
+        """The tail of every request, buffered or streamed: `extra` on top,
+        absent options noted, adaptations stored, announced, then enforced."""
         from ._adaptation import announce, enforce, note_absent
         asked = {**self._asked,
                  **{k: v for k, v in (output.get("format") or {}).items()
                     if k not in ("type", "schema", "name", "strict")}}
         if self.extra and isinstance(body, dict):
-            # Last, and on top: a caller reaching for `extra` is overriding,
-            # and a merge that lost to the library's own field would be an
-            # escape hatch that does not escape. Multipart bodies are a list
-            # of pairs, not a mapping, and are left alone rather than
-            # corrupted.
+            # Last, and on top: `extra` overrides the library's own fields.
+            # Multipart bodies are a list of pairs and are left alone.
             body.update(self.extra)
         if body is not None:
             note_absent(made, asked, body, self.name, provider=self._provider)
@@ -729,16 +629,13 @@ class Model:
         # and the record has to be there to say what happened.
         self.last_adaptations = list(made)
         announce(made)
-        # After the record is stored, not before: a caller catching this needs
-        # `last_adaptations` to say what happened, and a raise that leaves the
-        # evidence unwritten is the silence this whole channel exists against.
+        # After the record is stored: a caller catching this needs
+        # `last_adaptations` to say what happened.
         enforce(made, self.on_unsupported)
 
     def _canonical_format(self, output: dict) -> dict:
-        """Resolve a value's shorthand to the vocabulary's one type —
-        ``fidelity="high"`` to ``0.9`` — before anything else looks at it, so
-        a range declared for one provider does not reject a word another
-        needs. Not an adaptation: it normalises the caller's own input."""
+        """Resolve shorthand (``fidelity="high"`` → ``0.9``) before any range check
+        sees it. Not an adaptation: it normalises the caller's own input."""
         from ._options import canonical_value
 
         fmt = output.get("format") or {}
@@ -750,12 +647,8 @@ class Model:
         return {**output, "format": fixed} if changed else output
 
     def _check_values(self, output: dict) -> dict:
-        """Refuse a value this model does not take, before the wire.
-
-        Otherwise the provider answers for us, after the round trip is spent:
-        "Invalid value: 'ultra-max-supreme'. Supported values are: …". The
-        library knows the same thing and knows it earlier.
-        """
+        """Refuse a value this model does not take before the wire, rather
+        than let the provider refuse it after the round trip."""
         from ._adaptation import Adaptation, ADAPTED, record
         from ._options import check_applies, check_value
 
@@ -780,17 +673,11 @@ class Model:
         return {**output, "format": fixed} if fixed else output
 
     def _built(self, messages: list, output: dict, tools=None):
-        """Build, then say what building changed.
-
-        Everything a provider cannot take unchanged is adapted here or in the
-        family client; this is the one place all of it passes through, so it
-        is where the adaptations are gathered and announced. See
-        ``models._adaptation``: the library may adapt a request, it may not do
-        so in silence.
-        """
+        """Build, then say what building changed: the one place every adaptation
+        passes through, so it is where they are gathered and announced."""
         from ._adaptation import collect
 
-        # Emptied first: a build that raised left the previous call's record.
+        # Emptied first, so a build that raises leaves no stale record.
         self.last_adaptations = []
         with collect() as made:
             output = self._check_values(self._canonical_format(output))
@@ -855,25 +742,20 @@ class Model:
         self._finish(made, output, body)
 
         if body is None:
-            # `_built` reports on its own build, which would drop the
-            # `declined` just made — the notice about streaming would be
-            # warned about and then vanish from the machine-readable half,
-            # which is the half that matters.
+            # `_built` reports on its own build only; the `declined` just made
+            # is added back so the record keeps it.
             path, body, built = self._built(messages, output, tools=tools)
             notes = list(made) + built
             self.last_adaptations = notes
             import json as _json
             raw = self.client.send(path, body, self.client._auth_headers())
             response = _json.loads(raw)
-            # The envelopes `extract_usage` reads, per provider — and only
-            # those: the whole response held every image's base64 on a
-            # long-lived object.
+            # Only the envelopes `extract_usage` reads: the whole response
+            # would hold every image's base64 on a long-lived object.
             usage_seen = {k: response[k] for k in ("usage", "usageMetadata") if k in response}
             result = self.from_response(response, output, tools_sent=bool(tools))
-            # Kept whole beside the text. A tool call is neither a string nor
-            # a dict, and rendering one to text and throwing the object away
-            # is how a streamed tool-calling turn came to look like a model
-            # that answered nothing.
+            # Kept whole beside the text: a tool call rendered to text and
+            # thrown away looks like a model that answered nothing.
             self.last_stream_usage, self.last_stream_result = usage_seen, result
             from ..clients._families._structured import hit_ceiling
             cut = hit_ceiling(response)
@@ -882,10 +764,8 @@ class Model:
             elif isinstance(result, dict):
                 yield _json.dumps(result)
             else:
-                # A tool call's own text, which is usually empty — and an
-                # empty stream is right here. What must not go out is its
-                # repr: a caller printing the pieces would print
-                # "ToolCallRequest(calls=(...))" to a user's screen.
+                # A tool call's own text, usually empty; never its repr, which
+                # a caller printing the pieces would show to a user.
                 text = getattr(result, "text", "") or ""
                 if text:
                     yield text
@@ -901,11 +781,9 @@ class Model:
             assembly.add(self.client.stream_tool_fragments(event))
             usage = self.client.stream_usage(event)
             if usage:
-                # Merged, not replaced. Anthropic reports the input tokens in
-                # `message_start` and the output tokens in `message_delta`, so
-                # keeping the last report drops the entire prompt from the
-                # bill — and the number that comes back is still plausible,
-                # which is what makes it worth a comment rather than a line.
+                # Merged, not replaced: Anthropic reports input tokens in
+                # `message_start` and output in `message_delta`, and keeping
+                # the last report drops the prompt from the bill, plausibly.
                 usage_seen = _merge_usage(usage_seen, usage)
             piece = self.client.parse_stream_event(event, output)
             if piece:

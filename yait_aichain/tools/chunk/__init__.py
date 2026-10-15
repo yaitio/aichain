@@ -1,10 +1,5 @@
-"""
-tools.chunk
-===========
-
-A long text cut into pieces small enough to embed, along its own structure —
-headings, paragraphs, code and tables kept whole where they fit. ``chunk(…)``
-makes the tool, a :class:`Chunk`.
+"""A long text cut into pieces small enough to embed, along its own structure.
+``chunk(…)`` makes the tool, a :class:`Chunk`. See docs/tools/retrieval.md.
 """
 
 from ._chunk import Chunk

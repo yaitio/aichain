@@ -1,46 +1,11 @@
-"""
-tools.fetch._base
-=================
+"""``Fetch`` — the text of a web page from its URL, one record for every provider.
 
-``Fetch`` — the text of a web page from its URL, one record for every provider.
-
-A search finds the link; a fetch brings back the page. Four providers sell
-this as an API — Firecrawl Scrape, Tavily Extract, Exa Contents, Parallel
-Extract — and one more runs locally and free, converting HTML with the
-standard library.
-
-They differ in what they return (Tavily has no metadata at all), how many
-URLs a call takes (one to a hundred), how they report what a call cost, and in
-what they can reach: measured on 40 articles on 2026-10-08, Firecrawl returned
-text from sites behind bot protection and from articles readers see only with a
-subscription, Exa and Tavily mostly the public teaser, and a local fetch what
-the site serves an ordinary client. This class holds the record; each provider
-translates.
-
-Pages — one record
-------------------
-``fetch()`` returns ``{"pages", "notices", "cost", "cost_basis", "usage"}``;
-each page is::
-
-    {"url": str,           # as asked
-     "final_url": str,     # where it ended, after redirects, when the provider says
-     "title": str, "published": "YYYY-MM-DD" or "", "author": str,
-     "text": str,          # the page as Markdown, cut to max_chars
-     "error": str}         # "" when the page came back
-
-A page that failed is still a record, with ``error`` set and no text: one bad
-URL does not fail the call. ``published`` is what the page or the provider
-declares, normalised to a day, or empty.
-
-``run()`` returns that dict as a :class:`~tools.Record`: code reads its fields,
-and an agent — or a Skill prompt that substitutes it — gets :meth:`Fetch.render`,
-each page as text and each failed one as its reason. ``fetch()`` is ``run()``
-under its 3.2 name. ``fetch(service)`` makes one: ``fetch("firecrawl")``.
-
-Standard option
----------------
-``max_chars`` — most characters of text per page, default 20 000; cut at the
-provider where it takes a limit, here otherwise.
+This class holds the record — ``{"pages", "notices", "cost", "cost_basis",
+"usage"}``, each page with ``url``, ``final_url``, ``title``, ``published``,
+``author``, ``text`` and ``error`` — and the batching, order, ``max_chars``
+and errors; each provider translates its answer into it. A page that failed
+is a record with ``error`` set, so one bad URL does not fail the call.
+See docs/tools/fetch.md.
 """
 
 from __future__ import annotations

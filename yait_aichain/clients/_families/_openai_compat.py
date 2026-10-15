@@ -1,10 +1,6 @@
-"""
-clients._families._openai_compat
-================================
-
-Wire-format helpers for the OpenAI Chat Completions / Responses / Images
-APIs — shared by every OpenAI-compatible provider (openai, xai, perplexity,
-kimi, deepseek, qwen).  Pure functions: universal format ↔ provider JSON.
+"""Wire-format helpers for the OpenAI Chat Completions, Responses and Images
+APIs, shared by every OpenAI-compatible provider. Pure functions: universal
+format to provider JSON and back. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -23,19 +19,9 @@ import re
 
 
 def _drop_rejected(model, fmt: dict) -> dict:
-    """
-    Remove parameters the model's API refuses, warning once for each.
-
-    The list lives in the provider data (``rejects``) rather than in a set of
-    prefixes here, because it was established by asking the API and not by
-    reading the guide: the guide names only ``gpt-image-2``, while both GPT
-    Image 2.5 models and ``gpt-image-1-mini`` refuse ``input_fidelity`` too.
-
-    Dropping rather than forwarding turns a hard 400 into a working call. It
-    is not silent: a parameter the caller set and did not get is worth a line,
-    since for some models the setting is a no-op and for others it is a
-    request the API will not honour.
-    """
+    """Drop the parameters the model's API refuses (``rejects`` in the provider
+    data, established by asking the API, not the guide), each recorded as
+    declined: a hard 400 becomes a working call, and is still said."""
     rejects = getattr(model, "_REJECTS", ())
     if not rejects:
         return fmt
@@ -57,9 +43,8 @@ def _drop_rejected(model, fmt: dict) -> dict:
 
 
 def _dropped(part: dict, why: str) -> None:
-    """A part this wire cannot carry: left out, and said. Video, URL audio and
-    documents dropped in silence, and the model answered about an attachment
-    it never saw."""
+    """A part this wire cannot carry: left out, and said, or the model answers
+    about an attachment it never saw."""
     from ...models._adaptation import Adaptation, DECLINED, record
     src = part.get("source") or {}
     record(Adaptation(kind=DECLINED, option=f"{part.get('type')} input",
@@ -68,8 +53,8 @@ def _dropped(part: dict, why: str) -> None:
     return None
 
 
-#: The audio formats chat completions names, by MIME type — `audio/mpeg`
-#: went out as "mpeg", which no endpoint takes.
+#: The audio formats chat completions names, by MIME type: "mpeg", the MIME
+#: subtype, is not a format any endpoint takes.
 _AUDIO_FORMATS = {"audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav",
                   "audio/x-wav": "wav", "audio/wave": "wav"}
 
@@ -79,12 +64,8 @@ def _audio_format(mime: str) -> str | None:
 
 
 def _part_to_openai(part: dict) -> dict | None:
-    """
-    Convert one universal part dict to an OpenAI content item.
-
-    Returns ``None`` for part types that OpenAI does not support (video, URL
-    audio) so callers can filter them out.
-    """
+    """One universal part as a chat content item, or ``None`` (recorded as
+    declined) for a part this wire cannot carry."""
     ptype = part["type"]
 
     if ptype == "text":
@@ -138,27 +119,9 @@ def _part_to_openai(part: dict) -> dict | None:
 
 
 def _part_to_responses(part: dict, role: str = "user") -> dict | None:
-    """
-    Convert one universal part to a **Responses API** content item.
-
-    The two OpenAI wire formats name their content types differently, and the
-    difference is not cosmetic: chat completions take ``text``/``image_url``
-    with the image as an object, the Responses API takes
-    ``input_text``/``input_image`` with the image URL as a bare string, and
-    refuses the other spelling outright —
-
-        Invalid value: 'text'. Supported values are: 'input_text',
-        'input_image', 'input_audio', 'output_text', 'refusal', 'input_file'
-
-    Reusing the chat encoder here meant vision never worked on any model that
-    routes through the Responses API. It stayed invisible because a message
-    with exactly one text part was collapsed to a plain string, which is the
-    overwhelmingly common case; the moment a second part appeared — an image,
-    or a tool handing one back — the list went out in the wrong names.
-
-    An assistant turn spells its text ``output_text``: the same content in the
-    other direction has its own name here.
-    """
+    """One universal part as a Responses API item: ``input_text``/``input_image``
+    with the URL a bare string (the chat spelling is refused outright), and
+    ``output_text`` for an assistant's text."""
     ptype = part["type"]
 
     if ptype == "text":
@@ -214,19 +177,9 @@ def _build_openai_compat_request(
     max_tokens_field: str = "max_completion_tokens",
     tools:    list | None = None,
 ) -> tuple[str, dict]:
-    """
-    Build an OpenAI-compatible ``(path, body)`` pair.
-
-    Parameters
-    ----------
-    model    : Provider model instance (OpenAI / xAI / Perplexity / …).
-    messages : Substituted universal messages list.
-    output   : Universal output spec.
-    path     : Provider-specific endpoint path.
-    max_tokens_field : Request key for the output-token limit
-                       (``"max_completion_tokens"`` default, ``"max_tokens"``
-                       for Kimi/DeepSeek).
-    """
+    """An OpenAI-compatible chat ``(path, body)``. *max_tokens_field* is the
+    output-limit key: ``max_completion_tokens``, or ``max_tokens`` on
+    providers that still name it so."""
     openai_messages: list[dict] = []
     # Media the tools of one turn produced, sent in one user message after the
     # last of that turn's results: the results of parallel calls must follow
@@ -236,8 +189,8 @@ def _build_openai_compat_request(
 
     def release():
         if held:
-            # Without the parts this wire cannot carry: a None among them went
-            # out as `null`, a 400.
+            # Without the parts this wire cannot carry: a None among them
+            # would go out as `null`, a 400.
             items = [it for it in (_part_to_openai(p) for p in held) if it is not None]
             if items:
                 openai_messages.append({"role": "user", "content": items})
@@ -293,18 +246,10 @@ def _build_openai_compat_request(
             openai_messages.append({"role": role, "content": items})
 
     release()
-    # A system message means the same thing wherever it sits: it applies to
-    # the whole conversation. That is not a preference — it is the only
-    # meaning every provider can express. Anthropic, Google and the Responses
-    # API each carry the system prompt in a field of their own, so a system
-    # message written in the middle of a conversation is hoisted out of the
-    # sequence and becomes global; this family left it in place, where it
-    # reads as an instruction that begins to apply at that point. The same
-    # conversation therefore meant two different things depending on the
-    # model, with nothing said — measured 2026-09-12 across every provider.
-    #
-    # Hoisted here too, so the meaning is one. Reported, because for this
-    # family it is a real change to what the model sees.
+    # A system message applies to the whole conversation wherever it sits:
+    # the only meaning every provider can express, since Anthropic, Google and
+    # the Responses API carry it in a field of their own. Hoisted here too, and
+    # reported, because for this family it changes what the model sees.
     from ...models._adaptation import Adaptation, ADAPTED, record
     if any(m["role"] == "system" for m in openai_messages[1:]):
         hoisted = [m for m in openai_messages if m["role"] == "system"]
@@ -366,31 +311,9 @@ class SchemaNotExpressible(ValueError):
 
 
 def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
-    """
-    Convert a JSON Schema dict to the form OpenAI's ``strict`` mode accepts.
-
-    The mirror of ``_sanitize_google_schema``. Google forbids
-    ``additionalProperties`` and union types; strict mode requires the exact
-    opposite — every object closed with ``additionalProperties: false`` and
-    every property listed in ``required``. A schema written for one family
-    therefore fails on the other, and the caller ends up deriving a portable
-    form by hand. The library already normalises for one family; leaving the
-    other alone is what makes swapping providers break working code.
-
-    Fixed recursively:
-
-    * every object with ``properties`` gets ``additionalProperties: false``;
-    * every property is moved into ``required`` — an optional one keeps its
-      optionality as ``"type": ["X", "null"]``, which is how strict mode
-      spells it;
-    * ``$defs``/``definitions``, ``items`` and ``anyOf``/``oneOf``/``allOf``
-      are followed.
-
-    One shape has no strict equivalent and is reported rather than mangled:
-    a map with arbitrary keys (``additionalProperties`` given a schema, no
-    ``properties``). Strict mode cannot express it at all; the value has to
-    be modelled as an array of pairs.
-    """
+    """A JSON Schema in OpenAI strict form, recursively: objects closed, every
+    property required (an optional one as ``[X, "null"]``). A map with arbitrary
+    keys has no strict form and raises. Mirror of ``_sanitize_google_schema``."""
     if not isinstance(schema, dict):
         return schema
 
@@ -403,7 +326,7 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
         )
     if schema.get("type") == "object" and not schema.get("properties") and ap is not False:
         # A free object: strict mode closes every object, so it would accept
-        # only `{}` — and the provider said so with a 400.
+        # only `{}`, and the provider answers 400.
         raise SchemaNotExpressible(
             f"{path}: an object with no properties cannot be expressed in OpenAI "
             "strict mode; give it properties, or pass strict=False.")
@@ -439,8 +362,8 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
             elif isinstance(t, list) and "null" not in t:
                 sub["type"] = [*t, "null"]
             elif t is None:
-                # A $ref, an anyOf, an enum with no type: made required and
-                # not nullable, so the model had to invent a value. Optional
+                # A $ref, an anyOf, an enum with no type: required and not
+                # nullable would force the model to invent a value. Optional
                 # is "it, or null".
                 props[name] = {"anyOf": [sub, {"type": "null"}]}
         result["required"] = list(props.keys())
@@ -448,14 +371,9 @@ def _sanitize_openai_schema(schema: object, path: str = "$") -> object:
 
 
 def _tool_call_request(triples, text: str = "", opaque: dict | None = None) -> ToolCallRequest:
-    """
-    Build a :class:`ToolCallRequest` from ``(name, arguments, id)`` triples.
-
-    ``arguments`` arrives as a JSON **string** on the wire; a dict is accepted
-    too (some compatible servers send one), and unparseable arguments become an
-    empty dict rather than an exception — the executor's schema check is the
-    right place to complain, with the tool named.
-    """
+    """A :class:`ToolCallRequest` from ``(name, arguments, id)`` triples; arguments
+    as a JSON string or a dict, unparseable ones as ``{}`` so the executor's
+    schema check complains with the tool named."""
     from ...models._calls import ToolCall, ToolCallRequest
     calls = []
     for name, args, call_id in triples:
@@ -497,25 +415,9 @@ def speaks_harmony(model_name: str) -> bool:
 
 
 def _parse_harmony(text: str, *, calls_allowed: bool = True):
-    """
-    Split a harmony reply into its channels and return either a
-    :class:`ToolCallRequest` (when it asks to act) or the user-facing text.
-
-    Three channels matter. ``analysis`` is the model thinking aloud and is
-    **dropped** — surfacing it as the answer is how a reasoning model ends up
-    "replying" with its own notes. ``commentary`` carries tool calls, one per
-    segment, addressed with ``to=functions.NAME``. ``final`` is what the user
-    should see.
-
-    *calls_allowed* is False when no tools were sent: a call then is text the
-    model wrote, never a request to act, and the reply is its final text.
-
-    A truncated reply (max_tokens cut mid-call) yields a segment whose body is
-    not valid JSON; those become empty arguments rather than an exception, so
-    the executor can complain by name instead of the turn dying here. One pass
-    over the text: each segment is cut at its first stop token, where a
-    backtracking pattern took seconds on a long reply.
-    """
+    """A harmony reply as a :class:`ToolCallRequest` (``commentary`` addressed
+    ``to=functions.NAME``) or the ``final`` text; ``analysis`` is dropped. One
+    pass, cut at stop tokens: a backtracking pattern takes seconds on a long reply."""
     calls, final_parts = [], []
     for segment in text.split(_HARMONY_MARK)[1:]:
         head, sep, rest = segment.partition("<|message|>")
@@ -552,20 +454,9 @@ def _parse_harmony(text: str, *, calls_allowed: bool = True):
 def _parse_openai_compat_response(response: dict, output: dict, *,
                                   strip_fences: bool = False,
                                   harmony: str | None = None) -> str | dict:
-    """
-    Extract the clean result from an OpenAI-compatible chat completion
-    response.
-
-    Shared by the openai, xai and perplexity providers (and, via their own
-    request builders, the kimi/deepseek/qwen providers).
-
-    Raises
-    ------
-    ValueError
-        With a descriptive message when the response carries no usable
-        content: empty ``choices`` (blocked/failed upstream), an explicit
-        model ``refusal``, or invalid/truncated JSON in a JSON mode.
-    """
+    """The clean result of a chat completion: text, a parsed object, or a
+    :class:`ToolCallRequest`. Raises ``ValueError`` on no choices, a refusal,
+    or JSON that does not parse."""
     choices = response.get("choices") or []
     if not choices:
         detail = (response.get("error") or {}).get("message")
@@ -584,8 +475,7 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
 
     # The model asked to act. This outranks any accompanying text: a reply
     # that both says something and calls a tool is a call, with the text
-    # carried alongside — collapsing it to the text would silently drop the
-    # action, which is the exact failure this channel exists to remove.
+    # carried alongside.
     from ._structured import refuse_cut_off
     finish = choice.get("finish_reason") or ""
     spent = (response.get("usage") or {}).get("completion_tokens")
@@ -604,12 +494,10 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
 
     text  = content_text(message.get("content"))
 
-    # A server that does not implement harmony passes it through as prose.
-    # Parsing it here is what turns a lost tool call into a real one — and
-    # what keeps a reasoning model's notes out of the user-facing answer.
-    # Only for a model that writes it (*harmony* is "calls" when tools were
-    # sent, "text" when not): any other model's text that quotes a channel
-    # marker — read from a file, a page — was being executed as a tool call.
+    # A server that does not implement harmony passes it through as prose;
+    # parsed here, a lost tool call becomes a real one. Only for a model that
+    # writes it (*harmony* is "calls" when tools were sent, "text" when not):
+    # another model quoting a channel marker from a file is only quoting.
     if harmony and _is_harmony(text):
         parsed = _parse_harmony(text, calls_allowed=harmony == "calls")
         if not isinstance(parsed, str):
@@ -677,32 +565,9 @@ def _build_image_generations_request(
     output:   dict,
     path:     str = "/v1/images/generations",
 ) -> tuple[str, dict]:
-    """
-    Build an OpenAI ``/v1/images/generations`` ``(path, body)`` pair.
-
-    Shared by the openai and xai providers.
-
-    The text prompt is extracted from the last user message.  Optional
-    ``size`` and ``quality`` values are read from ``output["format"]``.
-
-    ``response_format`` handling
-    ----------------------------
-    All models that accept the parameter receive ``"b64_json"`` so that
-    the output is always an inline base64 string — consistent across every
-    provider (OpenAI DALL-E, xAI Grok-Imagine, Google).
-
-    ``gpt-image-*`` models are the single exception: they always return
-    ``b64_json`` natively and explicitly reject the parameter, so it is
-    omitted for them.
-
-    +-----------------------+--------------------------------------+
-    | Model prefix          | response_format sent?                |
-    +=======================+======================================+
-    | ``dall-e-*``          | Yes → ``"b64_json"``                 |
-    | ``gpt-image-*``       | No  → native ``b64_json``            |
-    | ``grok-imagine-*``    | Yes → ``"b64_json"``                 |
-    +-----------------------+--------------------------------------+
-    """
+    """An ``/v1/images/generations`` ``(path, body)`` for openai and xai: the
+    prompt from the last user message, ``response_format: b64_json`` on every
+    model but ``gpt-image-*``, which returns base64 natively and refuses it."""
     prompt = ""
     for msg in reversed(messages):
         if msg["role"] == "user":
@@ -715,7 +580,7 @@ def _build_image_generations_request(
     body: dict = {"model": model.name, "prompt": prompt, "n": 1}
 
     # This API takes pixels; a ratio has no field. Every other image provider
-    # in the library now understands both, so the ratio is turned into a size
+    # in the library understands both, so the ratio is turned into a size
     # rather than dropped. GPT Image 2.5 accepts any WIDTHxHEIGHT whose edges
     # are multiples of 16 and whose ratio is between 1:3 and 3:1, which a
     # 1024 short edge satisfies for every shape worth asking for.
@@ -755,12 +620,8 @@ def _build_image_generations_request(
 
 
 def _detect_image_mime(b64_data: str | None) -> str:
-    """
-    Return the MIME type of a base64-encoded image by inspecting its magic bytes.
-
-    Handles JPEG (``FF D8 FF``), PNG (``89 50 4E 47``), WebP (``RIFF…WEBP``),
-    and GIF (``GIF8``).  Falls back to ``"image/png"`` for unknown formats.
-    """
+    """The MIME type of a base64 image from its magic bytes (JPEG, PNG, WebP,
+    GIF, SVG); ``image/png`` when unknown."""
     if not b64_data:
         return "image/png"
     try:
@@ -784,23 +645,8 @@ def _detect_image_mime(b64_data: str | None) -> str:
 
 
 def _parse_image_generations_response(response: dict) -> dict:
-    """
-    Extract the image result from an OpenAI ``/v1/images/generations``
-    response.
-
-    Shared by the openai and xai providers.
-
-    Returns a dict with keys ``url``, ``base64``, ``mime_type``, and
-    ``revised_prompt`` — consistent with the Google image response format.
-
-    ``mime_type`` is detected from the image's magic bytes so it is always
-    accurate, regardless of which provider generated the image.
-
-    Raises
-    ------
-    ValueError
-        When ``data`` is empty (e.g. the prompt was rejected by moderation).
-    """
+    """``{url, base64, mime_type, revised_prompt}`` from an images response, the
+    MIME type read from the bytes. ``ValueError`` on no data (moderation)."""
     data = response.get("data") or []
     if not data:
         detail = (response.get("error") or {}).get("message")
@@ -843,10 +689,8 @@ def _image_sources(messages: list) -> list:
 
 
 def _edit_sources(messages: list, provider: str, model_name: str, limit: int | None = None) -> list:
-    """The images an edit sends: the newest *limit* of them — the provider's
-    `max_input_images` unless given — and a `declined` for the rest. The oldest
-    were taken, in silence: a third image on Recraft was dropped and the edit
-    ran on the first one in the conversation."""
+    """The images an edit sends: the newest *limit* (the provider's
+    `max_input_images` unless given), and a `declined` for the rest."""
     from ...models._adaptation import Adaptation, DECLINED, record
     from ...models._data import PROVIDERS
     sources = _image_sources(messages)
@@ -891,16 +735,9 @@ def _build_image_edits_request(
     output:   dict,
     path:     str = "/v1/images/edits",
 ) -> tuple[str, dict]:
-    """
-    Build an OpenAI ``/v1/images/edits`` **multipart** ``(path, body)`` pair.
-
-    The body is a sentinel the client's ``send()`` seam turns into a
-    ``multipart/form-data`` POST: a :class:`Multipart` of the fields —
-    a list of ``(name, value)`` tuples so multiple input images can share the
-    ``image[]`` key. ``gpt-image-*`` accepts multiple references via ``image[]``;
-    ``dall-e-2`` takes a single ``image``. ``response_format`` is omitted
-    (gpt-image returns b64 natively).
-    """
+    """An ``/v1/images/edits`` body as a :class:`Multipart` of ``(name, value)``
+    pairs, so several references share ``image[]`` (``gpt-image-*``);
+    ``dall-e-2`` takes one ``image``."""
     sources = _edit_sources(messages, "openai", model.name,
                             None if model.name.startswith(_GPT_IMAGE) else 1)
     if not sources:
@@ -950,23 +787,16 @@ def _build_xai_image_edit_request(
     output:   dict,
     path:     str = "/v1/images/edits",
 ) -> tuple[str, dict]:
-    """
-    Build an xAI ``/v1/images/edits`` **JSON** ``(path, body)`` pair.
-
-    Confirmed by live probe: xAI edits is JSON (not multipart); the source image
-    rides a nested ``image: {"url": <data-uri|url>, "type": "image_url"}`` and
-    ``response_format:"b64_json"`` yields base64 directly — so
-    ``_parse_image_generations_response`` consumes it unchanged.
-    """
+    """An xAI ``/v1/images/edits`` body: JSON, not multipart, the image as
+    ``{"url": …, "type": "image_url"}``, and base64 back, which
+    ``_parse_image_generations_response`` reads unchanged."""
     sources = _edit_sources(messages, "xai", model.name)
     if not sources:
         raise ValueError("image edit requires at least one input image part")
     imgs = [{"url": _image_source_to_data_uri(s), "type": "image_url"} for s in sources]
     body = {"model": model.name, "prompt": _last_user_text(messages),
             "response_format": "b64_json"}
-    # Shape control works on this path too — measured 2026-09-09, an edit with
-    # aspect_ratio "16:9" came back 1280x720 — and was read by neither the
-    # generation nor the edit branch until now.
+    # Shape control works on this path too: aspect_ratio "16:9" returns 1280x720.
     fmt = output.get("format", {})
     _ratio = fmt.get("aspect_ratio") or (
         ratio_of(fmt["size"]) if fmt.get("size") else None)
@@ -994,15 +824,9 @@ def _build_xai_image_edit_request(
 #: GPT models that stay on Chat Completions. Everything else named ``gpt-<N>``
 #: goes to the Responses API.
 #:
-#: The list is of the exceptions, not of the Responses models, and that is the
-#: whole change. Until 2026-10-01 it was the other way round —
-#: ``_RESPONSES_API_PREFIXES = ("gpt-5",)`` — so every new generation arrived on
-#: the old endpoint by default, and gpt-6 did: Chat Completions refuses function
-#: tools together with reasoning on it, HTTP 400, and the agent could not call a
-#: tool at all until someone noticed. New models ship on the new endpoint, so
-#: the new endpoint is the default and the old one is what has to be named.
-#: The gpt-4 and gpt-3.5 generations are a closed set; nothing will be added
-#: to them.
+#: The list is of the exceptions, not of the Responses models: new models ship
+#: on the new endpoint, so it is the default and the old one has to be named.
+#: The gpt-4 and gpt-3.5 generations are a closed set.
 _CHAT_COMPLETIONS_MODELS = ("gpt-4", "gpt-3.5")
 
 #: ``gpt-<digit>`` — the generation number names a chat model. It deliberately
@@ -1023,15 +847,9 @@ def _build_responses_api_request(
     output:   dict,
     tools:    list | None = None,
 ) -> tuple[str, dict]:
-    """
-    Build an OpenAI ``/v1/responses`` ``(path, body)`` pair.
-
-    Key differences from Chat Completions:
-    - ``input``        instead of ``messages``
-    - ``instructions`` for the system message (separate top-level field)
-    - ``max_output_tokens`` instead of ``max_completion_tokens``
-    - ``text.format``  instead of ``response_format`` for structured output
-    """
+    """An ``/v1/responses`` ``(path, body)``: ``input`` for messages,
+    ``instructions`` for the system prompt, ``max_output_tokens``, and
+    ``text.format`` for structured output."""
     system_texts: list = []
     input_messages: list[dict] = []
     held: list = []                      # as in the chat builder: after the turn's results
@@ -1079,9 +897,7 @@ def _build_responses_api_request(
         if role == "system":
             # Responses API takes the system prompt as a top-level field —
             # one string, so several system messages are joined here, as every
-            # other family joins them. Assigning instead would keep only the
-            # last, and the same conversation would carry different
-            # instructions depending on the model it went to.
+            # other family joins them.
             text_parts = [it["text"] for it in items
                           if it["type"] in ("input_text", "output_text")]
             system_texts.extend(text_parts)
@@ -1100,8 +916,8 @@ def _build_responses_api_request(
         "input":             input_messages,
         "max_output_tokens": model.max_tokens,
         # Not kept by OpenAI: nothing here reads `previous_response_id`, and
-        # every conversation moved to this API was stored there by default.
-        # `extra={"store": True}` keeps it.
+        # the API stores every conversation by default. `extra={"store": True}`
+        # keeps it.
         "store":             False,
     }
 
@@ -1135,21 +951,8 @@ def _build_responses_api_request(
 
 
 def _parse_responses_api_response(response: dict, output: dict) -> str | dict:
-    """
-    Extract the result from an OpenAI Responses API response.
-
-    Response structure::
-
-        {
-          "output": [
-            {
-              "type": "message",
-              "role": "assistant",
-              "content": [{"type": "output_text", "text": "…"}]
-            }
-          ]
-        }
-    """
+    """The result of a Responses API reply: its ``function_call`` items as a
+    :class:`ToolCallRequest`, else the ``output_text`` of its message items."""
     # Calls first: a reply that both says something and asks to act is a call,
     # with the text carried alongside. The output array mixes item kinds
     # (reasoning, message, function_call) — collect across all of them.
@@ -1180,9 +983,8 @@ def _parse_responses_api_response(response: dict, output: dict) -> str | dict:
         ftype = output.get("format", {}).get("type", "text")
         if ftype in ("json", "json_schema"):
             # The Responses API reports the ceiling as `incomplete_details`
-            # rather than a finish_reason, and this path had no truncation
-            # handling at all — a cut-off plan surfaced as a JSONDecodeError
-            # with nothing to attribute it to.
+            # rather than a finish_reason; read here, a cut-off answer is not
+            # an unattributed JSONDecodeError.
             from ._structured import parse_structured
             reason = ((response.get("incomplete_details") or {}).get("reason")
                       or response.get("status_details", {}).get("reason", ""))

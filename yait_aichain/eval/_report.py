@@ -1,29 +1,9 @@
-"""
-Turning attempts into numbers, and refusing to when the attempts are not sound.
+"""Turning attempts into numbers, and refusing to when they are not sound.
 
-Everything here recounts :class:`~._records.Record` objects. Nothing carries a
-tally forward, and nothing reads a summary line produced by whatever ran the
-work — the one time that shortcut was taken, the parser reported 0.878 where
-the simulations held 0.798, and it was caught only because the raw data had
-been kept.
-
-Three habits are built in rather than left to the reader:
-
-**Ratios are pooled, and the counts stay beside them.** Averaging per-case
-ratios rewards silence: a case where an arm reported nothing has no wrong
-answers in it and scores a perfect precision, so an arm that stays quiet on
-half the set can finish ahead of one that answers. Counts are summed across
-cases first, then divided once.
-
-**A cell that cannot be trusted is absent, not zero.** A zero is a
-measurement; a rejected cell is the absence of one, and printing it as zero
-invents a result. :meth:`Report.reject` marks them and every figure skips them.
-
-**Reliability is reported apart from accuracy.** ``Pass^k`` and the mean answer
-different questions, and the A+ run showed them disagreeing: the reference
-agent led on mean reward and trailed on ``Pass^3``. :meth:`Report.flips` goes
-further and reports the shape neither of them shows — how often an arm gave
-different verdicts to the same case on different trials.
+Everything is recounted from records. Ratios are pooled with the counts kept
+beside them; a cell that cannot be trusted is absent, not zero
+(:meth:`Report.reject`); reliability (``Pass^k``, :meth:`Report.flips`) is
+reported apart from accuracy. See docs/control/eval.md.
 """
 
 from __future__ import annotations
@@ -145,15 +125,9 @@ class Report:
     # ── the numbers ──────────────────────────────────────────────────────
     @staticmethod
     def _abstained(record: Record) -> bool:
-        """The judge said nothing about this row, so nothing may be counted.
-
-        Excluded from the denominator rather than scored zero, because those
-        are different claims: "wrong" and "unreadable by the instrument" fold
-        into one number only if you are willing to blame the arm for the
-        judge. The exclusions are counted and printed — a denominator that
-        quietly shrinks is its own defect, and the arm a judge could not read
-        twenty times has an instrument problem, not a 0.95.
-        """
+        """The judge said nothing about this row: left out of the denominator,
+        not scored zero ("wrong" and "unreadable" are different claims), and
+        counted, since a denominator that quietly shrinks is its own defect."""
         return bool((record.meta or {}).get("abstained"))
 
     def abstentions(self, arm: str, group: str = "") -> int:

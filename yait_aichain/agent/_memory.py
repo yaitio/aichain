@@ -1,34 +1,10 @@
 """
-agent._memory
-=============
+agent._memory — ``AgentMemory``, a key-value store with a pluggable backend.
 
-``AgentMemory`` — a key-value store with a pluggable backend.
-
-**Deprecated, removed in 5.0.** A dict does the in-process half and
-``state.FileStore`` the on-disk half.
-
-**The Agent does not use it.** An agent's state is its conversation; nothing
-in the loop reads or writes this store, and ``AgentResult.memory`` is a field
-that is never written. It is yours to use — from inside your own tools,
-across runs, or as scratch space in a ``Chain``.
-
-.. warning::
-    Memory is **not** encrypted or redacted, and with ``FileBackend`` it is
-    written to disk as plain JSON. Do not store secrets in it.
-
-Pluggable backends
-------------------
-By default ``AgentMemory`` uses an in-process ``InMemoryBackend``. For state
-that survives the process, supply a ``FileBackend``::
-
-    from yait_aichain.agent import AgentMemory, FileBackend
-
-    memory = AgentMemory(backend=FileBackend("~/.my_state.json"))
-    memory.set("last_seen", "2026-10-10")
-    memory.flush()                       # write it
-
-:meth:`AgentMemory.reset` (not :meth:`~AgentMemory.clear`) restores the
-loaded-plus-initial baseline without touching the backend.
+Deprecated, removed in 5.0: a dict does the in-process half and
+``state.FileStore`` the on-disk half. The agent loop never reads or writes it.
+It is not encrypted or redacted, and ``FileBackend`` writes plain JSON, so it
+must hold no secrets.
 """
 
 from __future__ import annotations
@@ -141,8 +117,8 @@ class FileBackend(MemoryBackend):
         """Load and return the JSON state, or ``{}`` on any error."""
         if not self._path.exists():
             return {}
-        # A damaged file is said, not read as empty — the next save overwrote
-        # everything it held.
+        # A damaged file is said, not read as empty, or the next save would
+        # overwrite everything it held.
         try:
             return json.loads(self._path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:

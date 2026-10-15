@@ -1,12 +1,8 @@
 """
-state._context — RunContext
-===========================
+state._context — RunContext, the non-secret per-request context of one run.
 
-Non-secret per-request context for a single ``run()`` / ``resume()``. Carries
-the tenant, tracing ids, and arbitrary metadata — NOT secrets (API keys stay on
-``Model`` / ``Tool``). It is exposed as ``chain.context`` / ``agent.context``
-for the duration of the run and is persisted in the run document, so it is
-restored on ``resume`` (even in another process).
+Persisted in the run document, so it is restored on ``resume`` in another
+process; API keys never go in it. See docs/production.md.
 """
 
 from __future__ import annotations

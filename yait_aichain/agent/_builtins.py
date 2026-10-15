@@ -11,7 +11,7 @@ import warnings
 from typing import Any
 
 from ..skills import Skill
-from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the release notes)
 
 from ._journal import MODEL_CLAIM
 from ..pool    import Pool
@@ -94,9 +94,9 @@ def _delegate_schema(team: dict) -> dict:
     if members:
         names = [getattr(w, "name", None) or f"worker{i}"
                  for i, w in enumerate(members)]
-        # What each worker is for, beside its name. `description` was stored
-        # and never read, so the lead chose between `worker0` and `worker1`
-        # by guessing — a whole worker run lost on every wrong guess.
+        # What each worker is for, beside its name, or the lead chooses
+        # between `worker0` and `worker1` by guessing — a whole worker run
+        # lost on every wrong guess.
         roster = "; ".join(f"{n}: {getattr(w, 'description', None) or 'no description given'}"
                            for n, w in zip(names, members))
         props["worker"] = {"type": "string", "enum": names,
@@ -159,7 +159,7 @@ def _team_parts(team) -> dict | None:
 # ── Agent ────────────────────────────────────────────────────────────────────
 
 #: The most entries one `pool` call fans out to, and the most at once. A
-#: model sets both; unbounded, a thousand items were a thousand threads.
+#: model sets both; unbounded, a thousand items would be a thousand threads.
 MAX_POOL_ITEMS = 200
 MAX_POOL_FLOWS = 8
 
@@ -199,18 +199,9 @@ class _Builtins:
         return "Plan recorded. Begin."
 
     def _do_pool(self, args: dict, state: dict) -> Any:
-        """
-        One call repeated over a list.
-
-        Every other call is exactly one execution. Without this, a model asked
-        to "read every document" reads one and reports success — measured at
-        2 of 8, silently.
-
-        The pool is no way around the policy: the loop asked about the tool
-        it names before this ran (see `_gated_tool`), and each item is checked
-        against that tool's schema before any of them starts. Its spend is the
-        run's — under `max_cost`, in `state`, and so in the result.
-        """
+        """One call repeated over a list, so "read every document" is not one read
+        reported as all. No way around the policy: the tool it names was decided on
+        before this ran, and every item is checked against its schema first."""
         items = args.get("items")
         if not isinstance(items, (list, tuple)) or not items:
             raise ValueError("pool needs a non-empty 'items' list")
@@ -257,17 +248,14 @@ class _Builtins:
         if errors:
             self._log(1, f"  ⚠  {len(errors)}/{len(pool_items)} entries failed; "
                          f"first: {errors[0]}")
-        # A list, which is what a model reads: the result object rendered to
-        # its repr, `PoolResult(ok, items=3)`, told it nothing it had asked for.
+        # A list, which is what a model reads: the result object's repr,
+        # `PoolResult(ok, items=3)`, would tell it nothing it asked for.
         return [out if err is None else {"error": err}
                 for out, err in zip(results.output, results.errors)]
 
     def _do_delegate(self, args: dict, state: dict) -> Any:
-        """
-        Hand a scoped sub-task down. First of all a **context-management**
-        mechanism: the child burns its own conversation and returns one
-        turn's worth of conclusion.
-        """
+        """Hand a scoped sub-task down: the child spends its own conversation and returns
+        one turn's worth of conclusion."""
         if not self.team:
             raise ValueError("this agent has no team; delegate is unavailable "
                              "unless team= is set")
@@ -280,8 +268,8 @@ class _Builtins:
             if worker is None:
                 raise ValueError(f"no worker named {args.get('worker')!r}. "
                                  f"Available: {sorted(self._worker_map)}")
-            # A run of its own, one level down (below): a listed worker sat at
-            # depth 0 whatever delegated to it, and the depth guard never fired.
+            # A run of its own, one level down (below), so the depth guard
+            # holds for a listed worker too.
         elif (instructions := str(args.get("instructions") or "")) in self._extended:
             worker = self._extended[instructions]       # the same role, given work again
         else:

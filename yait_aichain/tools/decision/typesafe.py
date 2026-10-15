@@ -1,24 +1,9 @@
-"""
-tools.decision.typesafe — decisionTypeSafe
-==========================================
-
-TypeSafe AI's Jev behind the common :class:`~tools.decision.Decision` format.
-
-    POST https://api.typesafe.ai/v1/systemone
-         {"state": ..., "model": "jev-latest", "questions": {id: Question}}
-       → {"model": "jev-1.13.0", "answers": {id: Answer}, "usage": {...}}
-
-Translated both ways: ``predicate`` is Jev's ``noul``, ``choices`` and
-``levels`` are its ``criteria`` (a map for a choice, a list for a score), and a
-score's probabilities, keyed by level index on the wire, come back keyed by
-level label like every other provider's.
-
-Jev takes structured state: a dict or a list from code travels as structure.
-It takes no images.
-
-Environment variable
---------------------
-``TYPESAFE_API_KEY`` — from https://console.typesafe.ai
+"""TypeSafe AI's Jev (``POST https://api.typesafe.ai/v1/systemone``) behind the
+common :class:`~tools.decision.Decision` format. ``predicate`` is Jev's
+``noul``, ``choices`` and ``levels`` its ``criteria`` (a map for a choice, a
+list for a score), and a score's probabilities, keyed by level index on the
+wire, come back keyed by level label. A dict or list state travels as
+structure; no images. Key: ``TYPESAFE_API_KEY``. See docs/tools/decide.md.
 """
 
 from __future__ import annotations

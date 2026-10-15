@@ -1,29 +1,11 @@
 """
-yait_aichain._events — observability events & lifecycle hooks
-============================================================
+yait_aichain._events — observability events and lifecycle hooks.
 
-The machine-readable side of the step boundary (1.4.4). While ``logging`` is the
-human/ops diagnostic channel, **events** are a structured stream a program can
-consume: route intermediate statuses into a chat UI, write traces to a database,
-forward to OpenTelemetry, or assert on them in tests.
-
-A *hook* is any callable ``hook(event) -> None`` registered on a ``Skill``,
-``Chain`` or ``Agent`` (``hooks=[...]``). The engine emits an :class:`Event` at
-every boundary (LLM call, tool call, step, run lifecycle). Hooks are
-**observe-only** — a hook that raises is logged at DEBUG and never crashes the
-run, and a hook cannot change the engine's behavior (approval/denial is the
-permission layer's job, not a hook's).
-
-Convenience bases:
-
-* :class:`Hook`         — dispatches an event to a same-named method
-  (``"tool_call.started"`` → ``tool_call_started(event)``), so you implement
-  only the boundaries you care about.
-* :class:`Tracer`       — records every event into ``.events``.
-* :class:`LoggingTracer`— logs every event to a ``logging`` logger.
-
-The library ships no heavy tracing dependency; OpenTelemetry/file/DB sinks live
-in the application (or the product).
+The machine-readable side of the step boundary: an :class:`Event` at every LLM
+call, tool call, step and run, sent to observe-only hooks, with the
+:class:`Hook`, :class:`Tracer` and :class:`LoggingTracer` bases. Heavy sinks
+(OpenTelemetry, files, databases) live in the application.
+See docs/control/observability.md.
 """
 
 from __future__ import annotations
@@ -194,8 +176,8 @@ def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
         try:
             hook(event)
         except Exception as exc:                     # observe-only: never propagate
-            # Said once per hook, with the traceback: a broken tracer logged a
-            # DEBUG line and nobody learned that their tracing had stopped.
+            # Said once per hook, as a warning with the traceback: a DEBUG
+            # line would let tracing stop with nobody knowing.
             key = id(getattr(hook, "__func__", hook))
             if key not in _FAILED:
                 _FAILED.add(key)

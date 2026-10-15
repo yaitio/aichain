@@ -1,0 +1,17 @@
+{
+  "code": {
+    "(top)": 1046,
+    "agent": 1643,
+    "chain": 1180,
+    "clients": 2683,
+    "eval": 584,
+    "models": 1168,
+    "pool": 365,
+    "skills": 656,
+    "state": 335,
+    "tools": 4191,
+    "utilities": 2122
+  },
+  "long_docstrings": 76,
+  "history_docstrings": 23
+}

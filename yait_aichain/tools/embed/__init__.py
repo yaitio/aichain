@@ -1,45 +1,9 @@
 """
-tools.embed
-===========
-
-Embedding as a tool: one interface over five providers.
-
-Public API
-----------
-``embed(service, *, model, dimensions=None, batch_size=None, api_key=None)``
-    Makes the embedding tool for *service* — one of ``SERVICES``:
-    ``"openai"``, ``"cohere"``, ``"voyage"``, ``"google"``, ``"qwen"``.
-
-``EmbeddingResult``
-    Uniform return type for every embedding call.
-
-``Embedder``
-    The base class of :class:`EmbeddingOpenAI`, :class:`EmbeddingCohere`,
-    :class:`EmbeddingVoyage`, :class:`EmbeddingGoogle` and
-    :class:`EmbeddingQwen`.
+Embedding as a tool: ``embed(service, model=…)`` over five providers
+(``SERVICES``), with ``EmbeddingResult`` and the ``Embedder`` base class.
 
 The model, ``dimensions`` and ``batch_size`` are settings of the tool; a call
-takes only ``input_type``. Vectors from two models, or of two lengths, cannot
-share a store, so a tool is fixed to one.
-
-Examples
---------
-::
-
-    from yait_aichain.tools import embed
-
-    e = embed("openai", model="text-embedding-3-small")
-
-    # One text
-    result = e.run("What is machine learning?", {"input_type": "query"})
-    vector = result.embeddings[0]                # list[float]
-
-    # A list — split into requests of at most batch_size
-    result = e.run(["text A", "text B"], {"input_type": "document"})
-    print(result.dimensions, result.total_tokens)
-
-    # A smaller batch, for rate-limiting — a setting of the tool
-    e = embed("cohere", model="embed-v4.0", batch_size=32)
+takes only ``input_type``. See docs/tools/retrieval.md.
 """
 
 from ._base   import Embedder, EmbeddingResult

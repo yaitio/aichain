@@ -1,20 +1,9 @@
-"""
-tools._wait — Wait / Gate
-=========================
+"""``Wait`` and ``Gate``: tools that park a run until an external signal arrives.
 
-Suspend tools: the developer-facing way to pause a run until an EXTERNAL signal
-arrives. The signal source is irrelevant to the library — a human clicking
-approve, a cron tick, a webhook from another service, a queue message: all of
-them simply call ``chain.resume(run_id, signal)`` later. The engine only parks
-the run; it never schedules or waits actively.
-
-* ``Wait``  — a leaf step: pause; on resume the signal becomes this step's
-  output (and thus enters ``variables``).
-* ``Gate``  — wraps any Tool: pause for a decision; on resume run the wrapped
-  tool when approved, or skip it.
-
-Both are thin sugar over the internal ``Suspend`` signal that the engine
-catches; nothing here is engine-specific.
+``Wait`` pauses, and on resume the signal becomes the step's output; ``Gate``
+wraps a tool and runs it on resume only when the signal approves. Both raise
+the engine's ``Suspend``; the engine parks the run and never waits actively.
+See docs/pipelines/pause-and-resume.md.
 """
 
 from __future__ import annotations

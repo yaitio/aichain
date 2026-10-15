@@ -1,25 +1,8 @@
-"""
-clients._families.bfl
-======================
-
-Black Forest Labs (FLUX) — asynchronous image generation and editing.
-
-The wire model is different from every other provider, so this is its own family
-client (not OpenAI-compatible):
-
-* auth is an ``x-key`` header (not Bearer);
-* the **model name is the endpoint path**: ``POST /v1/{model}``;
-* the call is **asynchronous** — it returns ``{"id", "polling_url"}``; poll the
-  URL until ``status == "Ready"``, then download ``result.sample`` (a signed URL,
-  valid ~10 min) and base64 it.
-
-The async submit → poll → download flow lives behind the ``send()`` seam and
-synthesises the standard ``{"data": [{"b64_json": ...}]}`` shape, so the shared
-image parser is reused unchanged — the same pattern ``QwenClient`` uses.
-
-Editing is FLUX Kontext: an input image (base64 or URL) under ``input_image``
-turns a generation request into an edit. Verified live against the BFL API
-(docs.bfl.ai / api.bfl.ai/openapi.json).
+"""Black Forest Labs (FLUX), its own family: an ``x-key`` header, the model name
+as the endpoint path, and an asynchronous submit → poll → download behind the
+``send()`` seam that synthesises the standard ``{"data": [{"b64_json"}]}``
+shape, so the shared image parser reads it. An ``input_image`` makes a FLUX
+Kontext edit. See docs/tools/media.md.
 """
 
 from __future__ import annotations

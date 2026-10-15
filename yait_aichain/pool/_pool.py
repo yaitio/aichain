@@ -1,42 +1,10 @@
 """
-pool._pool
-==========
+pool._pool — ``Pool``, parallel execution of one runner across many items.
 
-``Pool`` — parallel execution of one runner across many items.
-
-Where ``Chain`` runs steps sequentially (each feeds the next), ``Pool``
-runs the same runner against every item at the same time using a thread
-pool.  Order of items is preserved in the result even though execution
-is concurrent.
-
-Design
-------
-  runner   — one Skill, Tool, Chain, or Agent
-  items    — list of variable dicts, one per task
-  max_flows — maximum number of parallel worker threads
-
-Every item is merged with the shared ``variables`` passed to ``run()``
-and then handed to the runner independently.  No state flows between items.
-
-Runner dispatch
----------------
-  Skill / Chain  → ``runner.run(variables=merged)``
-  Tool           → ``runner.run(**kwargs)``  where kwargs are the item
-                   variables that match the tool's declared parameters
-  Agent          → ``runner.run(task=merged["task"], variables=merged)``
-
-Status codes (integers)
------------------------
-  PENDING = 0   queued, not yet started
-  RUNNING = 1   a worker thread is executing this item right now
-  DONE    = 2   completed successfully
-  FAILED  = 3   completed with an error
-
-Thread safety
--------------
-All writes to ``_history`` are protected by a ``threading.Lock`` so
-``pool.history`` and ``pool.status`` can be read safely from outside
-while the pool is still running (e.g. for progress monitoring).
+Every item is merged with the shared ``variables`` and handed to the runner
+independently; no state flows between items, and results keep item order.
+Writes to ``_history`` take a lock, so ``history`` and ``status`` can be read
+while the pool runs. See docs/pipelines/pool.md.
 """
 
 from __future__ import annotations
@@ -64,14 +32,13 @@ RUNNING = 1
 DONE    = 2
 FAILED  = 3
 #: Never started, and never will this run: a stop, a raise, an attention
-#: beacon. Such items stayed PENDING for ever, and a polling loop waiting for
-#: DONE + FAILED to reach the count waited for ever too.
+#: beacon. Not left PENDING, or a polling loop waiting for DONE + FAILED to
+#: reach the count would wait for ever.
 CANCELLED = 4
 
-# One vocabulary with Chain — see `_errors_policy`. `stop` is new here: it
-# means "start no more items", which is what a fan-out can offer where a
-# sequence stops running steps. The difference between the two is the
-# difference between a sequence and a fan-out, not between two vocabularies.
+# One vocabulary with Chain — see `_errors_policy`. Here `stop` means "start
+# no more items", which is what a fan-out can offer where a sequence stops
+# running steps.
 from .._budget import as_budget, lend, start_run
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 from .. import _hints
@@ -92,22 +59,9 @@ def _build_tool_kwargs(tool, variables: dict) -> dict:
 
 
 def _check_tool_kwargs(tool, variables: dict) -> None:
-    """
-    Refuse a fan-out that could not pass the runner anything it needs.
-
-    A Tool that declares no matching ``parameters`` gets called with nothing —
-    and if its ``run()`` requires arguments, that is a TypeError per item, which
-    the default ``on_error="collect"`` turns straight back into ``None``. The
-    caller receives a full-length list of ``None`` with no exception and no
-    warning, indistinguishable from "every item legitimately returned nothing".
-    That shipped: a cookbook recipe's first two stages silently did nothing.
-
-    This is a misdeclared tool, not a per-item runtime failure — it fails
-    identically for every item, before any work happens. So it is checked in
-    the caller's thread, ahead of the fan-out, where no error policy can
-    swallow it. Raising it from inside a worker only changed which exception
-    was being turned into ``None``.
-    """
+    """Refuse, in the caller's thread, a tool runner whose ``run()`` needs arguments
+    no declared parameter can pass: it fails for every item, and ``on_error``
+    would turn that into a list of None with nothing said."""
     if not variables or _build_tool_kwargs(tool, variables):
         return                                 # nothing to pass, or it fits
     import inspect
@@ -244,7 +198,7 @@ class Pool:
         hooks:       list | None = None,
     ) -> None:
         if not callable(getattr(runner, "run", None)):
-            # A plain function had no `run`, and every item failed into a list
+            # A plain function has no `run`: every item would fail into a list
             # of None under the default on_error.
             raise TypeError(f"Pool runs a Skill, a Tool, a Chain or an Agent — something with "
                             f"run(); got {type(runner).__name__}. Wrap a function with @tool")
@@ -393,15 +347,15 @@ class Pool:
                         if self._on_error == "skip":
                             name = getattr(self._runner, "name", None) or type(self._runner).__name__
                             # Logged, every time: a warning shows once per
-                            # place in the code, and the place was ours.
+                            # place in the code, and the place is ours.
                             _skip_log.warning(f"Pool item {idx} ({name!r}) failed and was skipped: "
                                               f"{type(exc).__name__}: {exc}")
                         # "collect", "skip" and "stop" all leave results[idx] None
                 finished = True
             finally:
                 if not finished:
-                    # A raise — on_error="raise", Ctrl-C — waited for the whole
-                    # queue: a thousand paid calls after the first one failed.
+                    # A raise — on_error="raise", Ctrl-C — cancels the queue
+                    # rather than make a thousand paid calls after the failure.
                     self._stop_reason = self._stop_reason or "the run was interrupted"
                     self._stop.set()
                 executor.shutdown(wait=finished, cancel_futures=not finished)
@@ -510,13 +464,10 @@ class Pool:
                                   error=f"not started: {self._stop_reason or 'the pool stopped'}")
 
     def _run_one(self, index: int, merged: dict) -> Any:
+        """Run one item in a worker thread, recording each status in ``_history[index]``;
+        re-raises after recording FAILED.
         """
-        Execute the runner for one item.  Called inside a worker thread.
-
-        Updates ``_history[index]`` at every status transition.
-        Raises the original exception after recording it as FAILED.
-        """
-        # Checked before starting, by the worker itself: a free worker took
+        # Checked before starting, by the worker itself: a free worker may take
         # the next item in the moment between a blocker and the cancel.
         if (self._stop is not None and self._stop.is_set()) or (
                 self._board is not None and self._board.attention()):
@@ -568,7 +519,7 @@ class Pool:
                     # `KeyError('tenant')` renders as `'tenant'`, which in a
                     # run record reads as a value rather than a fault.
                     # Never empty: `TimeoutError()` and a bare `assert` have
-                    # no message, and an empty error read as no error.
+                    # no message, and an empty error would read as no error.
                     "error":    str(exc) or type(exc).__name__,
                     "failure":  _describe(exc),
                     "duration": duration,
@@ -579,8 +530,8 @@ class Pool:
 
     def _run_tool(self, runner, kwargs: dict):
         """One item of a tool runner, decided and run where every tool call is
-        (`_dispatch.py`). Before, an item was only charged — a tool an agent's
-        policy refused ran when a pool inside its tool fanned it out."""
+        (`_dispatch.py`), so the policy around the pool holds for it.
+        """
         from .._dispatch import Denied, Dispatcher
         from ..models._calls import ToolCall
         from ..state._run import Run
@@ -598,14 +549,9 @@ class Pool:
         return dispatcher._after(call, dispatcher.run_tool(call, check=False))
 
     def _dispatch(self, variables: dict) -> tuple[Any, Any]:
-        """Route the call to the correct runner interface.
-
-        Returns ``(output, usage)``. Usage is per item because that is the
-        only place it can be attributed: one shared runner serves every item,
-        and ``last_usage`` on it is overwritten by whichever thread finishes
-        next. Reading it after ``run()`` races; the runner is copied instead,
-        so each item reads its own counter.
-        """
+        """Route to the runner's interface; ``(output, usage)``. Usage is read from a
+        per-item copy of the runner: a shared runner's ``last_usage`` is overwritten by
+        whichever thread finishes next."""
         from ..models._usage import Usage
         runner = self._runner
 
@@ -620,10 +566,8 @@ class Pool:
                     "Agent runner requires a 'task' key in the item variables."
                 )
             result = runner.run(task=task, variables=variables)
-            # A parked agent is falsy but did not fail: what the docstring
-            # above promises is the SuspendedResult as the item's output, with
-            # its run_id, not "Agent failed: unknown error" and an orphan
-            # document in the store.
+            # A parked agent is falsy but did not fail: its SuspendedResult,
+            # with its run_id, is the item's output.
             from ..state import SuspendedResult
             if isinstance(result, SuspendedResult):
                 return result, None

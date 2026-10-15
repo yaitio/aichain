@@ -1,37 +1,11 @@
 """
-tools.transcribe._stt — Transcription
-=====================================
+``Transcription``, the base of the speech-to-text tools, and its providers:
+``sttOpenAI`` and ``sttGoogle``, both plain HTTP.
 
-Base class and provider implementations for speech-to-text transcription.
-
-Supported providers
--------------------
-  sttOpenAI   OpenAI Whisper (whisper-1, gpt-4o-transcribe, …)
-  sttGoogle   Google Cloud Speech-to-Text
-  sttXAI      xAI STT
-  sttQwen     Alibaba DashScope Paraformer / Qwen3-ASR
-
-All implement ``run(input, options=None) -> str`` where:
-  input  — path to an audio file (string)
-  output — transcript string (or JSON string when timestamps are requested)
-
-Long audio files are automatically chunked, transcribed in pieces, and
-stitched back into a single transcript.  The chunk size, overlap, and
-size thresholds are class-level constants prefixed with ``_`` — advanced
-users can adjust these directly on the class before instantiating.
-
-``sttOpenAI`` is built on the internal ``_OpenAICompatSTT`` base class,
-which any provider with an OpenAI-shaped transcription endpoint can reuse.
-
-Installation
-------------
-  OpenAI, Google :  nothing extra — plain HTTP
-  Chunking       :  pip install "yait-aichain[audio]"   (only when audio exceeds the size limit)
-
-Environment variables
----------------------
-  OpenAI  :  OPENAI_API_KEY
-  Google  :  GOOGLE_CLOUD_API_KEY, GOOGLE_AI_API_KEY or GOOGLE_API_KEY  (Speech-to-Text API enabled)
+``run()`` takes the path of an audio file and returns the transcript, or a JSON
+string when timestamps or ``format="json"`` are asked. Audio over a provider's
+limit is cut into pieces and the transcripts joined, which needs
+``pip install "yait-aichain[audio]"``. See docs/tools/media.md.
 """
 
 from __future__ import annotations
@@ -57,8 +31,7 @@ from .._base import Tool
 
 
 def _model_setting(tool, model):
-    """The tool's model: the one given, or the provider's default. A setting,
-    fixed for the tool — a call does not choose it."""
+    """The model given, or the provider's default: a setting of the tool, not of a call."""
     default = getattr(type(tool), "_DEFAULT_MODEL", None)
     if model is not None and default is None:
         raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
@@ -71,9 +44,8 @@ def _no_model_option(tool, opts: dict) -> None:
                          f"make it with model=… ({type(tool).__name__}(model=…), or the factory)")
 
 def _without_options(parameters: dict, *keys: str) -> dict:
-    """A copy of *parameters* with option *keys* removed — see the twin in
-    `to_speech.py`. Declaring an option a provider has no control for
-    advertises it to the model, which sets it and watches it vanish."""
+    """A copy of *parameters* without option *keys* (the twin of the one in
+    ``speech/_tts.py``): an option advertised and not read is one a model loses."""
     import copy
     out = copy.deepcopy(parameters)
     options = out.get("properties", {}).get("options", {}).get("properties", {})
@@ -173,26 +145,11 @@ class Transcription(Tool):
 
 
 # ── Internal base: OpenAI-compatible STT ─────────────────────────────────────
-#
-# sttOpenAI and sttXAI both use the OpenAI Python SDK.
-# xAI simply points to a different base URL.
-# All shared logic lives here; subclasses set class-level variables only.
 
 class _OpenAICompatSTT(Transcription):
-    """
-    Shared implementation for STT providers with an OpenAI-compatible
-    transcriptions endpoint (OpenAI Whisper, xAI STT, DashScope) — one
-    multipart POST to ``{_BASE_URL}/audio/transcriptions``, in plain HTTP.
-
-    Subclasses configure behaviour through class-level variables:
-
-    _BASE_URL        str         API base URL.
-    _DEFAULT_MODEL   str         Default model name.
-    _ENV_KEY         str         Environment variable that holds the API key.
-    _CHUNK_SECONDS   int         Max audio duration (seconds) per API call.
-    _OVERLAP_SECONDS int         Overlap between consecutive chunks.
-    _MAX_FILE_MB     float       Files above this size (MB) are chunked.
-    """
+    """The OpenAI transcriptions wire: one multipart POST to
+    ``{_BASE_URL}/audio/transcriptions`` in plain HTTP. A provider on it sets the
+    URL, default model, key variable and chunking constants as class variables."""
 
     _BASE_URL:        str          = "https://api.openai.com/v1"
     _DEFAULT_MODEL:   str          = "whisper-1"
@@ -251,9 +208,8 @@ class _OpenAICompatSTT(Transcription):
         file_mb = os.path.getsize(input) / (1024 * 1024)
         if file_mb > self._MAX_FILE_MB:
             if timestamps:
-                # The chunks are joined as text, so a large file returned the
-                # text alone where a small one returned words: keys that
-                # depended on the file's size.
+                # Chunks are joined as text, so the result's keys would
+                # depend on the file's size.
                 raise ValueError(f"{type(self).__name__}: word timestamps are not available for a "
                                  f"file over {self._MAX_FILE_MB:.0f} MB; split it first")
             return self._transcribe_chunked(input, model, language, prompt, timestamps, fmt)
@@ -415,10 +371,8 @@ class sttGoogle(Transcription):
         text = tool.run(input="recording.wav", options={"language": "en-US"})
     """
 
-    # Google's speech-to-text has no prompt: biasing the transcription is
-    # done with a speech context, which is a different shape and is not
-    # wired. Declaring `prompt` offered the model something that fell on the
-    # floor.
+    # Google's speech-to-text has no prompt: biasing is done with a speech
+    # context, a different shape and not wired, so `prompt` is not offered.
     parameters = _without_options(Transcription.parameters, "prompt")
 
     name = "sttGoogle"
@@ -487,8 +441,8 @@ class sttGoogle(Transcription):
 
         ext = os.path.splitext(input)[1].lower()
         if ext not in self._ENCODING_MAP:
-            # Read as MP3 whatever it was, and `.m4a` was an AttributeError:
-            # the Speech API has no MP4 encoding.
+            # The Speech API has no MP4 encoding; an unknown extension is
+            # refused rather than sent under a guessed one.
             raise ValueError(f"sttGoogle reads {sorted(self._ENCODING_MAP)}; {ext or 'no extension'} "
                              "is not one — convert the file first")
         config = {"encoding": self._ENCODING_MAP[ext], "languageCode": language,

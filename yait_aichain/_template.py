@@ -1,19 +1,10 @@
 """
-yait_aichain._template
-======================
+yait_aichain._template — safe ``{placeholder}`` substitution for skills and the agent.
 
-Safe ``{placeholder}`` substitution shared by skills and the agent.
-
-``str.format_map`` is unusable for LLM prompt templates: any literal brace
-in the text — a JSON example (``{"a": 1}``), an empty ``{}``, an unbalanced
-``}`` in model-generated content — raises ``ValueError``, and ``{var.attr}``
-/ ``{var[0]}`` can raise ``AttributeError``/``IndexError`` at format time.
-
-``substitute_placeholders`` replaces **only** ``{name}`` occurrences where
-*name* is a valid Python identifier present in *variables*.  Everything
-else — unknown placeholders, format specs (``{x:>10}``), conversions
-(``{x!r}``), attribute/index access, literal braces of any kind — is left
-intact.  No escaping syntax is needed or honoured: ``{{`` stays ``{{``.
+``str.format_map`` breaks on the literal braces prompts carry (a JSON example,
+an empty ``{}``, model-generated text) and on ``{var.attr}``. Here only a
+``{name}`` whose *name* is an identifier present in the variables is replaced;
+everything else passes through intact. See docs/pipelines/skills.md.
 """
 
 from __future__ import annotations
@@ -23,9 +14,9 @@ import re
 
 # A doubled brace, or a single ``{name}``. Scanned left to right, so ``{{``
 # and ``}}`` are consumed as literals and a placeholder beside a closing brace
-# of JSON — ``{"summary": {text}}`` — is still one; a lookaround read that as
-# an escape and left the document out. *name* is any identifier, ``{θέμα}``
-# included. A doubled brace matches with no group.
+# of JSON — ``{"summary": {text}}`` — is still one, where a lookaround would
+# read it as an escape. *name* is any identifier, ``{θέμα}`` included. A
+# doubled brace matches with no group.
 _PLACEHOLDER_RE = re.compile(r"\{\{|\}\}|\{([^\W\d]\w*)\}")
 
 _warned: set = set()
@@ -38,7 +29,7 @@ def placeholder_names(text: str) -> list:
 
 def _text(value) -> str:
     # A dict or a list as JSON: its repr — single quotes, True, None — is
-    # Python, and a model was handed that as the data. Only the plain types:
+    # Python, not data a model can read. Only the plain types:
     # a subclass with its own text (a tool's Record) says what it means.
     if type(value) in (dict, list, tuple):
         return json.dumps(value, ensure_ascii=False, default=str)

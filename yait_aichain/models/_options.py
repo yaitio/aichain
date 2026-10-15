@@ -1,26 +1,10 @@
-"""
-models._options
-===============
+"""The universal vocabulary — what a caller may ask for, whatever the provider —
+defined here as a contract rather than inferred from what the clients wire.
 
-The universal vocabulary: what a caller may ask for, independent of provider.
-
-This is the list the library's promise rests on — one way to say a thing, and
-the library translating it to whatever each provider calls it. It is defined
-here rather than inferred from the clients because a vocabulary inferred from
-implementations is not a contract; it is a description of whatever happened to
-be wired.
-
-Which of these a provider has a control for at all is declared in its data
-(``[provider.options] accepts``). That answers a question the request diff
-cannot: whether an option that did not arrive is one this provider has no
-control for, or a name the library has never heard of — ``top_k`` on OpenAI
-against a mistyped ``temperatur``, which call for opposite reactions from the
-reader and so are reported differently.
-
-Narrowing *within* a provider stays a runtime matter and is not declared:
-OpenAI has a temperature control, and a reasoning model of theirs refuses it
-on a particular call. That is an adaptation with a reason, reported when it
-happens, not a capability that is absent.
+Which options a provider has a control for is declared in its data
+(``[provider.options] accepts``), so a missing control (``top_k`` on OpenAI)
+is told apart from a name nobody knows (``temperatur``). Narrowing within a
+provider stays a runtime adaptation. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -262,7 +246,7 @@ def why_absent(option: str, provider: str, model: str = "") -> str:
 # says "Invalid value: 'ultra-max-supreme'" after the request has been paid
 # for and the round trip spent. The allowed set belongs to the **model**, not
 # the provider — `quality="xhigh"` is fine on gpt-image-2.5-flare and refused
-# by gpt-image-1.5, measured 2026-09-09.
+# by gpt-image-1.5.
 
 
 def allowed_values(option: str, provider: str, model: str) -> list | None:
@@ -323,11 +307,10 @@ def check_value(option: str, value, provider: str, model: str):
 # "medium" on OpenAI, `true` on Qwen and a different model on DeepSeek — one
 # word, seven shapes, and the caller writes it once.
 #
-# That mapping existed for `reasoning` alone, as `[provider.reasoning_map]`.
-# It is the same need everywhere: Reve (removed in 3.10.0, when its API
-# closed) expressed render quality as `test_time_scaling`, a number from 1 to
-# 15, and a transparent background as an entry in a `postprocessing` list. Declaring those in data rather than
-# writing them into a client keeps the translation where it can be read.
+# Every option has the same need as `reasoning`: a provider may express
+# render quality as a number from 1 to 15 or a background as a list entry.
+# Declared in data rather than written into a client, the translation stays
+# where it can be read.
 
 
 def value_map(option: str, provider: str) -> dict | None:

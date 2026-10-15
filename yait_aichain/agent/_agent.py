@@ -1,38 +1,10 @@
 """
-agent._agent
-============
+agent._agent — the ``Agent`` class and its public loop: ``run``, ``stream``,
+``step``, ``execute`` and ``resume``.
 
-``Agent`` — a conversation that can act.
-
-The whole algorithm::
-
-    messages = [system, task]
-    loop:
-        reply = Skill(model, messages, tools).run()
-        if the reply is text          → done, it is the answer
-        for each requested call:
-            result = execute(call)
-            append the call and its result to the conversation
-        if a stop condition fires     → stop
-
-Tool calling is **native**: schemas travel as the provider's ``tools`` field
-and the reply comes back as typed calls, not as JSON the model was asked to
-write into text. The previous protocol cost 13,473 characters of prompt
-machinery per turn and a 42%-correct call rate against 86% for a native agent
-on the same tasks — acting was a special case of talking, so weak models
-talked.
-
-Everything the agent can *do* is a tool. Real tools are the caller's; three
-synthetic ones expose the library's own machinery through the same channel:
-
-``pool``        repeat one tool (or a prompt) over a list, in parallel
-``delegate``    hand a scoped sub-task to a worker — only when ``team`` is set
-``write_plan``  waterfall's step-0 plan — only when ``mode="waterfall"``
-
-Two parameters carry the design space: ``mode`` — is the sequence frozen;
-``team`` — who does the work. The conversation is held with the world, not
-with itself, and it only ever appends — which is what keeps the cacheable
-prefix stable.
+Everything the agent can do is a tool, its own machinery included (``pool``,
+``delegate``, ``write_plan``). The conversation only ever appends, which keeps
+the cacheable prefix stable. See docs/agents/overview.md.
 """
 
 from __future__ import annotations
@@ -51,7 +23,7 @@ from ..skills import Skill
 from ..utilities._base import Utility
 from ..state._run import AgentRun, active, opened
 from .._dispatch import Denied, Dispatcher, calling
-from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the release notes)
 from ..state import StateStore
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
 
@@ -68,8 +40,8 @@ from ..state   import RunContext, SuspendedResult, using
 
 _logger = logging.getLogger("yait_aichain.agent")
 
-# The pieces this module was cut into (4.3.0). Every name that lived here is
-# importable from here still: callers, tests and saved chains name them.
+# The pieces this module is cut into. Every name that lived here is still
+# importable from here: callers, tests and saved chains name them.
 from ._helpers import _interrupted, _copy, _action, _safe  # noqa: F401
 from ._stops import (step_count, token_budget, cost_budget, nudge, verified,  # noqa: F401
                      stalled, repeating, check, _EFFECTS)
@@ -78,11 +50,6 @@ from ._builtins import (_POOL_SCHEMA, _PLAN_SCHEMA, DELEGATE_WHEN,  # noqa: F401
                         _RESERVED, _Builtin, _DRAFTING, _Builtins)
 from ._loop import _Loop
 
-
-#
-# Everything that can end a run other than the model simply answering. Two
-# kinds, and they must not be confused: a *check* that passes is a success
-# with harness-verified evidence, a *ceiling* that is reached is a failure.
 
 def _is_utility(obj) -> bool:
     return isinstance(obj, Utility)
@@ -98,11 +65,8 @@ def _utility_tools(u) -> str:
 
 
 def _check_tools(tools: list) -> None:
-    """
-    Refuse, by name, what cannot be a tool and two tools the model cannot tell
-    apart — here, before the first call, rather than as an ``AttributeError``
-    on the first turn or a tool silently replaced by its namesake.
-    """
+    """Refuse, by name and before the first call, what cannot be a tool and two
+    tools the model cannot tell apart."""
     seen: dict = {}
     for t in tools:
         owner = getattr(t, "__self__", None)
@@ -119,7 +83,7 @@ def _check_tools(tools: list) -> None:
             raise TypeError(f"{kind} is not a tool: an Agent needs a name, schema() and run() — "
                             f"a Tool subclass, or a tool from a factory such as search('exa').{hint}")
         if t.name in _RESERVED:
-            # The loop answers these names itself, so a tool of one never ran.
+            # The loop answers these names itself, so a tool of one would never run.
             raise ValueError(f"{t.name!r} is a name the agent's own tools use "
                              f"({', '.join(sorted(_RESERVED))}); give the tool another name")
         if t.name in seen:
@@ -258,8 +222,8 @@ class Agent(_Loop, _Builtins):
         self.planner_model = planner_model
         self.stop_when    = list(stop_when) if stop_when is not None else [step_count(30)]
         if not any(getattr(c, "kind", "ceiling") == "ceiling" for c in self.stop_when):
-            # `stop_when=[check(...)]` replaced the default step_count(30), and
-            # a check that never passes ran the loop without end.
+            # A `stop_when` given replaces the default step_count(30), and a
+            # check that never passes would run the loop without end.
             warnings.warn("stop_when has no ceiling, so step_count(30) is added; give one of "
                           "your own — step_count, token_budget, cost_budget — to choose",
                           stacklevel=3)
@@ -286,8 +250,8 @@ class Agent(_Loop, _Builtins):
         # Everything one invocation owns — its id, a parked document, a
         # pending approval, whether it streams, the hooks it reports to —
         # lives on its `AgentRun` (state/_run.py), not here: one agent serves
-        # concurrent runs. Outside a run, `_idle` stands in, so the external
-        # seams (`step()`, a direct `_do_delegate`) behave as before.
+        # concurrent runs. Outside a run, `_idle` stands in for the external
+        # seams (`step()`, a direct `_do_delegate`).
         self._idle: AgentRun | None = None
         for old, value in (("permissions", permissions), ("approve", approve),
                            ("interceptors", interceptors)):
@@ -422,12 +386,10 @@ class Agent(_Loop, _Builtins):
         """
         self.last_result = None
         ended: dict = {}
-        # A context of its own, copied when the stream is made — not when it
-        # is first read. A generator runs in whichever context advances it:
-        # Starlette advances each step in a fresh copy, so the beacon board
-        # was gone from the second step on; and two streams advanced in turn
-        # in one thread set and reset the same variables out of order. The
-        # run is opened inside it, so it is this stream's from the first step.
+        # A context of its own, copied when the stream is made, not when it is
+        # first read: a generator runs in whichever context advances it (see
+        # `_bound`). The run is opened inside it, so it is this stream's from
+        # the first step.
         from .._bound import bound
         return bound(self._stream(task, variables, ended),
                      on_end=lambda: setattr(self, "last_result", ended.get("result")))
@@ -531,9 +493,9 @@ class Agent(_Loop, _Builtins):
         """
         if signal is _UNSET:
             # A run kept after a failure is retried with no answer; a run
-            # waiting for one is not resumed without it — taken without an
-            # answer, the parked question was gone: the run paused again with
-            # nobody to ask and its document deleted.
+            # waiting for one is not resumed without it: taken without an
+            # answer, the parked question would be lost, the run would pause
+            # again with nobody to ask, and its document would be deleted.
             waiting = ((((self.store.load(run_id) if self.store is not None else None) or {})
                         .get("steps") or [{}])[0].get("suspend") or {})
             if waiting and waiting.get("at") != "after":
@@ -550,8 +512,8 @@ class Agent(_Loop, _Builtins):
             raise ValueError(f"agent {self.name or ''!r} has no store, so it "
                              "never parked a run. Pass Agent(store=...).")
         # Claimed, not read: a second delivery of the same signal finds
-        # nothing and gets the KeyError below, where loading then deleting at
-        # the end let two deliveries both run the approved action.
+        # nothing and gets the KeyError below, so two deliveries cannot both
+        # run the approved action.
         raw = self.store.take(run_id)
         if raw is None:
             raise KeyError(
@@ -634,10 +596,9 @@ class Agent(_Loop, _Builtins):
         return self._continue(messages, state, journal, run_id)
 
     def _continue(self, messages, state, journal, run_id: str):
-        """The rest of a resumed run. A failure the run can be retried from —
-        the model's call failing, a reply cut off — keeps the run in the store
-        with what has happened so far, the parked action's result included, so
-        a retry picks up after it instead of losing a run a person approved."""
+        """The rest of a resumed run. A retryable failure keeps the run in the store with
+        what has happened, the parked action's result included, so a retry picks up
+        after it instead of losing a run a person approved."""
         with collecting_beacons() as board:
             result = self._loop(messages, state, journal)
         if _interrupted(result):
@@ -683,8 +644,8 @@ class Agent(_Loop, _Builtins):
         """
         opening = task
         if variables:
-            # Without its secrets: a token a chain carried for a tool went to
-            # the model's provider in this block.
+            # Without its secrets, or a token a chain carries for a tool would
+            # go to the model's provider in this block.
             from ..state._secret import public
             opening = (f"{task}\n\nGIVEN:\n"
                        + json.dumps(public(variables), indent=1, ensure_ascii=False,
@@ -748,8 +709,8 @@ class Agent(_Loop, _Builtins):
         state = state if state is not None else self.new_state()
         reply = self._ask(messages, state)
         if isinstance(reply, ToolCallRequest):
-            # Counted here as run() counts it: a driver on this seam had a
-            # step_count that never moved, and so no ceiling at all.
+            # Counted here as run() counts it, or a driver on this seam would
+            # have a step_count that never moves, and so no ceiling at all.
             state["steps"] = (state.get("steps") or 0) + 1
         return reply
 
@@ -822,12 +783,8 @@ class Agent(_Loop, _Builtins):
 
     def _opened(self, depth: int | None = None, parent_id: str | None = None,
                 hooks: list | None = None):
-        """Open a run of this agent: its id, hooks and depth are its own.
-
-        Replaces `_fork()`, which copied the whole agent per run to keep runs
-        apart. The configuration — tools, model, policy, store, a shared
-        `Budget` — stays where it was; the run gets the rest.
-        """
+        """Open a run of this agent: its id, hooks and depth are its own, while the
+        configuration (tools, model, policy, store, a shared `Budget`) stays here."""
         waiting = active(self)
         if waiting is not None and waiting.id is None and depth is None:
             # Opened for this run by whoever starts it — `delegate`, with the
@@ -843,8 +800,8 @@ class Agent(_Loop, _Builtins):
 
     @property
     def _live(self) -> AgentRun:
-        """This agent's current run — or, outside one, the idle stand-in that
-        holds what the instance used to hold, with the agent's own hooks."""
+        """This agent's current run, or, outside one, an idle stand-in with the agent's
+        own hooks."""
         run = active(self)
         if run is not None:
             return run
@@ -875,15 +832,13 @@ class Agent(_Loop, _Builtins):
                            evidence=_evidence(CHECK, text), reason=text)
 
     def _gated_tool(self, call):
-        """The tool a call will run, which the policy decides on. For `pool`
-        it is the tool the pool names — the fan-out runs that tool, once per
-        item, and asking about `pool` itself asked about nothing. One approval
-        covers the whole list, which the request carries as its arguments."""
+        """The tool a call will run, which the policy decides on: for `pool`, the tool
+        it fans out, one approval covering the whole list."""
         if call.name == "pool":
             return self._tool_map.get((call.arguments or {}).get("tool") or "")
         if call.name in _DRAFTING:
             # Asked about like any tool, as `draft`: allowed unless a policy
-            # says otherwise, where they ran unasked whatever it said.
+            # says otherwise.
             return _DRAFTING[call.name]
         return self._tool_map.get(call.name)
 

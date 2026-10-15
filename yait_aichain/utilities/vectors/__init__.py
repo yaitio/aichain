@@ -1,75 +1,8 @@
-"""
-utilities.vectors
-=================
-
-A vector database as a utility, over Chroma, Pinecone or Qdrant.
-
-Public API
-----------
-``Vectors(backend, collection, *, description, embedder, url, api_key, ...)``
-    The way in: ``create``, ``upsert``, ``fetch``, ``delete`` and ``count``
-    for code, and ``kb.query`` — the one tool an agent gets.
-
-Underneath
-----------
-``VectorDB(provider, collection, *, embedder, url, api_key, ...)``
-    Returns the :class:`VectorStore` a ``Vectors`` is built on (``kb.store``).
-
-``VectorStore``
-    A backend plus an optional embedder, bound to one collection.
-    Methods: ``create``, ``query``, ``upsert``, ``fetch``, ``delete``, ``count``.
-
-``VectorRecord``
-    Uniform data model: ``id``, ``text``, ``score``, ``metadata``.
-
-``VectorQueryTool``, ``VectorUpsertTool``, ``VectorFetchTool``, ``VectorDeleteTool``
-    Tools constructed with a store. ``Vectors`` uses ``VectorQueryTool`` for
-    ``kb.query``.
-
-Backends
---------
-``backend`` is a name, or an alias:
-
-  "chroma"   / "chromadb"  → ChromaBackend   (default URL: http://localhost:8000)
-  "pinecone"               → PineconeBackend (requires api_key or PINECONE_API_KEY)
-  "qdrant"                 → QdrantBackend   (default URL: http://localhost:6333)
-
-Further keyword arguments are forwarded to the backend:
-  ``url``      — server base URL (overrides env var default)
-  ``api_key``  — API key (overrides env var default)
-  ``index``    — Pinecone index name (or set PINECONE_INDEX env var)
-  ``cloud``    — Pinecone cloud for new index creation (default "aws")
-  ``region``   — Pinecone region for new index creation (default "us-east-1")
-
-Examples
---------
-Qdrant, text embedded on the way in::
-
-    from yait_aichain.utilities import Vectors
-    from yait_aichain.tools import embed, chunk
-
-    kb = Vectors("qdrant", collection="docs", description="the product documentation",
-                 embedder=embed("openai", model="text-embedding-3-small"))
-    kb.create(dimension=1536)
-
-    pieces = chunk(max_chars=800).run(text)
-    kb.upsert([{"id": f"doc-{i}", **p} for i, p in enumerate(pieces)])
-
-    for r in kb.query.run("how does caching work?", {"n": 3}):
-        print(r["score"], r["text"][:60])
-
-Pinecone, vectors computed by the caller::
-
-    kb = Vectors("pinecone", collection="my_namespace", description="support tickets",
-                 index="my-index", api_key="pk-...")
-    kb.upsert([{"id": "1", "text": "…", "vector": [0.1, 0.2, …]}])
-
-Given to an agent::
-
-    from yait_aichain.agent import Agent, step_count
-    from yait_aichain.models import Model
-
-    agent = Agent(Model("claude-haiku-5-5"), tools=[kb.query], stop_when=[step_count(10)])
+"""``Vectors``: a vector database — Chroma, Pinecone or Qdrant — as a utility,
+with ``create``/``upsert``/``fetch``/``delete``/``count`` for code and
+``kb.query`` the one tool an agent gets. Underneath: ``VectorDB()`` builds the
+``VectorStore`` (``kb.store``), and the ``Vector*Tool`` classes wrap it.
+See docs/utilities/index.md.
 """
 
 from ._base    import PartialUpsert, VectorRecord, VectorBackend, VectorStore

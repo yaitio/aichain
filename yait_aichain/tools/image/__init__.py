@@ -1,22 +1,8 @@
 """
-tools.image
-===========
-
-An image model as a tool. ``image(service, model=…)`` makes one —
-``openai``, ``google``, ``bfl``, ``xai``, ``qwen`` or ``recraft`` —
-built on the model layer's provider data: the same request, the same option
-vocabulary, the same notices when a provider adapts or declines an option.
-
-::
-
-    picture = image("openai", model="gpt-image-1.5", output_dir="images/")
-    out = picture.run("a lighthouse at dawn, watercolor", options={"aspect_ratio": "16:9"})
-    out["images"][0]["path"], out["cost"]
-    picture.run("make the sky stormy", images=[out["images"][0]["path"]])   # an edit
-    Agent(model, tools=[picture])
-
-Images are made only here: a ``Skill`` asked for image output raises and
-points to ``image()``.
+An image model as a tool: ``image(service, model=…)``, built on the model
+layer's provider data — the same request, option vocabulary and notices when a
+provider adapts or declines an option. A ``Skill`` asked for image output
+raises and points here. See docs/tools/media.md.
 """
 
 from ._tool import OPTIONS, Image

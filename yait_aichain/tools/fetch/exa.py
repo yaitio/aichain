@@ -1,24 +1,9 @@
-"""
-tools.fetch.exa — fetchExa
-==========================
-
-Exa Contents behind the common :class:`~tools.fetch.Fetch` record.
-
-Endpoint  : POST https://api.exa.ai/contents
-Auth      : ``x-api-key``
-Docs      : https://exa.ai/docs/reference/get-contents — answer checked live
-            2026-10-09.
-
-Up to 100 URLs a call, from Exa's cache with a live crawl when a page is not
-cached; ``max_age_hours`` sets how old a cached copy may be (0 fetches fresh, -1
-cache only). Title, date and author come with the text. Measured 2026-10-08:
-on articles behind a paywall Exa returns the public teaser, not the article.
-
-**Price.** $1 per 1 000 pages of text, read from the answer.
-
-Environment variable
---------------------
-``EXA_API_KEY``
+"""Exa Contents (``POST https://api.exa.ai/contents``, ``x-api-key``) behind the
+common :class:`~tools.fetch.Fetch` record. Up to 100 URLs a call, from Exa's
+cache with a live crawl when a page is not cached; ``max_age_hours`` sets how
+old a cached copy may be (0 fetches fresh, -1 cache only). Price read from the
+answer. Key: ``EXA_API_KEY``. See docs/tools/fetch.md and
+https://exa.ai/docs/reference/get-contents.
 """
 
 from __future__ import annotations

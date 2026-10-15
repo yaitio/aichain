@@ -1,27 +1,7 @@
 """
-tools.embed._openai — EmbeddingOpenAI
-======================================
-
-Wraps the OpenAI Embeddings API (``POST /v1/embeddings``).
-
-Supported models
-----------------
-  text-embedding-3-small    1536-dim default; supports truncation to any size
-  text-embedding-3-large    3072-dim default; supports truncation to any size
-  text-embedding-ada-002    1536-dim; no dimension override
-
-Model notes
------------
-* ``text-embedding-3-*`` accept a ``dimensions`` parameter (1–max-dim).
-* ``text-embedding-ada-002`` has a fixed length; ``dimensions`` on it is refused when the
-  embedder is made.
-* OpenAI does not distinguish query vs document embeddings; ``input_type`` is
-  accepted by the interface but ignored.
-* The API accepts up to 2 048 strings per request.
-
-Environment variable
---------------------
-OPENAI_API_KEY
+``EmbeddingOpenAI``: the OpenAI Embeddings API (``POST /v1/embeddings``),
+2,048 texts a request. OpenAI ignores ``input_type``.
+See docs/tools/retrieval.md.
 """
 
 from ._base import _OpenAIShaped

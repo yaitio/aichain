@@ -88,8 +88,7 @@ class AgentResult:
     #: What ended the run — ``"answered"``, ``"check:<name>"``, ``"step_count"``,
     #: ``"token_budget"``, ``"cost_budget"``, or an error name. Without it a run
     #: that finished and a run that ran out of budget look identical from the
-    #: outside, which is exactly how a benchmark came to score four zeroes it
-    #: could not tell apart.
+    #: outside.
     stopped_by:  str | None = None
     plan:        list[dict]     = field(default_factory=list)
     #: Everything the library changed about this run's requests to fit the

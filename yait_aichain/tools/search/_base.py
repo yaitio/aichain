@@ -1,61 +1,10 @@
-"""
-tools.search._base
-==================
+"""``Search`` — one format of options and results for every web search provider.
 
-``Search`` — one format of options and results for every web search provider.
-
-The providers sell the same thing — ranked pages for a query, filtered by
-time, place and site — and spell every part of it differently: Brave filters
-time with ``freshness``, Firecrawl with Google's ``tbs``, Perplexity with
-``search_recency_filter`` and MM/DD/YYYY dates, Exa with ISO dates; two of the
-four have no site filter and take ``site:`` in the query. This class holds the
-meaning; each provider translates it.
-
-Options — one vocabulary
-------------------------
-``max_results``  how many results; kept inside the provider's ceiling.
-``recency``      ``hour`` | ``day`` | ``week`` | ``month`` | ``year``.
-``start_date``   only pages published on or after this ``YYYY-MM-DD``.
-``end_date``     only pages published on or before this ``YYYY-MM-DD``.
-``country``      ISO 3166-1 alpha-2, e.g. ``"GB"``.
-``language``     ISO 639-1, e.g. ``"en"``.
-``domains``      only these sites — a domain, or a domain with a path prefix.
-
-``recency`` and ``start_date`` both bound the same side; the later of the two
-is the one both promises keep. A provider adds its own options beside these
-(``extra_options``), and keeps them.
-
-An option a provider cannot honour is never dropped in silence: it is
-reported — as a warning once per provider and option, as a line at the end of
-the text the model reads, and in the result's ``notices``. An
-option it honours differently (``hour`` on a provider whose finest window is a
-day) is adapted and reported the same way.
-
-Results — one record
---------------------
-``run()`` returns ``{"query", "provider", "results", "notices", "cost",
-"cost_basis", "usage"}`` as a :class:`~tools.Record`. ``cost`` is the call's price in USD; ``cost_basis``
-says where it came from — the provider's own figure, the provider's units
-(credits, operation counts) at the published rate, or the published rate alone
-for a provider that reports nothing — and ``usage`` holds those units as the
-provider sent them. Rates are each tool's, with their source and date. Each
-result is::
-
-    {"title": str, "url": str, "date": "YYYY-MM-DD" or "", "author": str,
-     "snippets": [str, ...], "text": str}
-
-``date`` is the publication date as the provider reports it, normalised to a
-calendar day, or empty — not a fact about the page: providers date pages
-wrongly, and a caller that needs the true date reads it from the page
-(``fetch``). ``text`` is the page's own text when the provider returned it
-(Exa, on request), else empty.
-
-The record is one object for three readers: code reads its fields, an agent
-shows the model :meth:`Search.render` — the results as a numbered list with
-the notes at the end — and a Skill prompt that substitutes it gets the same
-list. ``search()`` is ``run()`` under its 3.2 name.
-
-``search(service)`` makes one: ``search("exa")``, ``search("perplexity")``.
+This class holds the meaning — the standard options, the time window, the
+record ``{"query", "provider", "results", "notices", "cost", "cost_basis",
+"usage"}`` and its text for a model — and each provider translates it. An
+option a provider cannot honour, or honours differently, is reported, never
+dropped in silence. See docs/tools/search.md.
 """
 
 from __future__ import annotations

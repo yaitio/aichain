@@ -49,6 +49,12 @@ the files this repository tests, and CI fails when the copy drifts: a skill
 that teaches a removed API is worse than no skill, because an agent trusts its
 context over its weights.
 
+When an agent writes a name the library does not have — `max_steps=` on an
+`Agent`, `result.text` on its result, `from yait_aichain.hooks import Tracer` —
+the error names the call that works. The wrong name is never accepted as an
+alias: two spellings of one API leave the docs, the examples and the programs
+agents write disagreeing about which one is real.
+
 ## How well it works
 
 Measured on tasks the documents were not written against, each program run

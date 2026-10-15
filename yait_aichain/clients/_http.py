@@ -1,17 +1,8 @@
-"""
-One HTTP call, for the model clients and for every tool.
-
-Each client and tool used to carry its own try / status check / error: four
-copies in the base client, five in the vector backends, one in nearly every
-tool — and they had drifted. Some raised a typed `APIError`, others a bare
-`RuntimeError` carrying the whole body, so `except RateLimitError` around a
-tool caught nothing and an HTML error page reached a model's context.
-
-`request()` is the one shape: the body serialised before the call (a value
-that does not serialise is a bug to see, not a network failure to retry), a
-transport failure as `NetworkError`, a status as the typed error
-`error_from_status` gives it — with the body clipped, since an error message
-travels into logs, run records and model context.
+"""One HTTP call, for the model clients and for every tool: ``request()``
+serialises the body before the call (a value that does not serialise is a
+bug, not a network failure to retry), raises ``NetworkError`` for transport
+failures and the typed error for a status, with the body clipped since it
+travels into logs and model context. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -30,10 +21,9 @@ MAX_ERROR_BODY = 2000
 
 
 def _sendable(headers: dict) -> dict:
-    """Header values as HTTP can carry them: a key read from a file keeps its
-    newline, which is stripped here, and a control character that remains is
-    refused by naming the header — never its value, which is a credential
-    and which the HTTP library would otherwise quote in its error."""
+    """Header values stripped (a key read from a file keeps its newline); a
+    control character left is refused naming the header, never its value,
+    which is a credential the HTTP library would quote in its error."""
     out = {}
     for name, value in headers.items():
         if isinstance(value, str):

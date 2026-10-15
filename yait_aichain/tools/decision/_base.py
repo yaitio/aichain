@@ -1,52 +1,9 @@
-"""
-tools.decision._base
-====================
+"""``Decision`` — typed questions about a text, answered with probabilities.
 
-``Decision`` — typed questions about a text, answered with probabilities.
-
-A decision model writes no prose. It is given evidence and a fixed set of
-questions, and answers each one with a number: the probability that a
-statement is true, one option from a fixed set with a probability for every
-option, or a place on an ordered scale. Two providers sell exactly this —
-TypeSafe's Jev and OpenAI's Decisions API — and their wire formats differ in
-every detail while their meaning does not. This class holds the meaning; each
-provider translates it.
-
-Questions — one format for every provider
------------------------------------------
-A map of name → question. The name is what the answer comes back under.
-
-``predicate``
-    ``{"type": "predicate", "instructions": "Is this urgent?"}``
-``choice``
-    ``{"type": "choice", "instructions": "Which team?",
-    "choices": {"billing": "Payments, refunds", "other": None}}`` — option →
-    description, ``None`` when an option needs none; 2 to 255 options.
-``score``
-    ``{"type": "score", "instructions": "How severe?",
-    "levels": ["Cosmetic", {"label": "Blocked", "description": "No workaround"}]}``
-    — ordered from lowest to highest, 2 to 10 levels, each a label or a
-    label with a description.
-
-Answers — one format for every provider
----------------------------------------
-``run()`` returns ``{"answers", "model", "usage", "cost", "cost_basis"}`` as a
-:class:`~tools.Record` — the fields for code, one line per answer for a model
-(:meth:`Decision.render`); ``answers`` maps each question's name to::
-
-    {"type": "predicate", "probability": 0.92}
-    {"type": "choice", "choice": "billing", "confidence": 0.93,
-     "probabilities": {"billing": 0.95, "other": 0.05}}
-    {"type": "score", "score": 1.1, "confidence": 0.55,
-     "probabilities": {"Cosmetic": 0.1, "Workaround": 0.7, "Blocked": 0.2}}
-
-A score is the probability-weighted average of the level indices, from 0, so
-it can fall between levels. Probabilities are returned as the provider gave
-them; the threshold is the caller's, who knows what a wrong answer costs.
-
-The questions are fixed when the tool is made, and an agent passes only the
-text, as ``state``. A model that wrote the questions could write them badly,
-and the calibration that is the reason to use one of these would go with them.
+This class holds the one format of questions and answers, its checks and the
+rendering for a model; each provider subclass translates it to its wire.
+The questions are fixed when the tool is made, so an agent passes only the
+text and cannot write a question badly. See docs/tools/decide.md.
 """
 
 from __future__ import annotations
@@ -105,8 +62,8 @@ def check_questions(questions, owner: str = "Decision") -> None:
             if len(ch) > MAX_CHOICES:
                 raise ValueError(f"choice {name!r} has {len(ch)} options; at most {MAX_CHOICES}")
             if bad := [k for k in ch if not isinstance(k, str) or not k.strip()]:
-                # An answer is keyed by the option's text; an int key matched
-                # nothing and every probability came back None.
+                # An answer is keyed by the option's text; an int key would
+                # match nothing and every probability would come back None.
                 raise ValueError(f"choice {name!r}: options are named by strings; got {bad[:3]}")
         elif "choices" in q:
             raise ValueError(f"{kind} {name!r} takes no choices")
@@ -117,7 +74,7 @@ def check_questions(questions, owner: str = "Decision") -> None:
                 raise ValueError(f"score {name!r} needs levels: an ordered list of {lo} to {hi}, "
                                  "lowest first, each a label or {'label', 'description'}")
             if bad := [x for x in lv if not isinstance(x, (str, dict))]:
-                # `levels: [1, 2, 3]` was an AttributeError on the first int.
+                # `levels: [1, 2, 3]` would fail deep inside, on the first int.
                 raise ValueError(f"score {name!r}: a level is a label or {{'label', 'description'}}; "
                                  f"got {bad[:3]}")
             labels = [_level(x)[0] for x in lv]
@@ -280,7 +237,7 @@ class Decision(Tool):
             images = [images]                   # one image, not its characters
         answers, model, usage = self._ask(state, [image_url(i) for i in images or []])
         tokens = usage.get("input_tokens")
-        # No tokens reported is no cost known — it was $0.00, "reported".
+        # No tokens reported is no cost known, not $0.00.
         return Record({"answers": answers, "model": model, "usage": usage,
                        "cost": None if tokens is None else tokens * self._PRICE_PER_INPUT_TOKEN,
                        "cost_basis": (f"not reported by {self._PROVIDER}" if tokens is None else
@@ -311,7 +268,7 @@ class Decision(Tool):
         answers = self._raw_answers(data)
         if answers is None:
             raise RuntimeError(f"{self._PROVIDER} returned no answers: {json.dumps(data)[:500]}")
-        # A question the provider skipped was an answer of None and a run
+        # A question the provider skipped is not an answer of None in a run
         # that succeeded: fail closed, by name.
         if missing := [n for n in self.questions if not answers.get(n)]:
             raise RuntimeError(f"{self._PROVIDER} answered no {missing}; "

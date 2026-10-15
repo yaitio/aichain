@@ -1,23 +1,5 @@
-"""
-utilities.vectors._fetch
-========================
-
-VectorFetchTool — retrieve specific records by ID (no similarity ranking).
-
-Use this when you already know which IDs you need — e.g. after a query
-that returned IDs, or to verify what was indexed.
-
-Usage
------
-::
-
-    from yait_aichain.utilities.vectors import VectorDB, VectorFetchTool
-
-    store = VectorDB("qdrant", collection="docs")
-    tool  = VectorFetchTool(store)
-
-    records = tool.run(["doc_1", "doc_2"])
-    # → [{"id": "doc_1", "text": "…", "metadata": {…}}, …]
+"""``VectorFetchTool``: records by id, with no similarity ranking and no score —
+for ids already known, or to check what was indexed. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

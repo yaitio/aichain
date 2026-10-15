@@ -38,6 +38,19 @@ whole in one of them, and neighbours under the same heading are merged when
 they fit together. The sizes are settings of the tool, not of a call: a store
 is filled with pieces cut one way. It runs locally and costs nothing.
 
+How a text is cut. It is read as Markdown when a line starts with `#`, or it
+holds a code fence, a table separator row or emphasis around a word; otherwise
+as plain text. Headings are never pieces of their own: they become the
+`metadata.headings` of what follows, and a heading closes the ones at its level
+and below. A code block or a table that fits is kept whole; one that does not
+is split by lines or rows, with the opening fence, or the header and separator
+rows, repeated in every piece. Text is split on the first of a blank line, a
+line break, `. `, `。！？` and a space that cuts it, and by characters only for
+one word longer than the limit. Overlap joins text to text under the same
+headings — never a code block or a table — and starts at a word boundary.
+An empty text, or one of headings only, gives `[]`; an unclosed code fence is
+read as text; `overlap_chars >= max_chars` is refused when the tool is made.
+
 Each piece comes back as `{"text", "chars", "metadata"}` — with no `id`. A
 vector store needs one per record, and only you know what makes an id stable
 across re-indexing: a file name and a position, a section's slug. Give it one
@@ -52,10 +65,30 @@ filled by one model and searched with the same one. `input_type` per call says
 whether the texts are documents or queries, which some providers encode
 differently.
 
+A list of any length is split into requests the provider accepts — by rows,
+by estimated tokens and by bytes, whichever binds first — and the vectors come
+back in the order of the texts. `batch_size` lowers the rows per request, for
+rate limits. An empty text is refused before anything is sent.
+
 What a model reads of the result is one line — how many vectors, how many
 dimensions, how many tokens — never the numbers, which it can do nothing with.
 An agent rarely needs this tool directly; it reaches embeddings through a
 store's `query`.
+
+What each provider does with the two settings and the one option:
+
+| Service | Models | `dimensions` | `input_type` |
+|---|---|---|---|
+| `openai` | `text-embedding-3-small` (1536), `-3-large` (3072), `ada-002` (1536) | the `3-*` models; `ada-002` is fixed | ignored |
+| `cohere` | `embed-v4.0`, `embed-english-v3.0`, `embed-multilingual-v3.0` (1024) | every model | `search_query` / `search_document`; none sends `search_document`, as the API requires one |
+| `voyage` | `voyage-3-large`, `voyage-3`, `voyage-3-lite` (512), `voyage-code-3`, `voyage-finance-2`, `voyage-law-2` | every model | passed through; none is omitted |
+| `google` | `gemini-embedding-001` (768), `gemini-embedding-exp-03-07` (3072), `text-embedding-004` (768) | `gemini-embedding-001` and `-exp-03-07` | `RETRIEVAL_QUERY` / `RETRIEVAL_DOCUMENT`, sent to `gemini-embedding-001` and `text-embedding-004` only |
+| `qwen` | `text-embedding-v4` (64–2048), `-v3` (512–8192), `-v2` (fixed 1536) | `v4` and `v3` | passed through; none is omitted |
+
+`dimensions` on a fixed-length model raises when the tool is made, naming the
+models that take it. Google reports no token counts, so its `total_tokens` is
+`None`. Qwen's host follows `EmbeddingQwen(region=…)` or `DASHSCOPE_REGION` — `ap` (the
+default), `us`, `cn` or `hk`.
 
 ## Store and search: Vectors
 
@@ -79,6 +112,12 @@ puts them in order. Thirty candidates in, five out: the cheap search casts the
 net, the reranker chooses. `rerank(service, model=…)` takes `cohere`, `voyage`
 or `qwen`, documents as texts or as the records a store's search returns, and
 keeps a record's own fields on what it returns.
+
+The models each takes: `cohere` — `rerank-v3.5`, `rerank-english-v3.0`,
+`rerank-multilingual-v3.0`; `voyage` — `rerank-2`, `rerank-2-lite`; `qwen` —
+`gte-rerank`, `gte-rerank-v2`, with its host chosen by `RerankQwen(region=…)`
+or `DASHSCOPE_REGION` as for embeddings. Cohere bills in search units, and
+that is the number its result carries as `total_tokens`.
 
 ## As a pipeline
 

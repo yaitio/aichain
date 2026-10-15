@@ -1,58 +1,7 @@
-"""
-utilities.mcp._tools — MCPTool and discovery
-=============================================
-
-One ``MCPTool`` wraps one operation on an MCP (Model Context Protocol)
-server behind the standard ``run(input, options=None)`` interface.
-``discover()`` is the internal function :class:`~yait_aichain.utilities.MCP`
-uses to list a server's tools; the way in is ``MCP(server)``.
-
-A tool works anywhere a Tool is accepted: Chain steps, Agent tool lists,
-or direct ``run()`` calls.  No async boilerplate — the library manages a
-background event loop internally.
-
-Supported transports
----------------------
-+--------------------------------------------------+---------------------+
-| ``server`` value                                 | Transport           |
-+==================================================+=====================+
-| ``"./server.py"``, ``"python server.py ..."``    | STDIO subprocess    |
-| ``{"command": "npx", "args": [...]}``            | STDIO subprocess    |
-| ``"https://example.com/mcp"``                    | Streamable HTTP     |
-| ``"http://localhost:8000/mcp"``                  | Streamable HTTP     |
-| ``"https://example.com/sse"`` (URL ends /sse)    | SSE legacy          |
-| ``{"url": "https://..."}``                       | HTTP (dict form)    |
-+--------------------------------------------------+---------------------+
-
-Quick examples
---------------
-::
-
-    from yait_aichain.utilities import MCP
-
-    server = MCP("https://api.example.com/mcp",
-                 headers={"Authorization": "Bearer sk-..."})
-    server.names                                   # ['search', 'summarise', ...]
-    server.tool("search").run({"query": "latest AI research"})
-
-    # STDIO subprocess, only two of its tools
-    fs = MCP({"command": "npx", "args": ["@modelcontextprotocol/server-filesystem", "/data"]},
-             filter=["read_file", "list_directory"])
-    Agent(Model("claude-haiku-5-5"), tools=fs.tools)
-
-    # One tool built directly, skipping discovery
-    tool = MCPTool(
-        name        = "search_web",
-        description = "Search the web for recent information.",
-        server      = "https://api.example.com/mcp",
-    )
-    tool.run({"query": "MCP protocol"})
-
-Installation
-------------
-::
-
-    pip install fastmcp
+"""``MCPTool`` — one operation on an MCP server behind ``run(input, options)`` —
+and ``discover()``, which ``MCP`` uses to list a server's tools. Calls are
+synchronous over one shared background event loop; requires ``fastmcp``.
+See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -77,21 +26,9 @@ from ...tools._base import Tool
 # ---------------------------------------------------------------------------
 
 class _AsyncBridge:
-    """
-    A persistent daemon thread running a dedicated asyncio event loop.
-
-    All async MCP operations are submitted here via :meth:`run`, which
-    blocks the calling thread until the coroutine completes.
-
-    This approach avoids two common problems with ``asyncio.run()``:
-
-    * Calling from inside a running event loop (Jupyter, FastAPI) raises
-      ``RuntimeError: This event loop is already running``.
-    * Creating a new event loop per call tears down and rebuilds STDIO
-      subprocess connections unnecessarily.
-
-    A single background loop handles all concurrent MCPTool calls safely.
-    """
+    """One daemon thread running an event loop that every MCP call blocks on:
+    ``asyncio.run()`` fails inside a running loop (Jupyter, FastAPI), and a loop
+    per call would rebuild STDIO connections each time."""
 
     _instance: _AsyncBridge | None = None
     _lock = threading.Lock()
@@ -125,8 +62,8 @@ class _AsyncBridge:
                                "thread, which would wait on itself forever; await it instead")
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         # wait(), not result(timeout): from 3.11 the futures TimeoutError is
-        # the builtin one, so a TimeoutError the coroutine raised was caught
-        # as the wait's own and reported as `None:.0f` — a TypeError.
+        # the builtin one, so a TimeoutError the coroutine raised would be
+        # taken for the wait's own.
         done, _ = concurrent.futures.wait([future], timeout)
         if not done:
             future.cancel()
@@ -274,22 +211,9 @@ def _build_client(server: _Server) -> Any:
 # ---------------------------------------------------------------------------
 
 def _extract_result(result: Any) -> Any:
-    """
-    Normalise a ``CallToolResult`` to a plain Python value.
-
-    Priority:
-
-    1. Media in the content — images, audio, binary resources — makes the
-       result a list of the library's parts, text as strings beside them, so
-       the model sees an image rather than megabytes of base64.
-    2. ``structured_content`` — the server's JSON as sent, unwrapped from
-       ``{"result": …}`` only where fastmcp says it wrapped it. Not ``.data``:
-       for a typed schema that is a generated dataclass, and the model read
-       ``Root(code='LH1')``.
-    3. ``.data``, for a client that has no structured content.
-    4. The content: one text block is a ``str``, several a list.
-    5. Empty → ``None``.
-    """
+    """A ``CallToolResult`` as a plain value: media as parts, else the server's
+    ``structured_content`` (not ``.data``, a generated dataclass that reads as
+    ``Root(code='LH1')``), else ``.data``, else the text; ``None`` when empty."""
     content = list(getattr(result, "content", None) or [])
     parts = [_part(item) for item in content]
     if any(isinstance(p, dict) for p in parts):

@@ -28,6 +28,12 @@ The runner can be a whole Chain, so each item runs its own pipeline — fetch,
 then summarise — independently of the others. A Chain or an Agent runner
 contributes its `.output` to the results.
 
+A Tool runner is called with the item's variables that match its declared
+`parameters`; a Pool refuses to start when the tool's `run()` needs arguments
+none of them can pass, rather than return a list of `None`. An Agent runner
+takes its task from the item's `"task"`, and an agent that parks returns its
+`SuspendedResult` as that item's output.
+
 ## Concurrency is a cap, not a count
 
 `max_flows` is how many items are in flight at once, not how many there are:
@@ -57,6 +63,11 @@ forty-nine. A failed item is `None` in the results and its error is in
 `pool.status` counts the items pending, running, done and failed, and is safe
 to read from another thread while the pool works — enough for a progress bar.
 After the run, read the results, not the status.
+
+`pool.history` holds one record per item: its `index`, `variables`, `status`,
+`output`, `error` and `duration`. An item a stop, a raise or an attention
+beacon kept from starting is `CANCELLED`, with the reason in `error`, so a
+loop waiting for every item to finish does end.
 
 ## One budget for all of it
 

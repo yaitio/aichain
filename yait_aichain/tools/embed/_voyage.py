@@ -1,35 +1,6 @@
 """
-tools.embed._voyage — EmbeddingVoyage
-======================================
-
-Wraps the Voyage AI Embeddings API (``POST /v1/embeddings``).
-
-Supported models
-----------------
-  voyage-3-large     1024-dim default; best quality
-  voyage-3           1024-dim default; balanced quality/cost
-  voyage-3-lite      512-dim  default; lowest cost
-  voyage-code-3      1024-dim; optimised for code retrieval
-  voyage-finance-2   1024-dim; optimised for finance text
-  voyage-law-2       1024-dim; optimised for legal text
-
-Model notes
------------
-* All models support:
-    - ``input_type``       — "query" or "document"; optional.
-    - ``output_dimension`` — integer truncation; optional.
-* The API accepts up to 1 000 strings (or 320 000 tokens) per request.
-* Response includes token usage in ``usage.total_tokens``.
-
-Universal ``input_type`` mapping
----------------------------------
-  "query"    → "query"
-  "document" → "document"
-  None       → omitted from request body (provider default)
-
-Environment variable
---------------------
-VOYAGE_API_KEY
+``EmbeddingVoyage``: the Voyage AI Embeddings API (``POST /v1/embeddings``),
+1,000 texts a request. See docs/tools/retrieval.md.
 """
 
 from ._base import _OpenAIShaped

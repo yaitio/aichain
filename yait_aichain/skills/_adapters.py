@@ -1,101 +1,8 @@
-"""
-skills._adapters
-================
-
-Provider-agnostic format utilities used by the Skill layer.
-
-The actual provider-specific serialisation / deserialisation lives in the
-family clients (``clients/_families/*``), reached via the model's
-``to_request()`` / ``from_response()``.  This module only contains the
-pieces that are not tied to any single provider — validation and
-normalisation of *our* universal format, which only the Skill layer needs
-(the Agent builds the format by hand):
-
-* :func:`normalize_input`  — fill in implicit defaults in an input dict
-* :func:`normalize_output` — fill in implicit defaults in an output dict
-* :func:`validate_input`   — check a normalised input dict
-* :func:`validate_output`  — check a normalised output dict
-* :func:`substitute`       — replace ``{placeholder}`` tokens in message text
-
-Universal input format
-----------------------
-Full (explicit) form::
-
-    {
-      "messages": [
-        {
-          "role": "system" | "user" | "assistant",
-          "parts": [
-            {"type": "text",  "text": "..."},
-            {
-              "type": "image",
-              "source": {"kind": "url",    "url": "https://…"},
-              "meta":   {"detail": "high"}
-            },
-            {
-              "type": "image",
-              "source": {"kind": "base64", "mime": "image/png", "data": "…"},
-              "meta":   {}
-            },
-            {
-              "type": "video",
-              "source": {"kind": "url", "url": "https://…"},
-              "meta":   {"sampling": {"strategy": "fps", "fps": 1, "max_frames": 60},
-                         "include_audio_track": false}
-            },
-            {
-              "type": "audio",
-              "source": {"kind": "base64", "mime": "audio/wav", "data": "…"},
-              "meta":   {"purpose": "stt"}
-            }
-          ]
-        }
-      ]
-    }
-
-Shorthand form (normalised automatically):
-
-* A part that is a plain string → ``{"type": "text", "text": string}``
-* A part dict that has ``"text"`` but no ``"type"`` → ``"type"`` defaults to
-  ``"text"``
-
-So the minimal input for a single user message is::
-
-    {"messages": [{"role": "user", "parts": ["Hello!"]}]}
-
-    # or, equivalently:
-    {"messages": [{"role": "user", "parts": [{"text": "Hello!"}]}]}
-
-Universal output format
------------------------
-Default (omit entirely or pass ``{}`` / ``None`` for plain text output)::
-
-    {}   →   {"modalities": ["text"], "format": {"type": "text"}}
-
-Explicit forms::
-
-    {"modalities": ["text"], "format": {"type": "text"}}
-
-    {"modalities": ["text"], "format": {"type": "json"}}
-
-    {"modalities": ["text"], "format": {
-        "type":   "json_schema",
-        "name":   "result",
-        "schema": {...},
-        "strict": true
-    }}
-
-    {"modalities": ["image"], "format": {"type": "image"}}
-
-    {"modalities": ["image", "text"], "format": {"type": "image"}}
-
-Partial forms (each missing key is filled in with its default)::
-
-    {"format": {"type": "json"}}
-    →  {"modalities": ["text"], "format": {"type": "json"}}
-
-    {"modalities": ["image"], "format": {"type": "image"}}
-    →  (already complete; unchanged)
+"""The universal input and output format on the Skill side: normalising the
+shorthand forms, validating messages and output specs, substituting
+``{placeholder}`` tokens, and reading ``kind: "file"`` media on send. The
+provider-specific translation lives in the family clients.
+See docs/models/models.md, "The message format".
 """
 
 import base64
@@ -136,16 +43,9 @@ def _guess_mime(path: pathlib.Path, head: bytes) -> str:
 
 
 def _resolve_file_source(part: dict) -> None:
-    """
-    Resolve a ``kind:"file"`` media source into inline base64 *in place*.
-
-    When a media part's ``source`` is ``{"kind": "file", "path": "...",}`` and
-    carries no ``data`` yet, read the file, base64-encode it into ``data``, and
-    fill in ``mime`` (from the extension, falling back to magic bytes) if absent.
-    A ``"file"`` source that already has ``data`` is left untouched, so the
-    family clients (which read ``source["data"]`` for both ``base64`` and
-    ``file`` kinds) keep working unchanged.
-    """
+    """Read a ``kind: "file"`` source with no ``data`` into base64, in place, with
+    ``mime`` guessed when absent. The family clients read ``source["data"]`` for
+    both ``base64`` and ``file`` kinds."""
     src = part.get("source")
     if not isinstance(src, dict) or src.get("kind") != "file":
         return
@@ -243,11 +143,8 @@ def normalize_input(input_: dict) -> dict:
                 # Dict with "text" but no "type" → default type to "text"
                 normalised_parts.append({"type": "text", **part})
             else:
-                # A media part is left as written. Reading the file here — at
-                # construction — pinned a vision Skill to one file for its
-                # whole life, because substitute() only ever reached text
-                # parts. Resolution happens on send instead, so a path may
-                # carry a {placeholder} and one Skill can serve a whole Pool.
+                # A media part is left as written and read on send, so a path
+                # may carry a {placeholder} and one Skill can serve a whole Pool.
                 normalised_parts.append(part)
         msg["parts"] = normalised_parts
     return result
@@ -428,19 +325,9 @@ def is_generate_marker(msg: dict) -> bool:
 
 
 def _validate_turn_structure(messages: list) -> None:
-    """
-    Enforce the turn-structure contract for multi-turn directed reasoning:
-
-    * at least one ``user`` turn (otherwise there is nothing to run);
-    * an ``assistant`` turn cannot come first (after an optional ``system``) —
-      it must follow a ``user`` turn;
-    * no two ``assistant`` turns in a row (a generated turn followed by a canned
-      one, or vice-versa, breaks the user/assistant alternation).
-
-    Valid shape: ``[system?] user (assistant user)*``. Consecutive ``user``
-    turns are allowed (they are sent together in one call). Raises ``ValueError``
-    at construction time — this is a template error, not a runtime fault.
-    """
+    """Raise ``ValueError`` at construction unless the turns read
+    ``[system?] user (assistant user)*`` (consecutive users allowed), and every
+    ``tool`` turn follows the assistant turn whose call it answers."""
     content_idx = [i for i, m in enumerate(messages) if m.get("role") != "system"]
     if not any(messages[i].get("role") == "user" for i in content_idx):
         raise ValueError("input['messages'] must contain at least one 'user' turn")
@@ -499,8 +386,8 @@ def validate_output(output: dict) -> None:
             "output['format']['type'] must be 'text', 'json', 'json_schema', or 'image'"
         )
     if ftype == "json" and "schema" in fmt:
-        # A schema under `json` was never sent, and the answer was still
-        # checked against it — a failure for a rule the model never saw.
+        # A schema under `json` is never sent, yet the answer would be checked
+        # against it — a failure for a rule the model never saw.
         raise ValueError("a schema goes with format type 'json_schema', not 'json': "
                          "{'type': 'json_schema', 'schema': …} sends it to the model")
     if ftype == "json_schema" and not isinstance(fmt.get("schema"), dict):

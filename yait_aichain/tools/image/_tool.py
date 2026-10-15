@@ -1,12 +1,8 @@
 """
-tools.image._tool — ``Image``, an image model as a tool.
-
-A model is what can be an agent's mind; an image model cannot — it neither
-reasons nor calls tools — so since 3.9.0 it is reached as a tool. Only the face
-changed: the request is built by the same ``Skill`` and ``Model`` as before,
-from the same provider data, with the same option vocabulary and the same
-adaptation notices. What a call returns is a ``Record``: the image for code,
-and a line for a model — never the image's bytes in a conversation.
+``Image``, an image model as a tool: an image model neither reasons nor calls
+tools, so it is not a model an agent can think with. The request is built by
+the same ``Skill`` and ``Model``, from the same provider data. A call returns a
+``Record``: the image for code, a line for a model. See docs/tools/media.md.
 """
 
 from __future__ import annotations

@@ -1,24 +1,12 @@
 """
-state._run — one invocation's own data, apart from what ran it.
+state._run — one invocation's own data, apart from the agent that runs it.
 
-An agent is configuration: a model, tools, a policy, a store. A run is what
-one invocation of it accumulates — an id, the document it is parked under, the
-approval it is waiting on, whether somebody is watching it stream, the hooks it
-reports to. The second used to live on the first, and one agent serves
-concurrent runs (a module-level agent in a warm Lambda, a Pool's items, a
-`delegate` worker), so approvals crossed between runs, one tenant's stream
-carried another's events, and a run read another's id. `Agent._fork()` copied
-the agent per run to keep them apart. This holds the run instead, and the
-agent stays what it was configured as.
-
-The current run is ambient, in a `ContextVar`: a run opened inside another —
-a worker inside its lead — is the current one until it ends, and the lead's
-is current again after. A generator advanced in a context of its own
-(`_bound.bound`) keeps its run across steps.
-
-The working counters a `stop_when` condition reads (`state`) stay a plain
-dict: it is a public seam — a driver of `Agent.step()` keeps it between
-invocations as JSON, and a caller's `check(fn)` receives it.
+An agent is configuration; a run is what one invocation accumulates — its id,
+the document it is parked under, the approval it waits on, its hooks. One agent
+serves concurrent runs, so these live here and not on the agent. The current
+run is ambient in a ``ContextVar``. The working counters (``state``) stay a
+plain dict: a driver of ``Agent.step()`` keeps them as JSON between calls.
+See docs/agents/driving-the-loop.md.
 """
 
 from __future__ import annotations
@@ -68,15 +56,15 @@ class AgentRun(Run):
     #: The counters that survive a pause, and only those. `adaptations` are
     #: per-request notices about what went on the wire and do not describe
     #: the conversation, which is what resumes; `truncated` describes one
-    #: reply. `unverified` travels: dropped, an unchecked change made before
-    #: a pause was answered after it without the check `verified()` holds for.
+    #: reply. `unverified` travels, or an unchecked change made before a pause
+    #: would be answered after it without the check `verified()` holds for.
     PORTABLE = ("steps", "tokens", "cost", "plan", "plan_calls", "unverified")
 
     @classmethod
     def portable(cls, state: dict) -> dict:
         """*state* as a parked document keeps it: JSON, and only what resumes."""
         out = {k: state.get(k) for k in cls.PORTABLE}
-        # The nudge latch travels too, as a list: dropped, a resumed run said
+        # The nudge latch travels too, as a list, or a resumed run would say
         # its nudge again.
         out["nudged"] = sorted(state.get("nudged") or ())
         return out

@@ -1,108 +1,10 @@
 """
-chain._chain
-============
+chain._chain — the ``Chain`` class: building, running, pausing and resuming a
+pipeline of steps.
 
-``Chain`` — a sequential pipeline of :class:`~skills.Skill`,
-:class:`~tools.Tool` and :class:`~agent.Agent` instances, plain functions and
-utilities' methods.
-
-A Chain wires steps together so each step's output automatically feeds the
-next step's input as a named variable.  The kinds of step can be freely mixed
-in any order; a pause for a person or a signal is a step too, made with
-``wait(...)`` or ``gate(tool, ...)``.
-
-Step specification
-------------------
-Each element of *steps* may be any of the following forms:
-
-  * ``runner``
-        Bare Skill, tool, Agent, Chain or function.  Output stored under the
-        runner's name (a Skill's ``name``, a function's ``__name__``); one with
-        no name goes to ``"result"``, with a warning.
-
-  * ``(runner, output_key: str)``
-        Output stored under *output_key*.
-
-  * ``(runner, input_map: dict)``
-        Output under the runner's name, inputs from *input_map*.
-
-  * ``Step(runner, out=..., inputs=..., on_error=..., spread=...)``
-        Everything a tuple says, plus this step's own error policy and
-        whether a dict it returns is spread among the variables.
-
-  * ``(runner, output_key: str, input_map: dict)``
-        Same as above **plus** an *input_map* that fills the step's
-        arguments from the accumulated variables.
-
-        ``input_map`` has the form ``{"param_name": value}``, where *value*
-        is a variable's name, a path into one, or a ``"{template}"``.
-        ``{"source": "url"}`` passes ``accumulated["url"]`` as the ``source``
-        argument; ``{"text": "page.body"}`` passes the ``body`` field of the
-        dict stored under ``page``; ``{"text": "Title: {french}"}`` passes the
-        template filled in.
-
-  * ``(runner, output_key: str, input_map: dict, options: dict)``
-        Same as above **plus** an *options* dict for step-level settings.
-        Currently meaningful only for Agent steps:
-
-        ``task_key``     (str,  default ``"task"``)
-            Name of the accumulated variable that holds the agent's task
-            string.  The task is read from ``accumulated[task_key]``
-            before the agent runs.
-
-        ``output_field`` (str,  default ``"output"``)
-            Which field of the :class:`~agent.AgentResult` to extract as
-            the step's output.  Use ``"output"`` for the final answer
-            (default), or any other ``AgentResult`` attribute name.
-
-Variable flow
--------------
-1. The chain starts with *initial variables* — merged from
-   ``Chain.variables`` and ``run(variables=...)``, call-time values win.
-
-2. Before each step the *accumulated variable dict* is inspected to build
-   the step's input:
-
-   * **Skill** — the full accumulated dict is passed as
-     ``skill.run(variables=accumulated)``.  The skill's template engine
-     picks the placeholders it needs.
-
-   * **Tool**  — kwargs are assembled by matching the tool's declared
-     ``parameters["properties"]`` keys against the accumulated dict
-     (with optional *input_map* renaming).  Only declared parameters that
-     have a matching accumulated variable are forwarded, so extra variables
-     are silently ignored and never cause unexpected keyword errors.
-
-   * **Function / method** — called with the arguments its signature names,
-     filled the same way; a required one the chain cannot fill is an error.
-
-   * **Agent** — ``agent.run(task=accumulated[task_key],
-     variables=accumulated)`` is called.  The task string is read from
-     ``accumulated[task_key]`` (default key: ``"task"``).  The
-     ``AgentResult`` field named by ``output_field`` (default:
-     ``"output"``) is extracted as the step's output value.
-
-3. After each step the output is stored under its key —
-   ``accumulated[output_key] = output`` — a dict too, read whole or by path
-   (``"page.body"``). Until 5.0 a dict's fields are also spread among the
-   variables, with a warning, unless ``Step(spread=...)`` says otherwise.
-
-4. ``run()`` returns a :class:`ChainResult`: ``.output`` is the final step's
-   output and ``result["key"]`` any step's.
-
-History
--------
-After each ``run()`` call, ``chain.history`` holds one record per step::
-
-    {
-        "step":       int,                    # 0-based index
-        "kind":       "skill"|"tool"|"agent"|"call", # type of runner
-        "name":       str,                    # runner.name or "step_N"
-        "input":      dict,                   # accumulated vars before step
-        "output":     str|dict,               # raw output from the runner
-        "output_key": str,                    # variable name for str output
-        "options":    dict,                   # step-level options (agents)
-    }
+The step forms, how each kind of step reads the variables, and the history
+record are described in docs/pipelines/chain.md; saving is in ``_files``,
+input filling in ``_inputs``.
 """
 
 from __future__ import annotations
@@ -127,10 +29,9 @@ from ._result import ChainResult
 from ..tools._base import Record
 from ..state._secret import public
 
-# One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
-# is a silent `skip`: a chain of a hundred generated steps that expects a few
-# to fail should not have to choose between a warning per failure and no
-# record at all.
+# One vocabulary with Pool — see `_errors_policy`. `collect` is a silent
+# `skip`: a chain of a hundred generated steps that expects a few to fail
+# should not have to choose between a warning per failure and no record.
 from .._errors_policy import POLICIES as _VALID_ON_STEP_ERROR, describe as _describe
 
 # Default options applied to every Agent step unless overridden.
@@ -140,8 +41,8 @@ _AGENT_DEFAULT_OPTIONS: dict = {
 }
 
 
-# The pieces this module was cut into (4.3.0); every name that lived here is
-# importable from here still.
+# The pieces this module is cut into; every name that lived here is still
+# importable from here.
 from ._inputs import (_MISSING, _usage_to_dict, _build_tool_kwargs, _callable_name,  # noqa: F401
                       _build_call_kwargs, _runner_name, _lookup, _resolve, _type_name,
                       _sources)
@@ -281,7 +182,7 @@ class Chain(_Flow, _Files):
         # S3, …). It holds suspended runs for resume.
         from ..state import InMemoryStore
         # `is not None`: a store of one's own with a `__len__` is falsy when
-        # empty, and was replaced by an in-memory one that nobody read.
+        # empty, and must not be replaced by an in-memory one.
         self._store = store if store is not None else InMemoryStore()
         # A Wait is a pause for a human, and a human answers in another
         # process — `resume()` is typically a separate command, sometimes the
@@ -319,15 +220,9 @@ class Chain(_Flow, _Files):
         self.context = None
 
     def _store_output(self, idx: int, name: str, key: str, output, accumulated: dict) -> None:
-        """An output under its key — a dict too, read whole or by path
-        (``"page.body"``). Two pre-4.2.7 habits are kept for one version:
-
-        * a plain dict's fields are also spread among the variables, which is
-          said once per step unless ``Step(spread=...)`` decides it;
-        * a step whose key is its runner's name also writes ``"result"``.
-
-        A Record is one result, kept whole under its key, as it always was.
-        """
+        """An output under its key, a dict read whole or by path (``"page.body"``). For
+        now a dict's fields are also spread, said once per step unless ``Step(spread=)``
+        decides, and a step keyed by its runner's name also writes ``"result"``."""
         extra = self._extra[idx]
         accumulated[key] = output
         if isinstance(output, dict) and not isinstance(output, Record):
@@ -351,10 +246,8 @@ class Chain(_Flow, _Files):
             accumulated["result"] = output
 
     def _run_tool(self, runner, idx: int, kwargs: dict, signal, run_id):
-        """A tool step, decided and run where every tool call is
-        (`_dispatch.py`): this chain's rules and any around it, the tool's
-        schema, the budget. Before, a step was only charged — a tool an
-        agent's policy refused ran when a chain inside its tool called it."""
+        """A tool step, decided and run where every tool call is (`_dispatch.py`): this
+        chain's rules and any around it, the tool's schema, the budget."""
         from .._dispatch import Denied, Dispatcher
         from ..models._calls import ToolCall
         from ..state._run import Run
@@ -645,11 +538,8 @@ class Chain(_Flow, _Files):
 
     def _run_from(self, doc, accumulated, *, start_idx, signal, usage_in,
                   on_error, context, resumed: bool = False) -> ChainResult:
-        """
-        Shared step loop for ``run()`` (from step 0) and ``resume()`` (from the
-        suspended step). On ``resume``, *signal* is delivered to the step at
-        *start_idx* (the suspended tool) via ``_signal=``.
-        """
+        """The step loop for ``run()`` (from step 0) and ``resume()`` (from the suspended
+        step, which gets *signal* as ``_signal=``)."""
         from ..state import StepStatus, Suspend, SuspendedResult
 
         # Expose the per-request context for the duration of the run and persist
@@ -663,9 +553,8 @@ class Chain(_Flow, _Files):
         checkpoints = [True]                     # off once a document will not serialise
 
         def checkpoint():
-            """The document as it stands, so a process that dies mid-run can
-            be resumed from the step it died in, not from the start — which
-            re-ran every step before it, side effects and all."""
+            """Save the document as it stands, so a process that dies mid-run resumes from
+            the step it died in rather than re-running the ones before it."""
             if not checkpoints[0]:
                 return
             doc.variables = public(accumulated)
@@ -739,7 +628,7 @@ class Chain(_Flow, _Files):
                     # Fold the agent's token usage into the chain total. An
                     # Agent has no ``last_usage`` (the generic accumulation
                     # below would miss it); it reports on its result, cost
-                    # included — the tokens alone left the chain's cost None.
+                    # included, and the chain's cost needs both.
                     agent_usage = getattr(agent_result, "usage", None)
                     if agent_usage is None and getattr(agent_result, "tokens_used", 0):
                         agent_usage = Usage(total_tokens=agent_result.tokens_used)
@@ -748,13 +637,13 @@ class Chain(_Flow, _Files):
 
                 else:
                     # A copy for this step: one Skill shared by a Pool's
-                    # copies of this chain overwrote `last_usage` from another
-                    # thread before this one read it (35 of 400 items).
+                    # copies of this chain would have `last_usage` overwritten
+                    # from another thread before this one read it.
                     shared, runner = runner, copy.copy(runner)
                     # Skill: pass full accumulated dict, honouring input_map renames.
                     if input_map:
                         # Resolved as a tool's are: a template filled, a name
-                        # the chain lacks an error — they were dropped.
+                        # the chain lacks an error.
                         skill_vars = dict(accumulated)
                         for dst, src in input_map.items():
                             skill_vars[dst] = _resolve(src, accumulated, f"{name}.{dst}", top=True)
@@ -836,8 +725,7 @@ class Chain(_Flow, _Files):
                     return self._result(doc, history, accumulated, usage_total, last_output)
 
                 # skip / collect: record a terminal SKIPPED status so resume
-                # does not
-                # re-run this step (first_pending would otherwise land on it).
+                # does not re-run this step (first_pending would land on it).
                 doc.steps[idx]["status"] = StepStatus.SKIPPED
                 doc.steps[idx].pop("suspend", None)
                 doc.failures.append({"step": idx, "name": name, "type": type(exc).__name__,
@@ -845,7 +733,7 @@ class Chain(_Flow, _Files):
                 checkpoint()
                 if step_on_error == "skip":
                     # Logged, every time: a warning is shown once per place in
-                    # the code, and that place was inside the library.
+                    # the code, and that place is inside the library.
                     _skip_log.warning(
                         f"Chain step {idx} ({name!r}) failed and was skipped: "
                         f"{type(exc).__name__}: {exc}. Downstream steps that "
@@ -896,7 +784,7 @@ class Chain(_Flow, _Files):
     @staticmethod
     def _result(doc, history, accumulated, usage_total, last_output) -> ChainResult:
         # By the failure record, not by its message: `TimeoutError()` and a
-        # bare `assert` have an empty one, and the chain reported success.
+        # bare `assert` have an empty one, which would read as success.
         # Failures from before a pause come from the document, where they
         # were kept; the history of this process starts at the resume.
         seen = {r["step"] for r in history if r.get("failure") or r.get("error")}
@@ -965,11 +853,8 @@ class Chain(_Flow, _Files):
 
     @staticmethod
     def _normalise(steps) -> tuple[list, list]:
-        """
-        Validate and normalise *steps* into ``(runner, output_key, input_map,
-        kind, options)`` 5-tuples, and beside them what each step says beyond
-        that: its own ``on_error``, ``spread``, and whether its key was given.
-        """
+        """*steps* as ``(runner, output_key, input_map, kind, options)`` tuples, and beside
+        them what each says beyond that: its ``on_error``, ``spread``, and given key."""
         result: list = []
         extras: list = []
         for item in steps:
@@ -1028,9 +913,9 @@ class Chain(_Flow, _Files):
                 options   = {}
 
             if key is None:
-                # Named after its runner, where every unnamed step wrote one
-                # shared "result" and the next overwrote it. Still written
-                # there too for now; see `_store_output`.
+                # Named after its runner, so unnamed steps do not overwrite
+                # one shared "result". Still written there too for now; see
+                # `_store_output`.
                 key = _runner_name(runner)
                 extra["default_key"] = True
                 if key is None:
@@ -1049,8 +934,8 @@ class Chain(_Flow, _Files):
                 from ..tools.general._wait import Gate, Wait
                 if isinstance(runner, (Wait, Gate)):
                     # A pause's answer is the variables its `resume_with`
-                    # declares, so spreading it is what the step is for, not
-                    # the habit going in 5.0 — and it says nothing.
+                    # declares, so spreading it is what the step is for, and
+                    # it says nothing.
                     extra["spread"] = True
 
             if _is_tool(runner):
@@ -1064,7 +949,7 @@ class Chain(_Flow, _Files):
             elif callable(getattr(runner, "run", None)):
                 kind = "skill"
             else:
-                # Refused here, where it failed only when run() reached it.
+                # Refused here, not only when run() reaches it.
                 raise TypeError(f"a chain step is a Skill, a tool, an Agent, a Chain or a "
                                 f"function; got {type(runner).__name__} {runner!r}")
 
@@ -1089,7 +974,7 @@ class Chain(_Flow, _Files):
             extras.append(extra)
 
         # Two steps named alike would write one key: the later wins, which is
-        # the overwrite the runner's name was meant to end.
+        # the overwrite the runner's name is meant to end.
         seen: dict = {}
         for i, ((runner, key, *_), extra) in enumerate(zip(result, extras)):
             if extra["default_key"] and key in seen:

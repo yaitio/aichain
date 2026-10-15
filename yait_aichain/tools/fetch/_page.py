@@ -1,12 +1,5 @@
-"""
-tools.fetch._page
-=================
-
-What ``fetchLocal`` reads from a page's ``<head>``: its title, dates and
-author, which a conversion of the body leaves out.
-
-Moved here from ``convertToMD`` in 3.8.0, when the convert tools left the
-library; ``fetchLocal`` was the one user inside it.
+"""What ``fetchLocal`` reads from a page's ``<head>``: its title, dates and
+author, which a conversion of the body leaves out. See docs/tools/fetch.md.
 """
 
 from __future__ import annotations

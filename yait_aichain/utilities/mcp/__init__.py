@@ -1,32 +1,6 @@
-"""
-utilities.mcp
-=============
-
-``MCP`` — an MCP server as a utility. Its tools are the ones the server
-declares, each with the name, description and schema the server gives it.
-
-::
-
-    deepwiki = MCP("https://mcp.deepwiki.com/mcp")
-    deepwiki.names                                    # ['ask_wiki_question', ...]
-    deepwiki.tool("ask_wiki_question").run(repoName="yaitio/aichain", question="…")
-    deepwiki.call("read_wiki_structure", repoName="yaitio/aichain")   # the same, for code
-    Agent(model, tools=deepwiki.tools)
-
-Each tool is an ``MCPTool``. Two settings: ``connect_timeout`` bounds reaching
-the server and listing its tools (60 s), ``call_timeout`` one call of a tool
-(300 s); ``None`` waits indefinitely.
-
-Each tool's risk class — what a permission policy reads — comes from the
-server's annotations, and is ``privileged`` where the server says nothing:
-another server's tool is unknown here, and the unknown goes to a person.
-``trust_annotations=False`` ignores the server's annotations, so every tool
-is ``privileged`` unless ``risk=`` says otherwise. ``prefix="wiki_"`` names its tools ``wiki_…`` for an agent holding two
-servers whose tools share names; ``tool()``, ``call()`` and ``risk=`` take
-the server's own names. ``risk={"tool_name": "read"}`` puts your word over
-the server's::
-
-    MCP("https://mcp.deepwiki.com/mcp", risk={"ask_wiki_question": "read"})
+"""``MCP``: an MCP server as a utility, its tools the ones the server declares,
+their risk classes from the server's annotations (``privileged`` where it says
+nothing) unless ``risk=`` says otherwise. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

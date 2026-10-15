@@ -1,30 +1,11 @@
 """
 agent._swarm — what a finished result rests on, and how a child speaks up.
 
-Two mechanisms from the plan's *swarm coordination* row, and both are "a
-field and a comparison, not an architecture" — which is the reason they were
-worth waiting for `state/` and `Pool` to settle first.
-
-**Acceptance that evidence can invalidate.** An agent closed its run on its
-own word. `_journal.py` has always separated `CHECK` — a programmatic fact —
-from `MODEL_CLAIM` — the model says so and nothing verified it — and nothing
-read the field, so the distinction was decoration. A result now carries an
-`Acceptance`: *what kind* of support it has, and a fingerprint of the checked
-evidence. When the evidence changes, or the caller intervenes, the acceptance
-is superseded and has to be re-earned; it is not silently still true.
-
-**Beacons that interrupt a parent's wait.** `Pool` fanned out and had no
-channel back: a child that hit a blocker could only fail, or finish and be
-read afterwards. Coordination artifacts (`contract`, `decision`, `fact`) are
-now kept apart from beacons that demand attention (`blocker`, `question`,
-`contract_change`), and a `Pool` waiting on its items stops starting more the
-moment one of those arrives — instead of polling, timing out, or spending the
-rest of the fan-out on work the blocker already made pointless.
-
-Both are *reported*, not enforced. An `unsupported` acceptance does not stop a
-run; making the evidence kind **change** what the loop does is `nudge`, which
-is the next row of the plan. Reporting first means the number exists before
-anyone builds behaviour on it.
+An ``Acceptance`` records the kind of support a result has and a fingerprint of
+its checked evidence, so a change in the evidence supersedes it. A ``beacon``
+from anywhere inside a run travels up the boards; ``blocker``, ``question`` and
+``contract_change`` make a waiting ``Pool`` stop starting items. Both are
+reported, not enforced. See docs/control/observability.md.
 """
 
 from __future__ import annotations
@@ -69,13 +50,8 @@ class Beacon:
 
 
 class _Board:
-    """Beacons posted during one run, forwarded to the run that contains it.
-
-    Forwarding is what makes a grandchild's blocker reach the `Pool` two
-    levels up: a delegated worker's board forwards to its parent agent's,
-    which forwards to the pool item's, which the pool is watching. A board
-    that kept its beacons to itself would be a record, not a channel.
-    """
+    """Beacons posted during one run, forwarded to the run that contains it, so a
+    grandchild's blocker reaches the `Pool` two levels up."""
 
     def __init__(self, parent: _Board | None = None) -> None:
         self._items: list = []

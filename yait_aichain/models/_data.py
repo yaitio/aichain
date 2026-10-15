@@ -1,17 +1,7 @@
-"""
-models._data
-============
-
-Loader for the provider data files (``models/providers/*.toml``) — the data
-tier of the two-tier model layer.
-
-One file per provider; each holds the provider's transport/format settings
-(`[provider]`) and its models (`[models."name"]`).  Loaded once at import into
-``PROVIDERS`` (provider key → data).  ``Model`` and the registry query
-functions read from here.
-
-TOML parsing uses stdlib ``tomllib`` (Python 3.11+); on 3.10 it falls back to
-the optional ``tomli`` package.
+"""Loads the provider data files, ``models/providers/*.toml``, once at import
+into ``PROVIDERS`` (provider key → ``[provider]`` settings and ``[models]``).
+On 3.10 TOML parsing needs the optional ``tomli`` package.
+See docs/models/models.md.
 """
 
 from __future__ import annotations

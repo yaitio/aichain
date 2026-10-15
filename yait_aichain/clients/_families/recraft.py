@@ -1,19 +1,7 @@
-"""
-clients._families.recraft
-==========================
-
-Recraft is image-only and rides the OpenAI Bearer transport (inherited from
-``OpenAIClient``), but its endpoints differ from OpenAI's:
-
-* text-to-image  → ``POST /v1/images/generations``  (OpenAI-shaped JSON)
-* image-to-image → ``POST /v1/images/imageToImage``  (multipart/form-data)
-
-The multipart edit goes out through the ``send()`` seam already implemented on
-``OpenAIClient`` (it turns a ``Multipart`` body into
-a form POST), and the ``{"data": [...]}`` response is parsed by the shared image
-parser — so this client is just the request shaping.
-
-Verified live against the Recraft API (external.api.recraft.ai).
+"""Recraft: image-only, on the OpenAI Bearer transport, with its own endpoints —
+``/v1/images/generations`` (JSON), ``/v1/images/imageToImage`` and
+``/v1/images/vectorize`` (multipart, sent through ``OpenAIClient.send``).
+Responses are read by the shared image parser. See docs/tools/media.md.
 """
 
 from __future__ import annotations
@@ -42,12 +30,8 @@ _DEFAULT_STRENGTH = 0.2
 
 
 def _strength_from_fidelity(fmt: dict, model: str) -> float:
-    """This API asks how much to change; the vocabulary asks how much to keep.
-
-    Measured 2026-09-09: strength 0.05 left a blue square blue, strength 0.95
-    replaced it with the prompt. So the two run opposite ways and the number
-    is inverted here rather than in the caller's head.
-    """
+    """This API asks how much to change (``strength``); the vocabulary asks how
+    much to keep. The two run opposite ways, so the number is inverted here."""
     from ...models._adaptation import Adaptation, ADAPTED, record
     value = fmt.get("fidelity")
     if value is None:
@@ -77,9 +61,8 @@ def _build_recraft_generation_request(name, messages, output, path):
         body["size"] = fmt["size"]
     elif fmt.get("aspect_ratio"):
         # This API takes pixels only — an aspect ratio is accepted and
-        # ignored, measured 2026-09-09: "16:9" came back 1024x1024. So the
-        # ratio is turned into a size at a 1024 short edge and the provider
-        # snaps it to its own nearest (1707x1024 was returned as 1820x1024).
+        # ignored. So the ratio is turned into a size at a 1024 short edge
+        # and the provider snaps it to its own nearest.
         size = size_from_ratio(fmt["aspect_ratio"])
         if size:
             body["size"] = size
@@ -126,11 +109,8 @@ def _build_recraft_edit_request(name, messages, output, path):
 
 
 def _build_recraft_vectorize_request(messages, output, path):
-    """
-    Multipart vectorize body — raster → SVG trace. No model, no prompt: the input
-    image is converted as-is (distinct from imageToImage, which is a content
-    *variation*). Sentinel consumed by ``OpenAIClient.send`` → ``_post_form``.
-    """
+    """A multipart vectorize body: a raster traced to SVG as-is, with no model
+    and no prompt (imageToImage, by contrast, is a variation)."""
     sources = _edit_sources(messages, "recraft", "vectorize", limit=1)
     if not sources:
         raise ValueError("vectorize requires exactly one input image")
@@ -153,14 +133,8 @@ def _build_recraft_vectorize_request(messages, output, path):
 
 
 def _parse_vectorize_response(response: dict) -> dict:
-    """
-    Parse a Recraft vectorize response into the standard
-    ``{url, base64, mime_type, revised_prompt}`` shape.
-
-    Vectorize returns a single object ``{"image": {"b64_json"|"url", ...},
-    "credits": N}`` — NOT the ``{"data": [...]}`` list shape of generation
-    (verified live, 2026-06-30). The result is always SVG.
-    """
+    """A vectorize reply — one ``{"image": {...}}`` object, not generation's
+    ``{"data": [...]}`` list — as the standard image result; always SVG."""
     img = response.get("image")
     if not isinstance(img, dict):
         raise ValueError(
@@ -183,9 +157,7 @@ class RecraftClient(OpenAIClient):
     #: Recraft renders images and nothing else, so there is nothing to
     #: deliver progressively. It is spelled out because this class inherits
     #: from OpenAIClient, which streams — and inheriting a capability is
-    #: exactly how a provider comes to claim one it does not have. The same
-    #: defect the option layer was cleared of in 2.3.0, arriving through the
-    #: class hierarchy instead of through the data.
+    #: exactly how a provider comes to claim one it does not have.
     supports_streaming = False
 
     #: And it takes no tools, for the same reason: `OpenAIClient.supports_tools`

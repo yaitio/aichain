@@ -1,43 +1,7 @@
-"""
-utilities.vectors.providers._chroma
-===================================
-
-ChromaBackend — VectorBackend adapter for ChromaDB via its REST API v2.
-
-Uses pure urllib3, no ``chromadb`` SDK required.
-
-API v1 was removed in Chroma >= 0.6 (and is absent from Chroma Cloud), so
-all endpoints below use the v2 tenant/database-scoped layout.
-
-Environment variables
----------------------
-``CHROMA_URL``      — base URL of the Chroma server  (default: http://localhost:8000)
-``CHROMA_API_KEY``  — API key for Chroma Cloud        (optional for self-hosted)
-``CHROMA_TENANT``   — tenant name      (default: default_tenant)
-``CHROMA_DATABASE`` — database name    (default: default_database)
-
-Chroma REST API v2 reference (prefix = /api/v2/tenants/{t}/databases/{db})
----------------------------------------------------------------------------
-POST   {prefix}/collections                    — create collection (get_or_create)
-GET    {prefix}/collections/{name}             — describe (returns id, name, metadata)
-POST   {prefix}/collections/{id}/upsert        — upsert documents
-POST   {prefix}/collections/{id}/query         — similarity query
-POST   {prefix}/collections/{id}/get           — fetch by IDs or filter
-POST   {prefix}/collections/{id}/delete        — delete by IDs or filter
-GET    {prefix}/collections/{id}/count         — record count
-
-Distance normalisation
------------------------
-Chroma returns raw distances (lower = more similar).  For cosine distance
-the range is [0, 2].  We normalise to a score in [0, 1]:
-
-    score = 1.0 − distance / 2.0
-
-For l2 (Euclidean) the range is unbounded so we use:
-
-    score = 1.0 / (1.0 + distance)
-
-Inner-product (ip) results are returned as negated similarity; we negate back.
+"""``ChromaBackend``: ChromaDB over its REST API v2 (the tenant/database-scoped
+layout; v1 is gone from Chroma 0.6 and Chroma Cloud), with urllib3 and no SDK.
+Configured by ``CHROMA_URL``, ``CHROMA_API_KEY``, ``CHROMA_TENANT`` and
+``CHROMA_DATABASE``. See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -65,13 +29,9 @@ def _columns(ids: list, *columns: list):
 
 
 def _normalise_score(distance: float, space: str) -> float:
-    """A Chroma distance as the similarity every other backend gives.
-
-    Chroma answers a distance in each space: ``1 − cos`` for cosine,
-    ``1 − dot`` for ip, and the *squared* euclidean distance for l2. Each is
-    turned back into what the other backends return and scored by the one
-    shared rule.
-    """
+    """A Chroma distance (``1 − cos``, ``1 − dot``, or squared euclidean for l2)
+    turned back into what the other backends return, then scored by the
+    shared rule."""
     if space == "cosine":
         return normalise_score(1.0 - distance, "cosine")
     if space == "ip":
@@ -156,8 +116,8 @@ class ChromaBackend(VectorBackend):
             return self._collection_cache[name]
         data  = self._get(f"{self._prefix}/collections/{name}")
         cid   = data["id"]
-        # Chroma's own default is l2, and a collection created elsewhere
-        # without a space was read as cosine.
+        # Chroma's own default is l2, for a collection created elsewhere
+        # without a space.
         space = (data.get("metadata") or {}).get("hnsw:space") or "l2"
         self._collection_cache[name] = (cid, space)
         return cid, space

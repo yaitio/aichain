@@ -1,29 +1,8 @@
-"""
-tools
-=====
-
-What a model, a chain and your code can all call. A tool is made by its
-service's name and called with ``.run()``; what it *is* is set when it is made,
-what one call asks goes in ``.run()``:
-
-    search("exa").run("vector databases", {"max_results": 5})
-    fetch("local").run("https://example.com")
-    decide("openai", questions={...}).run(text)
-    chunk(max_chars=800).run(text)
-    embed("openai", model="text-embedding-3-small").run(texts)
-    rerank("cohere", model="rerank-v3.5").run(docs, {"query": q})
-    speech("openai").run(text, {"voice": "nova"})
-    transcribe("openai").run("call.mp3")
-    image("openai", model="gpt-image-1.5").run(prompt)
-    wait(reason="…") · gate(tool, reason="…")
-
-Any function becomes one with ``@tool``; a ``Tool`` subclass is the way for a
-tool with state. ``tool(...)`` called on a tool returns a ``ToolResult`` and
-never raises; ``.run()`` returns the data. Utilities — a vector store, a
-folder, a REST API, an MCP server — are in ``yait_aichain.utilities``.
-
-The classes behind each factory — ``searchExa``, ``fetchLocal``,
-``EmbeddingOpenAI`` and the rest — are importable by their own names.
+"""What a model, a chain and your code can all call: the tool factories
+(``search``, ``fetch``, ``decide``, ``chunk``, ``embed``, ``rerank``,
+``speech``, ``transcribe``, ``image``, ``wait``, ``gate``), ``@tool``, the
+``Tool`` base, the permission vocabulary, and the classes behind each factory
+by their own names. See docs/tools/index.md.
 """
 
 from ._base           import Tool, ToolResult, Record, FunctionTool, tool

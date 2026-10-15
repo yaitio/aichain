@@ -85,8 +85,9 @@ Skill prompt gets when it substitutes the result.
   labelled examples from your own data.
 - **`model`** is the version that answered. Pin Jev (`model="jev-1.13.0"`) when
   thresholds were tuned against it — its aliases move when a release ships.
-- **Money is reported, not budgeted.** `cost` counts input tokens at each
-  provider's price; no tool is held to `max_cost` yet.
+- **Money is reported and budgeted.** `cost` counts input tokens at each
+  provider's price, and the call is charged to the run's `max_cost`: a
+  decision that would begin past the limit is refused before it is sent.
 
 ## The agent sees one argument
 

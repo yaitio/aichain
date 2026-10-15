@@ -1,43 +1,6 @@
 """
-tools.rerank._qwen — RerankQwen
-===============================
-
-Wraps the Alibaba DashScope Text-Rerank API.
-
-Supported models
-----------------
-  gte-rerank      Latest GTE reranker; strong multilingual performance
-  gte-rerank-v2   Previous generation; still solid
-
-API reference
--------------
-POST {base_url}/api/v1/services/rerank/text-rerank/text-rerank
-
-Request body
-  model       : str
-  input
-    query     : str
-    documents : list[str]
-  parameters
-    top_n            : int | None
-  
-Response
-  output.results[].index           — original document index
-  output.results[].relevance_score — float, higher = more relevant
-  usage.total_tokens               — token count
-
-Region / base URL
------------------
-Same region logic as EmbeddingQwen (``DASHSCOPE_REGION`` env var):
-  ap (default) — https://dashscope-intl.aliyuncs.com
-  us           — https://dashscope-us.aliyuncs.com
-  cn           — https://dashscope.aliyuncs.com
-  hk           — https://cn-hongkong.dashscope.aliyuncs.com
-
-Environment variables
----------------------
-DASHSCOPE_API_KEY
-DASHSCOPE_REGION  (optional; default: ap)
+``RerankQwen``: the DashScope Text-Rerank API; the host follows ``region`` or
+``DASHSCOPE_REGION``, as for ``EmbeddingQwen``. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations

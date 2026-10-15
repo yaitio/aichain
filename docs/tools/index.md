@@ -194,6 +194,22 @@ refusal reaches the model with its reason. → [Permissions](../control/permissi
 
 ---
 
+## Keys and untrusted input
+
+A tool's `api_key=` is a string, or a callable asked on each request with the
+run's `RunContext` — the same rule as `Model(api_key=callable)`, so one tool
+serves every tenant. A resolver that returns nothing raises rather than
+falling back to the process-wide key. → [Production](../production.md)
+
+A URL or an output path a model supplies is untrusted. The built-in tools
+fetch only `http`/`https`, refuse hosts that resolve to a private or internal
+address, and never follow a redirect to another host with the caller's
+headers. For a trusted deployment, `AICHAIN_ALLOW_PRIVATE_URLS=1` allows
+private hosts, and `AICHAIN_OUTPUT_ROOT=/path` confines every file a tool
+writes to that folder.
+
+---
+
 ## Wait and gate
 
 Two tools that pause instead of returning: `wait(reason=…)` parks a run until a

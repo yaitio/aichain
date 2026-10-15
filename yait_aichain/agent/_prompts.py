@@ -1,18 +1,10 @@
 """
-agent._prompts
-==============
+agent._prompts — what is left of the prompt layer once tool calling is native:
+the system message and the rendering of results.
 
-What is left of the prompt layer once tool calling is native: the system
-message and the rendering of results. Nothing else.
-
-The previous versions of this module are a history of the text protocol —
-first five prompt builders composing fresh two-message prompts each step, then
-one growing conversation carrying an action vocabulary and every tool schema
-as JSON text. Measured on a 16-tool task, that put 13,473 characters of
-machinery into the system prompt against 357 for a native-calling agent doing
-the same job, and the policy that actually mattered drowned in it. Schemas now
-travel as the provider's ``tools`` field and the reply arrives as typed calls,
-so the prompt carries what only the prompt can: the caller's instructions.
+Schemas travel as the provider's ``tools`` field and replies arrive as typed
+calls, so the prompt carries what only the prompt can: the caller's
+instructions and the rule that a plain reply ends the run.
 """
 
 from __future__ import annotations

@@ -1,10 +1,6 @@
-"""
-tools.general
-=============
-
-Tools that belong to no provider: ``wait`` parks a run until a signal arrives,
-``gate`` holds another tool until its call is approved. The classes behind
-them are :class:`Wait` and :class:`Gate`.
+"""Tools that belong to no provider: ``wait`` parks a run until a signal arrives,
+``gate`` holds another tool until its call is approved. See
+docs/pipelines/pause-and-resume.md.
 """
 
 from ._wait import Gate, Wait

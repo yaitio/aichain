@@ -1,22 +1,8 @@
-"""
-clients._families.qwen
-======================
-
-Qwen (DashScope) rides the OpenAI Chat Completions *format* for text and vision
-(inherited from OpenAIClient, incl. its qwen quirk branch) but resolves its base
-URL by region.
-
-Text-to-image is the exception: DashScope does **not** serve the wanx image
-models through the OpenAI-compatible endpoint.  They run only on DashScope's
-native *asynchronous* task API — submit a job, poll until it finishes, then
-download the rendered image.  This client implements that flow behind the
-``send()`` seam and synthesises a response in the same ``{"data": [...]}`` shape
-the synchronous image path returns, so ``parse_response`` is reused unchanged.
-
-    submit  POST /api/v1/services/aigc/text2image/image-synthesis
-            (header X-DashScope-Async: enable)  → { output.task_id }
-    poll    GET  /api/v1/tasks/{task_id}        → until task_status terminal
-    collect download each result URL → base64 → { "data": [{"b64_json": …}] }
+"""Qwen (DashScope): the OpenAI Chat Completions format for text and vision,
+with a base URL resolved by region. Text-to-image is DashScope's native
+asynchronous task API — submit, poll ``/api/v1/tasks/{id}``, download — run
+behind the ``send()`` seam and reshaped to the ``{"data": [...]}`` form the
+shared image parser reads. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -64,13 +50,8 @@ def resolve_qwen_base_url(region: str | None = None) -> str:
 
 
 def _build_qwen_image_request(model, messages: list, output: dict) -> tuple[str, dict]:
-    """
-    Build the DashScope native text2image *submit* ``(path, body)`` pair.
-
-    Size is read from ``output["format"]["size"]`` and converted from our
-    ``"1280x720"`` convention to DashScope's ``"1280*720"``.  When absent,
-    the parameter is omitted and DashScope applies its own default.
-    """
+    """The DashScope text2image submit ``(path, body)``; ``size`` as ``1280*720``,
+    and omitted when unset so DashScope applies its own default."""
     prompt = _last_user_text(messages)
     fmt: dict = output.get("format", {})
 
@@ -85,8 +66,8 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> tuple[str,
             why="this provider separates the edges with '*', not 'x'"))
     elif fmt.get("aspect_ratio"):
         # Pixels only here: a ratio has no field, so it becomes a size at a
-        # 1024 short edge. `seed` is not offered — the same value twice gave
-        # two different pictures, measured 2026-09-09.
+        # 1024 short edge. `seed` is not offered: the same value twice gives
+        # two different pictures.
         ratio = fmt["aspect_ratio"]
         size = size_from_ratio(ratio, sep="*")
         if size:
@@ -106,13 +87,9 @@ def _build_qwen_image_request(model, messages: list, output: dict) -> tuple[str,
 
 
 def _build_qwen_image_edit_request(model, messages: list, output: dict) -> tuple[str, dict]:
-    """
-    Build the DashScope multimodal-generation (image-edit) *(path, body)* pair.
-
-    Synchronous endpoint. The input image(s) ride ``content[].image`` as a
-    base64 data-URI (or a URL); the edit instruction is a ``content[].text``
-    item. Size is converted from our ``"1280x720"`` to DashScope's ``"1280*720"``.
-    """
+    """The synchronous DashScope image-edit ``(path, body)``: images as
+    ``content[].image`` data URIs or URLs, the instruction as ``content[].text``,
+    ``size`` as ``1280*720``."""
     input_messages: list[dict] = []
     for msg in messages:
         content: list[dict] = []
@@ -184,15 +161,9 @@ class QwenClient(OpenAIClient):
 
     # ── synchronous image edit: POST → download result URL(s) → base64 ─
     def _image_edit_sync(self, body: dict, headers: dict) -> bytes:
-        """
-        Run the synchronous edit and reshape its result into the
-        ``{"data": [{"b64_json": …}]}`` form the image parser already consumes.
-
-        The response carries result image **URLs** under
-        ``output.choices[].message.content[].image``; download each and base64
-        it (the same normalisation ``_collect`` does for the async wan path).
-        An empty result falls through to the parser's descriptive error.
-        """
+        """Run the edit, download each result URL and reshape the lot into the
+        ``{"data": [{"b64_json"}]}`` form the image parser reads; an empty result
+        falls through to the parser's error."""
         resp = _json.loads(self._post(_MULTIMODAL_GEN_PATH, body, headers))
         items: list = []
         for choice in resp.get("output", {}).get("choices", []):

@@ -1,21 +1,7 @@
-"""
-clients
-=======
-
-The protocol layer: each family client owns both the wire format
-(``build_request`` / ``parse_response``) and the HTTP transport (auth +
-requests) for one API family.  Five family classes cover all eight providers:
-
-  ``BaseClient``        — transport primitives + abstract format hooks
-  ``OpenAIClient``      — OpenAI Chat Completions family
-                          (openai, xai, kimi, deepseek)
-  ``PerplexityClient``  — OpenAI-compatible; live /v1/models catalog  (perplexity)
-  ``QwenClient``        — OpenAI-compatible; region-resolved URL (qwen)
-  ``AnthropicClient``   — Anthropic Messages family            (anthropic)
-  ``GoogleClient``      — Google Generative AI family           (google)
-
-A client is created per provider with that provider's data dict; the model
-layer (``models.Model``) picks and builds the right one.
+"""The protocol layer: a family client per API dialect owns both the wire format
+(``build_request`` / ``parse_response``) and the HTTP transport. ``Model``
+builds one per provider from that provider's data. The ``APIError`` hierarchy
+is exported here too. See docs/models/models.md.
 """
 
 from ._base import BaseClient, APIError

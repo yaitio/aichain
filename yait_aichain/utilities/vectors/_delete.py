@@ -1,28 +1,6 @@
-"""
-utilities.vectors._delete
-=========================
-
-VectorDeleteTool — remove documents from the vector store.
-
-Supports deletion by explicit IDs, by metadata filter, or both.
-
-Usage
------
-::
-
-    from yait_aichain.utilities.vectors import VectorDB, VectorDeleteTool
-
-    store = VectorDB("chroma", collection="docs")
-    tool  = VectorDeleteTool(store)
-
-    # Delete by IDs
-    tool.run(["doc_1", "doc_2"])
-
-    # Delete by filter (provider-native filter dict)
-    tool.run(None, {"filter": {"source": "arxiv"}})
-
-    # Both
-    tool.run(["doc_3"], {"filter": {"year": 2020}})
+"""``VectorDeleteTool``: remove records from a vector store by ids or by a
+backend-native ``filter`` — exactly one, since "both" means different things
+on different backends. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

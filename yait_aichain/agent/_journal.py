@@ -1,34 +1,11 @@
 """
-agent._journal — the attempt journal
-====================================
+agent._journal — the attempt journal: an append-only, typed record of what the
+agent did, beside the conversation that holds what was said.
 
-An append-only, typed record of **what the agent did** — as opposed to the
-conversation, which holds what was said.
-
-One log, three views:
-
-* **progress**  — entries that finished, with the evidence that proves it;
-* **refuted**   — approaches already established not to work, with the reason.
-  These are fed back into the next action prompt as a "do not redo" block, so a
-  long run stops re-attempting what it already ruled out;
-* **recent**    — the tail, for the reflection prompt.
-
-The journal is also what makes a goal-loop *stoppable*: ``has_progress(k)``
-answers "did anything actually move in the last k entries", which is the only
-way to detect an agent spinning in place while still inside its budget.
-
-Entries are keyed by a monotonic ``seq`` — ``step``/``attempt`` are optional and
-only meaningful for the plan-driven modes (``waterfall`` / ``agile``); a
-goal-loop iteration has no step index.
-
-Evidence is deliberately typed. Today the honest split is:
-
-* ``check``       — a programmatic fact (a tool raised, a permission denied);
-* ``model_claim`` — the model asserts it worked. Nothing verified it.
-
-Success is normally a *claim*; failure is usually a *check*. Surfacing that
-asymmetry is the point: a run whose "done" entries are all ``model_claim`` has
-proven nothing, and the journal says so instead of hiding it.
+Each entry has an outcome and evidence — ``check`` for a fact code established,
+``model_claim`` for the model's word. Refuted entries feed a "do not redo"
+block, and ``has_progress(k)`` tells a run spinning in place inside its budget.
+See docs/control/observability.md.
 """
 
 from __future__ import annotations
@@ -98,19 +75,13 @@ def _action_signature(action: dict | None) -> str:
 
 
 def _action_excerpt(action: dict | None) -> str:
-    """
-    One-line, bounded rendering of what an action actually did.
-
-    For a tool call the arguments *are* the attempt, so a trail that omits them
-    records that something was tried without recording what.
-    """
+    """One bounded line of what an action did: for a tool call the arguments are the
+    attempt."""
     if not action:
         return ""
     if isinstance(action, str):
         # The agent loop stores the action already rendered to text (a JSON
-        # string, via `_safe`). This called `.get` on it and raised, so
-        # `progress_summary()` crashed on any journal the 2.x agent wrote —
-        # unnoticed because nothing in the library calls it.
+        # string, via `_safe`).
         return _excerpt(action, ACTION_CHARS)
     kind = action.get("type")
     if kind == "tool":
@@ -123,12 +94,8 @@ def _action_excerpt(action: dict | None) -> str:
 
 
 def _label(entry) -> str:
-    """What an entry was — its intent, or failing that what it did.
-
-    The agent loop records no intent (it has no plan step to name), and
-    "(no intent)" repeated down a list tells a reader nothing about which
-    attempt is which. The action does.
-    """
+    """What an entry was: its intent, or, since the agent loop records none, what it
+    did."""
     return entry.intent or _action_excerpt(entry.action) or "(no intent)"
 
 
@@ -178,7 +145,7 @@ class JournalEntry:
     artifact: str | None   = None
     observation: str        = ""
     #: A hash of the whole observation: the excerpt is cut at 240 characters,
-    #: and a result that changed past the cut ("… 7 failed") still "held".
+    #: and a result that changed past the cut ("… 7 failed") must not "hold".
     observation_sha: str     = ""
     step:     int | None   = None
     attempt:  int | None   = None

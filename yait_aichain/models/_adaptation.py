@@ -1,37 +1,11 @@
-"""
-models._adaptation
-==================
+"""What the library changed about a request, recorded and announced.
 
-What the library changed about a request, said out loud.
-
-Providers disagree, so a universal option cannot always travel unchanged:
-``top_k`` has no field on the OpenAI wire, a reasoner refuses ``temperature``,
-and asking DeepSeek to think routes to a different model altogether. Adapting
-is right. Adapting **in silence** is not: an option the caller set and did not
-get, with nothing said, is how a comparison between two models is quietly
-invalidated — the caller believes both arms ran with the same settings.
-
-Every option therefore meets one of five fates, and each of the last four is
-reported:
-
-    translated  same value, the provider's spelling (top_k → topK)
-    adapted     same intent, a different shape (reasoning → thinking budget)
-    declined    the provider has no such control; sent without it
-    swapped     the MODEL changed, so price and answer both change
-    refused     rejected before the wire, with the allowed values named
-
-Two outlets, and the second is the one that matters. A warning is emitted once
-per (model, option) so a loop does not drown in them — and warnings are lost
-in a log. The record is what survives: ``Skill.last_adaptations``,
-``AgentResult.adaptations``, so a measurement run can write down what its arms
-actually sent rather than what they were asked to send.
-
-Detection is deliberately not a list of rules. Sites that translate, adapt or
-swap say so by calling :func:`record`; everything else is caught by comparing
-the options the caller set against the request that came out. That way a new
-conversion which forgets to record shows up as a wrong "declined" — visible
-and reported, rather than silent. The failure mode of the mechanism is the
-thing the mechanism exists to prevent.
+Each universal option is translated, adapted, declined, swapped or refused;
+every fate but the first is warned once per (model, option) and kept on
+``Skill.last_adaptations`` and ``AgentResult.adaptations``. Detection compares
+the options set with the request built, so a conversion that forgets to
+:func:`record` shows up as a wrong "declined", never as silence.
+See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -142,8 +116,8 @@ def announce(made: list) -> None:
         mark = (a.model, a.option, a.kind)
         if mark in _WARNED:
             continue
-        # Warned, then remembered: under `-W error` the first call raised
-        # after the mark was set, and every later call passed in silence.
+        # Warn, then mark: under `-W error` a mark set first would silence
+        # every later call.
         warnings.warn(str(a), RuntimeWarning, stacklevel=4)
         _WARNED.add(mark)
 
@@ -166,9 +140,7 @@ def _leaves(obj, path=()) -> dict:
             out.update(_leaves(v, path + (str(k),)))
         return out
     # Tuples are walked too: a multipart body is a list of (name, value)
-    # pairs, and treating a pair as one opaque leaf hid the value inside it —
-    # three image models were told their `quality` had been declined while it
-    # was travelling in the request.
+    # pairs, and an opaque pair hides the value inside it.
     if isinstance(obj, (list, tuple)):
         out = {}
         for i, v in enumerate(obj):
@@ -204,9 +176,7 @@ def note_absent(made: list, asked: dict, body, model_name: str,
     if isinstance(body, dict):
         body = {k: v for k, v in body.items() if k not in _CONTENT_KEYS}
     # Compared with the type, not just the value: `True == 1 == 1.0` in
-    # Python, so a plain `in` found `cache_control=True` inside
-    # `temperature=1.0` and reported five providers as honouring an option
-    # none of them implements.
+    # Python, so `cache_control=True` would match `temperature=1.0`.
     def _mark(v):
         return (type(v).__name__, v)
 
@@ -230,9 +200,7 @@ def note_absent(made: list, asked: dict, body, model_name: str,
             continue
         if isinstance(value, bool):
             # A flag cannot be traced by its value: every `True` in a body
-            # looks alike, and `cache_control=True` was matching an unrelated
-            # `enable_thinking=True`. A boolean counts as arrived only when
-            # the site that consumed it said so.
+            # looks alike. It arrived only if the site that consumed it said so.
             arrived = False
         else:
             try:

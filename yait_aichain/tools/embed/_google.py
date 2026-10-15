@@ -1,40 +1,7 @@
 """
-tools.embed._google — EmbeddingGoogle
-======================================
-
-Wraps the Google AI (Gemini) Embeddings API
-(``POST /v1beta/models/{model}:batchEmbedContents``).
-
-Supported models
-----------------
-  gemini-embedding-001          768-dim default (v1); supports task_type and
-                                output_dimensionality
-  gemini-embedding-exp-03-07    3072-dim default; experimental
-  text-embedding-004            768-dim; older stable model
-
-Model notes
------------
-* Authentication is via the ``x-goog-api-key`` header.
-* The ``batchEmbedContents`` endpoint accepts a list of
-  ``EmbedContentRequest`` objects in one POST, making it naturally batched.
-* ``task_type`` (RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, etc.) is sent only to
-  ``gemini-embedding-001`` and ``text-embedding-004``; other models omit it.
-* ``output_dimensionality`` truncates the vector and is taken by
-  ``gemini-embedding-001`` and ``gemini-embedding-exp-03-07``; ``dimensions``
-  on any other model is refused when the embedder is made.
-* The API accepts up to 100 requests per batch call.
-* Google does not return token counts from ``batchEmbedContents``; ``total_tokens``
-  is always ``None``.
-
-Universal ``input_type`` mapping
----------------------------------
-  "query"    → "RETRIEVAL_QUERY"
-  "document" → "RETRIEVAL_DOCUMENT"
-  None       → omitted (provider default)
-
-Environment variable
---------------------
-GOOGLE_AI_API_KEY
+``EmbeddingGoogle``: the Gemini Embeddings API (``batchEmbedContents``), 100
+texts a request. It reports no token counts, so ``total_tokens`` is ``None``.
+See docs/tools/retrieval.md.
 """
 
 from ._base import Embedder
@@ -100,14 +67,8 @@ class EmbeddingGoogle(Embedder):
         dimensions: "int | None",
         **options,
     ) -> "tuple[list[list[float]], int | None, dict]":
-        """
-        Send one ``batchEmbedContents`` request and return
-        ``(embeddings, None, metadata)``.
-
-        Google's batch endpoint wraps each text in an ``EmbedContentRequest``
-        with model + content fields.  ``task_type`` and
-        ``output_dimensionality`` are included only when the model supports them.
-        """
+        """One ``batchEmbedContents`` request, a request object per text; ``task_type``
+        and ``output_dimensionality`` only where the model takes them."""
         task_type      = _INPUT_TYPE_MAP.get(input_type or "")
         supports_task  = self.model in _SUPPORTS_TASK_TYPE
         supports_dims  = self.model in _SUPPORTS_DIMENSIONS

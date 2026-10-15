@@ -1,41 +1,7 @@
-"""
-utilities.vectors.providers._pinecone
-=====================================
-
-PineconeBackend — VectorBackend adapter for Pinecone via its REST API.
-
-Uses pure urllib3, no ``pinecone`` SDK required.
-
-Pinecone concepts vs aichain mapping
---------------------------------------
-Pinecone concept    aichain concept
-─────────────────   ──────────────────────────────────
-Index               backend-level (set via ``index=`` at construction)
-Namespace           collection  (each VectorStore maps to one namespace)
-Vector              embedding + text stored in metadata["text"]
-
-Why text in metadata?
-  Pinecone stores only dense vectors + key-value metadata.  We persist
-  the original text as metadata["text"] so fetch() and query() can
-  reconstruct VectorRecord.text.
-
-Environment variables
----------------------
-``PINECONE_API_KEY``   — required; get from console.pinecone.io
-``PINECONE_INDEX``     — default index name (optional; can pass index= directly)
-
-Pinecone REST endpoints
-------------------------
-Control plane  https://api.pinecone.io
-  POST   /indexes                   — create serverless index
-  GET    /indexes/{name}            — describe index (returns host URL)
-
-Data plane     https://{index-host}
-  POST   /vectors/upsert            — upsert vectors
-  POST   /query                     — similarity search
-  GET    /vectors/fetch             — fetch by IDs
-  POST   /vectors/delete            — delete by IDs / filter / deleteAll
-  GET    /describe_index_stats      — namespace stats (includes vector count)
+"""``PineconeBackend``: Pinecone over its REST API, with urllib3 and no SDK. The
+index is set at construction (``index=`` or ``PINECONE_INDEX``), a collection is
+a namespace, and a record's text is kept in ``metadata["text"]`` since Pinecone
+stores only vectors and metadata. ``PINECONE_API_KEY`` is required. See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -285,7 +251,7 @@ class PineconeBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
-        # Nothing named was `deleteAll` here — the whole namespace.
+        # Nothing named would be `deleteAll` here — the whole namespace.
         _one_of(ids, filter)
         host  = self._index_url_resolved()
         body: dict = {"namespace": collection}

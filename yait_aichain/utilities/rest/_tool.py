@@ -1,91 +1,7 @@
-"""
-utilities.rest._tool — RestApiTool
-===================================
-
-A REST endpoint as a tool.  One instance = one configured endpoint; the
-usual way to make one is ``REST(base_url, …).endpoint(…)``.
-No boilerplate, no framework — drop any REST call directly into a Chain,
-Agent, or standalone script.
-
-Design
-------
-``RestApiTool`` is constructed once with the static parts of an API call
-(method, URL, which params go where, auth strategy) and called many times
-with the dynamic parts (the actual values).
-
-``run()`` accepts data in two equivalent forms so the tool works naturally
-both directly and inside a Chain:
-
-  * ``run(input={"bookingid": 1, "token": "abc"})``  — dict, direct use
-  * ``run(bookingid=1, token="abc")``                 — individual kwargs,
-                                                         Chain auto-passes
-                                                         from accumulated vars
-
-The two forms are merged; a field given in both is an error.
-
-Parameter routing
------------------
-The constructor declares which field names go where:
-
-  * ``path_params``  — substituted into ``{field}`` placeholders in the URL
-  * ``query_params`` — appended to the URL as ``?field=value``
-  * ``body_params``  — serialised as JSON in the request body
-
-Values can be any JSON-serialisable type (str, int, bool, list, dict).
-Fields absent from the call are silently omitted.
-
-Auth strategies (``auth`` kwarg)
----------------------------------
-+---------------+-----------------------------------------------------------+
-| ``type``      | Behaviour                                                 |
-+===============+===========================================================+
-| ``"bearer"``  | ``Authorization: Bearer <value>``                         |
-|               | Source: one of ``token`` (a value or a callable),         |
-|               | ``token_field`` (a field code or a chain fills — never    |
-|               | the model; wrap it in ``state.Secret`` so a paused chain  |
-|               | does not store it) or ``env``; two of them is an error.   |
-+---------------+-----------------------------------------------------------+
-| ``"cookie"``  | ``Cookie: <cookie_name>=<value>``                         |
-|               | Source: as for ``"bearer"``.                              |
-|               | Default cookie_name: ``"token"``                          |
-+---------------+-----------------------------------------------------------+
-| ``"basic"``   | ``Authorization: Basic base64(user:pass)``                |
-|               | Sources: ``username_env`` / ``password_env`` env vars.    |
-+---------------+-----------------------------------------------------------+
-| ``"api_key"`` | Custom header set to ``<value>``                          |
-|               | Header name: ``header`` (default ``"X-Api-Key"``).        |
-|               | Source: as for ``"bearer"``.                              |
-+---------------+-----------------------------------------------------------+
-
-Response handling
------------------
-* Valid JSON → returned as-is (``dict`` or ``list``).
-  When the Chain receives a **dict**, it merges the keys directly into the
-  accumulated variable dict — field names become variables automatically.
-* Non-JSON (plain text, HTML) → returned as ``str``.
-* ``response_field`` — when set, extracts ``response[response_field]``
-  from a dict response before returning.
-* HTTP errors → raise ``RuntimeError`` with the status code and body.
-
-Quick example
--------------
-::
-
-    from yait_aichain.utilities import REST
-
-    api = REST("https://api.example.com", description="Example user directory",
-               auth={"type": "bearer", "env": "EXAMPLE_API_KEY"})
-    create_user = api.endpoint("create_user", "POST", "/users",
-                               description="Create a new user account.",
-                               body_params=["username", "email", "role"],
-                               required_params=["username", "email"])
-
-    # Call it directly
-    result = create_user.run({"username": "alice", "email": "a@b.com"})
-
-    # Or in a Chain — the Chain passes matching accumulated variables
-    # automatically as individual kwargs:
-    (create_user, "user_response")
+"""``RestApiTool``: one REST endpoint as a tool, built once with the static parts
+(method, path, where each field goes, auth) and run with the values, as a dict
+or as keyword arguments. Usually made by ``REST(base_url, …).endpoint(…)``.
+See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -113,12 +29,12 @@ _DEFAULT_TIMEOUT = urllib3.Timeout(connect=10.0, read=30.0)
 #: The most of a response REST reads.
 MAX_RESPONSE_BYTES = 10 << 20
 # raise_on_status=False: retries spent, the last answer comes back and is
-# raised as the API's own typed error, where it was a raw MaxRetryError.
+# raised as the API's own typed error, not a raw MaxRetryError.
 _DEFAULT_RETRIES = Retry(total=2, backoff_factor=0.5, raise_on_status=False,
                          status_forcelist={429, 502, 503, 504})
 
-#: What each auth type reads. A key outside its type's set was dropped and
-#: the request went anonymous — GitHub answers that with less data, not 401.
+#: What each auth type reads. A key outside its type's set is refused: dropped,
+#: the request would go anonymous, which GitHub answers with less data, not 401.
 _AUTH_KEYS = {
     "bearer":  {"type", "token", "token_field", "env"},
     "cookie":  {"type", "token", "token_field", "env", "cookie_name"},
@@ -330,9 +246,8 @@ class RestApiTool(Tool):
         # what to pass — the token's field too, which only a chain fills.
         all_fields = set(path_params) | set(query_params) | set(body_params) | self._hidden
 
-        # Typed where `fields` says how: every field was a string with its
-        # own name as its description, and an array or an object could not be
-        # asked for at all.
+        # Typed where `fields` says how; otherwise a field is a string, and an
+        # array or an object could not be asked for.
         self.parameters = {
             "type": "object",
             "properties": {field: _field_schema(field, self._fields.get(field))
@@ -484,8 +399,8 @@ class RestApiTool(Tool):
                 if p in data
             }
             if body_dict:
-                # Written in the type the header names: a form endpoint was
-                # sent JSON under a form content type.
+                # Written in the type the header names, so a form endpoint is
+                # not sent JSON under a form content type.
                 body = (urllib.parse.urlencode({k: ([_text(x) for x in v] if isinstance(v, (list, tuple))
                                                     else _text(v)) for k, v in body_dict.items()},
                                                doseq=True)
@@ -525,8 +440,8 @@ class RestApiTool(Tool):
         raw = data.decode("utf-8", errors="replace")
 
         if not (200 <= response.status < 300):
-            # Typed, as every other API error is, and without the query: an
-            # auth key in it was in every error message.
+            # Typed, as every other API error is, and without the query, which
+            # may carry an auth key.
             from ...clients._errors import error_from_status
             raise error_from_status(response.status,
                                     f"RestApiTool '{self.name}' {self._method} {shown_url}: {raw[:500]}",
@@ -550,11 +465,7 @@ class RestApiTool(Tool):
     # ------------------------------------------------------------------
 
     def _apply_auth(self, headers: dict[str, str], data: dict[str, Any]) -> dict[str, str]:
-        """
-        Inject authentication headers based on the configured strategy.
-
-        Mutates and returns a copy of *headers*.
-        """
+        """A copy of *headers* with the configured authentication added."""
         auth = self._auth
         if not auth:
             return headers
@@ -620,11 +531,8 @@ class RestApiTool(Tool):
         auth: dict[str, str],
         data: dict[str, Any],
     ) -> str | None:
-        """
-        Resolve a token/secret from (in priority order):
-        1. ``data[auth["token_field"]]``  — runtime value (e.g. from a prior Chain step)
-        2. ``os.environ[auth["env"]]``    — environment variable
-        """
+        """The secret from ``auth["token"]`` (a value or a callable), else the
+        ``token_field`` the call carries, else the ``env`` variable; or None."""
         token = auth.get("token")
         if token is not None:
             return str(token() if callable(token) else token)
@@ -646,14 +554,9 @@ class RestApiTool(Tool):
     _SECRET_HEADER = ("authorization", "cookie", "token", "key", "secret", "password")
 
     def _serialise_init_args(self) -> dict:
-        """What `Chain.save` writes: the endpoint, never a secret.
-
-        A token given as a value or a callable is not written — a file is
-        not a place for it — and saving refuses, naming the two sources that
-        can be saved: ``env`` (the variable's name) and ``token_field`` (a
-        field the chain fills). A static header whose name says it carries a
-        secret is refused for the same reason.
-        """
+        """What `Chain.save` writes: the endpoint, never a secret. A token given as
+        a value or callable, or a header whose name says it holds one, refuses;
+        ``env`` and ``token_field`` can be saved."""
         if self._auth.get("token") is not None:
             raise ValueError(
                 f"RestApiTool {self.name!r} cannot be saved: its token is a value or a "

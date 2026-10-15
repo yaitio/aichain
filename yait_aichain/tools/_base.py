@@ -1,53 +1,8 @@
-"""
-tools._base
-===========
+"""Tool, ToolResult, Record and @tool — what every tool is built on.
 
-``Tool`` — base class for all tool implementations.
-``ToolResult`` — uniform return type for every tool call.
-
-Design
-------
-Every concrete tool:
-
-  1. Declares three class-level attributes:
-
-       name        : str   — unique machine-readable identifier
-       description : str   — one-sentence explanation (used by agents / LLMs)
-       parameters  : dict  — JSON Schema ``object`` describing accepted inputs
-
-  2. Implements ``run(input, options=None) -> Any`` — the actual logic.
-
-That is the complete contract.  Everything else (validation, error wrapping,
-OpenAI-compatible schema generation) is provided by this base class.
-
-Two call styles
----------------
-  * ``tool(input, options)``       → always returns a :class:`ToolResult`; never
-    raises.  Exceptions from ``run()`` are caught and surfaced as
-    ``ToolResult(success=False, error="...")``.
-
-  * ``tool.run(input, options)``   → returns the raw output; propagates exceptions.
-    Use this when you want normal Python error handling.
-
-Parameters schema
------------------
-``parameters`` must follow JSON Schema's ``object`` shape so it can be
-forwarded directly to OpenAI function-calling or Anthropic tool-use APIs::
-
-    parameters = {
-        "type": "object",
-        "properties": {
-            "input": {
-                "type":        "string",
-                "description": "File path or URL to process.",
-            },
-            "options": {
-                "type":        "object",
-                "description": "Optional configuration.",
-            },
-        },
-        "required": ["input"],
-    }
+A tool declares ``name``, ``description`` and ``parameters`` and implements
+``run()``; calling the tool returns a ``ToolResult`` and never raises, while
+``.run()`` returns the data and raises. See docs/tools/index.md.
 """
 
 from __future__ import annotations
@@ -279,8 +234,8 @@ class Tool:
     description: str  = ""
     parameters:  dict = {}
 
-    # Risk class consulted by an Agent's PermissionPolicy before the tool runs
-    # (1.4.4). Default ``"write"``; tag mutating/external tools accordingly —
+    # Risk class consulted by an Agent's PermissionPolicy before the tool runs.
+    # Default ``"write"``; tag mutating/external tools accordingly —
     # see ``tools._permissions`` for the vocabulary. Enforcement is opt-in: with
     # no policy attached this attribute is inert.
     risk:        str  = "write"
@@ -388,14 +343,9 @@ class Tool:
         return _inspect.signature(self.run)
 
     def _arguments(self, input, options, kwargs: dict) -> tuple[list, dict]:
-        """The call ``run`` receives: *input* in its first place, *options* by
-        name, the rest by name — checked against ``run``'s own signature.
-
-        Passing ``(input, options)`` positionally put the options in whatever
-        came second: ``Image.run(input, images, options)`` took them as its
-        images, and a function tool with no options took a dict where a
-        number belonged and ran.
-        """
+        """The call ``run`` receives: *input* first, *options* by name, the rest by
+        name, checked against ``run``'s signature — options passed positionally would
+        land in whatever ``run`` takes second."""
         params = self._signature().parameters
         args: list = [] if input is None else [input]
         kw = dict(kwargs)
@@ -462,29 +412,14 @@ class Tool:
     # ------------------------------------------------------------------
 
     def _validate(self, input, options) -> None:
-        """
-        Check that required parameters are satisfied.
-
-        If ``"input"`` is listed in ``parameters["required"]`` and *input*
-        is ``None``, a ``ValueError`` is raised.
-
-        Raises
-        ------
-        ValueError
-            When a required parameter is missing.
-        """
         required = self.parameters.get("required", [])
         if "input" in required and input is None:
             raise ValueError(
                 f"Tool '{self.name}' missing required parameter: 'input'"
             )
-        # A warning rather than a raise, and the asymmetry with `check_args`
-        # is deliberate. There the caller is a model, the message goes back
-        # into its attempt budget, and it retries; here the caller is a person
-        # whose tool subclass may legitimately read an option its schema does
-        # not advertise. Refusing their call over the library's reading of
-        # their own schema would be the library knowing better. Saying so is
-        # the most it is entitled to.
+        # A warning, not a raise as in `check_args`: there a model retries
+        # within its attempt budget; here a person's subclass may read an
+        # option its schema does not advertise.
         if isinstance(options, dict):
             if unknown := self.unknown_keys({"options": options}):
                 warnings.warn(self._unknown_message(unknown),
@@ -513,9 +448,8 @@ class Tool:
             The arguments of a call.
         """
         declared = self.parameters.get("properties", {})
-        # A schema that says more keys are allowed — `additionalProperties`
-        # true or a schema of its own — is an open map: every key was refused,
-        # and an agent spent its steps on a tool that took nothing.
+        # A schema that allows more keys — `additionalProperties` true or a
+        # schema of its own — is an open map: no key in it is unknown.
         unknown  = [] if _open(self.parameters) else [k for k in kwargs if k not in declared]
         for key, spec in declared.items():
             nested = spec.get("properties") if isinstance(spec, dict) else None

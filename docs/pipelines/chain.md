@@ -72,6 +72,26 @@ A name or a template naming a variable the chain does not have is an error
 with its name, and so is an argument the tool does not take: a pipeline that
 silently passes nothing fails later, somewhere less obvious.
 
+## A step in full
+
+A tuple says the common cases: a runner alone, stored under the runner's name;
+`(runner, key)`; `(runner, input_map)`; `(runner, key, input_map)`; and, for an
+Agent, `(runner, key, input_map, options)`. `Step` says the rest:
+
+```python
+Step(count_words, out="words", inputs={"text": "page.body"}, on_error="skip", spread=False)
+```
+
+An input can be a path into a variable: `"page.body"` is the `body` field of
+the dict stored under `page`. `on_error` is this step's own policy, over the
+chain's. `spread` says whether a dict output's fields are also put among the
+variables: `None`, the default for now, still spreads them, with a warning;
+`True` spreads them on purpose; `False` keeps the dict under its key alone.
+
+After a run, `chain.history` holds one record per step — `step`, `kind`,
+`name`, `input`, `output`, `output_key`, `options`, and for a failed step
+`error` and `failure`. Secrets are left out of `input`.
+
 ## Plain code is a step
 
 A function is a step as it is; its parameters are filled from the variables by

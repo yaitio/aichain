@@ -1,26 +1,10 @@
-"""
-tools.search.perplexity — searchPerplexity
-==========================================
-
-The Perplexity Search API behind the common :class:`~tools.search.Search`
-format. Its strength is the snippet: a substantive passage from each page, not
-a one-line description.
-
-Endpoint  : POST https://api.perplexity.ai/search
-Auth      : ``Authorization: Bearer <api_key>``
-Docs      : https://docs.perplexity.ai/api-reference/search-post
-
-Translated: ``recency`` → ``search_recency_filter``, dates →
-``search_after_date_filter`` / ``search_before_date_filter`` (MM/DD/YYYY),
-``domains`` → ``search_domain_filter`` (at most 20, refused above that),
-``language`` → ``search_language_filter``. At most 20 results.
-
-``after_date`` / ``before_date`` in Perplexity's own MM/DD/YYYY are still
-taken, and win over the standard dates.
-
-Environment variable
---------------------
-``PERPLEXITY_API_KEY`` — from https://www.perplexity.ai/settings/api
+"""Perplexity Search (``POST https://api.perplexity.ai/search``, Bearer) behind
+the common :class:`~tools.search.Search` format; a substantive passage from
+each page. ``recency`` → ``search_recency_filter``, dates → the MM/DD/YYYY
+filters, ``domains`` → ``search_domain_filter`` (at most 20), ``language`` →
+``search_language_filter``; its own ``after_date``/``before_date`` win.
+Key: ``PERPLEXITY_API_KEY``. See docs/tools/search.md and
+https://docs.perplexity.ai/api-reference/search-post.
 """
 
 from __future__ import annotations

@@ -84,11 +84,11 @@ class LocalReadTool(Tool, SandboxedTool):
         if not os.path.isfile(path):
             raise FileNotFoundError(f"File not found: {input!r}")
 
-        # Streamed, and bounded: a 2 GB log read whole for forty lines was the
-        # memory of the process, and a model asking for "all" of it was its
+        # Streamed, and bounded: a 2 GB log read whole for forty lines would
+        # be the process's memory, and a model asking for "all" of it its
         # context. Lines past MAX_READ_BYTES are counted, not kept.
-        # Brought to the file's bounds: `end_line=-1` matched every line as
-        # past the end and read nothing; 0 or below is "to the end".
+        # Brought to the file's bounds: `end_line` of 0 or below is "to the
+        # end", not a line every line is past.
         start = max(0, start_line - 1)
         end   = int(end_line) if end_line is not None else None
         if end is not None and end < 1:

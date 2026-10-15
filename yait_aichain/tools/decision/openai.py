@@ -1,31 +1,11 @@
-"""
-tools.decision.openai — decisionOpenAI
-======================================
-
-OpenAI's Decisions API behind the common :class:`~tools.decision.Decision`
-format.
-
-    POST https://api.openai.com/v1/decisions
-         {"model": "gpt-6-luna", "input": ..., "questions": [{type, name, ...}]}
-       → {"model": ..., "answers": [{type, name, ...}], "usage": {...}}
-
-Docs: https://developers.openai.com/api/docs/guides/decisions — read and
-checked live on 2026-10-08, when the API was in public beta with
-``gpt-6-luna`` the only model.
-
-Translated both ways: questions travel as a list carrying their ``name``,
-``choices`` as ``[{value, description}]``, ``levels`` as ``[{label,
-description}]``; answers come back as a list and are keyed by name again, with
-their probabilities keyed by option and by level label.
-
-This provider takes **images** beside the text, as base64 data URLs only —
-hosted URLs and file ids are refused by the endpoint. A dict or a list state
-from code is sent as JSON text: the endpoint takes text and messages, not
-structure.
-
-Environment variable
---------------------
-``OPENAI_API_KEY``
+"""OpenAI's Decisions API (``POST /v1/decisions``) behind the common
+:class:`~tools.decision.Decision` format. Questions travel as a list carrying
+their ``name``, ``choices`` as ``[{value, description}]``, ``levels`` as
+``[{label, description}]``; answers come back as a list and are keyed by name
+again. Images go as base64 data URLs only — the endpoint refuses hosted URLs
+and file ids — and a dict or list state is sent as JSON text.
+Key: ``OPENAI_API_KEY``. See docs/tools/decide.md and
+https://developers.openai.com/api/docs/guides/decisions.
 """
 
 from __future__ import annotations

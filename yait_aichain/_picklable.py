@@ -1,13 +1,11 @@
 """
 An exception that survives ``pickle`` and ``copy``.
 
-Python rebuilds an exception by calling its class with ``self.args``. The
-library's exceptions take their fields in ``__init__`` and pass one formatted
-message up, so that call either fails (``BudgetExceeded("budget exhausted…")``
-is missing two arguments) or formats the message a second time. Through a
-process pool, Celery or Ray the caller then receives a ``TypeError`` from the
-unpickler instead of the error that happened. Rebuilt from its message and its
-fields instead, without calling ``__init__`` again.
+Python rebuilds an exception by calling its class with ``self.args``, which
+fails for the library's exceptions: they take fields in ``__init__`` and pass
+one formatted message up. Rebuilt from its message and fields instead, without
+calling ``__init__`` again, so a process pool, Celery or Ray hands back the
+error that happened rather than a ``TypeError`` from the unpickler.
 """
 
 from __future__ import annotations

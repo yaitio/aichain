@@ -1,29 +1,7 @@
-"""
-models._calls
-=============
-
-Native tool calling — the value objects and the two conversation turns.
-
-A model given tool declarations answers in one of two ways: text (the answer)
-or a request to call tools. This module is the typed form of the second, plus
-the helpers that put a call and its result back into the universal message
-list, so a conversation with tools stays expressible in the same
-``{"role", "parts"}`` schema the rest of the library speaks.
-
-Two turn kinds extend that schema:
-
-* an ``assistant`` turn may carry ``tool_calls`` — the model asked to act::
-
-      {"role": "assistant", "parts": [...optional text...],
-       "tool_calls": [{"id": "...", "name": "...", "arguments": {...}}]}
-
-* a ``tool`` turn carries one call's result, keyed to the call id::
-
-      {"role": "tool", "call_id": "...", "parts": [{"type": "text", "text": ...}]}
-
-Providers require results to reference the call id in their own wire format —
-a result faked as a user turn ("TOOL RESULT: ...") is not part of the native
-protocol and models treat it as conversation, not as ground truth.
+"""Native tool calling: ``ToolCall``, ``ToolCallRequest``, and the helpers that
+put a call and its result into the universal message list as an
+``assistant`` turn with ``tool_calls`` and a ``tool`` turn keyed by
+``call_id``. See docs/models/models.md, "Tool calls in the conversation".
 """
 
 from __future__ import annotations
@@ -136,15 +114,14 @@ class ToolCallRequest:
 
 
 #: Part types a tool may hand back instead of text. Anything else is data and
-#: is serialised, as it always was.
+#: is serialised.
 MEDIA_PARTS = frozenset({"image", "audio", "video", "document"})
 
 
 #: The sources a tool result may carry media in: the bytes, or a URL. Not a
 #: local path — any server's JSON shaped like ``{"kind": "file", "path": …}``
-#: had the library read that path on the next turn and send it to the model,
-#: ``/proc/self/environ`` included. A tool that has a file reads it once, with
-#: `media_part`, and hands over the bytes.
+#: would have the library read that path (``/proc/self/environ`` included)
+#: and send it to the model. A tool with a file uses `media_part`.
 TOOL_MEDIA_SOURCES = frozenset({"base64", "url"})
 
 
@@ -224,9 +201,7 @@ def split_media_result(msg: dict) -> tuple[dict, dict | None]:
                                      "in the next message]"}]
     # The follow-up carries a line of text as well as the media, naming the
     # call it came from: a message that is nothing but an image arrives with
-    # no stated relation to the conversation. Whether the caption also makes
-    # the image easier to attend to is not established — measured on
-    # gpt-4o-mini it moved 2 of 6 to 3 of 6, which on six samples is noise.
+    # no stated relation to the conversation.
     label = {"type": "text",
              "text": f"Result of the `{msg.get('call_id') or 'tool'}` call:"}
     return tool_turn, {"role": "user", "parts": [label, *media]}
@@ -262,7 +237,7 @@ def dangling_calls(messages: list) -> list:
         A conversation, as ``Agent.step()`` takes it.
     """
     # Counted, not collected into a set: one id asked twice and answered once
-    # is a call left without its result, and a set saw both as answered.
+    # is a call left without its result, and a set would see both answered.
     # Walked in order, so a result answers a call made before it.
     from collections import Counter
     owed: Counter = Counter()

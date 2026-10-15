@@ -1,28 +1,10 @@
-"""
-tools.fetch.firecrawl — fetchFirecrawl
-======================================
-
-Firecrawl Scrape behind the common :class:`~tools.fetch.Fetch` record.
-
-Endpoint  : POST https://api.firecrawl.dev/v2/scrape
-Auth      : ``Authorization: Bearer fc-…``
-Docs      : https://docs.firecrawl.dev/api-reference/endpoint/scrape — answer
-            checked live 2026-10-09.
-
-One URL a call. ``only_main_content`` (default true) asks Firecrawl to drop
-navigation, headers and footers — measured 2026-10-08 on 34 articles, half of
-what came back was still page furniture. Of the five fetch tools this one
-reached the most: text from sites behind bot protection (McKinsey, INSEAD) and
-from articles readers see only with a subscription (HBR) — how, the
-measurement did not establish.
-
-**Price.** A page is one credit, read from the answer; a PDF is billed per PDF
-page. On low plans the scrape endpoint takes about ten requests a minute: a 429
-is retried after the wait the answer asks for.
-
-Environment variable
---------------------
-``FIRECRAWL_API_KEY``
+"""Firecrawl Scrape (``POST https://api.firecrawl.dev/v2/scrape``, Bearer) behind
+the common :class:`~tools.fetch.Fetch` record. One URL a call;
+``only_main_content`` (default true) drops navigation, headers and footers. A
+page is one credit, read from the answer; a PDF is billed per PDF page. Low
+plans take about ten requests a minute, so a 429 is retried after the wait the
+answer asks for. Key: ``FIRECRAWL_API_KEY``. See docs/tools/fetch.md and
+https://docs.firecrawl.dev/api-reference/endpoint/scrape.
 """
 
 from __future__ import annotations

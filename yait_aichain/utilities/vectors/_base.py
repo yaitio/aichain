@@ -1,27 +1,8 @@
-"""
-utilities.vectors._base
-=======================
-
-VectorRecord  — uniform data model across all vector DB providers.
-VectorBackend — abstract base class for provider REST adapters.
-VectorStore   — a backend + optional embedder, bound to one collection.
-
-Design
-------
-Every concrete backend:
-  1. Sets ``provider`` class attribute.
-  2. Implements the six abstract methods:
-       create_collection, query, upsert, fetch, delete, count
-  3. Uses the shared HTTP helpers (_get, _post, _put, _delete_req)
-     which all use urllib3 — no provider SDKs required.
-
-VectorStore sits above the backend and:
-  • Holds the active collection name (so callers don't repeat it)
-  • Owns the optional embedder for auto-vectorising text
-  • Exposes a clean public API: create / query / upsert / fetch / delete / count
-
-``Vectors`` is the way in; ``VectorDB()`` builds the store underneath it.
-Neither needs VectorStore + backend constructed by hand.
+"""The vector data model and its two layers: ``VectorRecord`` (``id``, ``text``,
+``score``, ``metadata``), ``VectorBackend`` (a provider's REST API over
+urllib3, no SDK) and ``VectorStore`` (a backend, an optional embedder and one
+collection). Scores are normalised by one shared rule, ``normalise_score``.
+See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -82,7 +63,7 @@ def normalise_score(raw: float | None, metric: str) -> float | None:
 
 
 #: The metrics a store may be created with; a backend takes those it has.
-#: An unknown one was created as cosine, and its scores read as cosine.
+#: An unknown one is refused, not quietly created as cosine.
 METRICS = ("cosine", "euclidean", "dot", "manhattan")
 
 
@@ -93,9 +74,9 @@ def check_metric(metric: str, accepted, who: str) -> str:
 
 
 def _one_of(ids, filter) -> None:
-    """A delete names records by id or by filter — exactly one. Both meant
-    three things across three backends (Qdrant dropped the filter, Chroma
-    took both), and neither meant the whole collection on Pinecone."""
+    """A delete names records by id or by filter — exactly one: "both" means
+    three things across three backends (Qdrant drops the filter, Chroma takes
+    both), and "neither" the whole collection on Pinecone."""
     if ids and filter:
         raise ValueError("delete takes ids or a filter, not both — the backends disagree on "
                          "what both would mean; call it twice")
@@ -565,12 +546,8 @@ class VectorStore:
         self,
         raw: list[dict],
     ) -> tuple[list[VectorRecord], list[list[float]]]:
-        """
-        Build (VectorRecord list, vector list) from raw dicts.
-
-        Records that already have a ``vector`` key are used as-is.
-        The rest are batched into a single embedder call.
-        """
+        """``(records, vectors)`` from raw dicts; those without a ``vector`` are
+        embedded in one batched call."""
         recs:    list[VectorRecord] = []
         vectors: list[list[float]]  = []
 

@@ -24,10 +24,9 @@ def _proxy_from_env() -> "dict | None":
 
 
 def _raise_if_error(event, kind: str = "") -> None:
-    """Raise the typed error a stream reports in the middle, where it was
-    taken for data and the reply cut short there became the final answer:
-    Anthropic's ``event: error`` (``overloaded_error`` is its 529), an
-    OpenAI-compatible ``{"error": {...}}``."""
+    """Raise the typed error a stream reports mid-way — Anthropic's ``event:
+    error`` (``overloaded_error`` is its 529), an OpenAI-compatible ``{"error"}``
+    — so a reply cut short there is not taken for the final answer."""
     if not isinstance(event, dict):
         return
     error = event.get("error")
@@ -40,11 +39,9 @@ def _raise_if_error(event, kind: str = "") -> None:
 
 
 def _clean_key(key):
-    """A key as a header can carry it: surrounding whitespace removed — a key
-    read with ``open().read()`` ends in a newline — and refused if a control
-    character remains, by saying so and never by quoting it. Left as it was,
-    the header library raised with the whole ``Bearer sk-…`` in its message,
-    and the message went into events, logs and run documents."""
+    """The key stripped (``open().read()`` keeps a newline) and refused, never
+    quoted, if a control character remains: the header library would put the
+    whole ``Bearer sk-…`` in its error, and errors reach logs and run records."""
     if not isinstance(key, str):
         return key
     key = key.strip()
@@ -80,15 +77,9 @@ def make_http(proxy: "dict | None" = None, *, timeout=DEFAULT_TIMEOUT, retries=D
 
 
 class _EnvironmentRouted:
-    """A proxy chosen per request, as the environment says, not once per client.
-
-    ``NO_PROXY`` exempts hosts — a ``private/`` model on localhost, a Chroma
-    or Qdrant in the VPC, an internal REST — which through the corporate proxy
-    answered 502, read as the provider's server error, and started a fallback.
-    ``HTTPS_PROXY`` is for https and ``HTTP_PROXY`` for http: the https one
-    applied to an ``http://`` server let the proxy read the key. The macOS
-    system settings are not consulted, only the variables.
-    """
+    """A proxy chosen per request from the environment variables: ``NO_PROXY``
+    exempts local and internal hosts, and each scheme gets its own proxy (an
+    https proxy on an ``http://`` server could read the key)."""
 
     def __init__(self, *, timeout, retries) -> None:
         self._kw = {"timeout": timeout, "retries": retries}
@@ -215,9 +206,9 @@ class BaseClient:
 
     def __init_subclass__(cls, **kwargs) -> None:
         # A family that overrides `build_request` takes `tools`, whether it
-        # uses them or not: an override that dropped the parameter while
-        # `supports_tools` was inherited True is how tools on Qwen were lost
-        # without a word. Caught when the class is defined, not on a call.
+        # uses them or not: an override that drops the parameter while
+        # inheriting `supports_tools = True` loses tools without a word.
+        # Caught when the class is defined, not on a call.
         super().__init_subclass__(**kwargs)
         own = cls.__dict__.get("build_request")
         if own is not None and "tools" not in inspect.signature(own).parameters:
@@ -273,16 +264,9 @@ class BaseClient:
         return key
 
     def _auth_headers(self) -> dict:
-        """The headers a request carries, from the provider's ``auth`` in its data:
-        ``bearer`` is ``Authorization: Bearer <key>``, any other word is the
-        header the key goes in, and ``none`` means the key is optional — sent
-        as a bearer when there is one (an aggregator behind ``private/``),
-        and no header at all when there is not, since some servers 401 on an
-        empty ``Bearer`` where they accept nothing.
-
-        The key is read once: it may be a resolver — a vault lookup — and
-        reading it twice would do that work twice.
-        """
+        """Headers from the provider's ``auth``: ``bearer``, a header name, or
+        ``none`` (a bearer only when there is a key — some servers 401 on an
+        empty one). The key is read once: it may be a vault lookup."""
         key = self.api_key
         scheme = ((getattr(self, "_data", None) or {}).get("provider") or {}).get("auth", "bearer")
         headers = {"Content-Type": "application/json"}
@@ -418,21 +402,9 @@ class BaseClient:
         return None
 
     def _post_sse(self, path: str, data: dict, headers: dict):
-        """
-        POST *data* and yield each server-sent event as a decoded object.
-
-        Deliberately not a generic line reader. Three details are what make
-        the difference between this working and appearing to work:
-
-        * ``preload_content=False`` — without it urllib3 buffers the whole
-          response and every chunk arrives at once, at the end. The code
-          reads as streaming and the user sees none of it.
-        * an event is terminated by a blank line and its data may span
-          several ``data:`` lines, which have to be joined before decoding.
-        * ``[DONE]`` is a sentinel, not JSON. Feeding it to a decoder is the
-          commonest way an SSE reader ends its stream with an exception
-          instead of a return.
-        """
+        """POST *data* and yield each server-sent event decoded. Unbuffered
+        (``preload_content=False``), an event ends at a blank line and may span
+        several ``data:`` lines, and ``[DONE]`` is a sentinel, not JSON."""
         body = json.dumps(data).encode("utf-8")       # a bug here is a bug, not the network
         try:
             response = self._http.request(
@@ -468,11 +440,10 @@ class BaseClient:
 
         finished = False
         try:
-            # Decoded incrementally: a character split across two chunks —
-            # any non-ASCII text — came out as two replacement marks when each
-            # chunk was decoded on its own. Lines split on "\n" alone: U+2028,
-            # which `splitlines` also splits on, is legal inside a JSON string
-            # and cut an event in half.
+            # Decoded incrementally: a non-ASCII character split across two
+            # chunks would decode as two replacement marks. Lines split on "\n"
+            # alone: U+2028, which `splitlines` also splits on, is legal inside
+            # a JSON string.
             decoder = codecs.getincrementaldecoder("utf-8")("replace")
             buffer = ""
             for raw in response.stream(8192, decode_content=True):

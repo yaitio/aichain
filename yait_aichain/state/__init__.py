@@ -1,19 +1,11 @@
 """
-state
-=====
+state — durable, resumable run state for Chain and Agent.
 
-Durable, resumable run state for the orchestration primitives (Chain, then
-Agent). The "Store + context" mechanism (M2):
-
-* ``RunDocument``   — a self-contained, serialisable snapshot of one run
-  (step definition + key-value ``variables`` + per-step status).
-* ``StateStore``    — persistence of suspended runs (``InMemoryStore`` default,
-  ``FileStore`` built-in, any KV/document store by subclassing).
-* ``RunContext``    — non-secret per-request context (tenant, metadata).
-* ``Suspend`` / ``SuspendedResult`` — pause a run until an external signal;
-  raised by a suspend tool, caught by the engine.
-
-All of this is opt-in: a run that never suspends behaves exactly as before.
+``RunDocument`` is a serialisable snapshot of one run, ``StateStore`` keeps the
+parked ones (``InMemoryStore``, ``FileStore``, or your own), ``RunContext`` the
+non-secret per-request context, and ``Suspend`` / ``SuspendedResult`` the
+pause. All opt-in: a run that never pauses needs none of it.
+See docs/pipelines/pause-and-resume.md.
 """
 
 from ._context import RunContext

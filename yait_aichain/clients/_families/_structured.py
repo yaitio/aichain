@@ -101,8 +101,7 @@ def parse_structured(text: str, schema: dict | None, *,
 
     # Whole, but not necessarily what was asked for. Google strips
     # `additionalProperties` from the schema it is sent, so a closed object
-    # comes back with fields nobody declared and nothing notices until two
-    # providers' outputs are diffed by hand.
+    # can come back with fields nobody declared, which is checked here.
     if isinstance(schema, dict) and (problems := check_structure(value, schema)):
         raise InvalidStructuredOutputError(
             "Response does not match the requested schema: "

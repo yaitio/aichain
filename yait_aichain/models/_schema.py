@@ -1,26 +1,7 @@
-"""
-models._schema
-==============
-
-Schemas travel badly between providers, and each family breaks them in its own
-direction: Google forbids ``additionalProperties`` and union types, while
-OpenAI's ``strict`` mode requires the exact opposite — every object closed and
-every property listed in ``required``. A schema written for one family is
-rejected by the other, and until this module existed every caller derived a
-portable form by hand.
-
-Two public helpers:
-
-* :func:`portable_schema` — normalise a JSON Schema for a provider family.
-* :func:`check_structure` — a dependency-free structural check of a value
-  against a schema, used to tell "the provider ignored the schema" from
-  "the response was cut off".
-
-The check is deliberately shallow. A full JSON Schema validator is a
-dependency, and this package has exactly one; what it catches is the failure
-that actually happens in practice — a provider that silently dropped
-``additionalProperties`` and returned fields nobody asked for, or omitted a
-required one.
+"""Schemas across provider families: :func:`portable_schema` rewrites a JSON
+Schema for OpenAI strict mode or Google, and :func:`check_structure` is a
+shallow, dependency-free check of an answer against its schema.
+See docs/models/models.md, "A schema that travels".
 """
 
 from __future__ import annotations

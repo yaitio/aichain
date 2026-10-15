@@ -122,3 +122,82 @@ generation is a tool, `image(service, model=…)`. → [Images](../tools/media.m
 
 A model on your own hardware is a `private/` name, needs no key, and sends
 nothing outside your network. → [Private models](private-models.md)
+
+## The message format
+
+A Model takes one message format for every provider: `{"role", "parts"}`, the
+role `system`, `user` or `assistant`, and each part typed:
+
+```python
+{"type": "text",  "text": "..."}
+{"type": "image", "source": {"kind": "url", "url": "https://…"}, "meta": {"detail": "high"}}
+{"type": "image", "source": {"kind": "base64", "mime": "image/png", "data": "…"}}
+{"type": "audio", "source": {"kind": "file", "path": "call.wav"}}
+{"type": "video", "source": {"kind": "url", "url": "https://…"},
+ "meta": {"sampling": {"strategy": "fps", "fps": 1, "max_frames": 60}}}
+{"type": "document", "source": {"kind": "base64", "mime": "application/pdf", "data": "…"}}
+```
+
+A plain string is a text part, and a dict with `text` and no `type` is one too,
+so `{"role": "user", "parts": ["Hello!"]}` is a whole message. A `file` source
+is read into base64 when the request is sent, not when the Skill is built, so
+its path may carry a `{placeholder}` and one Skill can serve a different file
+per call. A part a provider cannot take — video on most of them, audio on
+Claude — is left out and reported, never sent in a shape that fails.
+
+The answer's shape is `output`: `{"modalities": [...], "format": {"type": ...}}`,
+the type `text`, `json`, `json_schema` (with `schema`, and `strict`) or `image`.
+Left out, it is plain text; a missing key takes its default.
+
+## Tool calls in the conversation
+
+A model given tools answers either with text or with a request to call them,
+`ToolCallRequest`. Both stay in the same `{"role", "parts"}` messages the rest
+of the library speaks, through two more turn kinds:
+
+```python
+{"role": "assistant", "parts": [...],                 # the model asked to act
+ "tool_calls": [{"id": "...", "name": "...", "arguments": {...}}]}
+{"role": "tool", "call_id": "...", "parts": [{"type": "text", "text": "..."}]}
+```
+
+`request.as_turn()` writes the first, `tool_result_turn(call_id, result)` the
+second. A result is keyed to its call by id, as every provider's native
+protocol requires; a result dressed as a user turn ("TOOL RESULT: …") is read
+by the model as conversation, not as ground truth.
+→ [Driving the loop](../agents/driving-the-loop.md)
+
+## A schema that travels
+
+Schemas break between providers in opposite directions: Google forbids
+`additionalProperties` and union types, while OpenAI's strict mode requires
+every object closed and every property listed in `required`. A schema written
+for one family is rejected by the other. `portable_schema(schema, "openai")` or
+`"google"` returns the form that family takes; the one shape with no strict
+equivalent, a map with arbitrary keys, raises instead of being mangled.
+
+`check_structure(value, schema)` is the check a `json_schema` answer gets on
+return. It is shallow on purpose — a full validator would be a second
+dependency — and catches what happens in practice: a provider that ignored the
+schema and returned fields nobody declared, or left out a required one.
+
+## When a call fails
+
+Every provider failure is an `APIError` (a `RuntimeError`), and the subclasses
+in `yait_aichain.clients` let a caller react to one failure mode — retry on a
+rate limit, re-authenticate on a 401 — without parsing messages:
+
+| Status | Raised as |
+|---|---|
+| 402, or a credits or quota message on 400/403/429 | `InsufficientCreditsError` — checked first, so a billing problem is not read as auth, a rate limit or a bad request |
+| 429 | `RateLimitError`, with `retry_after` in seconds |
+| 401, 403 | `AuthenticationError` |
+| 400, 422 | `InvalidRequestError` |
+| 404 | `NotFoundError` |
+| 5xx | `ServerError` |
+| no response | `NetworkError` |
+
+Tools that make HTTP calls raise the same classes, so `except RateLimitError`
+around a tool works too. An error carries at most the first 2 000 characters
+of the provider's body: it travels into logs, run records and a model's
+context.

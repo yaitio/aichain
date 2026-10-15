@@ -26,7 +26,20 @@ out["images"][0]["path"], out["cost"]
 `qwen`. A voice, a speed, a language and a format are asked per call; the
 service and the model are fixed when the tool is made. Speech returns the path
 of the file it wrote, which is what a chain passes on and what a model can be
-told.
+told. The file goes in the tool's `output_dir`, else `AICHAIN_OUTPUT_ROOT`,
+else the system's temporary directory — the one writable place on Lambda.
+Qwen's speech endpoint answers WAV whatever is asked, so `wav` is the one
+format `speech("qwen")` takes; its host, like every DashScope tool's, follows
+`region=` or `DASHSCOPE_REGION` (`ap`, `us`, `cn`, `hk`).
+
+A transcript is plain text, or a JSON string with words and their times when
+`timestamps` or `format="json"` is asked. Audio over a provider's limit is cut
+into pieces and the transcripts joined, which needs
+`pip install "yait-aichain[audio]"`: OpenAI takes 24 MB a request and is sent
+ten-minute pieces; Google's synchronous API takes about a minute of audio and
+is sent 55-second pieces that overlap by two seconds, with words in the overlap
+counted once. Word timestamps come from `whisper-1` alone, and not for a file
+OpenAI has to cut.
 
 ## Images: why a tool and not a model
 

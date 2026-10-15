@@ -1,33 +1,9 @@
 """
-tools.speech._tts — Speech
-==========================
+``Speech``, the base of the text-to-speech tools, and its providers:
+``ttsOpenAI``, ``ttsGoogle``, ``ttsXAI`` and ``ttsQwen``, all plain HTTP.
 
-Base class and provider implementations for text-to-speech synthesis.
-
-Supported providers
--------------------
-  ttsOpenAI   OpenAI TTS (tts-1, tts-1-hd)
-  ttsGoogle   Google Cloud Text-to-Speech
-  ttsXAI      xAI TTS
-  ttsQwen     Alibaba DashScope CosyVoice / Qwen3-TTS
-
-All implement ``run(input, options=None) -> str`` where the return value
-is the absolute path to the saved audio file.
-
-A ``stream()`` placeholder is present on every class.  Real-time
-streaming synthesis is reserved for a future release.
-
-Installation
-------------
-  Nothing extra — every provider is plain HTTP.
-
-Environment variables
----------------------
-  OpenAI  :  OPENAI_API_KEY
-  Google  :  GOOGLE_CLOUD_API_KEY, GOOGLE_AI_API_KEY or GOOGLE_API_KEY  (Text-to-Speech API enabled)
-  xAI     :  XAI_API_KEY
-  Qwen    :  DASHSCOPE_API_KEY
-             DASHSCOPE_REGION   (optional: ap|us|cn|hk; default ap)
+``run()`` returns the path of the audio file it saved, in the tool's
+``output_dir``. See docs/tools/media.md.
 """
 
 from __future__ import annotations
@@ -54,8 +30,7 @@ _DEFAULT_SPEED  = 1.0
 
 
 def _model_setting(tool, model):
-    """The tool's model: the one given, or the provider's default. A setting,
-    fixed for the tool — a call does not choose it."""
+    """The model given, or the provider's default: a setting of the tool, not of a call."""
     default = getattr(type(tool), "_DEFAULT_MODEL", None)
     if model is not None and default is None:
         raise TypeError(f"{type(tool).__name__} has one model and takes no model=")
@@ -69,9 +44,8 @@ def _no_model_option(tool, opts: dict) -> None:
 
 
 def _call_options(tool, options) -> dict:
-    """A call's options without the unset ones — `voice=None` went into the
-    request and `speed=None` raised — and with the format checked against the
-    ones this provider writes, where an unknown one became MP3 in silence."""
+    """A call's options without the unset ones, and with the format checked
+    against those this provider writes rather than replaced in silence."""
     _no_model_option(tool, options or {})
     opts = {k: v for k, v in (options or {}).items() if v is not None}
     fmt = opts.get("format", _DEFAULT_FORMAT)
@@ -80,9 +54,8 @@ def _call_options(tool, options) -> dict:
     return opts
 
 def _output_folder(output_dir: str | None) -> str:
-    """Where audio is written: the tool's ``output_dir``, else
-    ``AICHAIN_OUTPUT_ROOT``, else the system's temporary directory — which is
-    writable on Lambda, where the working directory is not."""
+    """``output_dir``, else ``AICHAIN_OUTPUT_ROOT``, else the temporary directory,
+    which is writable on Lambda where the working directory is not."""
     folder = output_dir or os.environ.get("AICHAIN_OUTPUT_ROOT", "").strip() or tempfile.gettempdir()
     folder = confine_output_path(folder)
     os.makedirs(folder, exist_ok=True)
@@ -93,18 +66,9 @@ def _output_folder(output_dir: str | None) -> str:
 
 
 def _without_options(parameters: dict, *keys: str) -> dict:
-    """A copy of *parameters* with option *keys* removed.
-
-    The mirror of `_deep_with_option`, and it exists for the same reason:
-    these subclasses share one schema and each honours a different part of
-    it. Declaring an option a provider has no control for advertises it to
-    the model, which then sets it and watches it fall on the floor — a claim
-    not established by effect, the same defect the model layer refuses.
-    Measured per tool by reading what its `run()` actually
-    consumes, not by reading the description.
-
-    A copy, because the schemas are class attributes shared by inheritance.
-    """
+    """A copy of *parameters* without option *keys*: an option advertised and not
+    read is one a model sets and loses. A copy, since the schemas are class
+    attributes shared by inheritance."""
     import copy
     out = copy.deepcopy(parameters)
     options = out.get("properties", {}).get("options", {}).get("properties", {})
@@ -114,12 +78,8 @@ def _without_options(parameters: dict, *keys: str) -> dict:
 
 
 def _deep_with_option(parameters: dict, key: str, spec: dict) -> dict:
-    """A copy of *parameters* with one more key under ``options``.
-
-    A copy, because the schemas are class attributes shared by inheritance:
-    mutating the parent's dict in place would add the key to every sibling —
-    which is exactly the mistake this is here to avoid.
-    """
+    """A copy of *parameters* with one more key under ``options``; a copy, since
+    changing the shared class attribute would add the key to every sibling."""
     import copy
     out = copy.deepcopy(parameters)
     out.setdefault("properties", {}).setdefault(
@@ -205,15 +165,9 @@ class Speech(Tool):
         raise NotImplementedError(f"{type(self).__name__} must implement run()")
 
     def _save(self, opts: dict, fmt: str, produce) -> str:
-        """Make the file, then pay for what goes in it; return its path.
-
-        The path is settled — and refused, if it must be — before the paid
-        call. Each file is created new and exclusively, so parallel calls in
-        a Pool never share one, which a timestamp to the second did. A file
-        the call never filled is removed. The path is the code's choice:
-        ``output_dir`` on the tool, never an option a model can set — the
-        model choosing it overwrote ``~/.zshrc`` with an MP3.
-        """
+        """Make the file (new and exclusive, so parallel calls never share one), then
+        pay for its contents; return the path. An unfilled file is removed. The
+        folder is ``output_dir``, never an option a model can set."""
         if "output_path" in opts:
             import warnings
             warnings.warn(f"{self.name}: output_path is going in 5.0 — set the folder with "
@@ -246,12 +200,8 @@ class Speech(Tool):
 # ── ttsOpenAI ─────────────────────────────────────────────────────────────────
 
 class _OpenAISpeech(Speech):
-    """The OpenAI speech wire, which xAI speaks too: ``POST {base}/audio/speech``
-    with model, voice, input, format and speed; the answer is the audio.
-
-    A provider on it is data — ``_BASE_URL``, ``_ENV_KEY``, ``_LABEL`` and its
-    defaults. Plain HTTP, so neither needs the ``openai`` package.
-    """
+    """The OpenAI speech wire (``POST {base}/audio/speech``), which xAI speaks too.
+    A provider on it is data: ``_BASE_URL``, ``_ENV_KEY``, ``_LABEL`` and defaults."""
 
     # The endpoint has no language field — the voice and the model carry it.
     parameters = _without_options(Speech.parameters, "language")
@@ -547,9 +497,7 @@ class ttsQwen(Speech):
     """
 
     name           = "ttsQwen"
-    # cosyvoice-v2 answered "Model not exist" on this endpoint; qwen3-tts-flash
-    # synthesises, checked live 2026-10-13. It answers WAV whatever format is
-    # asked, so WAV is the one format — an MP3 asked for was WAV saved as .mp3.
+    # The endpoint answers WAV whatever format is asked, so WAV is the one format.
     _DEFAULT_MODEL = "qwen3-tts-flash"
     _DEFAULT_VOICE = "Cherry"
     _TTS_PATH      = "/api/v1/services/aigc/multimodal-generation/generation"

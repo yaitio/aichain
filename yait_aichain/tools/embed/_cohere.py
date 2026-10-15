@@ -1,34 +1,7 @@
 """
-tools.embed._cohere — EmbeddingCohere
-======================================
-
-Wraps the Cohere Embed v2 API (``POST /v2/embed``).
-
-Supported models
-----------------
-  embed-v4.0                 1024-dim default; supports output_dimension
-  embed-english-v3.0         1024-dim; supports output_dimension
-  embed-multilingual-v3.0    1024-dim; supports output_dimension
-
-Model notes
------------
-* All v3 / v4 models support:
-    - ``input_type``       — required by the API; defaults to "search_document"
-      when ``None`` is passed so the request never errors.
-    - ``output_dimension`` — truncate/expand the embedding vector size.
-    - ``embedding_types``  — always sent as ``["float"]``; extended types
-      (int8, uint8, binary, ubinary) are not exposed by this wrapper.
-* The API accepts up to 96 strings per request.
-
-Universal ``input_type`` mapping
----------------------------------
-  "query"    → "search_query"
-  "document" → "search_document"
-  None       → "search_document"  (safe default)
-
-Environment variable
---------------------
-COHERE_API_KEY
+``EmbeddingCohere``: the Cohere Embed v2 API (``POST /v2/embed``), 96 texts a
+request. ``input_type`` is required there, so ``None`` is sent as
+``search_document``. See docs/tools/retrieval.md.
 """
 
 from ._base import Embedder
@@ -83,13 +56,7 @@ class EmbeddingCohere(Embedder):
         dimensions: "int | None",
         **options,
     ) -> "tuple[list[list[float]], int | None, dict]":
-        """
-        Send one ``/v2/embed`` request and return
-        ``(embeddings, total_tokens, metadata)``.
-
-        ``input_type`` is mapped to Cohere's native terms.
-        ``dimensions`` is forwarded as ``output_dimension`` when provided.
-        """
+        """One ``/v2/embed`` request; ``dimensions`` goes as ``output_dimension``."""
         cohere_input_type = _INPUT_TYPE_MAP.get(
             input_type or "", _DEFAULT_INPUT_TYPE
         )

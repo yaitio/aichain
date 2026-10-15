@@ -16,7 +16,7 @@ from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models._adaptation import Adaptation
 from ..skills import Skill
 from .._dispatch import Denied, NeedsApproval
-from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the release notes)
 
 from ._swarm import acceptance_from
 from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
@@ -37,25 +37,16 @@ class _Loop:
     """The loop and the pause."""
 
     def _begin(self, task: str, variables: dict | None):
-        """A run's first moments, for `run()` and `stream()` alike: a fresh
-        journal, the opening messages, working state, a new run id — and no
-        document of an earlier run, which a finishing run would otherwise
-        delete or overwrite."""
+        """A run's first moments, for `run()` and `stream()` alike: a fresh journal, the
+        opening messages, working state, a new run id, and no earlier run's document."""
         self._live.id = uuid.uuid4().hex
         self._live.doc_id = None
         start_run(self)
         return Journal(), self.opening(task, variables, ground_rules=True), self.new_state()
 
     def _loop(self, messages: list, state: dict, journal: Journal) -> AgentResult:
-        """Drive the loop to its end and return the result.
-
-        One loop, driven two ways. ``run()`` exhausts it and takes the value;
-        ``stream()`` walks it and hands each event on as it appears. A second
-        copy of this loop for the streaming case is exactly the mistake 2.0
-        undid when `Agent` stopped hand-rolling its own call path — two paths
-        do not stay the same, and the one nobody watches is where the defect
-        lives.
-        """
+        """Drive the loop to its end and return the result. One loop, driven two ways:
+        ``run()`` exhausts it, ``stream()`` walks it, so the two cannot drift apart."""
         walk = self._loop_events(messages, state, journal)
         try:
             while True:
@@ -65,20 +56,9 @@ class _Loop:
 
     def _loop_events(self, messages: list, state: dict, journal: Journal,
                      sink: list | None = None):
-        """The loop itself, yielding what it has emitted as it goes.
-
-        Events are not produced twice. They go out through ``_emit`` exactly
-        as they always have — every hook a caller installed still fires, in
-        the same order — and a streaming caller adds one more hook that
-        appends to *sink*, which is drained at each boundary. So the stream is
-        a view of the existing event channel rather than a second vocabulary
-        beside it.
-
-        The granularity is the turn, not the token: everything a turn emitted
-        is handed over when the turn is done. Within one model call there is
-        nothing to interleave, because the loop is synchronous by design —
-        no threads, no async, because the target is Lambda.
-        """
+        """The loop itself, yielding as it goes: events go out through ``_emit`` as
+        always, and a stream adds one hook that appends to *sink*, drained at each
+        boundary — a view of the event channel, not a second one."""
         def drain():
             while sink:
                 yield sink.pop(0)
@@ -86,9 +66,8 @@ class _Loop:
         self._live.journal = journal        # where an interceptor's change is written
         while True:
             try:
-                # Walked, not called: the text deltas of a streamed turn reach
-                # the consumer as they arrive, where they were handed over in
-                # one batch after the model finished.
+                # Walked, not called, so the text deltas of a streamed turn
+                # reach the consumer as they arrive.
                 asking = self._ask_events(messages, state)
                 while True:
                     try:
@@ -116,7 +95,6 @@ class _Loop:
                 if state.get("truncated"):
                     # Cut at max_tokens: kept as the output, because half an
                     # answer can be worth reading, but not called an answer.
-                    # It ended the run as `answered`, `success=True`.
                     self._log(1, "\n[Done] ✗ the answer was cut at max_tokens")
                     return self._result(state, False, str(reply), "truncated",
                                         error="the answer was cut at max_tokens; raise max_tokens "
@@ -150,8 +128,8 @@ class _Loop:
                 # form in which "no rows" and "the tool declined" are still
                 # different things. `prompts.observation_text` is the model's
                 # view and stays the model's view.
-                # A copy: a hook that masks a token in the payload changed
-                # the argument the tool then ran with.
+                # A copy, or a hook that masks a token in the payload would
+                # change the argument the tool runs with.
                 self._emit("tool_call.started", name=call.name,
                            step=state["steps"],
                            payload={"id": call.id or "",
@@ -185,10 +163,9 @@ class _Loop:
                         parked = self._park(susp, call, reply, messages,
                                             state, journal)
                     except Exception as exc:
-                        # The store refused the document — a DynamoDB item
-                        # over 400 KB after twenty calls. run() raised it raw
-                        # and the paid conversation was gone; it comes back
-                        # as a result, history and cost with it.
+                        # The store refused the document (a DynamoDB item
+                        # over 400 KB, say): a result, history and cost with
+                        # it, rather than a raise that loses the conversation.
                         yield from drain()
                         return self._result(state, False, None, "park_failed",
                                             error=f"the run could not be parked: "
@@ -210,7 +187,7 @@ class _Loop:
                            payload={"id": call.id or "", "result": _copy(result),
                                     "agent": self.name or "",
                                     # The type and the traceback, which the
-                                    # error string had dropped.
+                                    # error string drops.
                                     **({"exception": failure} if failure else {})},
                            error=error)
                 yield from drain()
@@ -224,12 +201,9 @@ class _Loop:
                     action      = _action(call),
                     outcome     = _J_FAILED if error else _J_DONE,
                     # A call that *ran* is a fact, but what it returned is
-                    # only as good as its source. `delegate` hands back a
-                    # worker's own account and marks it MODEL_CLAIM; this
-                    # recorded the call as CHECK regardless, so an unverified
-                    # report entered the parent's journal as a programmatic
-                    # fact — the distinction existed and decided nothing. A
-                    # failure stays CHECK: that the call failed is verified.
+                    # only as good as its source: a `delegate` worker's own
+                    # account is marked MODEL_CLAIM and stays one. A failure
+                    # stays CHECK: that the call failed is verified.
                     evidence    = _evidence(
                         MODEL_CLAIM if (not error and isinstance(result, dict)
                                         and result.get("evidence") == MODEL_CLAIM)
@@ -276,10 +250,8 @@ class _Loop:
                 yield from drain()
 
     def _callback_failed(self, state: dict, where: str, exc: BaseException) -> AgentResult:
-        """One handling for every caller-supplied callback that raises — a check,
-        a ceiling, a nudge, an approver. They were handled three ways: a check
-        swallowed it, a ceiling and a nudge raised out of run(), and so did an
-        approver, with no result and no `run.finished`."""
+        """One handling for every caller-supplied callback that raises — a check, a
+        ceiling, a nudge, an approver: the run stops with a result, not an exception."""
         _logger.warning("%s raised; the run stops", where, exc_info=exc)
         return self._result(state, False, None, "condition_error",
                             error=f"{where} raised {type(exc).__name__}: {exc}")
@@ -312,15 +284,8 @@ class _Loop:
         return None
 
     def _plan_gate(self, state: dict) -> str | None:
-        """Hold an answer once when the plan has more goals than work done.
-
-        A waterfall run that wrote five goals, made two calls and answered
-        ended as a clean success: "plan not completed" was recorded only when
-        a ceiling stopped the run. Nothing marks a goal done, so the count of
-        calls since the plan is the fact there is — fewer calls than goals
-        means some goal had none. Said once; the model may still answer, now
-        knowing which goals it has not touched.
-        """
+        """Hold an answer once when the plan has more goals than calls made since it:
+        nothing marks a goal done, so fewer calls than goals means some goal had none."""
         plan = state.get("plan")
         done = state.get("plan_calls") or 0
         if not plan or done >= len(plan):
@@ -343,8 +308,8 @@ class _Loop:
     def _nudges(self, state: dict) -> list:
         """Messages from nudges that fired this turn — once per streak."""
         # Keyed by place, not name: two nudges of one name — every nudge is
-        # "nudge" unless named, `stalled(3)` beside `stalled(8)` — shared one
-        # latch, and the second never spoke. A list after a resume.
+        # "nudge" unless named, `stalled(3)` beside `stalled(8)` — would share
+        # one latch. A list after a resume.
         latched = state.get("nudged")
         if not isinstance(latched, set):
             latched = state["nudged"] = set(latched or ())
@@ -389,14 +354,8 @@ class _Loop:
                 return done.value
 
     def _ask_events(self, messages: list, state: dict):
-        """
-        One turn of the conversation, through ``Skill``, yielding after each
-        event it emits so a stream can hand it on.
-
-        Delegating instead of hand-rolling the call is what makes cost,
-        caching and native tool calling arrive at all: they were added to the
-        primitive and would never reach a private copy of it.
-        """
+        """One turn of the conversation, through ``Skill`` so cost, caching and native
+        tool calling reach it, yielding after each event so a stream can hand it on."""
         _t0 = time.monotonic()
         # The planning phase, when it exists and has its own model, deserves
         # deliberation; execution turns do not. The phase boundary is the
@@ -408,17 +367,14 @@ class _Loop:
             model  = model,
             input  = {"messages": messages},
             # Stamped, not passed through: a Skill emits `llm_call.*` and
-            # knows nothing of the run it is inside, so those events reached
-            # the stream with no run_id and a consumer could not tell them
-            # from another invocation's. Identity belongs to whoever owns the
-            # run, and that is the agent.
+            # knows nothing of the run it is inside. Identity belongs to
+            # whoever owns the run, and that is the agent.
             hooks  = self._stamping_hooks(),
             max_cost = self.max_cost,
             _tools = self._tool_schemas(),
             # Transient provider failures (rate limit / 5xx / network) retry
-            # inside the call instead of costing the whole turn. The reference
-            # agent this design was measured against retries every call; a
-            # loop that doesn't pays for each blip with a lost decision.
+            # inside the call instead of costing the whole turn: a loop that
+            # does not pays for each blip with a lost decision.
             max_retries = 2,
         )
         reply = yield from self._reply(skill)
@@ -428,10 +384,8 @@ class _Loop:
         # Kept per run, deduplicated: a loop asks the same thing of the same
         # model every turn, so without this the list grows by a copy a step.
         for a in skill.last_adaptations:
-            # As plain data: the state of the step() seam is documented as
-            # JSON-serialisable, and a dataclass in it broke `json.dumps` on
-            # the first adaptation — and with `default=str` the `not in`
-            # check never matched, so the list grew every step.
+            # As plain data: the state of the step() seam is JSON-serialisable,
+            # and dicts compare equal for the `not in` check below.
             entry = dataclasses.asdict(a) if dataclasses.is_dataclass(a) else a
             if entry not in state["adaptations"]:
                 state["adaptations"].append(entry)
@@ -456,12 +410,8 @@ class _Loop:
         )
 
     def _finished(self, result, journal, board):
-        """Attach the run's records and announce the end — unless it parked.
-
-        A :class:`~..state.SuspendedResult` is not an end: ``run.suspended``
-        went out when the run parked, the document is in the store, and none
-        of the closing records apply to a run that is still owed an answer.
-        """
+        """Attach the run's records and announce the end, unless it parked: a
+        ``SuspendedResult`` is still owed an answer, and none of the closing applies."""
         if isinstance(result, SuspendedResult):
             return result
         result.journal = journal.to_list()
@@ -479,15 +429,9 @@ class _Loop:
         return result
 
     def _park(self, susp, call, reply, messages, state, journal):
-        """Write the parked run to the store and return a SuspendedResult.
-
-        Two things are settled here rather than left to the resume. The other
-        calls of the same turn — a provider may ask for several — are answered
-        as not executed, because a history with calls nobody answered is the
-        one shape every provider handles differently. And the parked call is
-        deliberately left **unanswered**: that gap is what the run is waiting
-        for, and `resume()` fills exactly it.
-        """
+        """Write the parked run to the store and return a SuspendedResult. The turn's
+        other calls are answered as not executed; the parked call is left unanswered,
+        the gap ``resume()`` fills."""
         at = next(i for i, c in enumerate(reply.calls) if c is call)
         for other in reply.calls[at + 1:]:
             messages.append(tool_result_turn(
@@ -495,8 +439,8 @@ class _Loop:
                 prompts.result_message(None, f"not executed: the run paused at "
                                              f"{call.name!r} before this call")))
 
-        # The question with what it is about: a person asked to approve saw a
-        # reason and not the call it was for.
+        # The question with what it is about, so a person asked to approve
+        # sees the call and not only a reason.
         awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with),
                     "tool": call.name, "arguments": _copy(dict(call.arguments or {}))}
         if getattr(susp, "approval", False):
@@ -549,14 +493,8 @@ class _Loop:
             + (f" — {parked['reason']}" if parked.get("reason") else "") + ".")
 
     def _complete(self, parked: dict, signal):
-        """Run the parked tool with the signal. Returns ``(result, error)``.
-
-        A tool that parks and a tool that resumes are the same object called
-        twice — `_signal=None` the first time, the world's answer the second.
-        A second `Suspend` from here would be a tool that cannot be completed
-        by the signal it asked for, so it is reported rather than parked
-        again: the run would otherwise wait for the same answer forever.
-        """
+        """Run the parked tool with the signal; ``(result, error)``. A second `Suspend`
+        is reported, not parked, or the run would wait for the same answer forever."""
         tool = self._tool_map.get(parked.get("tool"))
         if tool is None:
             return None, (f"no tool named {parked.get('tool')!r} on this agent "
@@ -578,7 +516,7 @@ class _Loop:
             return dispatcher.execute(call, {})
         try:
             # Through the dispatcher, as every tool runs: the budget, the
-            # interceptors, the rules around. It ran the tool directly.
+            # interceptors, the rules around.
             result = dispatcher.run_tool(call, extra={"_signal": signal}, check=False)
             return dispatcher._after(call, result), None
         except Suspend as susp:
@@ -603,20 +541,9 @@ class _Loop:
     # ── Plumbing ─────────────────────────────────────────────────────────
 
     def _reply(self, skill):
-        """One model turn — streamed when somebody is watching it.
-
-        `run()` buffers, because it has nobody to show prose to and a
-        buffered call keeps the fallback chain. `stream()` streams, because a
-        reader is in front of the last turn and today it arrives in one piece
-        after a silence as long as the model takes.
-
-        The text goes out on the **same** channel as everything else, bracketed
-        so a consumer can open a block, append to it and close it:
-        ``text.started`` on the first piece, a ``text.delta`` per piece, and
-        ``text.ended`` when the turn is done — all carrying one ``id``. A turn
-        that asks for a tool and says nothing produces none of the three,
-        rather than an empty pair a consumer has to filter.
-        """
+        """One model turn, streamed when somebody watches: ``text.started``, a
+        ``text.delta`` per piece and ``text.ended``, one ``id``; buffered for `run()`,
+        which keeps the fallback chain."""
         if not self._live.streaming:
             return skill.run()
 

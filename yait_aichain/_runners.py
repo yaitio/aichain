@@ -2,9 +2,8 @@
 What kind of runner a step or a pool item is — one answer for Chain and Pool.
 
 By ``isinstance``, imported late: the primitives import Chain and Pool, so a
-module-level import here would be a cycle. Matching the class *name* in the MRO,
-as both used to, mistook any user class called ``Agent`` or another library's
-``Tool`` for ours.
+module-level import here would be a cycle. Matching a class name would mistake
+a user's own ``Agent`` or another library's ``Tool`` for ours.
 """
 
 from __future__ import annotations

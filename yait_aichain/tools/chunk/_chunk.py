@@ -1,89 +1,8 @@
-"""
-tools.chunk._chunk
-==================
+"""``Chunk`` — a text cut into pieces small enough to embed.
 
-Chunk — intelligent text chunker for RAG pipelines.
-
-Splits long text into overlapping chunks suitable for embedding and
-vector-store ingestion.  Supports plain text and Markdown with dedicated
-handling for headings, code blocks, and tables.
-
-Output schema (per chunk)
---------------------------
-::
-
-    {
-        "text":  str,     # chunk content (may include overlap prefix)
-        "chars": int,     # len(text)  — always <= max_chars
-        "metadata": {
-            "headings": list[str],   # heading path at this chunk's position
-            "is_code":  bool,        # True for code-block chunks
-        }
-    }
-
-Format detection
-----------------
-Text is treated as Markdown when it contains at least one of:
-  • A line starting with ``#``
-  • A fenced code block marker (`` ``` `` or ``~~~``)
-  • A table separator row  (``| --- |``)
-  • Inline emphasis markers (``**``, ``__``, ``*``, ``_``)
-
-Markdown chunking
------------------
-Segments are parsed in a single pass:
-
-  Headings   — update the heading stack; never emitted as chunks.
-               When heading level N appears, all stack entries with
-               level ≥ N are replaced by the new heading.
-
-  Code blocks — kept whole if ≤ max_chars; otherwise split line-by-line
-                with the opening fence repeated in every sub-chunk.
-
-  Tables      — kept whole if ≤ max_chars; otherwise split row-by-row
-                with the header + separator rows repeated.
-
-  Text        — split by priority: \\n\\n → \\n → ". " → space.
-
-Plain text
-----------
-Split priority: \\n\\n → \\n → ". " → 。！？ → space.
-``metadata.headings`` is always ``[]``.
-
-Overlap
--------
-The last ``overlap_chars`` characters of chunk N are prepended to chunk N+1
-when both are text under the same headings — never to a table or a code
-block, and never across a heading.
-The left boundary of the overlap window is shifted right to the nearest space
-so that no word is split across the boundary.  The final prepend is trimmed to
-ensure ``chunk["chars"] <= max_chars``.  Overlap is never applied to code chunks.
-
-Merge peers
------------
-When ``merge_peers=True`` (default) adjacent non-code chunks that share the
-same heading path are merged if their combined length fits in ``max_chars``.
-
-Edge cases
-----------
-  empty string          → ``[]``
-  headings only         → ``[]``
-  unclosed code block   → treated as plain text to end of input
-  overlap_chars ≥ max_chars → ``ValueError`` on construction
-
-Into a vector store
--------------------
-A piece has no ``"id"``; a record in a store needs one::
-
-    from yait_aichain.tools import chunk, embed
-    from yait_aichain.utilities import Vectors
-
-    kb = Vectors("qdrant", collection="docs", description="the product documentation",
-                 embedder=embed("openai", model="text-embedding-3-small"))
-    kb.create(dimension=1536)
-
-    pieces = chunk(max_chars=800, overlap_chars=80).run(long_markdown_text)
-    kb.upsert([{"id": f"doc-{i}", **p} for i, p in enumerate(pieces)])
+Plain text and Markdown, with headings, code blocks and tables handled on
+their own terms; each piece is ``{"text", "chars", "metadata": {"headings",
+"is_code"}}``, with ``chars <= max_chars``. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations
@@ -103,9 +22,9 @@ class _Chunk:
     text:     str
     headings: list[str] = field(default_factory=list)
     is_code:  bool      = False
-    #: "text", "table" or "code". Overlap joins text to text only: a table's
-    #: header row was glued to a data row, and a section's first chunk began
-    #: with the end of the section before it.
+    #: "text", "table" or "code". Overlap joins text to text only, so a
+    #: table's header row is never glued to a data row, nor a section's first
+    #: chunk to the end of the section before it.
     kind:     str       = "text"
 
 
@@ -116,8 +35,7 @@ class _Chunk:
 _MD_FENCE_RE  = re.compile(r'```|~~~')
 _MD_TABLE_RE  = re.compile(r'\|\s*[-:]+\s*\|')
 # Emphasis as a pair around words, not a lone marker: one `_` in a CSV
-# column name switched the whole document to Markdown, and its rows were cut
-# in the middle.
+# column name must not make the whole document Markdown.
 _MD_INLINE_RE = re.compile(r'\*\*\S[^\n]*?\*\*|__\S[^\n]*?__|(?<![\w*])\*\S[^*\n]*\*(?![\w*])')
 
 def _is_markdown(text: str) -> bool:
@@ -142,12 +60,6 @@ def _push_heading(
     level: int,
     text:  str,
 ) -> list[tuple[int, str]]:
-    """
-    Update heading stack for a new heading of *level*.
-
-    All entries with level >= *level* are dropped (they are children of the
-    incoming heading's parent), then the new heading is appended.
-    """
     return [(l, t) for l, t in stack if l < level] + [(level, text)]
 
 
@@ -160,12 +72,7 @@ def _headings_list(stack: list[tuple[int, str]]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _force_split(text: str, max_chars: int) -> list[str]:
-    """Cut *text* into pieces of at most *max_chars* characters.
-
-    The last resort of `_split_by_priority`, reached only when even a space
-    did not split the text — so it is one oversized token, and characters are
-    all there is to cut on.
-    """
+    """Cut by characters: the last resort, for one token longer than the limit."""
     return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
 
 
@@ -174,13 +81,8 @@ def _split_by_priority(
     max_chars: int,
     seps:      list[str],
 ) -> list[str]:
-    """
-    Recursively split *text* into pieces ≤ *max_chars* using *seps* in order.
-
-    Each separator is tried in turn; the first one that produces multiple
-    parts drives the split.  When no separator applies, falls back to
-    word-boundary splitting via :func:`_force_split`.
-    """
+    """Split *text* into pieces of at most *max_chars* on the first of *seps*
+    that splits it, recursing with the rest on a piece still too large."""
     if len(text) <= max_chars:
         return [text] if text.strip() else []
 
@@ -225,8 +127,8 @@ def _split_by_priority(
     return _force_split(text, max_chars)
 
 
-# Chinese and Japanese end a sentence without a space after it; text in them
-# was cut at fixed offsets. A line break splits plain text too.
+# Chinese and Japanese end a sentence without a space after it. A line break
+# splits plain text too.
 _CJK_SEPS        = ["。", "！", "？"]
 _MD_TEXT_SEPS    = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
 _PLAIN_TEXT_SEPS = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
@@ -238,14 +140,9 @@ _PLAIN_TEXT_SEPS = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
 
 def _pack(prefix: str, lines: list[str], suffix: str, max_chars: int,
           is_code: bool = False) -> list[_Chunk]:
-    """Pack *lines* into chunks of at most *max_chars*, each wrapped in
-    *prefix* and *suffix* so every piece stands on its own — a code block
-    keeps its fences, a table its header rows.
-
-    A single line longer than the whole budget is cut by characters: the
-    pieces are no longer well-formed lines, but the size contract downstream
-    (metadata and token limits) matters more.
-    """
+    """Pack *lines* into chunks of at most *max_chars*, each wrapped in *prefix*
+    and *suffix* (fences, header rows). A line over the budget is cut by
+    characters: the size limit matters more than a well-formed line."""
     budget = max(1, max_chars - len(prefix) - len(suffix))
     chunks: list[_Chunk] = []
     buf: list[str] = []
@@ -316,19 +213,13 @@ _ROW_RE     = re.compile(r'^\s*\|')
 
 
 def _starts_block(line: str) -> bool:
-    """True when *line* opens a code block, a heading or a table. One
-    definition for the parser and for where plain text stops — two copies
-    that disagreed would leave the text loop taking nothing and the outer
-    loop spinning on the same line."""
+    """True when *line* opens a code block, a heading or a table. One definition
+    for the parser and the text loop: if they disagreed, the outer loop would spin."""
     return bool(_FENCE_RE.match(line) or _HEADING_RE.match(line) or _ROW_RE.match(line))
 
 
 def _parse_markdown(text: str) -> list[_Segment]:
-    """
-    Parse *text* into a flat list of typed segments in a single pass.
-
-    Unclosed code fences are emitted as plain-text segments.
-    """
+    """*text* as a flat list of typed segments, in one pass; an unclosed fence is text."""
     lines:    list[str]      = text.split("\n")
     segments: list[_Segment] = []
     i = 0
@@ -347,7 +238,7 @@ def _parse_markdown(text: str) -> list[_Segment]:
             closed = False
             # A closing fence is the fence character alone, at least as many
             # as opened it (CommonMark): a "```python" line inside a block
-            # closed it, and what followed was lost.
+            # does not close it.
             closing = re.compile(rf"^ {{0,3}}{re.escape(fence_chars[0])}{{{len(fence_chars)},}}\s*$")
             while i < n:
                 if closing.match(lines[i]):
@@ -527,7 +418,7 @@ class Chunk(Tool):
             raise ValueError(f"{self.name} takes no options; got {sorted(options)}")
         if not input or not input.strip():
             return []
-        # Windows line ends: "\r\n\r\n" was not a paragraph break.
+        # Windows line ends: "\r\n\r\n" is a paragraph break too.
         input = input.replace("\r\n", "\n").replace("\r", "\n")
         max_chars     = self._max_chars
         overlap_chars = self._overlap_chars
@@ -646,16 +537,8 @@ class Chunk(Tool):
         overlap_chars: int,
         max_chars:     int,
     ) -> list[_Chunk]:
-        """
-        Prepend the tail of each chunk to the next.
-
-        Rules
-        -----
-        • Skip overlap when either chunk is a code block.
-        • The tail length is capped so ``len(new_text) <= max_chars``.
-        • The left edge of the tail is shifted right to the nearest space
-          so no word is split at the overlap boundary.
-        """
+        """Prepend the tail of each text chunk to the next one under the same
+        headings, capped at *max_chars* and starting at a word boundary."""
         if not chunks or overlap_chars == 0:
             return chunks
 

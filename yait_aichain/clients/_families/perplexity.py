@@ -38,7 +38,7 @@ class PerplexityClient(OpenAIClient):
 
     def check_auth(self) -> bool:
         # No auth-check endpoint; make the smallest completion the API takes —
-        # it refuses max_tokens below 16 (HTTP 400, measured 2026-10-13).
+        # it refuses max_tokens below 16 (HTTP 400).
         body = {"model": _KNOWN_MODELS[0],
                 "messages": [{"role": "user", "content": "1"}],
                 "max_tokens": 16}

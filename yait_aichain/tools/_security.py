@@ -1,15 +1,8 @@
-"""
-tools._security
-===============
-
-Shared defensive helpers for tools that act on caller/LLM-supplied URLs and
-output paths. In an agentic setting these inputs are untrusted, so the tools
-default to safe behaviour — no SSRF to private hosts, no ``file://`` reads,
-optional confinement of output writes — with explicit opt-outs for trusted
-deployments via environment variables:
-
-* ``AICHAIN_ALLOW_PRIVATE_URLS=1`` — allow fetching private / internal hosts.
-* ``AICHAIN_OUTPUT_ROOT=/path``    — confine all tool output writes here.
+"""Defensive helpers for tools that act on URLs and output paths a caller or a
+model supplies: no SSRF to private hosts, no ``file://`` reads, optional
+confinement of output writes. Opt-outs for trusted deployments:
+``AICHAIN_ALLOW_PRIVATE_URLS=1`` and ``AICHAIN_OUTPUT_ROOT=/path``.
+See docs/tools/index.md.
 """
 
 from __future__ import annotations
@@ -35,11 +28,9 @@ def assert_url_scheme(url: str) -> None:
 
 
 def _public(ip) -> bool:
-    """Whether *ip* is a public address, looking through IPv6 forms that carry
-    an IPv4 one — ``::ffff:127.0.0.1`` and the NAT64 ``64:ff9b::/96``. Public
-    is ``is_global``, which also excludes the shared ``100.64.0.0/10`` range
-    that a list of private networks misses (Alibaba's metadata service is
-    ``100.100.100.200``)."""
+    """Whether *ip* is public, looking through IPv6 forms that carry an IPv4 one
+    (``::ffff:…``, NAT64 ``64:ff9b::/96``). ``is_global`` also excludes the shared
+    ``100.64.0.0/10`` range, home of Alibaba's metadata service."""
     if ip.version == 6:
         if ip.ipv4_mapped is not None:
             ip = ip.ipv4_mapped

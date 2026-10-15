@@ -1,19 +1,8 @@
-"""
-utilities.shell._run — LocalRunTool
-===================================
-
-Execute a shell command or Python file. The working directory is set to the
-sandbox root (or a sub-directory of it).
-
-.. danger::
-    This tool runs **arbitrary commands** through the shell (``shell=True``)
-    with the full privileges of the host process. ``root_dir`` only sets the
-    *starting directory* — it does NOT confine what the command can read,
-    write, execute, or reach over the network (a command can use absolute
-    paths, ``..``, ``curl | sh``, etc.). Treat ``LocalRunTool`` as
-    arbitrary-code-execution: only expose it to trusted input, and never wire
-    it to an agent acting on untrusted instructions without an OS-level
-    sandbox (container, seccomp, separate user).
+"""``LocalRunTool``: run a shell command or a Python file, starting in the
+sandbox root. It is arbitrary code execution with the host process's rights
+(``shell=True``): the root is where a command starts, not what it can reach.
+Expose it only behind a permission policy or an OS-level sandbox.
+See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -34,8 +23,8 @@ MAX_OUTPUT_CHARS = 50_000
 
 
 _DEFAULT_TIMEOUT = 30   # seconds
-#: The longest a model may ask a command to run. Unbounded, `10**9` was an
-#: OverflowError and a large one a process that outlived the agent.
+#: The longest a model may ask a command to run. Unbounded, `10**9` is an
+#: OverflowError and a large one a process that outlives the agent.
 MAX_TIMEOUT = 600
 
 #: Environment names a child does not inherit: the provider keys in this
@@ -178,8 +167,8 @@ class LocalRunTool(Tool, SandboxedTool):
             command = f"{shlex.quote(sys.executable)} {command}"
 
         # Its own session, so a timeout kills the whole group — `sleep 99 &`
-        # and every stage of a pipeline outlived the shell that was killed —
-        # no stdin to wait on, and an environment without this process's keys.
+        # and every stage of a pipeline would outlive the shell alone — no
+        # stdin to wait on, and an environment without this process's keys.
         proc = subprocess.Popen(
             command, shell=True, cwd=cwd, env=_child_env(),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -194,8 +183,8 @@ class LocalRunTool(Tool, SandboxedTool):
             except (AttributeError, ProcessLookupError, PermissionError):
                 proc.kill()
             out, err = proc.communicate()       # what it printed before, kept
-        # Decoded leniently: one invalid byte raised after the command's
-        # effects had happened, and the result of a command that ran was lost.
+        # Decoded leniently: one invalid byte would raise after the command's
+        # effects happened, losing the result of a command that ran.
         stdout = out.decode("utf-8", errors="replace")
         stderr = err.decode("utf-8", errors="replace")
         if timed_out:

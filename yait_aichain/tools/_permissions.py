@@ -1,37 +1,8 @@
-"""
-tools._permissions — risk classes & permission policy
-=====================================================
+"""Risk classes and the permission policy.
 
-The governance side of the step boundary (1.4.4). Every tool carries a **risk
-class** (data on the tool, like the provider registry is data); a
-:class:`PermissionPolicy` maps a risk class to a runtime **decision** the harness
-enforces *before* a tool executes — outside the model.
-
-Decisions:
-
-* ``"allow"``   — run the tool.
-* ``"approve"`` — do not run the tool until someone outside the model says so.
-  The Agent asks its ``approve=`` callable and runs the tool only on a yes.
-  **With no approver attached the call is refused**, because the alternative is
-  worse in exactly the case this exists for: a policy whose whole content is
-  "ask a human" cannot mean "go ahead" when there is no human.
-* ``"deny"``    — never run; the tool call still returns a (denial) result, so
-  the "every tool call returns a result" invariant holds.
-
-Enforcement is **opt-in**: an ``Agent`` without ``permissions=`` behaves exactly
-as before. With a policy attached, the shipped default lets ``read``/``draft``/
-``write`` run, gates ``external``/``financial``/``privileged`` behind approval,
-and denies ``destructive`` — so existing (unmarked, ``write``) tools keep
-working and you opt risky tools into gating by tagging their ``risk``.
-
-**A decision is a policy only where something acts on it.** The agent's loop
-asks before every tool call and acts on each answer — ``deny`` refuses,
-``approve`` waits for ``approve=`` — and the tests assert that the decision
-*happened*, not only what :meth:`PermissionPolicy.decide` returns. The loop
-asks, and so do the ``pool`` tool — about the tool it fans out — and
-``Agent.execute()``. ``resume()`` runs the call that was parked, which was
-asked about when it parked; ``Chain`` and ``Pool`` steps are the code's own
-choice and are not asked about.
+Every tool carries a risk class; a ``PermissionPolicy`` maps it to ``allow``,
+``approve`` or ``deny``, decided by the harness before the tool runs, outside
+the model. See docs/control/permissions.md.
 """
 
 from __future__ import annotations
@@ -151,7 +122,7 @@ class PermissionPolicy:
 
     def __init__(self, rules: dict | None = None, *, default: str = APPROVE) -> None:
         # A misspelt class is a rule that matches nothing: `{"destructve":
-        # "deny"}` left `destructive` at its default, silently.
+        # "deny"}` would leave `destructive` at its default.
         unknown = sorted(set(rules or {}) - RISK_CLASSES)
         if unknown:
             raise ValueError(f"PermissionPolicy: {unknown} is not a risk class; the classes are "
@@ -165,9 +136,9 @@ class PermissionPolicy:
                 f"Invalid permission decision(s) {sorted(bad)}; "
                 f"must be one of {sorted(DECISIONS)}."
             )
-        # Read-only: the rules were checked here, and a change after the
-        # check — `policy.rules["destructive"] = "alow"` — was a decision no
-        # gate knew, which the agent then read as "allowed".
+        # Read-only: the rules are checked here, and a change after the check
+        # — `policy.rules["destructive"] = "alow"` — would be a decision no
+        # gate knows.
         from types import MappingProxyType
         self.rules   = MappingProxyType(merged)
         self.default = default

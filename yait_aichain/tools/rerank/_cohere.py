@@ -1,33 +1,6 @@
 """
-tools.rerank._cohere — RerankCohere
-===================================
-
-Wraps the Cohere Rerank API v2 (``POST /v2/rerank``).
-
-Supported models
-----------------
-  rerank-v3.5                  Latest; multilingual; best quality
-  rerank-english-v3.0          English-only; strong baseline
-  rerank-multilingual-v3.0     Multilingual; 100+ languages
-
-API reference
--------------
-POST https://api.cohere.com/v2/rerank
-
-Request body
-  model            : str
-  query            : str
-  documents        : list[str]
-  top_n            : int | None
-
-Response
-  results[].index            — original document index
-  results[].relevance_score  — float, higher = more relevant
-  meta.billed_units.search_units — billing
-
-Environment variable
---------------------
-COHERE_API_KEY
+``RerankCohere``: the Cohere Rerank v2 API (``POST /v2/rerank``). Cohere bills
+in search units, which ``total_tokens`` carries. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations

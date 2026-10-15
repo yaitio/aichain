@@ -1,25 +1,10 @@
-"""
-tools.search.brave — searchBrave
-================================
-
-The Brave Search API behind the common :class:`~tools.search.Search` format.
-
-Endpoint  : POST https://api.search.brave.com/res/v1/web/search
-Auth      : ``x-subscription-token`` header
-Docs      : https://api-dashboard.search.brave.com/api-reference/web/search/post
-
-Translated: ``recency`` → ``freshness`` (``pd``/``pw``/``pm``/``py``; Brave has
-no hour, so ``hour`` is adapted to a day and said so), dates → a
-``YYYY-MM-DDtoYYYY-MM-DD`` range, ``domains`` → ``site:`` in the query (Brave
-has no site field), ``language`` → ``search_lang``. At most 20 results.
-
-Brave's own options stay: ``safe_search``, ``extra_snippets`` (up to five more
-passages per result), ``result_filter``, and ``freshness`` itself, which wins
-over the standard time options when given.
-
-Environment variable
---------------------
-``BRAVE_SEARCH_API_KEY`` — from https://api-dashboard.search.brave.com
+"""Brave Search (``POST https://api.search.brave.com/res/v1/web/search``,
+``x-subscription-token``) behind the common :class:`~tools.search.Search`
+format. ``recency`` → ``freshness`` (no hour, so ``hour`` is a day, said so),
+dates → a ``YYYY-MM-DDtoYYYY-MM-DD`` range, ``domains`` → ``site:`` in the
+query, ``language`` → ``search_lang``. Key: ``BRAVE_SEARCH_API_KEY``.
+See docs/tools/search.md and
+https://api-dashboard.search.brave.com/api-reference/web/search/post.
 """
 
 from __future__ import annotations

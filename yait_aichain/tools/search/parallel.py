@@ -1,41 +1,10 @@
-"""
-tools.search.parallel — searchParallel
-======================================
-
-The Parallel Search API behind the common :class:`~tools.search.Search`
-format. Parallel is built for agents: it takes an **objective** in natural
-language beside a few short keyword queries, and returns for each page the
-excerpts that serve the objective.
-
-Endpoint  : POST https://api.parallel.ai/v1/search
-Auth      : ``x-api-key`` header
-Docs      : https://docs.parallel.ai/api-reference/search/search — read
-            2026-10-08.
-
-The query an agent passes becomes both the ``objective`` and the one keyword
-query. ``search_queries`` adds keyword queries of its own — Parallel advises
-two or three of three to six words — and ``objective`` replaces the goal.
-
-Translated: ``max_results`` → ``advanced_settings.max_results``, ``domains`` →
-``source_policy.include_domains`` (path prefixes and bare extensions such as
-``.edu`` work), ``start_date`` and ``recency`` → ``source_policy.after_date``
-(a day, so ``hour`` is a day here and said so), ``country`` →
-``advanced_settings.location``. Parallel filters from a start date only, so
-``end_date`` is declined with a notice, and it has no language filter.
-
-**Undated pages pass the date filter**, as on Exa — measured 2026-10-08: a
-week on ``bcg.com/publications`` returned BCG pages with no date. And the
-ceiling on results is 20, not documented and measured the same day.
-
-Parallel's own options stay: ``objective``, ``search_queries``, ``mode``
-(``turbo``, ``fast``, ``basic``, ``advanced`` — the default), ``exclude_domains``
-(ignored by Parallel when ``domains`` is set, so the pair is refused),
-``max_chars_total`` and ``max_age_seconds`` (fetch a page live when the cached
-copy is older; slower).
-
-Environment variable
---------------------
-``PARALLEL_API_KEY`` — from https://platform.parallel.ai
+"""Parallel Search (``POST https://api.parallel.ai/v1/search``, ``x-api-key``)
+behind the common :class:`~tools.search.Search` format. The query is both the
+``objective`` and the one keyword query; ``search_queries`` adds more.
+``domains`` → ``source_policy.include_domains``, ``start_date``/``recency`` →
+``after_date`` (a day); ``end_date`` and ``language`` are declined. Undated
+pages pass the date filter. Key: ``PARALLEL_API_KEY``.
+See docs/tools/search.md and https://docs.parallel.ai/api-reference/search/search.
 """
 
 from __future__ import annotations

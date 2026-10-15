@@ -1,15 +1,9 @@
 """
-chain._result — ChainResult
-===========================
+chain._result — ChainResult, what ``Chain.run()`` and ``Chain.resume()`` return.
 
-What ``Chain.run()`` and ``Chain.resume()`` return, in the same shape as
-``AgentResult`` and ``PoolResult``: ``output``, ``success``, ``error``,
-``history``, ``usage``, ``tokens_used``, ``cost``.
-
-A chain names its steps, so a step's output is read by its name:
-``result["tweet"]``. Measured 2026-09-13: given the
-documentation, a model reached for exactly that in twenty of forty-seven
-failed attempts.
+The same shape as ``AgentResult`` and ``PoolResult`` — ``output``, ``success``,
+``error``, ``history``, ``usage``, ``tokens_used``, ``cost`` — and a step's
+output read by its name: ``result["tweet"]``. See docs/pipelines/chain.md.
 """
 
 from __future__ import annotations
@@ -57,8 +51,8 @@ class ChainResult(Spend):
     variables: dict = field(default_factory=dict)
     usage:     Any = None
     run_id:    str = ""
-    #: Keys an output used to be found under, mapped to where it is now —
-    #: ``{"result": "fetch"}``: reading the old one still works and says so.
+    #: An output's old keys, mapped to where it is now — ``{"result":
+    #: "fetch"}``: reading the old one still works and says so.
     renamed:   dict = field(default_factory=dict, repr=False)
 
     @property

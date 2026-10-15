@@ -1,25 +1,6 @@
-"""
-utilities.rest
-==============
-
-``REST`` — an HTTP API as a utility. The base URL, a description of the API,
-the authentication and the headers are set once for the whole API; each
-endpoint is a tool.
-
-::
-
-    api = REST("https://restful-booker.herokuapp.com",
-               description="Restful Booker, a hotel booking API",
-               headers={"Accept": "application/json"})
-    get_booking = api.endpoint("get_booking", "GET", "/booking/{id}", path_params=["id"],
-                               description="One booking by its id.")
-    get_booking.run(id=1)
-    Agent(model, tools=api.tools)                    # every endpoint made so far
-
-Each endpoint is a ``RestApiTool``, which can also be built on its own when
-an API has a single endpoint. Its risk class follows the method — ``GET`` is
-``read``, ``DELETE`` is ``destructive``, a write is ``external`` — unless
-``risk=`` says otherwise.
+"""``REST``: an HTTP API as a utility — base URL, description, auth and headers
+set once, each endpoint a ``RestApiTool`` whose risk class follows its method.
+See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -51,8 +32,8 @@ class REST(Utility):
         self.auth = dict(auth or {})
         self.headers = dict(headers or {})
         self.timeout = timeout
-        # One API on an internal network, not every URL in the process: the
-        # global AICHAIN_ALLOW_PRIVATE_URLS was the only way to reach one.
+        # One API on an internal network, without opening every URL in the
+        # process as the global AICHAIN_ALLOW_PRIVATE_URLS does.
         self.allow_private = allow_private
         self._endpoints: dict = {}
 

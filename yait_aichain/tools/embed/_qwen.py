@@ -1,42 +1,7 @@
 """
-tools.embed._qwen — EmbeddingQwen
-=================================
-
-Wraps the Alibaba DashScope Embeddings API via the OpenAI-compatible
-endpoint (``POST /compatible-mode/v1/embeddings``).
-
-Supported models
-----------------
-  text-embedding-v4    Latest generation.  Supports ``dimensions`` (64–2048).
-                       Default dimensions: 1024.
-  text-embedding-v3    Supports ``dimensions`` (512–8192).
-                       Default dimensions: 1024.
-  text-embedding-v2    Fixed 1536 dimensions; no dimension override.
-
-Model notes
------------
-* ``input_type`` is mapped to DashScope's ``input_type`` parameter:
-    ``"query"``     → ``"query"``
-    ``"document"``  → ``"document"``
-    ``None``        → omitted (provider picks the default)
-* ``text-embedding-v4`` and ``text-embedding-v3`` support variable
-  ``dimensions``; on any other model it is refused when the embedder is made.
-* The API accepts up to 25 strings per request; the base class handles
-  automatic chunking for larger inputs.
-
-Region
-------
-The base URL is derived from the ``DASHSCOPE_REGION`` environment variable
-(or the ``region`` constructor argument):
-  ap (default) — https://dashscope-intl.aliyuncs.com
-  us           — https://dashscope-us.aliyuncs.com
-  cn           — https://dashscope.aliyuncs.com
-  hk           — https://cn-hongkong.dashscope.aliyuncs.com
-
-Environment variables
----------------------
-DASHSCOPE_API_KEY
-DASHSCOPE_REGION  (optional; default: ap)
+``EmbeddingQwen``: DashScope embeddings through its OpenAI-compatible endpoint
+(``/compatible-mode/v1/embeddings``); the host follows ``region`` or
+``DASHSCOPE_REGION``. See docs/tools/retrieval.md.
 """
 
 from __future__ import annotations
@@ -50,8 +15,6 @@ _SUPPORTS_DIMENSIONS = frozenset({
     "text-embedding-v4",
     "text-embedding-v3",
 })
-
-# Maps universal input_type to DashScope's native values
 
 
 class EmbeddingQwen(_OpenAIShaped):

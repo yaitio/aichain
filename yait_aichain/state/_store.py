@@ -1,14 +1,9 @@
 """
-state._store — StateStore + built-in backends
-==============================================
+state._store — StateStore and the built-in backends.
 
-Persistence for suspended runs: a ``run_id`` → run-document (a JSON-serialisable
-dict) mapping. The interface is deliberately tiny (``save``/``load``/``delete``)
-so any KV / document store fits: in-memory (default), a local directory
-(``FileStore``), or — by subclassing — S3, DynamoDB, Redis, Mongo, …
-
-The store holds only *suspended* runs; a completed run is deleted. Full audit
-of every run is the observability concern (M3), routed elsewhere.
+A ``run_id`` → run document mapping behind ``save``/``load``/``delete``, small
+enough for any KV store. It holds only parked runs; a completed one is deleted.
+See docs/pipelines/pause-and-resume.md.
 """
 
 from __future__ import annotations
@@ -81,8 +76,8 @@ class InMemoryStore(StateStore):
         self._lock = threading.Lock()
 
     def save(self, run_id: str, document: dict) -> None:
-        # Through JSON, as every persistent store does: a set, bytes or an int
-        # key worked here and broke in production on the first FileStore.
+        # Through JSON, as every persistent store does, so what works here
+        # works on a FileStore too.
         self._runs[run_id] = json.loads(_as_json(document))
 
     def take(self, run_id: str) -> dict | None:
@@ -117,7 +112,7 @@ class FileStore(StateStore):
     """
 
     def __init__(self, directory: str) -> None:
-        # `~/runs` was a folder named "~" in the working directory.
+        # Expanded, or `~/runs` would be a folder named "~" in the working directory.
         self._dir = os.path.expanduser(directory)
         os.makedirs(self._dir, exist_ok=True)
 
@@ -128,8 +123,8 @@ class FileStore(StateStore):
 
     def save(self, run_id: str, document: dict) -> None:
         path = self._path(run_id)
-        # Serialised before the temporary file exists: a document that could
-        # not be written left an open descriptor and a stray file behind.
+        # Serialised before the temporary file exists, so a document that
+        # cannot be written leaves no open descriptor or stray file behind.
         payload = _as_json(document)
         fd, tmp = tempfile.mkstemp(dir=self._dir, suffix=".tmp")
         try:

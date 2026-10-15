@@ -1,12 +1,7 @@
-"""
-clients._families.anthropic
-============================
-
-Anthropic Messages API family (``POST /v1/messages``): format
-(build_request / parse_response) + transport (x-api-key + version header).
-
-System messages lift to a top-level ``system`` field; structured output uses
-a forced ``tool_use``; extended thinking maps to ``budget_tokens``.
+"""The Anthropic Messages API family (``POST /v1/messages``), format and
+transport: system messages lift to a top-level ``system`` field, structured
+output is a forced ``tool_use``, reasoning maps to a thinking budget, and
+``cache_control`` places the prompt-cache mark. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -19,11 +14,8 @@ from .._base import BaseClient
 
 
 def _extract_first_json(t: str) -> str:
-    """Return the first balanced top-level JSON object/array in t.
-
-    Models sometimes append commentary after the JSON, or wrap it in prose.
-    Scans for the first { or [ and walks until the matching close, respecting
-    string literals and escapes."""
+    """The first balanced top-level JSON object or array in *t*, string literals
+    respected: models sometimes wrap the JSON in prose."""
     start = next((i for i, ch in enumerate(t) if ch in "{["), -1)
     if start == -1:
         raise json.JSONDecodeError("no JSON object found", t, 0)
@@ -49,11 +41,8 @@ _API_VERSION = "2023-06-01"
 
 
 def _part_to_anthropic(part: dict) -> dict | None:
-    """
-    Convert one universal part dict to an Anthropic content block.
-
-    Returns ``None`` for unsupported types (video) so callers can filter.
-    """
+    """One universal part as an Anthropic content block, or ``None`` (recorded
+    as declined) for a type Claude cannot take."""
     ptype = part["type"]
 
     if ptype == "text":
@@ -84,8 +73,8 @@ def _part_to_anthropic(part: dict) -> dict | None:
             return {"type": "document",
                     "source": {"type": "base64", "media_type": "application/pdf", "data": src["data"]}}
         return _dropped(part, "Claude reads a document as PDF bytes")
-    # Claude takes no audio — sent as a `document` it was a 400 — and no
-    # video: left out, and said.
+    # Claude takes no audio (sent as a `document` it is a 400) and no video:
+    # left out, and said.
     if ptype == "image":
         return _dropped(part, f"an image source of kind {part['source'].get('kind')!r} cannot be sent")
     return _dropped(part, f"Claude takes no {ptype} input")
@@ -102,11 +91,9 @@ def _note_ttl(params: dict) -> None:
                           sent=f"cache_control ttl {params['cache_ttl']}", model=params["name"]))
 
 def _anthropic_id(call_id: str) -> str:
-    """A call id as this API accepts one — letters, digits, ``_`` and ``-``.
-    A history made with another model carries its ids (Kimi's
-    ``functions.get_weather:0``), and a fallback or a planner model sends that
-    history here; mapped the same way on both sides of the turn, the call and
-    its result still match."""
+    """A call id in the characters this API accepts. A history from another
+    model (Kimi's ``functions.get_weather:0``) is mapped the same way on both
+    sides of the turn, so the call and its result still match."""
     return re.sub(r"[^A-Za-z0-9_-]", "_", call_id or "") or "call"
 
 class AnthropicClient(BaseClient):
@@ -126,7 +113,7 @@ class AnthropicClient(BaseClient):
         return {**super()._auth_headers(), "anthropic-version": _API_VERSION}
 
     def list_models(self) -> list[str]:
-        # Every page: the first one alone was twenty models.
+        # Every page: the first holds only twenty models.
         out, after = [], None
         for _ in range(50):
             path = "/v1/models?limit=1000" + (f"&after_id={after}" if after else "")
@@ -289,21 +276,16 @@ class AnthropicClient(BaseClient):
         # a caller that rebuilds part of the array — a memory that sends
         # retrieved context plus a sliding window of recent turns — has a
         # prefix that ends well before the last message, and marking past it
-        # asks the provider to cache content that changes every call. Measured:
-        # a composed prompt whose first 29 of 36 messages were byte-identical
-        # turn after turn got a cache read of zero, because the mark sat on
-        # message 34.
+        # asks the provider to cache content that changes every call.
         #
         # ``cache_control="last"`` is the third placement, and the one an agent
         # loop needs. It marks the last block of the last message, whatever
         # its type — a ``tool_result`` as readily as text. ``True`` looks for a
         # *text* block in the second-to-last message, and in a tool loop that
-        # message is the assistant's ``tool_use`` turn, which has none: so
-        # nothing was marked at all, every turn, and the only trace was a
-        # ``declined`` notice. Marking the newest block is right here, unlike
-        # in a chat, because the next call sends exactly this history plus one
-        # more turn — the whole of it is the stable prefix. Added 2026-10-01
-        # for the yait agents tool evals; ``True`` keeps its meaning.
+        # message is the assistant's ``tool_use`` turn, which has none, so
+        # nothing would be marked. Marking the newest block is right here,
+        # unlike in a chat, because the next call sends exactly this history
+        # plus one more turn — the whole of it is the stable prefix.
         mark = params.get("cache_control")
         if mark == "last":
             target = amsgs[-1]["content"] if amsgs else None
@@ -328,30 +310,22 @@ class AnthropicClient(BaseClient):
         if mark is True or by_index:
             target = None
             if by_index:
-                # Absolute index only, and index 0 is a real answer: a memory
-                # that puts a fixed preamble first is saying exactly that.
-                # Testing the mark for truthiness threw it away, because zero
-                # is false. Python would also read -1 as the *last* message,
-                # the opposite of what a caller reporting "nothing is stable
-                # yet" means by it. Both mistakes surface the same way — a
-                # cache that silently never hits — which is why an index that
-                # names no message marks nothing rather than being second-
-                # guessed: an explicit index is an instruction, not a hint.
+                # Absolute index only, and index 0 is a real answer (a fixed
+                # preamble first), so the mark is not tested for truthiness.
+                # Python would read -1 as the *last* message, the opposite of
+                # "nothing is stable yet". An index that names no message marks
+                # nothing: an explicit index is an instruction, not a hint.
                 if 0 <= mark < len(amsgs):
                     target = amsgs[mark]["content"]
             else:
                 if len(amsgs) >= 2:
                     target = amsgs[-2]["content"]
                 if target is None and system_parts:
-                    # An all-text system prompt was collapsed into a string a
-                    # few lines above, and a string has no block to carry the
-                    # mark. Normalising it back is what makes
-                    # ``cache_control=True`` mean anything for the commonest
-                    # skill shape there is — one system prompt plus one short
-                    # user message — where ``amsgs`` holds a single message and
-                    # the branch above cannot fire. Marking that message
-                    # instead would be worse than doing nothing: it asks the
-                    # provider to store a prefix that changes every call.
+                    # An all-text system prompt was collapsed into a string
+                    # above, which has no block to carry the mark. Normalised
+                    # back, ``cache_control=True`` works for the commonest
+                    # skill shape — one system prompt, one short user message —
+                    # where marking that message would cache a changing prefix.
                     if isinstance(body.get("system"), str):
                         body["system"] = [{"type": "text", "text": body["system"]}]
                     target = body["system"]
@@ -464,14 +438,8 @@ class AnthropicClient(BaseClient):
             ]
         if fmt.get("type") == "json":
             # Anthropic has no JSON-mode field. Every other provider does, so
-            # by the universal-vs-local rule this is absorbed rather than
-            # refused: the intent is portable, only the control is missing
-            # here. Until 2026-09-12 the request went out **byte-identical**
-            # to a plain text one and nothing was said — the caller asked for
-            # JSON, got prose, and `parse_response` was left digging a JSON
-            # object out of whatever came back. Silence about a format is
-            # worse than silence about a sampling knob: the answer does not
-            # merely differ, it is the wrong type.
+            # this is absorbed rather than refused: the intent is portable,
+            # only the control is missing here.
             #
             # An instruction, not a prefilled `{`: prefilling is Anthropic's
             # own trick and it works, but the opening brace is then missing
@@ -498,10 +466,8 @@ class AnthropicClient(BaseClient):
                     "description": "Return the result matching the given schema.",
                     "input_schema": fmt["schema"]}
             # Without this the schema is advisory: the provider forces the tool
-            # call but not its shape, so a model may fill one field and drop the
-            # rest — measured on claude-sonnet-5, which returned the first
-            # property carrying XML tags for the others. ``strict`` was accepted
-            # and documented in the output spec but never left the library.
+            # call but not its shape, so a model may fill one field and drop
+            # the rest.
             if fmt.get("strict"):
                 spec["strict"] = True
             body["tools"] = [spec]
@@ -514,8 +480,8 @@ class AnthropicClient(BaseClient):
         content = response.get("content", [])
         if ftype == "json_schema":
             # Answered through a forced tool call. No call is no answer — cut
-            # off, or refused — and was returned as `{}`, a valid-looking
-            # result; the other families raise there, and so does this one.
+            # off, or refused — and raises, as on the other families, rather
+            # than returning `{}`.
             schema = (output.get("format") or {}).get("schema")
             block = next((b for b in content if b.get("type") == "tool_use"), None)
             if block is None:
@@ -537,8 +503,7 @@ class AnthropicClient(BaseClient):
                     problems=problems, value=value)
             return value
         # Every text block, joined: Claude splits an answer around citations
-        # and server tools, and the first block alone was a fragment — while
-        # stream() gave the whole.
+        # and server tools, and the first block alone is a fragment.
         text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
         calls = [b for b in content if b.get("type") == "tool_use"]
         from ._structured import refuse_cut_off

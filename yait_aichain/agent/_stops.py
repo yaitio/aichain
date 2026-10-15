@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 
-from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the release notes)
 
 
 _logger = logging.getLogger("yait_aichain.agent")
@@ -204,8 +204,8 @@ def check(fn, name: str = "check"):
         How the stop is reported: ``stopped_by="check:<name>"``.
     """
     def _c(state):
-        # A raise is the loop's to report — as `condition_error`, the way a
-        # ceiling's or a nudge's is — where it was a DEBUG line and "not yet".
+        # A raise is the loop's to report, as `condition_error`, the way a
+        # ceiling's or a nudge's is.
         return f"check:{name}" if fn(state) else None
     _c.kind, _c.name = "check", name
     return _c

@@ -1,43 +1,7 @@
-"""
-utilities.vectors.providers._qdrant
-===================================
-
-QdrantBackend — VectorBackend adapter for Qdrant via its REST API.
-
-Uses pure urllib3, no ``qdrant-client`` SDK required.
-
-Qdrant concepts vs aichain mapping
-------------------------------------
-Qdrant concept     aichain concept
-──────────────     ────────────────────────────────────────
-Collection         collection  (1-to-1 mapping)
-Point              VectorRecord
-Payload            metadata + text (stored as payload["text"])
-Filter             passed through as-is (Qdrant native filter JSON)
-
-Text storage
-  Qdrant stores only vectors + payload dicts.  We persist the original
-  text as payload["text"] so fetch() and query() can reconstruct
-  VectorRecord.text without an extra lookup.
-
-Environment variables
----------------------
-``QDRANT_URL``     — base URL of the Qdrant server  (default: http://localhost:6333)
-``QDRANT_API_KEY`` — API key for Qdrant Cloud        (optional for self-hosted)
-
-Qdrant REST endpoints used
----------------------------
-PUT    /collections/{name}                        — create collection
-GET    /collections/{name}                        — describe (not used directly)
-PUT    /collections/{name}/points                 — upsert points
-POST   /collections/{name}/points/search          — similarity search
-POST   /collections/{name}/points                 — retrieve points by IDs
-POST   /collections/{name}/points/delete          — delete by IDs or filter
-POST   /collections/{name}/points/count           — exact record count
-
-Auth
-  Qdrant Cloud uses the ``api-key`` header (not ``Authorization: Bearer``).
-  Self-hosted Qdrant typically requires no auth header.
+"""``QdrantBackend``: Qdrant over its REST API, with urllib3 and no SDK. A point
+is a ``VectorRecord``, its text kept in ``payload["text"]``, filters passed
+through as Qdrant's own JSON. ``QDRANT_URL`` and ``QDRANT_API_KEY`` (sent as
+``api-key``, for Qdrant Cloud). See docs/utilities/index.md.
 """
 
 from __future__ import annotations
@@ -49,14 +13,12 @@ from ....clients._errors import APIError
 from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
 
 def _point_id(rec_id: str | int) -> int | str:
-    """Map an arbitrary record ID onto a Qdrant-acceptable point ID.
-
-    Qdrant accepts only unsigned integers and UUIDs, so a string id ("doc_1")
-    becomes a UUIDv5; the original is kept in the payload under
+    """A record id as a Qdrant point id, which must be an unsigned integer or a
+    UUID: a string id becomes a UUIDv5, the original kept in the payload under
     ``_ORIGINAL_ID_KEY`` and restored on every read."""
     s = str(rec_id)
-    # Only an integer's own spelling: "007" and "7" were one point, and "²"
-    # passed isdigit() and raised in int().
+    # Only an integer's own spelling: "007" and "7" must not be one point, and
+    # "²" passes isdigit() but raises in int().
     if s.isascii() and s.isdigit() and s == str(int(s)):
         return int(s)
     try:
@@ -199,10 +161,9 @@ class QdrantBackend(VectorBackend):
 
     #: The metric this store was created with. Declared, not discovered.
     #:
-    #: Asking the collection was tried and withdrawn the same hour: it adds a
-    #: network round trip with retries in front of the first query, and when
-    #: the host is unreachable that is a minute of backoff before a search
-    #: that would otherwise have failed fast. A hidden request is a bad trade
+    #: Asking the collection adds a network round trip with retries in front
+    #: of the first query, and when the host is unreachable that is a minute
+    #: of backoff before a search that would otherwise have failed fast. A hidden request is a bad trade
     #: for a value the caller already knows — and `raw_score` keeps the
     #: original either way, so a wrong declaration is visible rather than
     #: baked into a number.

@@ -1,15 +1,7 @@
 """
-tools.transcribe
-================
-
-An audio file written down as text — one format of options, a provider per
-tool. ``transcribe(service)`` makes one by the provider's name; the classes
-behind it share the base :class:`Transcription`.
-
-Tools
------
-sttOpenAI   OpenAI ``gpt-4o-transcribe`` and ``whisper-1``.
-sttGoogle   Google Gemini.
+An audio file written down as text: ``transcribe(service)`` makes a tool by the
+provider's name (``SERVICES``); the classes behind it share
+:class:`Transcription`. See docs/tools/media.md.
 """
 
 from ._stt import Transcription, sttGoogle, sttOpenAI

@@ -114,6 +114,11 @@ Agent(model, tools=[search("perplexity")])           # the agent calls the same 
 - **Exa's highlights are capped** at 1 000 characters a result by default
   (`highlight_chars`; `0` turns them off): uncapped they were 5 000–8 000
   characters each, most of every page, in the agent's context.
+- **Tavily's dates are its own estimate**, which it says can be later than
+  the original publication; every request asks for them.
+- **`exclude_domains` with `domains` is refused** on Firecrawl, which cannot
+  combine them, and on Parallel, which ignores the exclusion when `domains`
+  is set.
 - **Search finds what is relevant, not everything that was published.** For a
   complete list of a site's new pages, its own feed or sitemap is the better
   source; a search is the top-up.

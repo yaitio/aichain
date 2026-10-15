@@ -1,40 +1,9 @@
-"""
-Running the same cases through several arms, N times each.
+"""Running the same cases through several arms, N times each.
 
-    ev = Eval(
-        cases  = [Case("q1", input="capital of Norway?", expect="Oslo")],
-        arms   = {"luna": lambda c: ask(c, "gpt-5.6-luna"),
-                  "oss":  lambda c: ask(c, "private/gpt-oss-20b")},
-        score  = contains(),
-        trials = 3,
-    )
-    report = ev.run()
-    print(report.table())
-
-An **arm** is a named callable taking a :class:`~._records.Case`. It may return
-the answer, or a dict ``{"output": ..., "cost": ..., "tokens": ...}`` when it
-knows what it spent. Anything that can be called fits — a ``Skill``, a
-``Chain``, an ``Agent``, a raw HTTP call, someone else's framework.
-
-Three behaviours are not optional, because each of them was learned by losing
-something:
-
-**Results are written to a durable path as they happen.** ``out`` defaults to
-``./eval-runs/<name>.jsonl`` under the working directory, never a scratch
-directory. A regression run of 450 simulations once existed only in a session
-scratchpad; it was reported as a table, the scratchpad was deleted, and the
-raw data is gone. Writing to a place that outlives the process has to be the
-default, or the copy step is the step that gets forgotten.
-
-**A finished attempt is never re-run.** The output file is the ledger: on
-start it is read back and every ``(arm, case, trial)`` already in it is
-skipped. An interrupted run costs nothing to continue, and a crash at attempt
-400 does not throw away 399.
-
-**Smoke before scale.** :meth:`smoke` runs a couple of cases through every arm
-and stops on trouble. Two minutes against two hours, and it catches the
-failures that look identical from the outside — a missing key, a model name in
-the wrong dialect, an arm that returns nothing at all.
+Every attempt is written to a durable ledger (``./eval-runs/<name>.jsonl`` by
+default) as it happens, a finished ``(arm, case, trial)`` is never re-run, and
+:meth:`Eval.smoke` runs a couple of cases through every arm before the bill.
+See docs/control/eval.md.
 """
 
 from __future__ import annotations

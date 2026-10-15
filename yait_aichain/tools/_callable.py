@@ -1,12 +1,7 @@
-"""
-tools._callable — a package that is its own factory.
-
-``search("exa")`` calls the ``yait_aichain.tools.search`` package itself. A
-function by the package's name in ``tools`` would hide the package behind it,
-and every path that resolves through that attribute would fail — ``mock.patch``
-on Python 3.10 and 3.11, ``import yait_aichain.tools.search.exa as m`` and
-attribute access on any version. Found running 3.3.0 on 3.10; held by
-``tests/test_factories_keep_their_packages.py``.
+"""A package that is its own factory: ``search("exa")`` calls the package. A
+function of the package's name would hide the package, and ``mock.patch``
+and ``import yait_aichain.tools.search.exa`` resolve through that attribute.
+Held by ``tests/test_factories_keep_their_packages.py``.
 """
 
 from __future__ import annotations

@@ -1,16 +1,6 @@
-"""
-utilities._base — what a utility is.
-
-A utility holds a connection or a place — a database, a server, an API, a
-folder. Code calls its methods directly; the actions an agent may have are
-tools, held as attributes and called with ``.run`` like every tool. Only a tool
-has ``.run``, so the code shows which is which:
-
-    kb.upsert(chunks)                                  # a method: code and chain
-    kb.query.run("how does caching work?", {"n": 5})   # a tool: an agent can take it
-
-An agent given a utility or one of its methods refuses it by name and lists
-the utility's tools (see ``agent._agent._check_tools``).
+"""What a utility is: an object whose methods code calls and whose tools — the
+attributes ``TOOLS`` names, called with ``.run`` — an agent may be given. An
+agent given a method is refused by name. See docs/utilities/index.md.
 """
 
 from __future__ import annotations

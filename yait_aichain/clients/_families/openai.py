@@ -1,17 +1,7 @@
-"""
-clients._families.openai
-========================
-
-OpenAI Chat Completions API family — one client for the six OpenAI-compatible
-providers (openai, xai, perplexity, kimi, deepseek, qwen).  Holds BOTH the
-format (build_request / parse_response) and the Bearer transport.
-
-The client is created **per provider** (it gets the provider's data dict), so
-it knows its endpoints, base URL, and which quirk branches apply — while the
-model-level settings (name, temperature, …) arrive in ``params`` on each call.
-
-The wire-format helpers live alongside in ``_openai_compat`` (format is a
-property of the API, so it belongs in the client layer).
+"""The OpenAI-compatible family: one client, made per provider from its data,
+for every provider that speaks Chat Completions (and OpenAI's Responses and
+Images APIs), with the per-provider quirk branches. Wire helpers live in
+``_openai_compat``. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -136,9 +126,8 @@ class OpenAIClient(BaseClient):
     #: Chat completions streams; the image endpoints do not, and the
     #: Responses API streams under a different event vocabulary that is not
     #: wired yet. `build_stream_request` refuses those two by name rather
-    #: than letting the flag stand for the whole family — a provider that
-    #: claims to stream and then does not is the defect this library spent
-    #: 2.3.0 removing from the option layer.
+    #: than letting the flag stand for the whole family: a provider that
+    #: claims to stream and then does not is a silent adaptation.
     supports_streaming = True
 
     def build_stream_request(self, messages, output, params, tools=None):
@@ -154,9 +143,7 @@ class OpenAIClient(BaseClient):
         from ._openai_compat import speaks_harmony
         if speaks_harmony(m.name):
             # Its channels are parsed from the whole reply. Streamed, the raw
-            # analysis text went to a UI as text.delta and a tool call written
-            # in harmony was lost — run() and stream() decided differently on
-            # the same bytes.
+            # analysis text would reach a UI and a harmony tool call be lost.
             raise NotImplementedError(f"{m.name!r} writes harmony, which is parsed from the "
                                       "whole reply")
         # Forwarded unconditionally: every override of `build_request` takes
@@ -240,12 +227,10 @@ class OpenAIClient(BaseClient):
                 prompt = _last_user_text(messages)
                 body = {"model": m.name, "prompt": prompt,
                         "n": 1, "response_format": "b64_json"}
-                # Shape control, wired 2026-09-09. This branch was sending
-                # four fixed fields and reading no format key at all, which
-                # measured as "reads nothing" and was in fact "never wired":
-                # aspect_ratio returns 1280x720 for 16:9 and honours every
-                # ratio tried exactly. `size` is refused outright by this API
-                # (HTTP 400 "Argument not supported"), so it becomes a ratio.
+                # Shape control: aspect_ratio returns 1280x720 for 16:9 and
+                # honours every ratio exactly. `size` is refused outright by
+                # this API (HTTP 400 "Argument not supported"), so it becomes
+                # a ratio.
                 fmt = output.get("format", {})
                 ratio = fmt.get("aspect_ratio")
                 if ratio:
@@ -333,9 +318,8 @@ class OpenAIClient(BaseClient):
                 has = any(isinstance(x.get("content"), str)
                           and "json" in x["content"].lower()
                           for x in body["messages"] if x.get("role") == "system")
-                # A schema always goes in: a system prompt that merely said
-                # "JSON" dropped it, and the answer was checked against rules
-                # the model never saw.
+                # A schema always goes in, even when a system prompt already
+                # says "JSON": the answer is checked against it.
                 if ft == "json_schema":
                     _json_in_prompt(body, fmt)
                     record(Adaptation(

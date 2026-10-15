@@ -1,21 +1,8 @@
-"""
-models._usage
-=============
+"""Token usage and cost, one shape for every provider.
 
-Normalised token-usage accounting, uniform across every provider.
-
-Each provider reports token counts under a different shape:
-
-    OpenAI-compatible : usage.prompt_tokens / completion_tokens / total_tokens
-    Anthropic         : usage.input_tokens / output_tokens
-    Google            : usageMetadata.promptTokenCount / candidatesTokenCount
-
-``extract_usage(response)`` flattens all of them into a single ``Usage``
-object, so ``result.usage.input_tokens`` means the same thing no matter
-which model produced it.
-
-``Usage`` is additive (``a + b``), so a Chain/Pool can sum the usage of its
-steps into one total.  Cost is attached separately in block 1.2-C.
+``extract_usage(response)`` flattens each provider's own usage envelope into
+an additive ``Usage``, so a Chain or Pool sums its steps; prices come from the
+provider data. See docs/control/cost-and-budget.md.
 """
 
 from __future__ import annotations
@@ -48,17 +35,14 @@ class Usage:
     output_tokens: int = 0
     total_tokens:  int = 0
     cost:          float | None = None
-    # Prompt-cache accounting (1.6.1). A provider bills a reused prefix at a
+    # Prompt-cache accounting. A provider bills a reused prefix at a
     # fraction of the fresh rate, so a report that folds cached tokens into
-    # ``input_tokens`` overstates what a long conversation actually costs —
-    # measured at roughly tenfold on Anthropic.
+    # ``input_tokens`` overstates what a long conversation actually costs.
     cache_write_tokens: int = 0    # prefix stored this call (billed above 1x)
     cache_read_tokens:  int = 0    # prefix reused from an earlier call
     # Image tokens sent *in*, kept out of ``input_tokens`` because they are
     # not billed at the same rate: an edit carrying reference images costs
-    # $8/M against text's $5/M on the GPT Image 2.5 family. Measured on a real
-    # edit call — 1024 image tokens beside 19 of text — folding them together
-    # under-states the input line by 37% and the whole call by 22%.
+    # $8/M against text's $5/M on the GPT Image 2.5 family.
     image_input_tokens: int = 0
     #: Calls among these that had no price — their cost is not in ``cost``,
     #: which is then the floor of the bill rather than the bill.
@@ -195,7 +179,7 @@ def extract_usage(response: dict) -> Usage:
         # Thinking tokens are billed, and are not in candidatesTokenCount:
         # "When thinking is turned on, response pricing is the sum of output
         # tokens and thinking tokens." Dropped, they under-state a reasoning
-        # call enormously — measured at 1 output token beside 235 of thought.
+        # call enormously.
         out += g.get("thoughtsTokenCount") or 0
         # Google reports the input split by modality, same reasoning as above.
         img_in = 0
@@ -277,9 +261,8 @@ def estimate_cost(usage: Usage, model_name: str,
     tier = price.get("long_context")
     prompt = (usage.input_tokens + usage.image_input_tokens
               + usage.cache_write_tokens + usage.cache_read_tokens)
-    # Past the threshold every input-side rate scales with the input rate —
-    # the cache and image rates too, which were left at the short-context
-    # price while input and output went up.
+    # Past the threshold every input-side rate scales with the input rate,
+    # the cache and image rates included.
     scale = 1.0
     if isinstance(tier, dict) and prompt > tier.get("above", float("inf")):
         scale = tier.get("input", rate_in) / rate_in if rate_in else 1.0

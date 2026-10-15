@@ -75,6 +75,11 @@ Keep everything except the thing under test identical between arms. A
 paraphrased system prompt — a two-character difference — once cost a whole
 study two thirds of its scores on a weak model.
 
+Run `ev.smoke()` before `ev.run()`. It sends a couple of cases through every
+arm and stops on trouble: two minutes against two hours, and it catches the
+failures that look identical from the outside — a missing key, a model name in
+the wrong dialect, an arm that returns nothing at all.
+
 ---
 
 ## Scorers
@@ -165,6 +170,12 @@ than a fifth of its rows by default — is **absent from every figure**, not
 scored as zero. Past that share a judge has not measured the arm, and the
 number that survives the exclusions is not worth printing. A zero is a measurement; a rejected cell is the
 absence of one, and printing it as zero invents a result.
+
+Ratios are pooled, with the counts beside them. Averaging per-case ratios
+rewards silence: a case where an arm reported nothing has no wrong answers in
+it and scores a perfect precision, so an arm that stays quiet on half the set
+can finish ahead of one that answers. Counts are summed across cases first,
+then divided once.
 
 ---
 

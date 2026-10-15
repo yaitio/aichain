@@ -1,33 +1,14 @@
 """
-yait-aichain
-============
-
-The provider-agnostic AI toolkit for Python: one interface over every provider
-in the registry, for skills, chains, pools, agents and their tools.
-
-    pip install yait-aichain
-
-Quick start::
+yait-aichain — the provider-agnostic AI toolkit for Python: one interface over
+every provider in the registry, for skills, chains, pools, agents and tools.
 
     from yait_aichain import Model, Skill
+    Skill(Model("claude-haiku-5-5"), prompt="What is {topic}?").run(variables={"topic": "AI"})
 
-    skill = Skill(
-        model = Model("claude-haiku-5-5"),
-        input = {"messages": [{"role": "user", "parts": ["What is {topic}?"]}]},
-    )
-    result = skill.run(variables={"topic": "machine learning"})
-
-Full imports::
-
-    from yait_aichain.models import Model
-    from yait_aichain.skills import Skill
-    from yait_aichain.chain  import Chain
-    from yait_aichain.pool   import Pool, DONE, FAILED
-    from yait_aichain.agent  import Agent
-    from yait_aichain.tools  import fetch, search, embed
+See docs/start/quickstart.md.
 """
 
-__version__ = "4.4.0"
+__version__ = "4.4.1"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -65,7 +46,7 @@ def docs_dir():
 # ── Convenience re-exports ─────────────────────────────────────────────────────
 
 from .models import Model
-# Schema portability, public because every caller was writing it by hand:
+# Schema portability, public because every caller would write it by hand:
 # the two provider families demand opposite forms of the same schema.
 from .models import portable_schema, check_structure, SchemaNotExpressible
 # What the library had to change about a request to fit a provider. Reachable
@@ -81,9 +62,9 @@ from .chain  import ChainResult
 from .pool   import PoolResult
 from .agent  import Agent, AgentResult
 
-# Observability events & lifecycle hooks (1.4.4).
+# Observability events & lifecycle hooks.
 from ._events import Event, Hook, Tracer, LoggingTracer
-# Permission matrix for tool governance (1.4.4).
+# Permission matrix for tool governance.
 from .tools._permissions import (PermissionPolicy, ApprovalRequest,
                                  ApprovalDecision)
 

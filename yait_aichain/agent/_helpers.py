@@ -8,7 +8,7 @@ import json
 import copy
 import logging
 
-from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
+from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the release notes)
 
 from ._result  import AgentResult
 
@@ -30,9 +30,9 @@ def _copy(value):
 
 
 def _action(call) -> str:
-    """A call as the journal records it: the name and arguments, shortened for
-    reading, with a hash of the whole arguments — two calls that differed only
-    past the cut read as one repeated, and `repeating()` fired on them."""
+    """A call as the journal records it: name and arguments shortened for reading,
+    plus a hash of the whole arguments, so calls that differ only past the cut do
+    not read as one repeated."""
     import hashlib
     full = json.dumps(call.arguments or {}, ensure_ascii=False, default=str, sort_keys=True)
     digest = hashlib.sha256(full.encode()).hexdigest()[:12]

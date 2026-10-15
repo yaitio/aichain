@@ -18,11 +18,6 @@ _skip_log = logging.getLogger("yait_aichain.chain")
 
 from .._template import placeholder_names
 
-# One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
-# is a silent `skip`: a chain of a hundred generated steps that expects a few
-# to fail should not have to choose between a warning per failure and no
-# record at all.
-
 # Default options applied to every Agent step unless overridden.
 _AGENT_DEFAULT_OPTIONS: dict = {
     "task_key":     "task",
@@ -150,10 +145,8 @@ class _Flow:
         return out
 
     def _check_flow(self) -> None:
-        """What can be known before a run: a step reading what only a later
-        step writes is an error now, where it failed when the run reached it.
-        A name no step writes may be a run variable, so it is left to the run
-        — unless it is one letter from a step's key, which is said."""
+        """What can be known before a run: a step reading what only a later step writes
+        is an error, and a name no step writes that is one letter from a key is said."""
         writes: dict = {}
         for i, (_r, key, *_rest) in enumerate(self._steps):
             writes.setdefault(key, i)

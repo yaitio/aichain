@@ -1,33 +1,12 @@
 """
 _budget — a ceiling in money, shared by everything under one run.
 
-``max_tokens`` bounds one reply. Nobody budgets in replies: a chain of ten
-steps, a pool over a thousand items and an agent that decides how many turns
-it needs are all unbounded in the only unit that appears on the invoice. The
-agent has had ``cost_budget`` since 2.0 and the other three primitives had
-nothing at all, so a runaway `Pool` was visible on the bill and nowhere else.
-
-**One object, passed down, decremented by whoever spends.** That is the whole
-mechanism, and it is why a budget handed to a `Chain` covers the agent inside
-it: they share the object rather than each holding a copy of a number. A copy
-would let every level spend the full amount, which is the failure mode this
-shape exists to avoid.
-
-Where the money is actually counted is ``Skill``, because ``Skill`` is the one
-primitive that talks to a model — `Agent` builds Skills, `Chain` and `Pool`
-run them. A ceiling anywhere else would be a second place to keep in sync.
-
-**What it bounds, exactly.** The length of a reply is not known before it is
-paid for, so this bounds *do not begin another call* and not *never exceed by
-a cent*. The same caveat `cost_budget` carries, for the same reason, and it is
-worth saying twice: a budget that promised the second thing would be lying
-about the one number a caller checks.
-
-**Under concurrency the overshoot is up to one call per worker.** The check
-and the charge are separated by the request itself, so a `Pool` with sixteen
-workers can have sixteen calls in flight when the ceiling is reached: a $0.10
-budget was measured spending $4.32. The lock keeps the sum right; it cannot
-make a call that has begun cost nothing.
+One object, passed down, decremented by whoever spends: a budget handed to a
+`Chain` covers the agent inside it because both hold the object, not a copy of
+a number each could spend in full. The money is counted in ``Skill``, the one
+primitive that talks to a model. It bounds *do not begin another call*, not
+*never exceed*: under concurrency the overshoot is up to one call per worker.
+See docs/control/cost-and-budget.md.
 """
 
 from __future__ import annotations
@@ -100,8 +79,8 @@ class Budget:
         import math
         if isinstance(limit, bool) or not isinstance(limit, (int, float)) \
                 or not math.isfinite(limit) or limit <= 0:
-            # NaN compares false with everything, so `Budget(nan)` was never
-            # exhausted; `True` was a dollar.
+            # NaN compares false with everything, so it would never be
+            # exhausted; `True` would be a dollar.
             raise ValueError(f"a budget is a finite, positive number of dollars; got {limit!r}")
         self.limit = float(limit)
         self._spent = float(spent)
@@ -148,8 +127,8 @@ class Budget:
         import math
         if isinstance(amount, bool) or not isinstance(amount, (int, float)) \
                 or not math.isfinite(amount) or amount < 0:
-            # A refund, a NaN from a proxy, a `True`: `charge(-10)` gave money
-            # back, and a NaN made every later comparison false.
+            # A negative charge would give money back, and a NaN would make
+            # every later comparison false.
             raise ValueError(f"a charge is a finite amount of 0 or more; got {amount!r}")
         if not amount:
             return
@@ -173,10 +152,9 @@ def as_budget(value) -> Budget | None:
 
 #: The budgets of the runs this call sits inside — a Chain's, a Pool's —
 #: ambient for the duration of each, as the tenant is. A Skill checks and
-#: charges its own and every one of these. Lending by writing the budget onto
-#: each step's `max_cost` and restoring it afterwards raced in a Pool, whose
-#: copies of one Chain share its steps: items ran with no budget, and a Skill
-#: kept the Pool's ceiling for good.
+#: charges its own and every one of these. Ambient rather than written onto
+#: each step's `max_cost`, because a Pool's copies of one Chain share its steps
+#: and writing and restoring them would race.
 _AMBIENT: ContextVar = ContextVar("yait_aichain_budgets", default=())
 
 

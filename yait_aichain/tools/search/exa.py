@@ -1,40 +1,10 @@
-"""
-tools.search.exa — searchExa
-============================
-
-The Exa Search API behind the common :class:`~tools.search.Search` format.
-
-Endpoint  : POST https://api.exa.ai/search
-Auth      : ``x-api-key`` header
-Docs      : https://exa.ai/docs/reference/search — the OpenAPI spec there is the
-            source of truth; read 2026-10-02 and checked live the same day.
-
-Exa is a search engine built for agents: the same request that finds the pages
-can return query-relevant **highlights** from each one, so the agent reads the
-part that answers it without fetching the page. Highlights are on by default
-here; ``text_chars`` adds the page text itself, cut to a length, into each
-result's ``text``.
-
-**Highlights are capped, at 1 000 characters a result by default.** Exa sizes
-them to relevance and left alone that size is most of the page — measured
-2026-10-02: 5 000 to 8 000 characters for each of three results, about 20 000
-characters for a three-result search, which an agent then carries in its
-context for the rest of the run. ``highlights.maxCharacters`` bounds the whole
-of a result's highlights, and the price does not move with it.
-``highlight_chars`` sets the cap; ``0`` turns highlights off.
-
-Translated: dates and ``recency`` → ``startPublishedDate`` /
-``endPublishedDate``, ``domains`` → ``includeDomains`` (path prefixes work),
-``country`` → ``userLocation``. ``language`` has no field on this API and is
-declined with a notice. At most 100 results.
-
-**Exa's date filter lets undated pages through** (measured 2026-10-06: 31 of
-73 results in a one-week window carried no date), so a dated window is a
-preference here, not a guarantee.
-
-Environment variable
---------------------
-``EXA_API_KEY`` — from https://dashboard.exa.ai/api-keys
+"""Exa Search (``POST https://api.exa.ai/search``, ``x-api-key``) behind the
+common :class:`~tools.search.Search` format. Query-relevant highlights are on
+and capped per result (``highlight_chars``), since uncapped they are most of
+the page; ``text_chars`` adds the page text. Dates and ``recency`` →
+``start/endPublishedDate``, ``domains`` → ``includeDomains``, ``country`` →
+``userLocation``; no language filter. Undated pages pass the date filter.
+Key: ``EXA_API_KEY``. See docs/tools/search.md and https://exa.ai/docs/reference/search.
 """
 
 from __future__ import annotations

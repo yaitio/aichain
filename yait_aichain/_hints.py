@@ -1,24 +1,11 @@
 """
 The names a program reaches for that this library does not have, and the one to use.
 
-The tables are measured rather than imagined. An eval ran a model
-on twenty tasks with nothing but `SKILL.md` and `llms.txt`, and most of its
-failures were not wrong ideas but familiar names: `messages` written with
-`content`, `from yait_aichain.hooks import Tracer`, `result.variables` on a
-paused chain, `max_steps=` and `orchestrator=` from the 1.x agent. Each of
-those used to end in Python's own `TypeError` or `AttributeError`, which says
-what is wrong and nothing about what is right. A model — or a person — then
-guesses again.
-
-Two rules hold every entry:
-
-* **A wrong name is refused, never accepted.** An alias quietly turns one API
-  into two, and in a year the docs, the examples and the programs agents write
-  disagree about which one is real. The hint names the call that works; the
-  caller writes it.
-* **A hint never shadows a real name.** `refuse` checks at import that no
-  keyword it hints about is a parameter of the function it guards, and the
-  attribute hints only run when normal lookup has already failed.
+Each table maps a familiar wrong name — ``max_steps=``, ``result.text``,
+``yait_aichain.hooks`` — to the call that works. A wrong name is refused, never
+accepted as an alias, and a hint never shadows a real name: `refuse` checks at
+import that no hinted keyword is a parameter, and attribute hints run only
+after normal lookup has failed. See docs/with-your-agent.md.
 """
 
 from __future__ import annotations
@@ -181,7 +168,7 @@ MODULES: dict = {
     "yait_aichain.workflow": "`from yait_aichain import Chain`",
     "yait_aichain.budget": "`from yait_aichain import Budget`",
     "yait_aichain.results": "`from yait_aichain import ChainResult, PoolResult`; AgentResult comes from yait_aichain.agent",
-    # Paths from tutorials written before 4.0; nothing lives at them.
+    # Paths from older tutorials; nothing lives at them.
     "yait_aichain.tools.vectordb": "a vector store is `from yait_aichain.utilities import Vectors`",
     "yait_aichain.tools.embedding": "`from yait_aichain.tools import embed` — embed('openai', model='…')",
     "yait_aichain.tools.reranking": "`from yait_aichain.tools import rerank` — rerank('cohere', model='…')",

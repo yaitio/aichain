@@ -1,24 +1,9 @@
-"""
-Deciding whether one answer was right.
+"""Deciding whether one answer was right.
 
-A scorer takes ``(case, output)`` and returns a verdict: ``True``/``False``, a
-number in ``[0, 1]``, or both as a pair. The runner normalises whichever shape
-comes back, so a scorer can be three lines of your own code and still fit.
-
-Two rules are enforced here rather than left to the caller, because both have
-already been paid for:
-
-**A scorer that cannot decide must not say yes.** An LLM judge whose reply
-fails to parse is a broken instrument, and the tempting default — treat it as a
-pass — inflates every arm at once and looks like a good day. ``judge`` and
-``pairwise`` abstain instead: the row is left out of the denominator and
-counted in ``Report.abstentions()``, where the validity guards can see it.
-
-**Silence is not precision.** A scenario that reports nothing has no wrong
-answers in it, so any ratio computed per case hands it a perfect score. That
-is not fixed here — it is fixed in :mod:`._report`, which pools counts across
-cases before dividing. It is mentioned here because the scorer is where the
-mistake feels natural.
+A scorer takes ``(case, output)`` and returns ``True``/``False``, a number in
+``[0, 1]``, or both as a pair. A scorer that cannot decide must not say yes:
+``judge`` and ``pairwise`` abstain, leaving the row out of the denominator and
+counted in ``Report.abstentions()``. See docs/control/eval.md.
 """
 
 from __future__ import annotations
@@ -153,10 +138,9 @@ _JUDGE_PROMPT = (
 )
 
 def _ask(model, text: str, words: tuple[str, str]):
-    """Put *text* to the judge *model* and read the first of *words* it opens
-    with. Returns ``(word or None, reply, tokens, cost)`` — the grading is
-    billed to the instrument, never to the arm, so a cost table cannot quietly
-    include the cost of grading."""
+    """Ask the judge *model* and read the first of *words* it opens with:
+    ``(word or None, reply, tokens, cost)``, the grading billed to the
+    instrument, never to the arm."""
     from ..skills import Skill
 
     skill = Skill(model, {"messages": [{"role": "user", "parts": [text]}]})

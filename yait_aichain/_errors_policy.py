@@ -1,29 +1,10 @@
 """
 _errors_policy — one vocabulary for "what happens when a step fails".
 
-`Chain` took `on_step_error` in {raise, stop, skip}; `Pool` took `on_error` in
-{raise, collect, skip}. Two names for one decision, three values each, and
-only `raise` meant the same thing in both — a caller who learned one primitive
-guessed wrong at the other, and `skip` was the trap: in a chain it meant
-"carry on to the next step, loudly", in a pool "record it and say nothing"
-was `collect` while `skip` added the warning.
-
-Four words, one meaning each, on both:
-
-    raise     stop everything and propagate. The default for Chain, because
-              a pipeline that continues past a broken step produces a result
-              nobody can trust.
-    stop      end here and keep what completed. No exception, no further work.
-    skip      carry on, and warn. What you want when a failure is expected
-              but should still be visible.
-    collect   carry on, silently, recording the error. The default for Pool,
-              because a fan-out over a thousand items usually expects a few
-              to fail and a thousand warnings help nobody.
-
-Both primitives accept all four. What each does with `stop` differs in the
-obvious way — a chain stops running steps, a pool stops starting items — and
-that is the difference between a sequence and a fan-out, not between two
-vocabularies.
+Four words, one meaning each, on both `Chain` (``on_step_error``) and `Pool`
+(``on_error``): ``raise`` propagates, ``stop`` ends and keeps what completed,
+``skip`` carries on and warns, ``collect`` carries on silently and records the
+error. See docs/pipelines/chain.md and docs/pipelines/pool.md.
 """
 
 from __future__ import annotations

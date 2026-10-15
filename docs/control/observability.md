@@ -54,6 +54,13 @@ Every event of a run carries its `run_id`, including the model calls a Skill
 makes inside an agent: two runs writing into one stream can be told apart
 afterwards.
 
+Three bases save writing a hook from scratch. `Hook` dispatches an event to the
+method of the same name — `"tool_call.started"` reaches
+`tool_call_started(event)` — so a subclass implements only the boundaries it
+cares about. `Tracer` keeps every event in `.events`; `LoggingTracer` logs each
+one to a `logging` logger. The library ships no tracing dependency:
+OpenTelemetry, file and database sinks are a hook in your application.
+
 ## Enough to rebuild a turn
 
 A tool call's event carries the tool's **own** result, by value — not the text

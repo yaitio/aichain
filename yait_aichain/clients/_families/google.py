@@ -1,13 +1,7 @@
-"""
-clients._families.google
-=========================
-
-Google Generative AI family (``POST /models/{model}:generateContent``):
-format + transport (x-goog-api-key).
-
-System messages lift into ``system_instruction``; generation params live in
-``generationConfig``; reasoning maps to ``thinkingConfig``; image output uses
-``responseModalities``.
+"""The Google Generative AI family (``POST /models/{model}:generateContent``),
+format and transport: system messages lift into ``system_instruction``,
+sampling lives in ``generationConfig``, reasoning maps to ``thinkingConfig``,
+images come back through ``responseModalities``. See docs/models/models.md.
 """
 
 from __future__ import annotations
@@ -24,35 +18,17 @@ _WARNED_STRIP = False
 
 
 #: The shapes this provider will render. It chooses the pixel count itself,
-#: so a caller who names pixels gets the nearest of these — measured
-#: 2026-09-09: `aspectRatio` "16:9" returns 1344x768 and "9:16" 768x1344,
-#: while `imageSize` had no effect on gemini-2.5-flash-image.
+#: so a caller who names pixels gets the nearest of these: `aspectRatio`
+#: "16:9" returns 1344x768, and `imageSize` has no effect on
+#: gemini-2.5-flash-image.
 _ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
                   "9:16", "16:9", "21:9")
 
 
 def _sanitize_google_schema(schema: object, _root: dict | None = None, _depth: int = 0) -> object:
-    """
-    Convert a JSON Schema dict to a form accepted by Google's ``responseSchema``
-    proto field.
-
-    Three incompatibilities are fixed recursively:
-
-    * ``additionalProperties``          — not supported; stripped, with one
-      warning per process. It is not cosmetic: ``additionalProperties: false``
-      is how a schema says "no fields beyond these", so removing it inverts
-      the instruction. The model then returns extra fields and nothing
-      notices — the failure is only visible by diffing two providers' output
-      against the same schema. ``check_structure`` catches it on the way
-      back; the warning is so it is caught before the run.
-    * ``"type": ["X", "null"]``         — union types are not supported;
-      converted to ``"type": "X", "nullable": true``.
-    * ``"type": "array"`` with no ``items`` — Google requires the element
-      schema and rejects the whole request without it, before the first step.
-      A permissive default is filled in rather than failing: every other
-      provider accepts the loose form, so a tool that works elsewhere must
-      not be the reason a run cannot start here.
-    """
+    """A JSON Schema in the form Google's ``responseSchema`` takes, recursively:
+    ``additionalProperties`` stripped (warned once — it inverts "no other fields"),
+    unions as ``nullable``/``anyOf``, ``$ref`` inlined, a bare array given ``items``."""
     if not isinstance(schema, dict):
         return schema
     root = _root if _root is not None else schema
@@ -104,7 +80,7 @@ def _sanitize_google_schema(schema: object, _root: dict | None = None, _depth: i
         elif key == "items" and isinstance(value, dict):
             result[key] = down(value)
         elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
-            # Followed too: an `additionalProperties` inside one was a 400.
+            # Followed too: an `additionalProperties` inside one is a 400.
             result["anyOf" if key == "oneOf" else key] = [down(v) for v in value]
         else:
             result[key] = value
@@ -114,11 +90,8 @@ def _sanitize_google_schema(schema: object, _root: dict | None = None, _depth: i
 
 
 def _part_to_google(part: dict) -> dict | None:
-    """
-    Convert one universal part dict to a Google AI part object.
-
-    Returns ``None`` for unsupported source kinds so callers can filter.
-    """
+    """One universal part as a Google part, or ``None`` (recorded as declined)
+    for a source kind this wire cannot carry."""
     ptype = part["type"]
 
     if ptype == "text":
@@ -196,7 +169,7 @@ class GoogleClient(BaseClient):
     # ── transport ────────────────────────────────────────────────────
 
     def list_models(self) -> list[str]:
-        # Every page: the first one alone was fifty models.
+        # Every page: the first holds only fifty models.
         out, token = [], None
         for _ in range(50):
             path = "/models?pageSize=1000" + (f"&pageToken={token}" if token else "")
@@ -223,10 +196,7 @@ class GoogleClient(BaseClient):
         is a slower non-stream wearing a stream's name.
         """
         # The modality, not the presence of the key: a Skill sets
-        # `modalities: ["text"]` on every text call, so guarding on the key
-        # existing refused to stream anything at all through Google — and it
-        # refused it as "an image is not delivered progressively", a sentence
-        # that reads plausible enough to be believed.
+        # `modalities: ["text"]` on every text call.
         fmt = ((output or {}).get("format") or {}).get("type", "text")
         modalities = [str(m).lower() for m in ((output or {}).get("modalities") or [])]
         if fmt == "image" or "image" in modalities:
@@ -259,8 +229,7 @@ class GoogleClient(BaseClient):
                 if not fc:
                     continue
                 # No slot: Google numbers its parts afresh in every event, so
-                # two whole calls in two events both claimed "0:0" — the first
-                # was lost and the second ran with `{}`. Each is its own.
+                # two whole calls would share one. Each is its own.
                 out.append({
                     "id":        fc.get("id") or "",
                     "name":      fc.get("name") or "",
@@ -359,7 +328,7 @@ class GoogleClient(BaseClient):
             if budget is not None:
                 gc["thinkingConfig"] = {"thinkingBudget": budget}
                 # The budget is spent out of maxOutputTokens: a budget at or
-                # above it left nothing for the answer, which came back empty.
+                # above it leaves nothing for the answer.
                 if budget > 0 and budget >= gc["maxOutputTokens"]:
                     raised = budget + gc["maxOutputTokens"]
                     record(Adaptation(
@@ -373,17 +342,14 @@ class GoogleClient(BaseClient):
         ftype = fmt.get("type", "text")
         modalities = output.get("modalities", ["text"])
         # `format.type == "image"` is how every other provider is asked for a
-        # picture; requiring `modalities` as well made one provider need a
-        # second word for the same request. Both are accepted.
+        # picture, so it is accepted here beside `modalities`.
         if "image" in modalities or ftype == "image":
             from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
                                                record)
             mods = ["IMAGE"] + (["TEXT"] if "text" in modalities else [])
             gc["responseModalities"] = mods
 
-            # Shape control. This provider takes a ratio and picks the pixels;
-            # it was reading none of our image keys at all until now, which
-            # measured as "reads nothing" and was in fact "never wired".
+            # Shape control. This provider takes a ratio and picks the pixels.
             ratio = fmt.get("aspect_ratio")
             if ratio:
                 record(Adaptation(
@@ -426,7 +392,7 @@ class GoogleClient(BaseClient):
         cands = response.get("candidates", [])
         if not cands:
             # No candidate is a refusal, not an empty answer: an empty string
-            # here ended an agent's run as a success with nothing in it.
+            # would end an agent's run as a success with nothing in it.
             block = (response.get("promptFeedback") or {}).get("blockReason")
             raise ValueError(
                 "Google returned no " + ("image" if ftype == "image" else "answer")

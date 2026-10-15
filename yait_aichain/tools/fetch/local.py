@@ -1,33 +1,10 @@
-"""
-tools.fetch.local — fetchLocal
-==============================
-
-A page fetched from this machine and converted to Markdown here — no
-provider, no key, no charge, and nothing to install for HTML.
-
-HTML is converted with the standard library (``tools.fetch._html``); text,
-Markdown, JSON and XML are returned as they are; a PDF needs ``pypdf``
-(``pip install "yait-aichain[fetch]"``) and says so when it is missing. Until
-4.0 this was MarkItDown, which brought ``magika`` and ``onnxruntime`` — tens
-of megabytes and a model loaded at import — to turn tags into text.
-
-It reads what the site serves an ordinary client — measured 2026-10-08 on 34
-articles, 21 came back in full; the rest were behind bot protection or a
-paywall. The whole page is converted, so navigation and footers come with
-the article. Title, date and author are read from the page's ``<head>``
-(JSON-LD first, then meta tags).
-
-**robots.txt is respected by default.** Before a page is fetched the site's
-``robots.txt`` is read once per host and the page is skipped — a record with
-``error`` set, no request made — when it disallows any of ``robots_agents``:
-``*`` and the Claude crawlers by default, since a page an agent reads is
-usually read for a model. Per RFC 9309 a robots.txt that answers 4xx allows
-everything and one that answers 5xx disallows everything; a site that does not
-answer at all is reported as unreachable. ``respect_robots=False`` turns the check off; that is the
-caller's decision about the sites they read.
-
-No User-Agent is invented: the request goes out as ``python-urllib3`` unless
-``headers=`` says otherwise.
+"""``fetchLocal`` — a page fetched from this machine and converted to Markdown
+here: no provider, no key, no charge. HTML goes through ``tools.fetch._html``;
+text, Markdown, JSON and XML are returned as they are; a PDF needs ``pypdf``.
+Title, date and author come from the page's ``<head>`` (JSON-LD first, then
+meta tags). ``robots.txt`` is respected by default (RFC 9309; a site that does
+not answer is reported unreachable), and no User-Agent is invented.
+See docs/tools/fetch.md.
 """
 
 from __future__ import annotations
@@ -196,8 +173,8 @@ class fetchLocal(Fetch):
                     parser.parse((body or b"").decode(_charset(ctype), errors="replace").splitlines())
             except Exception as exc:
                 # The site did not answer at all: say so, rather than blame
-                # robots.txt — and do not remember it, where one failed read
-                # kept the host unreachable until the process restarted.
+                # robots.txt — and do not remember it, or one failed read
+                # would keep the host unreachable until the process restarts.
                 return f"the site could not be reached ({type(exc).__name__}: {exc})"
             if not parser.disallow_all:            # a 5xx is asked again next time, too
                 if len(self._robots) >= ROBOTS_CACHE_SIZE:

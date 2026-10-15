@@ -1,40 +1,10 @@
-"""
-tools.search.firecrawl — searchFirecrawl
-========================================
-
-The Firecrawl Search API (v2) behind the common :class:`~tools.search.Search`
-format. Firecrawl is a scraper first, so the same call that finds the pages can
-return each page's content as Markdown — ``text_chars`` asks for it, as on Exa,
-and it lands in each result's ``text``.
-
-Endpoint  : POST https://api.firecrawl.dev/v2/search
-Auth      : ``Authorization: Bearer fc-…``
-Docs      : https://docs.firecrawl.dev/api-reference/endpoint/search — read
-            2026-10-08.
-
-Translated: ``max_results`` → ``limit`` (at most 100), ``recency`` →
-``tbs=qdr:h|d|w|m|y``, dates → ``tbs=cdr:1,cd_min:…,cd_max:…``, ``country`` →
-``country``, ``domains`` → ``includeDomains``. That field takes host names
-only, so a domain with a path prefix travels as ``site:`` in the query instead,
-and the caller is told. ``language`` has no field on this API and is declined
-with a notice.
-
-Firecrawl's own options stay: ``exclude_domains`` (it cannot be combined with
-``domains``, and asking for both is refused), ``categories`` (``research``,
-``pdf``, ``developer``, ``gov``), ``sources`` (``web``, ``news``), ``location``,
-``safe`` and ``tbs`` (raw, wins over the standard time options).
-
-**Its time filter is not enforced** — measured 2026-10-08. A ``cdr`` range of
-28.09–04.10.2026 returned exactly the unfiltered results, and with
-``hbr.org`` all five fell outside it (2025-11 to 2026-08); ``qdr:w`` changed
-the results but still let through a page from April. The filter is sent, and
-every search that uses it says so in ``notices``: check the dates. And they
-are only there to check when the page is scraped (``text_chars``) or comes
-from the ``news`` source — a web result carries no date of its own.
-
-Environment variable
---------------------
-``FIRECRAWL_API_KEY`` — from https://www.firecrawl.dev/app/api-keys
+"""Firecrawl Search v2 (``POST https://api.firecrawl.dev/v2/search``, Bearer)
+behind the common :class:`~tools.search.Search` format; ``text_chars`` scrapes
+each page as Markdown in the same call. ``recency`` → ``tbs=qdr:…``, dates →
+``tbs=cdr:…``, ``domains`` → ``includeDomains`` (host names only, so a path
+goes as ``site:``); no language filter. Its time filter is not enforced, so
+every search that uses it carries a notice. Key: ``FIRECRAWL_API_KEY``.
+See docs/tools/search.md and https://docs.firecrawl.dev/api-reference/endpoint/search.
 """
 
 from __future__ import annotations

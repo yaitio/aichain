@@ -1,5 +1,33 @@
 # Changelog
 
+## [4.4.1] — 2026-10-15
+
+### Changed
+
+- Module and private docstrings are short — what the module holds and the page
+  that explains it — and comments keep why, not when: 3 683 docstring lines
+  and 192 comment lines fewer, with no line of code changed (checked by
+  comparing every module's syntax tree without its docstrings). What the
+  docstrings taught and the guides did not is on the guide pages now: the
+  message format and tool turns (`models/models.md`), a step in full
+  (`pipelines/chain.md`), what a pool passes each runner, how a text is cut,
+  each embedding and rerank provider's models, where audio is saved, the
+  vector backends, REST field routing and MCP settings. Public docstrings,
+  from which the API reference is built, are unchanged.
+- `tests/test_size_budget.py`: lines of code per subpackage, held to a budget
+  that fails past 5 % growth, and two ratchets that only go down — docstrings
+  longer than their kind allows (298 → 76) and docstrings that tell history
+  (53 → 23).
+
+### Fixed
+
+- `docs/tools/decide.md` said no tool is held to `max_cost`; a decision is
+  charged to it, and refused before it is sent when the limit is reached.
+- Comments that named things that do not exist — `sttXAI`, `sttQwen`,
+  `to_speech.py`, an SDK the transcription client does not use — and a
+  description of `Vectors` delete that allowed ids and a filter together,
+  which the code refuses.
+
 ## [4.4.0] — 2026-10-15
 
 ### Added

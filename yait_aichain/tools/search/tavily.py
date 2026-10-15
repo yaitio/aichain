@@ -1,36 +1,11 @@
-"""
-tools.search.tavily — searchTavily
-==================================
-
-The Tavily Search API behind the common :class:`~tools.search.Search` format.
-Tavily returns, for each page, up to three passages chosen for the query, and
-on request the page itself as Markdown.
-
-Endpoint  : POST https://api.tavily.com/search
-Auth      : ``Authorization: Bearer tvly-…``
-Docs      : https://docs.tavily.com/documentation/api-reference/endpoint/search
-            — read 2026-10-08.
-
-Translated: ``max_results`` (at most 20), ``recency`` → ``time_range`` (Tavily's
-finest window is a day, so ``hour`` is widened and said so), ``start_date`` /
-``end_date`` (same format), ``domains`` → ``include_domains``, ``language`` (a
-ranking boost; ``filter_by_language`` makes it a filter), ``country`` → the
-English country name Tavily takes instead of a code — and only on the
-``general`` topic, said so otherwise.
-
-Every request asks for ``include_published_date``, so results carry the date
-Tavily estimates — which it says can be later than the original publication.
-**Undated pages pass a date filter** unless ``filter_by_published_date`` is set,
-which drops them.
-
-Tavily's own options stay: ``topic`` (``general``, ``news``, ``finance``),
-``search_depth``, ``chunks_per_source``, ``exclude_domains``, ``exact_match``,
-``safe_search``, ``filter_by_published_date``, ``filter_by_language``, and
-``text_chars`` — each page as Markdown, cut to a length, into ``text``.
-
-Environment variable
---------------------
-``TAVILY_API_KEY`` — from https://app.tavily.com
+"""Tavily Search (``POST https://api.tavily.com/search``, Bearer) behind the
+common :class:`~tools.search.Search` format: up to three passages per page,
+the page as Markdown with ``text_chars``. ``recency`` → ``time_range`` (finest
+is a day), ``domains`` → ``include_domains``, ``country`` → the English name
+Tavily takes, on the ``general`` topic only. Dates are Tavily's estimate;
+undated pages pass unless ``filter_by_published_date``. Key: ``TAVILY_API_KEY``.
+See docs/tools/search.md and
+https://docs.tavily.com/documentation/api-reference/endpoint/search.
 """
 
 from __future__ import annotations

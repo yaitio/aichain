@@ -1,25 +1,10 @@
-"""
-tools.fetch.parallel — fetchParallel
-====================================
-
-Parallel Extract behind the common :class:`~tools.fetch.Fetch` record.
-
-Endpoint  : POST https://api.parallel.ai/v1/extract
-Auth      : ``x-api-key``
-Docs      : https://docs.parallel.ai/api-reference/extract/extract — answer
-            checked live 2026-10-09.
-
-Up to 20 URLs a call; the tool asks for each page's full content (Parallel's
-default is excerpts only) and returns it with the title and date. A URL that
-fails comes back in ``errors`` and is a page with ``error`` here.
-``max_age_seconds`` (600 or more) fetches a page live when the cached copy is
-older — slower.
-
-**Price.** $1 per 1 000 URLs, from the operation counts in the answer.
-
-Environment variable
---------------------
-``PARALLEL_API_KEY``
+"""Parallel Extract (``POST https://api.parallel.ai/v1/extract``, ``x-api-key``)
+behind the common :class:`~tools.fetch.Fetch` record. Up to 20 URLs a call;
+the tool asks for full content, since Parallel's default is excerpts only. A
+URL in the answer's ``errors`` is a page with ``error`` here.
+``max_age_seconds`` (600 or more) fetches live when the cache is older. Price
+from the answer's operation counts. Key: ``PARALLEL_API_KEY``.
+See docs/tools/fetch.md and https://docs.parallel.ai/api-reference/extract/extract.
 """
 
 from __future__ import annotations

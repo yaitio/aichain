@@ -1,13 +1,8 @@
-"""
-tools.fetch._html — an HTML page as Markdown, with the standard library.
-
-``fetchLocal`` converted pages with MarkItDown, which brought ``magika`` and
-``onnxruntime`` — tens of megabytes and a model loaded at import — to turn
-tags into text. A page a model reads needs headings, paragraphs, lists,
-links, emphasis, code and tables; ``html.parser`` reads all of them.
-
-What is not kept: scripts, styles, forms, SVG and anything hidden by the
-``hidden`` attribute. Navigation and footers are kept, as they were.
+"""An HTML page as Markdown, with the standard library: headings, paragraphs,
+lists, links, emphasis, code and tables, which is what a model reading a page
+needs, without a converter's dependencies. Scripts, styles, forms, SVG and
+anything ``hidden`` are dropped; navigation and footers are kept.
+See docs/tools/fetch.md.
 """
 
 from __future__ import annotations

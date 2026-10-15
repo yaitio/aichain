@@ -1,19 +1,7 @@
-"""
-tools.decision
-==============
-
-Typed questions about a text, answered with probabilities — one format of
-questions and answers, a provider per tool, the way ``tools.search`` works.
-
-Tools
------
-decisionOpenAI     OpenAI's Decisions API — text and images, gpt-6-luna.
-decisionTypeSafe   TypeSafe's Jev — text and structured state.
-
-``decide(service, questions=...)`` makes one by the provider's name and is the
-way the documentation shows. ``Decision`` is the base; it holds the format, the
-checks and the translation of answers, and a new provider is a subclass that
-implements ``_ask``, and an entry in ``SERVICES``.
+"""Typed questions about a text, answered with probabilities: ``decisionOpenAI``
+and ``decisionTypeSafe`` behind one format, made with ``decide(service,
+questions=...)``. A new provider subclasses ``Decision``, implements ``_ask``
+and joins ``SERVICES``. See docs/tools/decide.md.
 """
 
 from ._base    import Decision

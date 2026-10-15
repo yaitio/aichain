@@ -1,27 +1,6 @@
-"""
-clients._errors
-===============
-
-Exception hierarchy for provider API failures.
-
-``APIError`` is the base class — catching it still catches every provider
-failure, so existing ``except APIError`` code keeps working unchanged.  The
-subclasses let callers react to a *specific* failure mode (retry on rate
-limits, re-auth on 401, surface a bad request, etc.) and are the foundation
-for the model fallback chain (block 1.2-F).
-
-Mapping (HTTP status → class):
-
-    billing signal   → InsufficientCreditsError   (402, or a credits/quota body
-                       on 400/403/429 — checked FIRST so it is not misread as
-                       auth / rate-limit / bad-request)
-    429              → RateLimitError       (carries ``retry_after`` seconds)
-    401, 403         → AuthenticationError
-    400, 422         → InvalidRequestError
-    404              → NotFoundError
-    5xx              → ServerError
-    0 (no response)  → NetworkError
-    other            → APIError
+"""The ``APIError`` hierarchy and ``error_from_status``, which maps an HTTP status
+(or a billing signal in the body, checked first) to the typed error a caller
+can react to. See docs/models/models.md, "When a call fails".
 """
 
 from __future__ import annotations

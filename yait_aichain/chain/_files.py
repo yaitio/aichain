@@ -17,11 +17,6 @@ import warnings
 _skip_log = logging.getLogger("yait_aichain.chain")
 
 
-# One vocabulary with Pool — see `_errors_policy`. `collect` is new here and
-# is a silent `skip`: a chain of a hundred generated steps that expects a few
-# to fail should not have to choose between a warning per failure and no
-# record at all.
-
 # Default options applied to every Agent step unless overridden.
 _AGENT_DEFAULT_OPTIONS: dict = {
     "task_key":     "task",
@@ -33,15 +28,9 @@ from ._inputs import _MISSING, _usage_to_dict, _callable_name  # noqa: F401
 
 
 def _import_tool(class_path: str, init_args: dict, trusted: bool):
-    """Build the tool a chain file names — the one way both kinds of step do.
-
-    A file names a class by import path, and importing one runs its module
-    and constructor. Unless *trusted*, the class must be a `Tool` from this
-    package that declares `_safe_for_untrusted_load`, its own refusal hook
-    must not object to the arguments, and what it builds must be `read` or
-    `draft`. A prefix check alone let a file name the package's own shell,
-    MCP and REST tools and give them its command, server or address.
-    """
+    """Build the tool a chain file names. Unless *trusted*, it must be a package
+    `Tool` declaring `_safe_for_untrusted_load`, its refusal hook must accept the
+    arguments, and what it builds must be `read` or `draft`."""
     from ..tools._base import Tool
 
     module_path, _, class_name = class_path.rpartition(".")
@@ -79,9 +68,8 @@ def _import_tool(class_path: str, init_args: dict, trusted: bool):
 
 
 def _tool_spec(tool) -> dict:
-    """A tool as a file holds it: its class and its settings — or a refusal
-    naming why it cannot be, where a tool that could not come back was
-    written anyway and failed only on load."""
+    """A tool as a file holds it: its class and its settings, or a refusal naming
+    why it cannot be, rather than a file that fails only on load."""
     from ..tools.general._wait import Gate
     from ..utilities.mcp._tools import MCPTool
     _refuse_function_tool(tool)
@@ -199,7 +187,7 @@ class _Files:
                 # a number — so what survives is what can be named. A condition
                 # that cannot be reconstructed is dropped **loudly**: a chain
                 # that silently comes back without its budget is the quiet
-                # failure this whole repair is about.
+                # failure to avoid.
                 kept, lost = [], []
                 for cond in (runner.stop_when or []):
                     spec = getattr(cond, "spec", None)
@@ -215,12 +203,12 @@ class _Files:
                         RuntimeWarning, stacklevel=2)
                 # Tool list — store class paths only (no API keys)
                 if getattr(runner, "tools", None):
-                    # Each with its settings: a class path alone rebuilt a
-                    # Shell tool in the loader's working directory.
+                    # Each with its settings: a class path alone would rebuild
+                    # a Shell tool in the loader's working directory.
                     agent_data["tools"] = [_tool_spec(t) for t in runner.tools]
-                # The policy comes back with the agent — a reloaded agent with
-                # no gate was the quiet way to lose one. An approver is code and
-                # does not: reloaded, an `approve` rule refuses until one is given.
+                # The policy comes back with the agent, or reloading would lose
+                # the gate quietly. An approver is code and does not: reloaded,
+                # an `approve` rule refuses until one is given.
                 if runner.permissions is not None:
                     agent_data["permissions"] = {"rules": dict(runner.permissions.rules),
                                                  "default": runner.permissions.default}

@@ -1,43 +1,12 @@
 """
 _dispatch — the one place a tool call is decided and run.
 
-Before this the rules lived in five places: the agent loop, its `execute()`
-seam, `pool` inside the agent, a Chain step and a Pool item — and the last
-two only charged the budget, so a refused tool ran there with nothing said
-(`tests/test_dispatch_matrix.py` names each path). The invariant this module
-exists for: **one place calls `tool.run()`**, and every rule is applied there,
-in this order:
-
-    1 resolve    name → tool (the owner's built-ins included)
-    2 validate   argument depth, the tool's schema
-    3 decide     the policy, on (tool, arguments) → allow / deny / approve
-    4 approve    the owner's approver, or a refusal that says why
-    5 budget     not begun if it would pass `max_cost`
-    6 execute    `tool.run(**arguments)`; `Suspend` passes up untouched
-    7 record     what failed, described, for the journal
-
-Two calls, not one, so that `approval.requested` reaches a streaming consumer
-*before* the approver is asked — which is what lets a UI put the question to a
-person — and so that a run can be parked between the asking and the answer:
-
-    step = dispatcher.prepare(call, state)      # Ready | Denied | NeedsApproval
-    if isinstance(step, NeedsApproval):
-        step = dispatcher.answer(step, state)   # Ready | Denied
-    result, error = dispatcher.execute(call, state)
-
-A refusal is a result, not a crash: it goes back to the model as the call's
-error, so the history stays well-formed and the model hears why.
-
-**The rules around a call apply to everything it runs.** While a call
-executes, its owner's policy and approver are *governing*: a Chain, a Pool or
-an agent started inside it — a tool that runs a pipeline, a `delegate` worker
-— decides each of its own calls under the stricter of its own rules and every
-governing set around it (deny over approve over allow), and asks the nearest
-approver when it has none of its own. An agent's policy that stopped at its
-own tool list governed nothing the tool did.
-
-Phase 2 of PLAN-agent-chain.md moves what the agent already did here without
-changing it; Chain and Pool come through it in phase 3.
+In order: resolve the tool, validate the arguments, let the policy decide, ask
+the approver, check the budget, run it (`Suspend` passes up), record what
+failed. `prepare` and `answer` are two calls so `approval.requested` reaches a
+stream before the approver is asked and a run can park between them. A call's
+owner's rules govern everything started inside it, the strictest word winning.
+See docs/control/permissions.md.
 """
 
 from __future__ import annotations
@@ -53,8 +22,8 @@ from ._budget import lend
 from .state import Suspend
 from .tools._base import charged
 
-#: How deeply a call's arguments may nest. 450 levels raised RecursionError
-#: copying the history on the next turn and ended the run unseen.
+#: How deeply a call's arguments may nest. Much deeper raises RecursionError
+#: copying the history on the next turn and ends the run unseen.
 MAX_ARGUMENT_DEPTH = 64
 
 
@@ -388,7 +357,7 @@ class Dispatcher:
             return Denied(f"tool {tool.name!r} denied by policy")
         if decision != APPROVE:
             # A policy of another make answering a word this gate does not
-            # know: it was read as "allowed". Anything but yes is no.
+            # know: anything but yes is no.
             return Denied(f"tool {tool.name!r}: the policy answered {decision!r}, "
                           "which is not a decision")
 
@@ -442,7 +411,7 @@ class Dispatcher:
             from .tools._permissions import ApprovalDecision
             reply = approve(request)
             # Only a yes that says yes: `bool("denied")` and
-            # `bool({"approved": False})` both approved the call.
+            # `bool({"approved": False})` are both true.
             if not isinstance(reply, (bool, ApprovalDecision)):
                 raise TypeError(f"an approver answers True, False or ApprovalDecision(granted, "
                                 f"reason); it answered {type(reply).__name__} {reply!r}")
@@ -483,8 +452,7 @@ class Dispatcher:
                 # once, before it began: the decision covers what it runs.
                 gated = self.gated_tool(call)
                 settled = frozenset({gated.name}) if gated is not None else frozenset()
-                # Under the owner's budget too: a worker's spend is the
-                # team's, and a lead's `max_cost` bounded only its own calls.
+                # Under the owner's budget too: a worker's spend is the team's.
                 with governing(self.permissions, self.approve, settled), lend(self.max_cost):
                     result = handler(call.arguments, state)
             else:

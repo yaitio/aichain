@@ -49,7 +49,9 @@ and a reader can see exactly what the model was told and when.
 
 ## Tools, and three it may be given
 
-The agent offers each tool's name, description and schema, and checks every
+The agent offers each tool's name, description and schema in the provider's
+own `tools` field, and the calls come back typed — not as JSON the model was
+asked to write into its text, which weak models get wrong. It checks every
 call against the schema before it runs: a missing argument or an unknown key
 comes back to the model as a message it can correct, not as a crash. Beside
 your tools it may get three of its own:
