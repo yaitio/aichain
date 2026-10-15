@@ -94,10 +94,17 @@ def _delegate_schema(team: dict) -> dict:
     if members:
         names = [getattr(w, "name", None) or f"worker{i}"
                  for i, w in enumerate(members)]
+        chains = {n: w for n, w in zip(names, members) if _is_chain(w)}
+        if chains:
+            props["inputs"] = {"type": "object",
+                               "description": "for a chain member: its inputs by name, as its "
+                                              "description lists them; `task` fills a single "
+                                              "text input left out"}
         # What each worker is for, beside its name, or the lead chooses
         # between `worker0` and `worker1` by guessing — a whole worker run
         # lost on every wrong guess.
         roster = "; ".join(f"{n}: {getattr(w, 'description', None) or 'no description given'}"
+                           + (f" (a chain; inputs: {_inputs_line(w)})" if _is_chain(w) else "")
                            for n, w in zip(names, members))
         props["worker"] = {"type": "string", "enum": names,
                            "description": f"which member takes it — {roster}"}
@@ -124,6 +131,21 @@ def _delegate_schema(team: dict) -> dict:
     }
 
 
+def _is_chain(worker) -> bool:
+    from ..chain import Chain
+    return isinstance(worker, Chain)
+
+
+def _inputs_line(chain) -> str:
+    """A chain's inputs as a model reads them: name, whether required, what it is."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")            # said once, when the chain was built
+        schema = chain.input_schema()
+    return ", ".join(f"{n} ({'required' if s.get('required') else 'optional'}"
+                     + (f" — {s['description']}" if s.get("description") else "") + ")"
+                     for n, s in schema.items()) or "none"
+
+
 def _team_parts(team) -> dict | None:
     """``team=`` in its one form: ``{"members": [...], "extend": bool, "max": N}``.
     A list is the members; ``"auto"`` is ``{"extend": True}``, said."""
@@ -138,22 +160,25 @@ def _team_parts(team) -> dict | None:
     if not isinstance(team, dict):
         raise ValueError(f"team is a dict {{'members': [...], 'extend': bool, 'max': N}}, a list "
                          f"of agents, or None; got {type(team).__name__}")
-    if unknown := sorted(set(team) - {"members", "extend", "max"}):
-        raise ValueError(f"team keys are 'members', 'extend' and 'max'; got {unknown}")
+    if unknown := sorted(set(team) - {"members", "extend", "max", "max_delegations"}):
+        raise ValueError(f"team keys are 'members', 'extend', 'max' and 'max_delegations'; "
+                         f"got {unknown}")
     from ._agent import Agent                 # here, not above: it imports this module
     members = list(team.get("members") or [])
-    if bad := [type(m).__name__ for m in members if not isinstance(m, Agent)]:
-        raise ValueError(f"a team member is an Agent; got {bad} — a Chain as a member is planned, "
-                         "not built")
+    if bad := [type(m).__name__ for m in members if not (isinstance(m, Agent) or _is_chain(m))]:
+        raise ValueError(f"a team member is an Agent or a Chain; got {bad}")
     extend = bool(team.get("extend", False))
     cap = team.get("max")
     if cap is not None and (isinstance(cap, bool) or not isinstance(cap, int) or cap < 1):
         raise ValueError(f"team['max'] is a whole number of at least 1; got {cap!r}")
     if cap is not None and len(members) > cap:
         raise ValueError(f"team['max'] is {cap} and {len(members)} members are listed")
+    calls = team.get("max_delegations")
+    if calls is not None and (isinstance(calls, bool) or not isinstance(calls, int) or calls < 1):
+        raise ValueError(f"team['max_delegations'] is a whole number of at least 1; got {calls!r}")
     if not members and not extend:
         return None
-    return {"members": members, "extend": extend, "max": cap}
+    return {"members": members, "extend": extend, "max": cap, "max_delegations": calls}
 
 
 # ── Agent ────────────────────────────────────────────────────────────────────
@@ -235,8 +260,11 @@ class _Builtins:
             raise ValueError("pool needs either 'tool' or 'prompt'")
 
         self._log(1, f"  ⇉  pool ×{len(items)} (max_flows={max_flows})")
-        results = Pool(runner, items=pool_items, max_flows=max_flows,
-                       on_error="collect", max_cost=self.max_cost).run()
+        from .._dispatch import calling
+        fan_out = Pool(runner, items=pool_items, max_flows=max_flows, on_error="collect",
+                       max_cost=self.max_cost, hooks=self._live.hooks)
+        fan_out._parent_call = calling() or "pool"
+        results = fan_out.run()
         if results.usage is not None:
             state["tokens"] += results.tokens_used
             if results.cost is not None:
@@ -261,6 +289,11 @@ class _Builtins:
                              "unless team= is set")
         if self._live.depth >= self._live.max_depth:
             raise RuntimeError(f"maximum delegation depth {self._live.max_depth} reached")
+        limit = self.team.get("max_delegations")
+        if limit is not None and (state.get("delegations") or 0) >= limit:
+            raise RuntimeError(f"this run has delegated {limit} time(s), its team's "
+                               "max_delegations; finish the rest yourself")
+        state["delegations"] = (state.get("delegations") or 0) + 1
 
         task = args.get("task") or ""
         if args.get("worker") or not self.team["extend"]:
@@ -293,12 +326,15 @@ class _Builtins:
             self._extended[instructions] = worker
 
         self._log(1, f"  ▽  delegate → {getattr(worker, 'name', None) or 'worker'}")
+        if _is_chain(worker):
+            return self._delegate_to_chain(worker, task, args.get("inputs"), state)
         with worker._opened(depth=self._live.depth + 1, parent_id=self._live.id,
                             hooks=self._live.hooks):
             child = worker.run(task)
         state["tokens"] += child.tokens_used
         if child.cost is not None:
             state["cost"] = (state["cost"] or 0.0) + child.cost
+        steps = getattr(child, "steps_taken", None)
         # What the child says it did is the child's word for it. Delegation
         # multiplies the places where "it says it did" stands in for "we
         # checked"; naming the class keeps them countable.
@@ -312,7 +348,45 @@ class _Builtins:
                 # because the model that delegated is waiting too, and the
                 # tool result is the only channel it reads.
                 "beacons": [b.to_dict() for b in (child.beacons or [])],
-                "evidence": MODEL_CLAIM}
+                "evidence": MODEL_CLAIM,
+                "steps": steps, "cost": child.cost,
+                **({"note": f"{getattr(worker, 'name', None) or 'the member'} finished in "
+                            f"{steps} step(s) with your model and your tools; work this small "
+                            "is cheaper done with your own calls than handed down"}
+                   if self._no_wider(worker) and steps is not None and steps <= 1 else {})}
+
+    def _no_wider(self, worker) -> bool:
+        """The member has nothing the lead lacks: the same model, no other tools."""
+        same = getattr(getattr(worker, "model", None), "name", None) == getattr(self.model, "name", "")
+        theirs = {t.name for t in getattr(worker, "tools", ()) or ()}
+        return same and theirs <= set(self._tool_map)
+
+    def _delegate_to_chain(self, chain, task: str, given, state: dict) -> Any:
+        """A chain member takes its inputs by name; the lead's rules, budget and
+        hooks hold inside it, as around any call the lead makes."""
+        from .._events import listening
+        from ..state import SuspendedResult
+        values = dict(given) if isinstance(given, dict) else {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            schema = chain.input_schema()
+        missing = [n for n, s in schema.items() if s.get("required") and n not in values]
+        if len(missing) == 1 and task and schema[missing[0]].get("type") in (None, "string"):
+            values[missing[0]] = task
+            missing = []
+        if missing:
+            raise ValueError(f"chain {chain.name or 'member'!r} needs the inputs {missing}; "
+                             f"give them in `inputs` — it takes: {_inputs_line(chain)}")
+        with listening(self._live.hooks):
+            result = chain.run(variables=values)
+        if isinstance(result, SuspendedResult):
+            raise RuntimeError(f"chain {chain.name or 'member'!r} paused ({result.awaiting.get('reason')}); "
+                               "a delegated chain cannot park — put its pause in the lead's tools")
+        state["tokens"] += result.tokens_used or 0
+        if result.cost is not None:
+            state["cost"] = (state["cost"] or 0.0) + result.cost
+        return {"worker": chain.name or "chain", "success": result.success,
+                "output": result.output, "error": result.error, "evidence": result.evidence}
 
     # ── Result ───────────────────────────────────────────────────────────
 

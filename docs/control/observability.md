@@ -45,7 +45,7 @@ and a hook cannot change what the run does: observation only.
 |---|---|---|
 | `run.started` · `run.finished` | Agent, Chain, Pool | the task and mode; the verdict, usage and cost |
 | `step.started` · `step.ended` | Chain, Pool | one step and its kind; for a Pool, one item, its index as the step |
-| `tool_call.started` · `tool_call.ended` | Agent | one call: its id, its arguments, its raw result or error |
+| `tool_call.started` · `tool_call.ended` | Agent | one call: its id, its arguments, its raw result or error; each item of a `pool` call as a child with `parent_call_id`, its arguments cut at 8 KB (`complete: false`) and no result, at most 256 per call |
 | `text.started` · `text.delta` · `text.ended` | Agent, while streaming | the answer as it is written |
 | `approval.requested` · `approval.decided` | Agent | a gated call, before someone answers and after |
 | `llm_call.started` · `llm_call.ended` | Skill | the model, tokens, cost, duration |

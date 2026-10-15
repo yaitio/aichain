@@ -5,27 +5,9 @@ about its data flow before a run. A mixin of `Chain`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
-
-import logging
 import warnings
 
-_skip_log = logging.getLogger("yait_aichain.chain")
-
-from .._template import placeholder_names
-
-# Default options applied to every Agent step unless overridden.
-_AGENT_DEFAULT_OPTIONS: dict = {
-    "task_key":     "task",
-    "output_field": "output",
-}
-
-
-from ._inputs import _runner_name, _sources, _type_name
+from ._inputs import _runner_name, _sources
 
 
 def _chain_class():
@@ -78,84 +60,58 @@ class _Flow:
 
     @staticmethod
     def _needs(runner, kind: str, input_map: dict, options: dict) -> list:
-        """``(name, spec, where)`` for each input one step reads."""
-        import inspect
-        from ..tools._base import _param_docs
+        """``(name, spec, where)`` for each input one step reads: what the runner
+        reads (`_runners.inputs`), its mapped parameters reading their sources."""
+        from .._runners import inputs
         out: list = []
+        label = _runner_name(runner) or type(runner).__name__
+        reads = inputs(runner, task_key=options.get("task_key", "task"))
+        if isinstance(runner, _chain_class()):
+            return [(name, spec, label) for name, spec in reads.items()]
+        where = label if kind in ("call", "tool", "agent") else f"a Skill template ({label})"
 
-        def mapped(param: str, spec: dict, where: str) -> None:
-            """A parameter the input map fills reads its sources instead."""
-            source = input_map[param]
-            for name in _sources({param: source}):
+        def mapped(param: str, spec: dict) -> None:
+            for name in _sources({param: input_map[param]}):
                 head, _, rest = name.partition(".")
                 out.append((head, {"type": "object"} if rest else dict(spec), where))
 
-        label = _runner_name(runner) or type(runner).__name__
-        if kind == "call":
-            docs = _param_docs(inspect.getdoc(runner) or "")
-            for name, p in inspect.signature(runner).parameters.items():
-                if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
-                    continue
-                spec = {"type": _type_name(p.annotation)}
-                if docs.get(name):
-                    spec["description"] = docs[name]
-                if name in input_map:
-                    mapped(name, spec, f"{label}")
-                elif p.default is p.empty:
-                    out.append((name, {**spec, "required": True}, label))
-                else:
-                    out.append((name, {**spec, "default": p.default}, label))
-        elif kind == "tool":
-            params = getattr(runner, "parameters", {}) or {}
-            required = set(params.get("required") or ())
-            for name, prop in (params.get("properties") or {}).items():
-                spec = {k: v for k, v in prop.items() if k in ("type", "description", "enum")}
-                if name in input_map:
-                    mapped(name, spec, label)
-                else:
-                    out.append((name, {**spec, "required": True} if name in required else spec,
-                                label))
+        for name, spec in reads.items():
+            if name in input_map:
+                mapped(name, {k: v for k, v in spec.items() if k not in ("required", "default")})
+            else:
+                out.append((name, spec, where))
+        if kind == "tool":
             for name in input_map:
-                if name not in (params.get("properties") or {}):
-                    mapped(name, {}, label)
-        elif kind == "agent":
-            out.append((options.get("task_key", "task"),
-                        {"type": "string", "description": f"the task for {label}", "required": True},
-                        label))
-        elif isinstance(runner, _chain_class()):
-            for name, spec in runner.input_schema().items():
-                out.append((name, dict(spec), label))
-        else:                                         # a Skill: its template's placeholders
-            defaults = getattr(runner, "variables", {}) or {}
-            names: list = []
-            for message in (getattr(runner, "_input", {}) or {}).get("messages", []):
-                for part in message.get("parts", []):
-                    text = part if isinstance(part, str) else (part.get("text") or "") \
-                        if isinstance(part, dict) else ""
-                    names += placeholder_names(text)
-            for name in dict.fromkeys(names):
-                if name in input_map:
-                    mapped(name, {"type": "string"}, f"a Skill template ({label})")
-                elif name in defaults:
-                    out.append((name, {"type": "string", "default": defaults[name]},
-                                f"a Skill template ({label})"))
-                else:
-                    out.append((name, {"type": "string", "required": True},
-                                f"a Skill template ({label})"))
+                if name not in reads:
+                    mapped(name, {})
         return out
 
     def _check_flow(self) -> None:
         """What can be known before a run: a step reading what only a later step writes
         is an error, and a name no step writes that is one letter from a key is said."""
+        from .._runners import outputs
         writes: dict = {}
-        for i, (_r, key, *_rest) in enumerate(self._steps):
+        fields: dict = {}
+        for i, (r, key, *_rest) in enumerate(self._steps):
             writes.setdefault(key, i)
+            fields.setdefault(key, outputs(r))
         for i, (runner, _key, input_map, _kind, _opts) in enumerate(self._steps):
             for source in _sources(input_map):
                 head = source.partition(".")[0]
                 if head in self.variables:
                     continue
                 first = writes.get(head)
+                field = source.partition(".")[2].partition(".")[0]
+                known = fields.get(head)
+                if first is not None and first < i and field and known is not None \
+                        and field not in known:
+                    import difflib
+                    close = difflib.get_close_matches(field, sorted(known), n=1)
+                    raise ValueError(
+                        f"step {i} ({_runner_name(runner) or type(runner).__name__}) reads "
+                        f"{source!r}, and step {first}'s output has no field {field!r}"
+                        + (f"; did you mean {head + '.' + close[0]!r}?" if close
+                           else f"; it has {sorted(known)}"))
                 if first is not None and first >= i:
                     raise ValueError(
                         f"step {i} ({_runner_name(runner) or type(runner).__name__}) reads "

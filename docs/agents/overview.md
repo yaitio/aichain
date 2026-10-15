@@ -82,11 +82,23 @@ and the same system prompt, a plain loop scored best with open-weight models
 model and an asset on a strong one; measure on yours before settling.
 → [Eval](../control/eval.md)
 
-`team=[historian, chemist]` delegates only to the agents named, each read by
+`team=[historian, chemist]` delegates only to the members named, each read by
 its `name` and `description`; `team={"members": [...], "extend": True, "max": 6}`
 also lets the lead add a member when none fits — one role made once and reused,
-within `max`. Members are held to the lead: its rules, its budget, its hooks. A worker's report comes
-back as the model's word, not as a checked fact, and the result says so.
+within `max`; `"max_delegations": 10` bounds the delegations of one run. A
+member may be a `Chain` as well as an agent: the lead reads its inputs from its
+`input_schema()` and gives them by name, and a chain that does exactly the job
+is the deterministic choice over an agent doing it by hand. Members are held to
+the lead: its rules, its budget, its hooks. A worker's report comes back as the
+model's word, not as a checked fact, and the result says so, with what it cost
+and how many steps it took — and a member with nothing the lead lacks that
+finished in one step is said to have cost more than doing it would have.
+
+```python
+reader = Chain([(fetch("local"), "page"), summarise], name="reader",
+               description="Reads a web page and summarises it")
+lead = Agent(Model("claude-haiku-5-5"), team={"members": [reader], "max_delegations": 5})
+```
 
 ## How a run ends
 

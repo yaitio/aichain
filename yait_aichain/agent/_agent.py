@@ -120,11 +120,14 @@ class Agent(_Loop, _Builtins):
         ``"agile"`` decides at every step. ``"waterfall"`` writes a plan at
         step 0 (via the ``write_plan`` tool) and holds to it.
     team : dict | list[Agent] | None
-        Who else may do work: ``{"members": [...], "extend": bool, "max": N}``.
-        ``members`` are agents the lead hands tasks to, each read by its
-        ``name`` and ``description``; ``extend: True`` lets the lead add a
-        member when none fits — one role, by its instructions, made once and
-        reused; ``max`` bounds the team, added members included. A list is the
+        Who else may do work: ``{"members": [...], "extend": bool, "max": N,
+        "max_delegations": N}``. ``members`` are agents and chains the lead
+        hands tasks to, each read by its ``name`` and ``description``; a chain
+        takes its inputs by name, as its ``input_schema()`` lists them.
+        ``extend: True`` lets the lead add a member when none fits — one role,
+        by its instructions, made once and reused; ``max`` bounds the team,
+        added members included; ``max_delegations`` bounds the delegations of
+        one run. A list is the
         members. ``None`` removes ``delegate``. ``"auto"`` (``{"extend":
         True}``) is deprecated since 4.2.9.
     planner_model : Model, optional

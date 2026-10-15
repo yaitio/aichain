@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.5.0] — 2026-10-15
+
+### Added
+
+- A `Chain` can be a team member. The lead reads its inputs from its
+  `input_schema()` — named in the `delegate` description — and gives them as
+  `inputs={...}`; a task alone fills a chain with a single text input. The
+  lead's rules, budget and hooks hold inside it, as for an agent member, and a
+  chain that pauses is refused with the reason.
+- `team={"max_delegations": N}` bounds the delegations of one run.
+- A `delegate` result says what the member cost and how many steps it took,
+  and when a member with the lead's own model and no other tools finished in
+  one step, that work this small is cheaper done than handed down.
+- The items of an agent's `pool` call are its children: each emits
+  `tool_call.started` and `tool_call.ended` with `parent_call_id`, its
+  arguments cut at 8 KB with `complete: false`, no result, at most 256 per
+  call, in the agent's run.
+- A path into a field a step is known not to have — a Skill answering to a
+  JSON schema, a function returning a `TypedDict` or a dataclass — is refused
+  when the chain is built, with the closest field named.
+
+### Changed
+
+- Chain and Pool run an agent, a Skill or a chain through one function
+  (`_runners.invoke`), and read what a runner takes from one
+  (`_runners.inputs`), where each kept a copy. A chain step's usage is read
+  from its own run, not from a runner another thread may have written last.
+- A function step is named after its function in events and history, not
+  `step_N`.
+
 ## [4.4.1] — 2026-10-15
 
 ### Changed

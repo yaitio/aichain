@@ -338,8 +338,7 @@ class Skill:
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch an observability :class:`Event` to registered hooks."""
-        if self.hooks:
-            emit(self.hooks, Event(type=etype, **fields))
+        emit(self.hooks, Event(type=etype, **fields))
 
     def _started(self, model) -> float:
         """Check the budget, announce the call, return its start time. Before the

@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 from .._budget import as_budget, lend, start_run
 
-import copy
 import logging
 import warnings
 
@@ -34,11 +33,7 @@ from ..state._secret import public
 # should not have to choose between a warning per failure and no record.
 from .._errors_policy import POLICIES as _VALID_ON_STEP_ERROR, describe as _describe
 
-# Default options applied to every Agent step unless overridden.
-_AGENT_DEFAULT_OPTIONS: dict = {
-    "task_key":     "task",
-    "output_field": "output",
-}
+from ._inputs import _AGENT_DEFAULT_OPTIONS
 
 
 # The pieces this module is cut into; every name that lived here is still
@@ -48,6 +43,7 @@ from ._inputs import (_MISSING, _usage_to_dict, _build_tool_kwargs, _callable_na
                       _sources)
 from ._files import _import_tool, _tool_spec, _refuse_function_tool, _Files  # noqa: F401
 from ._flow import _Flow
+from .._runners import invoke
 from ._step import Step
 from .._runners import is_tool as _is_tool, is_agent as _is_agent
 
@@ -268,8 +264,7 @@ class Chain(_Flow, _Files):
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch a step-boundary :class:`Event` to registered hooks."""
-        if self.hooks:
-            emit(self.hooks, Event(type=etype, **fields))
+        emit(self.hooks, Event(type=etype, **fields))
 
     # ------------------------------------------------------------------
     # Public API
@@ -328,7 +323,7 @@ class Chain(_Flow, _Files):
         from ..state import RunDocument
         start_run(self)
         accumulated = {**self.variables, **(variables or {})}
-        step_names  = [getattr(r, "name", None) or f"step_{i}"
+        step_names  = [getattr(r, "name", None) or _runner_name(r) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
         doc = RunDocument.new("chain", step_names, variables=public(accumulated),
                               definition={"steps": self._signature()})
@@ -383,7 +378,7 @@ class Chain(_Flow, _Files):
             raise ValueError("a chain with no steps has nothing to arm")
 
         accumulated = {**self.variables, **(variables or {})}
-        step_names  = [getattr(r, "name", None) or f"step_{i}"
+        step_names  = [getattr(r, "name", None) or _runner_name(r) or f"step_{i}"
                        for i, (r, *_rest) in enumerate(self._steps)]
         doc = RunDocument.new("chain", step_names, variables=public(accumulated),
                               definition={"steps": self._signature()})
@@ -540,7 +535,7 @@ class Chain(_Flow, _Files):
                   on_error, context, resumed: bool = False) -> ChainResult:
         """The step loop for ``run()`` (from step 0) and ``resume()`` (from the suspended
         step, which gets *signal* as ``_signal=``)."""
-        from ..state import StepStatus, Suspend, SuspendedResult
+        from ..state import StepStatus, Suspend
 
         # Expose the per-request context for the duration of the run and persist
         # it in the document so it survives suspend/resume.
@@ -571,12 +566,13 @@ class Chain(_Flow, _Files):
         for idx in range(start_idx, len(self._steps)):
             runner, output_key, input_map, kind, options = self._steps[idx]
             step_input  = dict(accumulated)          # snapshot before the step
-            name        = getattr(runner, "name", None) or f"step_{idx}"
+            name        = getattr(runner, "name", None) or _runner_name(runner) or f"step_{idx}"
             step_signal = signal if idx == start_idx else None
             doc.steps[idx]["status"] = StepStatus.RUNNING
 
             self._emit("step.started", step=idx, name=name, run_id=doc.run_id,
                        payload={"kind": kind})
+            run_usage = None
 
             try:
                 if kind == "call":
@@ -588,14 +584,11 @@ class Chain(_Flow, _Files):
                     output = self._run_tool(runner, idx, kwargs, step_signal, doc.run_id)
 
                 elif kind == "agent":
-                    # An agent step always starts a run. An agent can park
-                    # its own run, but the chain does not carry that pause:
-                    # two levels of resume would need the child's run id
-                    # threaded through this document, and the pause belongs
-                    # in the chain as a step when the chain is what waits.
+                    # An agent can park its own run, but the chain does not
+                    # carry that pause: the pause belongs in the chain as a
+                    # step when the chain is what waits.
                     task_key = options.get("task_key", _AGENT_DEFAULT_OPTIONS["task_key"])
-                    task     = accumulated.get(task_key, "")
-                    if not task:
+                    if not accumulated.get(task_key, ""):
                         raise ValueError(
                             f"Agent step {idx} ({name!r}): accumulated variable "
                             f"{task_key!r} is empty or missing — an Agent step reads its "
@@ -603,73 +596,42 @@ class Chain(_Flow, _Files):
                             f"{task_key!r}, e.g. (question_skill, {task_key!r}), or pass "
                             f"run(variables={{{task_key!r}: ...}})."
                         )
-                    agent_result = runner.run(task=task, variables=accumulated)
-
-                    if isinstance(agent_result, SuspendedResult):
+                    done = invoke(runner, accumulated, task_key=task_key,
+                                  output_field=options.get(
+                                      "output_field", _AGENT_DEFAULT_OPTIONS["output_field"]),
+                                  label=f"Agent step {idx} ({name!r})")
+                    if done.parked is not None:
                         raise RuntimeError(
                             f"Agent step {idx} ({name!r}) parked its own run "
-                            f"({agent_result.awaiting.get('reason') or 'no reason given'}) "
+                            f"({done.parked.awaiting.get('reason') or 'no reason given'}) "
                             f"and a chain cannot carry a child's pause. Put the "
                             f"Wait/Gate in this chain as its own step, or drive "
                             f"that agent outside the chain and resume it with "
-                            f"agent.resume({agent_result.run_id!r}, signal=...)."
+                            f"agent.resume({done.parked.run_id!r}, signal=...)."
                         )
-                    if not agent_result:
-                        raise RuntimeError(
-                            f"Agent step {idx} ({name!r}) failed: "
-                            f"{getattr(agent_result, 'error', 'no result returned')}"
-                        )
-
-                    output_field = options.get(
-                        "output_field", _AGENT_DEFAULT_OPTIONS["output_field"]
-                    )
-                    output = getattr(agent_result, output_field)
-
-                    # Fold the agent's token usage into the chain total. An
-                    # Agent has no ``last_usage`` (the generic accumulation
-                    # below would miss it); it reports on its result, cost
-                    # included, and the chain's cost needs both.
-                    agent_usage = getattr(agent_result, "usage", None)
-                    if agent_usage is None and getattr(agent_result, "tokens_used", 0):
-                        agent_usage = Usage(total_tokens=agent_result.tokens_used)
-                    if agent_usage is not None:
-                        usage_total = agent_usage if usage_total is None else usage_total + agent_usage
+                    output = done.output
+                    # The agent reports on its result, not through `last_usage`,
+                    # which the accumulation below reads.
+                    if done.usage is not None:
+                        usage_total = done.usage if usage_total is None else usage_total + done.usage
 
                 else:
-                    # A copy for this step: one Skill shared by a Pool's
-                    # copies of this chain would have `last_usage` overwritten
-                    # from another thread before this one read it.
-                    shared, runner = runner, copy.copy(runner)
-                    # Skill: pass full accumulated dict, honouring input_map renames.
-                    if input_map:
+                    values = dict(accumulated)
+                    for dst, src in (input_map or {}).items():
                         # Resolved as a tool's are: a template filled, a name
                         # the chain lacks an error.
-                        skill_vars = dict(accumulated)
-                        for dst, src in input_map.items():
-                            skill_vars[dst] = _resolve(src, accumulated, f"{name}.{dst}", top=True)
-                        output = runner.run(variables=skill_vars)
-                    else:
-                        output = runner.run(variables=accumulated)
-                    # Mirrored onto the step the caller holds, for reading
-                    # afterwards; the chain's own sum reads the copy.
-                    for key, value in vars(runner).items():
-                        if vars(shared).get(key, _MISSING) is not value:
-                            setattr(shared, key, value)
-                    # A chain used as a step contributes its output, and its
-                    # failure is this step's failure — the same contract an
-                    # agent step has.
-                    if isinstance(output, SuspendedResult):
+                        values[dst] = _resolve(src, accumulated, f"{name}.{dst}", top=True)
+                    done = invoke(runner, values, mirror=True,
+                                  label=f"Chain step {idx} ({name!r})")
+                    run_usage = done.usage
+                    if done.parked is not None:
                         raise RuntimeError(
                             f"Chain step {idx} ({name!r}) parked its own run "
-                            f"({output.awaiting.get('reason') or 'no reason given'}) and a chain "
+                            f"({done.parked.awaiting.get('reason') or 'no reason given'}) and a chain "
                             "cannot carry a child's pause: put the Wait/Gate in this chain as "
                             "its own step, or run that chain on its own and resume it with "
-                            f"its resume({output.run_id!r}, signal=...).")
-                    if isinstance(output, ChainResult):
-                        if not output:
-                            raise RuntimeError(
-                                f"Chain step {idx} ({name!r}) failed: {output.error}")
-                        output = output.output
+                            f"its resume({done.parked.run_id!r}, signal=...).")
+                    output = done.output
 
             except Suspend as susp:
                 # Only a tool step is handed the signal on resume, so only a
@@ -753,7 +715,10 @@ class Chain(_Flow, _Files):
                 **({"default_key": True} if self._extra[idx]["default_key"] else {}),
             })
 
-            step_usage = getattr(runner, "last_usage", None)
+            # A Skill's or a chain's from its own run; a shared runner's
+            # `last_usage` is whichever thread wrote it last.
+            step_usage = run_usage if kind not in ("call", "tool", "agent") \
+                else getattr(runner, "last_usage", None) if kind != "agent" else None
             if step_usage:
                 usage_total = step_usage if usage_total is None else usage_total + step_usage
 

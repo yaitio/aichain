@@ -158,6 +158,22 @@ def running(run_id):
         _RUN_ID.reset(token)
 
 
+#: Hooks that hear every event sent inside a block, beside the sender's own:
+#: a lead's, while a chain it delegated to runs.
+_LISTENERS: "_contextvars.ContextVar[tuple]" = _contextvars.ContextVar(
+    "yait_aichain_listeners", default=())
+
+
+@_contextlib.contextmanager
+def listening(hooks):
+    """Let *hooks* hear every event sent inside the block."""
+    token = _LISTENERS.set(_LISTENERS.get() + tuple(h for h in (hooks or ()) if h is not None))
+    try:
+        yield
+    finally:
+        _LISTENERS.reset(token)
+
+
 def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
     """
     Dispatch *event* to every hook, swallowing hook errors.
@@ -165,6 +181,8 @@ def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
     A buggy or slow hook must never crash the run, so each hook is called inside
     a try/except; failures are logged at DEBUG and otherwise ignored.
     """
+    own = list(hooks or ())
+    hooks = own + [h for h in _LISTENERS.get() if all(h is not o for o in own)]
     if not hooks:
         return
     ambient = _RUN_ID.get()

@@ -9,7 +9,6 @@ while the pool runs. See docs/pipelines/pool.md.
 
 from __future__ import annotations
 
-import copy
 import threading
 import time
 import logging
@@ -40,6 +39,10 @@ CANCELLED = 4
 # no more items", which is what a fan-out can offer where a sequence stops
 # running steps.
 from .._budget import as_budget, lend, start_run
+
+#: The bounds of a nested call's events: arguments per call, calls per parent.
+MAX_NESTED_ARGUMENTS = 8 * 1024
+MAX_NESTED_EVENTS = 256
 from .._errors_policy import POLICIES as _VALID_ON_ERROR, describe as _describe
 from .. import _hints
 from ..state import Suspend
@@ -245,6 +248,9 @@ class Pool:
 
         self.hooks = list(hooks or [])
         self._run_id = None
+        #: Inside an agent's `pool` call: its items are the call's children,
+        #: and only their `tool_call.*` events go out, under that call's id.
+        self._parent_call = None
         self._lock: threading.Lock = threading.Lock()
         self._history: list[dict]  = self._init_history()
 
@@ -299,7 +305,11 @@ class Pool:
         self._stop = threading.Event()
         self._stop_reason = ""
         from .._events import running
-        with collecting_beacons() as board, lend(self.max_cost), running(self._run_id):
+        import contextlib
+        if self._parent_call is not None:
+            self._run_id = None              # a nested call belongs to the agent's run
+        stamp = running(self._run_id) if self._run_id else contextlib.nullcontext()
+        with collecting_beacons() as board, lend(self.max_cost), stamp:
             self._board = board
             executor = ThreadPoolExecutor(max_workers=self._max_flows)
             future_to_idx: dict = {}
@@ -373,10 +383,11 @@ class Pool:
         return result
 
     def _emit(self, etype: str, **fields) -> None:
-        if self.hooks:
-            from .._events import Event, emit
-            fields.setdefault("name", self.name)
-            emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
+        if self._parent_call is not None and not etype.startswith("tool_call."):
+            return
+        from .._events import Event, emit
+        fields.setdefault("name", self.name)
+        emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
 
     @property
     def beacons(self) -> list:
@@ -480,6 +491,7 @@ class Pool:
             self._history[index]["status"]    = RUNNING
             self._history[index]["variables"] = merged
         self._emit("step.started", step=index)
+        child = self._child_started(index, merged)
 
         start = time.monotonic()
         try:
@@ -508,6 +520,7 @@ class Pool:
                     "usage":    usage,
                 })
             self._emit("step.ended", step=index, duration=duration)
+            self._child_ended(child, duration)
             return output
 
         except Exception as exc:
@@ -526,7 +539,28 @@ class Pool:
                 })
             self._emit("step.ended", step=index, duration=duration,
                        error=str(exc) or type(exc).__name__)
+            self._child_ended(child, duration, error=str(exc) or type(exc).__name__)
             raise
+
+    def _child_started(self, index: int, merged: dict):
+        """A nested call's `tool_call.started`: arguments up to 8 KB, the first
+        256 items of a call; the tree is for hooks, the model sees the result."""
+        if self._parent_call is None or index >= MAX_NESTED_EVENTS:
+            return None
+        import json
+        text = json.dumps(merged, default=str)
+        complete = len(text.encode()) <= MAX_NESTED_ARGUMENTS
+        child = {"id": f"{self._parent_call}/{index}", "parent_call_id": self._parent_call}
+        self._emit("tool_call.started", name=getattr(self._runner, "name", None), step=index,
+                   payload={**child, "complete": complete,
+                            "arguments": merged if complete
+                            else text.encode()[:MAX_NESTED_ARGUMENTS].decode(errors="ignore")})
+        return child
+
+    def _child_ended(self, child, duration, error=None) -> None:
+        if child is not None:
+            self._emit("tool_call.ended", name=getattr(self._runner, "name", None),
+                       duration=duration, error=error, payload=dict(child))
 
     def _run_tool(self, runner, kwargs: dict):
         """One item of a tool runner, decided and run where every tool call is
@@ -552,50 +586,21 @@ class Pool:
         """Route to the runner's interface; ``(output, usage)``. Usage is read from a
         per-item copy of the runner: a shared runner's ``last_usage`` is overwritten by
         whichever thread finishes next."""
-        from ..models._usage import Usage
         runner = self._runner
 
         if _is_tool(runner):
             kwargs = _build_tool_kwargs(runner, variables)
             return self._run_tool(runner, kwargs), None
 
-        if _is_agent(runner):
-            task = variables.get("task", "")
-            if not task:
-                raise ValueError(
-                    "Agent runner requires a 'task' key in the item variables."
-                )
-            result = runner.run(task=task, variables=variables)
-            # A parked agent is falsy but did not fail: its SuspendedResult,
-            # with its run_id, is the item's output.
-            from ..state import SuspendedResult
-            if isinstance(result, SuspendedResult):
-                return result, None
-            if not result:
-                raise RuntimeError(
-                    f"Agent failed: {getattr(result, 'error', 'unknown error')}"
-                )
-            # An Agent reports on its result, not through ``last_usage``; only
-            # the total is available, so the split is left at zero rather than
-            # invented. Same treatment as Chain gives an Agent step.
-            tokens = getattr(result, "tokens_used", 0) or 0
-            cost   = getattr(result, "cost", None)
-            usage  = Usage(total_tokens=tokens, cost=cost) if (tokens or cost) else None
-            return result.output, usage
-
-        # Skill or Chain — both expose run(variables=...) and report on
-        # ``last_usage``. The copy is shallow: configuration is shared, the
-        # usage counter is not.
-        own = copy.copy(runner)
-        output = own.run(variables=variables)
-        # A chain as the runner contributes its output; a chain that did not
-        # complete is a failed item, exactly as a failed agent is.
-        from ..chain._result import ChainResult
-        if isinstance(output, ChainResult):
-            if not output:
-                raise RuntimeError(f"Chain failed: {output.error}")
-            return output.output, output.usage
-        return output, getattr(own, "last_usage", None)
+        from .._runners import invoke
+        if _is_agent(runner) and not variables.get("task", ""):
+            raise ValueError("Agent runner requires a 'task' key in the item variables.")
+        done = invoke(runner, variables, label="Agent" if _is_agent(runner) else "Chain")
+        # A parked agent or chain did not fail: its SuspendedResult, with its
+        # run_id, is the item's output.
+        if done.parked is not None:
+            return done.parked, None
+        return done.output, done.usage
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 

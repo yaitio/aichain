@@ -83,7 +83,12 @@ Step(count_words, out="words", inputs={"text": "page.body"}, on_error="skip", sp
 ```
 
 An input can be a path into a variable: `"page.body"` is the `body` field of
-the dict stored under `page`. `on_error` is this step's own policy, over the
+the dict stored under `page`. Where a step's fields are known before it runs —
+a Skill answering to a JSON schema, a function returning a `TypedDict` or a
+dataclass — a path to a field it does not have is refused when the chain is
+built, with the closest one named; elsewhere it is found when the run reaches
+it. A pause's answer (`wait`, `gate`) is spread among the variables, which is
+what it is for. `on_error` is this step's own policy, over the
 chain's. `spread` says whether a dict output's fields are also put among the
 variables: `None`, the default for now, still spreads them, with a warning;
 `True` spreads them on purpose; `False` keeps the dict under its key alone.

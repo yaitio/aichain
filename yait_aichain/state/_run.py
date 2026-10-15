@@ -58,7 +58,7 @@ class AgentRun(Run):
     #: the conversation, which is what resumes; `truncated` describes one
     #: reply. `unverified` travels, or an unchecked change made before a pause
     #: would be answered after it without the check `verified()` holds for.
-    PORTABLE = ("steps", "tokens", "cost", "plan", "plan_calls", "unverified")
+    PORTABLE = ("steps", "tokens", "cost", "plan", "plan_calls", "unverified", "delegations")
 
     @classmethod
     def portable(cls, state: dict) -> dict:

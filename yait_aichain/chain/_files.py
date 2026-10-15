@@ -17,11 +17,6 @@ import warnings
 _skip_log = logging.getLogger("yait_aichain.chain")
 
 
-# Default options applied to every Agent step unless overridden.
-_AGENT_DEFAULT_OPTIONS: dict = {
-    "task_key":     "task",
-    "output_field": "output",
-}
 
 
 from ._inputs import _MISSING, _usage_to_dict, _callable_name  # noqa: F401
