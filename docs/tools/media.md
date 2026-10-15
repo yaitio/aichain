@@ -33,13 +33,48 @@ format `speech("qwen")` takes; its host, like every DashScope tool's, follows
 `region=` or `DASHSCOPE_REGION` (`ap`, `us`, `cn`, `hk`).
 
 A transcript is plain text, or a JSON string with words and their times when
-`timestamps` or `format="json"` is asked. Audio over a provider's limit is cut
-into pieces and the transcripts joined, which needs
-`pip install "yait-aichain[audio]"`: OpenAI takes 24 MB a request and is sent
-ten-minute pieces; Google's synchronous API takes about a minute of audio and
-is sent 55-second pieces that overlap by two seconds, with words in the overlap
-counted once. Word timestamps come from `whisper-1` alone, and not for a file
-OpenAI has to cut.
+`timestamps` or `format="json"` is asked. Word timestamps come from
+`whisper-1` alone. A file over a provider's limit is refused with its size and
+the limit — OpenAI takes 25 MB, Google's synchronous API a minute and 10 MB.
+
+### Long audio
+
+The library does not cut audio: decoding it takes a dependency the rest of the
+library does not need. A recording over the limit is cut by your own tool,
+which wraps the library's — here with `pydub` (`pip install pydub`, plus
+`audioop-lts` on Python 3.13 and later, and `ffmpeg` on the machine for any
+format but WAV):
+
+```python
+import os, tempfile
+from pydub import AudioSegment
+from yait_aichain.tools import tool, transcribe
+
+stt = transcribe("openai")
+
+@tool(risk="external")
+def transcribe_long(path: str, minutes: int = 10) -> str:
+    """Transcribe a recording of any length, cut into pieces.
+
+    Parameters
+    ----------
+    path : str
+        The audio file.
+    minutes : int
+        How long each piece is.
+    """
+    audio, step = AudioSegment.from_file(path), minutes * 60_000
+    texts = []
+    for start in range(0, len(audio), step):
+        piece = os.path.join(tempfile.mkdtemp(), "piece.mp3")
+        audio[start:start + step].export(piece, format="mp3")
+        texts.append(stt.run(piece).strip())
+    return " ".join(texts)
+```
+
+Pieces are cut end to end: a cut may split a word, where an overlap would
+repeat a few seconds of speech in the joined text. A runnable version is the
+`splice` recipe in the cookbooks repository.
 
 ## Images: why a tool and not a model
 

@@ -744,16 +744,47 @@ class TestChainConcurrency(unittest.TestCase):
         self.assertEqual(chain.accumulated.get("x"), "second")
 
 
-class TestSttGoogleRouting(unittest.TestCase):
+class TestAudioOverTheLimitIsRefused(unittest.TestCase):
+    """The library does not cut audio; a file over a provider's limit is
+    refused with its size and the limit, and the way to cut it named."""
 
-    def test_duration_probe_used_for_routing(self):
-        """A small-but-long file must go to the chunked path."""
+    def _wav(self, seconds: float) -> str:
+        import os, tempfile, wave
+        path = os.path.join(tempfile.mkdtemp(), "a.wav")
+        with wave.open(path, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000)
+            w.writeframes(b"\0\0" * int(8000 * seconds))
+        return path
+
+    def test_google_refuses_a_wav_over_a_minute_before_sending(self):
+        from unittest.mock import patch
         from yait_aichain.tools.transcribe import sttGoogle
+        tool = sttGoogle(api_key="k")
+        with patch("yait_aichain.tools.transcribe._stt.request_json") as req, \
+                self.assertRaisesRegex(ValueError, "61 s .*Long audio"):
+            tool.run(self._wav(61))
+        req.assert_not_called()
 
-        tool = sttGoogle.__new__(sttGoogle)   # skip __init__ (no credentials)
-        self.assertEqual(tool._MAX_SYNC_SECONDS, 55.0)
-        # _probe_duration_seconds returns None gracefully without pydub/file
-        self.assertIsNone(tool._probe_duration_seconds("/nonexistent.mp3"))
+    def test_google_sends_a_wav_under_a_minute(self):
+        from unittest.mock import patch
+        from yait_aichain.tools.transcribe import sttGoogle
+        with patch("yait_aichain.tools.transcribe._stt.request_json",
+                   return_value={"results": []}) as req:
+            sttGoogle(api_key="k").run(self._wav(5))
+        req.assert_called_once()
+
+    def test_openai_refuses_a_file_over_25_mb(self):
+        import os, tempfile
+        from unittest.mock import patch
+        from yait_aichain.tools.transcribe import sttOpenAI
+        path = os.path.join(tempfile.mkdtemp(), "big.mp3")
+        with open(path, "wb") as fh:
+            fh.write(b"ID3")                     # an MP3's first bytes
+            fh.truncate(26 * 1024 * 1024)
+        with patch("yait_aichain.tools.transcribe._stt.request") as req, \
+                self.assertRaisesRegex(ValueError, "up to 25 MB.*26.0 MB.*Long audio"):
+            sttOpenAI(api_key="k").run(path)
+        req.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -25,10 +25,7 @@ yaml    = ["pyyaml>=5.1"]
 mcp     = ["fastmcp>=2.10,<5"]
 # fetchLocal reads HTML with the standard library; a PDF needs pypdf.
 fetch   = ["pypdf>=4"]
-# Splitting a long recording. pydub needs audioop, which left the standard
-# library in 3.13.
-audio   = ["pydub", "audioop-lts; python_version >= '3.13'"]
-all     = ["yait-aichain[yaml,mcp,fetch,audio]"]
+all     = ["yait-aichain[yaml,mcp,fetch]"]
 
 [project.urls]
 Homepage   = "https://github.com/yaitio/aichain"

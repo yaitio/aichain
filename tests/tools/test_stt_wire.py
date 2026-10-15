@@ -55,11 +55,11 @@ class TestTheWire(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "whisper-1"):
             _sent(make, {"timestamps": True})
 
-    def test_a_large_file_with_timestamps_is_refused(self):
+    def test_a_file_over_the_limit_is_refused_and_told_how_to_cut_it(self):
         tool = sttOpenAI()
         tool._MAX_FILE_MB = 0.0
-        with self.assertRaisesRegex(ValueError, "split it"):
-            tool.run(_audio(), {"timestamps": True})
+        with self.assertRaisesRegex(ValueError, "the provider's limit.*Long audio"):
+            tool.run(_audio())
 
     def test_text_asks_for_text(self):
         _, _, fields, _, out = _sent(sttOpenAI, {"language": "en"})

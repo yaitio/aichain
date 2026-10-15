@@ -45,8 +45,7 @@ class TestGoogleSpeechWire(unittest.TestCase):
         answer = {"results": [{"alternatives": [{"transcript": "hello there", "words": [
             {"word": "hello", "startTime": "0s", "endTime": "0.400s"},
             {"word": "there", "startTime": "0.400s", "endTime": "0.900s"}]}]}]}
-        with patch("yait_aichain.tools.transcribe._stt.request_json", return_value=answer) as req, \
-                patch.object(type(tool), "_probe_duration_seconds", staticmethod(lambda p: 2.0)):
+        with patch("yait_aichain.tools.transcribe._stt.request_json", return_value=answer) as req:
             out = json.loads(tool.run(path, {"timestamps": True, "language": "en-GB"}))
         (_, method, url), kw = req.call_args
         self.assertEqual((method, url), ("POST", "https://speech.googleapis.com/v1/speech:recognize"))

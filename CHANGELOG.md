@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.6.1] — 2026-10-15
+
+### Removed
+
+- The library no longer cuts audio, and the `[audio]` extra (`pydub`,
+  `audioop-lts`) is gone: decoding audio is a dependency nothing else needs. A
+  file over a provider's limit is refused with its size and the limit — 25 MB
+  for OpenAI; a minute and 10 MB for Google's synchronous API, the minute read
+  from a WAV's header with the standard library — and the error points to
+  "Long audio" in `docs/tools/media.md`, where a wrapped tool that cuts and
+  transcribes is shown. `pip install "yait-aichain[audio]"` now installs the
+  library alone, with pip's warning that the extra does not exist.
+
 ## [4.6.0] — 2026-10-15
 
 ### Removed

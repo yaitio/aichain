@@ -3,19 +3,16 @@
 ``sttOpenAI`` and ``sttGoogle``, both plain HTTP.
 
 ``run()`` takes the path of an audio file and returns the transcript, or a JSON
-string when timestamps or ``format="json"`` are asked. Audio over a provider's
-limit is cut into pieces and the transcripts joined, which needs
-``pip install "yait-aichain[audio]"``. See docs/tools/media.md.
+string when timestamps or ``format="json"`` are asked. A file over a provider's
+limit is refused with the limit named; cutting it is the caller's — see "Long
+audio" in docs/tools/media.md.
 """
 
 from __future__ import annotations
 
-from ..._require import require
 
-import io
 import json
 import os
-import tempfile
 
 import urllib3
 
@@ -24,6 +21,10 @@ from ...clients._http import request, request_json
 
 from .._security import check_input_file
 from .._base import Tool
+
+#: Where a recording over a provider's limit is shown how to cut it.
+_LONG_AUDIO = ("cut it into pieces and transcribe each — a wrapped tool that does it is "
+               "under \"Long audio\" in docs/tools/media.md")
 
 
 # ── Base class ────────────────────────────────────────────────────────────────
@@ -149,15 +150,12 @@ class Transcription(Tool):
 class _OpenAICompatSTT(Transcription):
     """The OpenAI transcriptions wire: one multipart POST to
     ``{_BASE_URL}/audio/transcriptions`` in plain HTTP. A provider on it sets the
-    URL, default model, key variable and chunking constants as class variables."""
+    URL, default model, key variable and size limit as class variables."""
 
     _BASE_URL:        str          = "https://api.openai.com/v1"
     _DEFAULT_MODEL:   str          = "whisper-1"
     _ENV_KEY:         str          = "OPENAI_API_KEY"
-    # ── Chunking — advanced: adjust on the class before instantiating ─────
-    _CHUNK_SECONDS:   int          = 600    # 10 min per chunk
-    _OVERLAP_SECONDS: int          = 3      # overlap to avoid clipping words
-    _MAX_FILE_MB:     float        = 24.0   # stay under the 25 MB API limit
+    _MAX_FILE_MB:     float        = 25.0   # the API's own limit
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.model = _model_setting(self, model)
@@ -203,12 +201,8 @@ class _OpenAICompatSTT(Transcription):
             raise ValueError(f"{model} gives no word timestamps; use model='whisper-1' for them")
         file_mb = os.path.getsize(input) / (1024 * 1024)
         if file_mb > self._MAX_FILE_MB:
-            if timestamps:
-                # Chunks are joined as text, so the result's keys would
-                # depend on the file's size.
-                raise ValueError(f"{type(self).__name__}: word timestamps are not available for a "
-                                 f"file over {self._MAX_FILE_MB:.0f} MB; split it first")
-            return self._transcribe_chunked(input, model, language, prompt, timestamps, fmt)
+            raise ValueError(f"{type(self).__name__} takes a file up to {self._MAX_FILE_MB:.0f} MB, "
+                             f"the provider's limit; this one is {file_mb:.1f} MB — {_LONG_AUDIO}")
         return self._transcribe_single(input, model, language, prompt, timestamps, fmt)
 
     # ------------------------------------------------------------------
@@ -242,45 +236,6 @@ class _OpenAICompatSTT(Transcription):
                          for x in data.get("segments") or []],
         }, ensure_ascii=False)
 
-    def _transcribe_chunked(
-        self,
-        path:       str,
-        model:      str,
-        language:   str | None,
-        prompt:     str | None,
-        timestamps: bool,
-        fmt:        str,
-    ) -> str:
-        """Split oversized audio, transcribe each chunk, stitch results."""
-        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit", extra="audio").AudioSegment
-
-        audio      = AudioSegment.from_file(path)
-        chunk_ms   = self._CHUNK_SECONDS * 1000
-        parts: list[str] = []
-
-        # Chunks are CONTIGUOUS (no overlap): this path joins plain transcript
-        # text and has no word-timing data to de-duplicate an overlap region,
-        # so overlapping audio would repeat a few seconds of speech at every
-        # boundary. A clean cut at a 10-minute boundary risks splitting at most
-        # one word — far less harmful than duplicated phrases.
-        for start_ms in range(0, len(audio), chunk_ms):
-            chunk = audio[start_ms:start_ms + chunk_ms]
-
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-                tmp_path = tmp.name
-            try:
-                chunk.export(tmp_path, format="mp3")
-                part = self._transcribe_single(tmp_path, model, language, prompt,
-                                               timestamps=False, fmt="text")
-                parts.append(part.strip())
-            finally:
-                os.unlink(tmp_path)
-
-        combined = " ".join(p for p in parts if p)
-        if fmt == "json" or timestamps:
-            return json.dumps({"text": combined}, ensure_ascii=False)
-        return combined
-
 
 # ── sttOpenAI ─────────────────────────────────────────────────────────────────
 
@@ -288,9 +243,8 @@ class sttOpenAI(_OpenAICompatSTT):
     """
     Speech-to-text via the OpenAI Whisper API.
 
-    Audio files larger than 24 MB are automatically split into overlapping
-    chunks, transcribed in sequence, and stitched into a single transcript.
-    Requires ``pydub`` for chunking (``pip install pydub``).
+    A file over 25 MB, the API's limit, is refused with its size; cutting it
+    is the caller's (see "Long audio" in docs/tools/media.md).
 
     Models
     ------
@@ -327,13 +281,9 @@ class sttOpenAI(_OpenAICompatSTT):
 
     name = "sttOpenAI"
 
-    # ── Chunking settings — advanced: adjust on the class before instantiating
     _BASE_URL        = "https://api.openai.com/v1"
     _DEFAULT_MODEL   = "whisper-1"
     _ENV_KEY         = "OPENAI_API_KEY"
-    _CHUNK_SECONDS   = 600
-    _OVERLAP_SECONDS = 3
-    _MAX_FILE_MB     = 24.0
 
 
 # ── sttGoogle ─────────────────────────────────────────────────────────────────
@@ -342,11 +292,11 @@ class sttGoogle(Transcription):
     """
     Speech-to-text via Google Cloud Speech-to-Text, over its REST API.
 
-    Audio up to about a minute goes in one ``speech:recognize`` request.
-    Longer audio is cut into pieces of under a minute with ``pydub``
-    (``pip install "yait-aichain[audio]"``) and the transcripts are joined.
+    Audio up to a minute and 10 MB goes in one ``speech:recognize`` request —
+    the synchronous API's limits; longer audio is refused, and cutting it is
+    the caller's (see "Long audio" in docs/tools/media.md).
 
-    One plain HTTPS request per piece; no Google SDK. The key is an API key
+    One plain HTTPS request; no Google SDK. The key is an API key
     with the Cloud Speech-to-Text API enabled on its project.
 
     Parameters
@@ -377,10 +327,8 @@ class sttGoogle(Transcription):
     # ── Chunking settings — advanced: adjust on the class before instantiating
     _DEFAULT_LANGUAGE = "en-US"
     _DEFAULT_MODEL    = "latest_long"
-    _CHUNK_SECONDS    = 55      # Google sync limit is 60 s; stay safely under
-    _OVERLAP_SECONDS  = 2
-    _MAX_SYNC_SECONDS = 55.0    # sync API hard limit is ~60 s of audio
-    _MAX_SYNC_MB      = 10.0    # size fallback when duration can't be probed
+    _MAX_SYNC_SECONDS = 60.0    # the synchronous API's limits
+    _MAX_SYNC_MB      = 10.0
 
     # Maps audio extensions to Google RecognitionConfig encoding names
     _ENCODING_MAP: dict = {
@@ -443,20 +391,18 @@ class sttGoogle(Transcription):
                   "model": self.model, "enableWordTimeOffsets": timestamps,
                   "enableAutomaticPunctuation": True}
 
-        # The sync recognize API is limited by audio *duration* (~60 s), not
-        # file size: a 5 MB low-bitrate MP3 can hold half an hour of speech.
-        # Route by real duration whenever pydub can probe it.
-        duration_s = self._probe_duration_seconds(input)
-        if duration_s is not None:
-            use_sync = duration_s <= self._MAX_SYNC_SECONDS
-        else:
-            use_sync = os.path.getsize(input) / (1024 * 1024) <= self._MAX_SYNC_MB
-
-        if use_sync:
-            with open(input, "rb") as fh:
-                results = self._recognize(config, fh.read())
-            return self._format_results(results, timestamps, fmt)
-        return self._transcribe_chunked(config, input, timestamps, fmt)
+        # The sync API is limited by duration, which only a WAV states without a
+        # decoder, and by the request's size, which every file does.
+        size_mb = os.path.getsize(input) / (1024 * 1024)
+        seconds = _wav_seconds(input) if ext == ".wav" else None
+        if size_mb > self._MAX_SYNC_MB or (seconds or 0) > self._MAX_SYNC_SECONDS:
+            what = f"{seconds:.0f} s" if seconds else f"{size_mb:.1f} MB"
+            raise ValueError(f"sttGoogle takes up to {self._MAX_SYNC_SECONDS:.0f} s and "
+                             f"{self._MAX_SYNC_MB:.0f} MB of audio in one request; this file is "
+                             f"{what} — {_LONG_AUDIO}")
+        with open(input, "rb") as fh:
+            results = self._recognize(config, fh.read())
+        return self._format_results(results, timestamps, fmt)
 
     def _recognize(self, config: dict, audio: bytes) -> list:
         """One ``speech:recognize`` request; the results it answered with."""
@@ -467,18 +413,6 @@ class sttGoogle(Transcription):
                             headers={"x-goog-api-key": self._api_key},
                             what="Google Speech-to-Text API")
         return data.get("results") or []
-
-    @staticmethod
-    def _probe_duration_seconds(path: str) -> float | None:
-        """Return the audio duration in seconds, or None if unprobeable."""
-        try:
-            from pydub import AudioSegment
-        except ImportError:
-            return None
-        try:
-            return len(AudioSegment.from_file(path)) / 1000.0
-        except Exception:
-            return None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -492,18 +426,14 @@ class sttGoogle(Transcription):
         return float(str(value or "0").rstrip("s") or 0)
 
     @classmethod
-    def _words(cls, results: list, offset: float = 0.0, skip_before: float = 0.0) -> list:
+    def _words(cls, results: list) -> list:
         words = []
         for r in results:
             alts = r.get("alternatives") or []
             for w in (alts[0].get("words") or []) if alts else []:
-                start = cls._seconds(w.get("startTime"))
-                # Words inside the leading overlap of a later piece were
-                # already heard in the piece before it.
-                if start < skip_before:
-                    continue
-                words.append({"word": w.get("word", ""), "start": start + offset,
-                              "end": cls._seconds(w.get("endTime")) + offset})
+                words.append({"word": w.get("word", ""),
+                              "start": cls._seconds(w.get("startTime")),
+                              "end": cls._seconds(w.get("endTime"))})
         return words
 
     @staticmethod
@@ -518,38 +448,12 @@ class sttGoogle(Transcription):
             return text
         return json.dumps({"text": text, "words": cls._words(results)}, ensure_ascii=False)
 
-    def _transcribe_chunked(self, config: dict, path: str, timestamps: bool, fmt: str) -> str:
-        AudioSegment = require("pydub", package="pydub", who="transcribing a file over the size limit",
-                               extra="audio").AudioSegment
 
-        audio      = AudioSegment.from_file(path)
-        chunk_ms   = self._CHUNK_SECONDS   * 1000
-        overlap_ms = self._OVERLAP_SECONDS * 1000
-        parts: list[str]  = []
-        words: list[dict] = []
-        piece_config = {**config, "encoding": "LINEAR16"}
-
-        # Each chunk starts an overlap before the last one ended, and the last
-        # chunk is the one that reaches the end: a further chunk would be the
-        # overlap alone, transcribed and billed a second time.
-        for start_ms in range(0, len(audio), chunk_ms - overlap_ms):
-            buffer = io.BytesIO()
-            audio[start_ms:start_ms + chunk_ms].export(buffer, format="wav")
-            results = self._recognize(piece_config, buffer.getvalue())
-            parts.append(self._text(results).strip())
-            if timestamps:
-                words += self._words(results, offset=start_ms / 1000.0,
-                                     skip_before=self._OVERLAP_SECONDS if start_ms else 0.0)
-            if start_ms + chunk_ms >= len(audio):
-                break
-
-        # NB: the plain-text join may duplicate a word or two at chunk
-        # boundaries (the 2 s overlap is transcribed twice); the word list
-        # above is deduplicated by timestamp and is the precise record.
-        combined = " ".join(p for p in parts if p)
-        if fmt == "json" or timestamps:
-            payload: dict = {"text": combined}
-            if timestamps:
-                payload["words"] = words
-            return json.dumps(payload, ensure_ascii=False)
-        return combined
+def _wav_seconds(path: str) -> "float | None":
+    """A WAV file's duration from its header, or None when it cannot be read."""
+    import wave
+    try:
+        with wave.open(path, "rb") as w:
+            return w.getnframes() / float(w.getframerate())
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        return None
