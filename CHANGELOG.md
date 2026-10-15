@@ -1,5 +1,32 @@
 # Changelog
 
+## [4.3.0] — 2026-10-15
+
+### Changed
+
+- The agent and the chain are cut into modules by what each part does, with
+  no change of behaviour. `agent/_agent.py` keeps the configuration and the
+  public methods (2 074 → 942 lines); the loop and the pause are
+  `agent/_loop.py`, the stop conditions `agent/_stops.py`, `pool` /
+  `delegate` / `write_plan` `agent/_builtins.py`. `chain/_chain.py` keeps the
+  order of steps and their running (1 794 → 1 092); how a step's inputs are
+  filled is `chain/_inputs.py`, `input_schema()` and the checks made when a
+  chain is built `chain/_flow.py`, `save()` / `load()` `chain/_files.py`.
+  Every name either module held is importable from it still, and a saved
+  chain naming `yait_aichain.agent._agent.Agent` loads as before.
+
+### Fixed
+
+- `Chain.load()` built an agent step through the deprecated `permissions=`,
+  so loading a saved chain warned about the library's own call.
+
+### Not in this release
+
+- `AgentMemory` stays deprecated and goes in 5.0, as announced; removing it in
+  a minor would break those still on it. `Journal.entries` and
+  `Journal.recent()` are kept: unused by the library, but part of a public
+  record callers read.
+
 ## [4.2.9] — 2026-10-15
 
 ### Added
