@@ -499,10 +499,17 @@ class Chain:
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
-        from .._dispatch import as_policy
-        self.policy  = as_policy(policy)
-        self.approve = approve
-        self.interceptors = list(interceptors or [])
+        from .._dispatch import split_policy
+        import warnings as _warnings
+        for old, value in (("approve", approve), ("interceptors", interceptors)):
+            if value is not None:
+                _warnings.warn(f"Chain({old}=...) goes in 5.0; say it in policy={{{old!r}: ...}}",
+                              FutureWarning, stacklevel=3)
+        self.policy, self.approve, self.interceptors = split_policy(
+            policy, approve=approve, interceptors=interceptors, where="Chain(policy=)")
+        if self.approve == "park":
+            raise ValueError("Chain: approve='park' parks an agent's run; a chain cannot "
+                             "be parked on a person's answer yet — give a function, or 'deny'")
         if inputs is not None and not (isinstance(inputs, dict)
                                        and all(isinstance(v, str) for v in inputs.values())):
             raise ValueError("inputs maps an input's name to its description, a str")

@@ -272,10 +272,17 @@ class Pool:
         self._on_error  = on_error
         self.name       = name
         self.description = description
-        from .._dispatch import as_policy
-        self.policy     = as_policy(policy)
-        self.approve    = approve
-        self.interceptors = list(interceptors or [])
+        from .._dispatch import split_policy
+        import warnings as _warnings
+        for old, value in (("approve", approve), ("interceptors", interceptors)):
+            if value is not None:
+                _warnings.warn(f"Pool({old}=...) goes in 5.0; say it in policy={{{old!r}: ...}}",
+                              FutureWarning, stacklevel=3)
+        self.policy, self.approve, self.interceptors = split_policy(
+            policy, approve=approve, interceptors=interceptors, where="Pool(policy=)")
+        if self.approve == "park":
+            raise ValueError("Pool: approve='park' parks an agent's run; a pool cannot "
+                             "be parked on a person's answer yet — give a function, or 'deny'")
 
         self._lock: threading.Lock = threading.Lock()
         self._history: list[dict]  = self._init_history()

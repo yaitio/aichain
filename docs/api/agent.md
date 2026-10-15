@@ -27,6 +27,7 @@ Agent(
     description: str | None = None,
     verbose: int = 0,
     interceptors: list | None = None,
+    policy: dict | PermissionPolicy | None = None,
 )
 ```
 
@@ -39,9 +40,13 @@ A loop that holds one growing conversation and acts on the world.
 - `instructions` (*str, optional*, default `''`) — The standing brief — goes into the stable prefix.
 - `mode` (*"agile" | "waterfall"*, default `'agile'`) — `"agile"` decides at every step. `"waterfall"` writes a plan at
   step 0 (via the `write_plan` tool) and holds to it.
-- `team` (*list[Agent] | "auto" | None*, default `None`) — Who else may do work. `None` removes `delegate` from the tool set
-  entirely; a list restricts it to those workers; `"auto"` lets the
-  model describe new ones.
+- `team` (*dict | list[Agent] | None*, default `None`) — Who else may do work: `{"members": [...], "extend": bool, "max": N}`.
+  `members` are agents the lead hands tasks to, each read by its
+  `name` and `description`; `extend: True` lets the lead add a
+  member when none fits — one role, by its instructions, made once and
+  reused; `max` bounds the team, added members included. A list is the
+  members. `None` removes `delegate`. `"auto"` (`{"extend":
+  True}`) is deprecated since 4.2.9.
 - `planner_model` (*Model, optional*, default `None`) — `waterfall` only: the model that writes the plan. The freeze makes
   the plan the highest-leverage tokens of the run — everything after
   merely executes it — so it may deserve deliberation the execution
@@ -52,11 +57,26 @@ A loop that holds one growing conversation and acts on the world.
   a backstop, not a plan.
 - `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` at every step boundary; `stream()` yields
   the same events.
-- `permissions` (*PermissionPolicy | None, optional*, default `None`) — Maps a tool's `risk` class to `allow`, `approve` or `deny`,
-  checked before the tool runs. With none, every tool runs.
-- `approve` (*callable, optional*, default `None`) — Asked when the policy says `approve`: given an `ApprovalRequest`,
-  returns `True`, `False` or `ApprovalDecision(False, reason)`.
-  With `approve` in the policy and none attached, the call is refused.
+- `policy` (*dict | PermissionPolicy | None, optional*, default `None`) — Everything that decides what happens to a call, in one place:
+
+  ```python
+  {"rules":   {"read": "allow", "external": "approve", "destructive": "deny"},
+   "default": "approve",        # a class no rule names
+   "approve": "park",           # or "deny", or a function
+   "interceptors": [...]}
+  ```
+
+  `rules` map a tool's risk class to `allow`, `approve` or
+  `deny`. `approve` says who answers an `approve`: `"park"` parks
+  the run with the question — `resume(run_id, signal={"approved":
+  True})` runs the call, and needs a `store`; `"deny"` refuses it; a
+  function given an `ApprovalRequest` answers `True`, `False` or
+  `ApprovalDecision`. `interceptors` act on each call before and
+  after it runs — see `Interceptor`. Keys are
+  checked when the agent is built. A `PermissionPolicy` or a dict of
+  rules is the `rules` alone. With no policy every tool runs.
+- `permissions` (*PermissionPolicy | None, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"rules": ...}`. Removed in 5.0.
+- `approve` (*callable, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"approve": ...}`. Removed in 5.0.
 - `store` (*StateStore, optional*, default `None`) — Where a run parked by a `wait()` or `gate()` in the agent's tools
   is kept until `resume()`. Required when such a tool is given.
 - `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars for the whole run; a model call that would begin
@@ -67,10 +87,7 @@ A loop that holds one growing conversation and acts on the world.
 - `description` (*str | None, optional*, default `None`) — What it does — what a lead agent reads when choosing a worker.
 - `verbose` (*int, optional*, default `0`) — `0` is silent, `1` logs each step, `2` logs everything, through the
   `yait_aichain` logger.
-- `interceptors` (*list | None, optional*, default `None`) — Objects that act on a call before and after it runs — `before(call,
-  run)` may block it or change its arguments, before the policy decides;
-  `after(call, result, run)` may change its result. Every change is
-  written down. See `Interceptor`.
+- `interceptors` (*list | None, optional*, default `None`) — Deprecated since 4.2.9 — `policy={"interceptors": [...]}`. Removed in 5.0.
 
 ### `Agent.run()`
 

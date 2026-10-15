@@ -1,5 +1,44 @@
 # Changelog
 
+## [4.2.9] — 2026-10-15
+
+### Added
+
+- `policy={...}` on `Agent`, `Chain` and `Pool` holds everything that decides
+  what happens to a call — `rules`, `default`, `approve` (a function, `"park"`
+  or `"deny"`) and `interceptors` — with its keys checked when built: a
+  misspelt `"aprove"` is refused, not ignored. A `PermissionPolicy` or a plain
+  dict of rules is the rules alone.
+- `approve: "park"`: a call the rules want a person for parks the run with the
+  question — `awaiting` says `approval: True`, the tool and its arguments —
+  and `agent.resume(run_id, signal={"approved": True})` runs it, or `False`
+  with a `"reason"` refuses it. It needs a `store=`. A lead's `"park"` does not
+  reach inside a team member or a chain, which have nowhere to wait: such a
+  call is refused, and says so.
+- `team={"members": [...], "extend": bool, "max": N}`. `extend` lets the lead
+  add a member when none fits — one role, by its instructions, made once and
+  given work again; `max` bounds the team. `delegate`'s description now says
+  when to delegate and when not to.
+
+### Deprecated — removed in 5.0
+
+- `Agent(permissions=, approve=, interceptors=)` and `Chain`/`Pool(approve=,
+  interceptors=)`: say them in `policy=`.
+- `team="auto"`: `team={"extend": True}`.
+- `cost_budget(...)` in `stop_when`: `max_cost=`, which refuses a call before
+  it passes the limit where `cost_budget` stopped the run after a turn had.
+
+### Fixed
+
+- A parked tool completed on `resume()` ran outside the dispatcher — no
+  interceptors, no budget, no rules around it. It goes through it now.
+
+### Not in this release, by decision
+
+- `planner_model` stays until the `scribe` measurement decides it; a required
+  `reason` on `delegate` waits for a measurement of how often weak models get
+  it wrong; a `Chain` as a team member is planned, not built.
+
 ## [4.2.8] — 2026-10-15
 
 ### Added

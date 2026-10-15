@@ -2,7 +2,7 @@
 
 A model decides which tool to call. Whether the call runs is decided outside
 the model, before the tool starts, from two pieces of data: the tool's `risk`
-class and the agent's `PermissionPolicy`.
+class and the `policy` of whatever runs it — an `Agent`, a `Chain`, a `Pool`.
 
 ```python
 from yait_aichain import Agent, Model
@@ -23,9 +23,21 @@ def manager(request):                     # what the agent asks before the call 
     return ApprovalDecision(False, "refunds over $50 need a ticket")
 
 agent = Agent(Model("claude-haiku-5-5"), tools=[issue_refund],
-              permissions=PermissionPolicy({"financial": "approve"}),
-              approve=manager)
+              policy={"rules": {"financial": "approve"}, "approve": manager})
 ```
+
+`policy` holds everything that decides what happens to a call, and its keys
+are checked when the agent is built — a misspelt `"aprove"` is refused, not
+ignored:
+
+| key | what it is |
+|---|---|
+| `rules` | a risk class → `allow`, `approve` or `deny` |
+| `default` | the decision for a class no rule names |
+| `approve` | who answers an `approve`: a function, `"park"`, or `"deny"` |
+| `interceptors` | objects that act on each call before and after it runs |
+
+A `PermissionPolicy` or a plain dict of rules is the `rules` alone.
 
 ---
 
@@ -59,27 +71,28 @@ follows its method — `GET` is `read`, `DELETE` is `destructive`, a write is
 | Decision | What happens |
 |---|---|
 | `allow` | the tool runs |
-| `approve` | the agent asks `approve=`, and the tool runs only on a yes |
+| `approve` | the policy's `approve` answers, and the tool runs only on a yes |
 | `deny` | the tool never runs |
 
-An agent with no `permissions=` runs every tool. With a policy, the rules you
+An agent with no `policy` runs every tool. With one, the rules you
 do not give take the shipped default: `read`, `draft` and `write` run;
 `external`, `financial` and `privileged` need approval; `destructive` is
 denied.
 
-**With `approve` in the policy and no `approve=` attached, the call is
-refused** — a rule whose whole content is "ask a person" cannot mean "go
-ahead" when there is no one to ask.
+**With an `approve` rule and no one to answer it, the call is refused** — a
+rule whose whole content is "ask a person" cannot mean "go ahead" when there
+is no one to ask.
 
-**Where the policy holds, in 4.0.** It is consulted in the agent's own loop.
-The built-in `pool` tool, `Agent.execute()`, `resume()`, and tools run as
-steps of a `Chain` or items of a `Pool` do not consult it yet — so a tool that
-must never run without a person should not be reachable through them. This is
-a known issue of 4.0.0, to be closed in 4.0.x.
+**Where the policy holds.** Everywhere a tool runs: the agent's loop, its
+`execute()` seam, `resume()`, the built-in `pool`, `delegate` and
+`write_plan` (asked about as `draft`), a `Chain` step, a `Pool` item. And the
+rules around a call govern what it starts: a pipeline run inside an agent's
+tool, or a team member, decides under the stricter of its own rules and the
+agent's, and asks the agent's approver when it has none.
 
 ## The approver
 
-`approve=` gets an `ApprovalRequest` — the tool's name, its risk class, the
+A function in `approve` gets an `ApprovalRequest` — the tool's name, its risk class, the
 arguments and the call's id — and returns `True`, `False`, or
 `ApprovalDecision(False, reason)`. A refusal reaches the model as the tool's
 result, with the reason, so it can tell the user or try something else; the
@@ -92,7 +105,29 @@ is how a UI shows a person the question before the approver is asked.
 
 ## When the answer comes later
 
-`approve=` decides within one call of `run()`. When the person answers hours
-later, in another process, the tool belongs behind a `gate(tool)` in a chain
-or in the agent's hands, with a `store=`: the run parks, and resumes when the
-signal arrives. → [Pause and resume](../pipelines/pause-and-resume.md)
+A function decides within one call of `run()`. When the person answers hours
+later, in another process, say `"approve": "park"` and give the agent a
+`store=`: the run parks with the question, and
+`agent.resume(run_id, signal={"approved": True})` runs the call — or `False`,
+with a `"reason"`, refuses it. A `gate(tool)` does the same for one tool, in a
+chain or in an agent's hands. → [Pause and resume](../pipelines/pause-and-resume.md)
+
+## Interceptors
+
+Where a hook watches, an interceptor acts. `before(call, run)` may return a
+`Block(reason)` to stop the call, or the call with other arguments to run that
+instead — before the rules, so they decide on what will really run.
+`after(call, result, run)` may return another result. Every change goes into
+the run's journal and an `interceptor.changed` event, with what it was and
+what it became; one that raises blocks the call rather than being skipped.
+
+```python
+from yait_aichain import Block, Interceptor
+
+class NoFridays(Interceptor):
+    def before(self, call, run):
+        if call.name == "deploy" and is_friday():
+            return Block("no deploys on a Friday")
+
+agent = Agent(model, tools=[deploy], policy={"interceptors": [NoFridays()]})
+```

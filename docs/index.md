@@ -68,7 +68,7 @@ browse, read, write and run commands in, `MCP` and `REST` for connections. Your
 code calls their methods; the agent gets only the methods that are tools.
 
 **Control and measurement.** Usage and cost on every result; `max_cost`, one
-budget in dollars across every step; permissions by risk class, and `approve=`
+budget in dollars across every step; permissions by risk class, and `approve`
 for a person to decide; an [event for every step](control/observability.md);
 [Eval](control/eval.md) runs arms × cases × trials and reports accuracy,
 `Pass^k` and cost side by side.

@@ -209,7 +209,7 @@ print(agent.run("What is the tallest mountain? Store the answer.").stopped_by)
 
 ```python
 from yait_aichain import Agent, Model
-from yait_aichain.tools import ApprovalDecision, PermissionPolicy, Tool
+from yait_aichain.tools import ApprovalDecision, Tool
 class Refund(Tool):
     name = "issue_refund"
     description = "Refund an order."
@@ -220,7 +220,7 @@ class Refund(Tool):
 def approve(request):
     return True if request.arguments.get("amount", 0) <= 50 else ApprovalDecision(False, "over 50")
 agent = Agent(Model("gpt-5.4-mini"), tools=[Refund()],
-              permissions=PermissionPolicy({"financial": "approve"}), approve=approve)
+              policy={"rules": {"financial": "approve"}, "approve": approve})
 print(agent.run("Refund 80 for order 42.").output)
 ```
 

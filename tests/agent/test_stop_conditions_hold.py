@@ -40,6 +40,9 @@ class TestCeilings(unittest.TestCase):
     def test_a_priced_model_says_nothing(self):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            # The one warning it does give since 4.2.9 is that cost_budget goes
+            # in 5.0; what is pinned is that a priced model gets no price one.
+            warnings.filterwarnings("ignore", category=FutureWarning)
             Agent(Model("gpt-4o", api_key="k"), stop_when=[step_count(3), cost_budget(1.0)])
 
 

@@ -6,8 +6,8 @@ so the output is identical every time and you can check it. The point is the
 harness around the model, not the model:
 
   1. A Tracer hook records a structured event at every boundary.
-  2. A PermissionPolicy marks a FINANCIAL tool as needing approval, and
-     ``approve=`` is who answers. The run does not pause: the approver is an
+  2. The policy marks a FINANCIAL tool as needing approval, and its
+     ``approve`` is who answers. The run does not pause: the approver is an
      ordinary callable, so the wait lives wherever your application already
      waits — a console prompt, a queue, a UI.
   3. A refusal carries its reason back to the model as a tool result.
@@ -102,7 +102,6 @@ def manager(request):
 
 logging.basicConfig(level=logging.INFO, format="    log │ %(message)s",
                     stream=sys.stdout)              # stdout, so it reads in order
-policy = PermissionPolicy({"financial": "approve"})
 
 
 def run(amount):
@@ -110,8 +109,8 @@ def run(amount):
     agent  = Agent(script(amount),
                    tools       = [IssueRefund()],
                    hooks       = [tracer],          # observability
-                   permissions = policy,            # governance
-                   approve     = manager)           # who answers "approve"
+                   policy      = {"rules": {"financial": "approve"},   # governance
+                                  "approve": manager})                 # who answers "approve"
     result = agent.run(f"Refund ${amount} for order #123.")
 
     print("\n    event timeline:")

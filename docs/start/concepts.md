@@ -104,7 +104,7 @@ agent.run("What changed in Python 3.14?").output
 One loop: each turn the model calls tools or answers. The reply decides —
 tool calls continue, prose ends the turn — so the model chooses content, never
 control flow. `stop_when` decides how a run ends: a ceiling (`step_count`,
-`token_budget`, `cost_budget`) ends it as a failure, `check(fn)` ends it on a
+`token_budget`) ends it as a failure, `check(fn)` ends it on a
 fact your code verified, and `stalled(k)` / `repeating(k)` speak to the model
 and let it go on.
 
@@ -155,7 +155,7 @@ by name.
 Every result carries `usage` and `cost`, priced from the registry.
 `max_cost=` is one ceiling in dollars shared by every step of a Skill, Chain,
 Pool or Agent. A tool's `risk` class and a `PermissionPolicy` decide whether it
-runs, asks `approve=` first, or never runs. Every step emits an event a tracer
+runs, asks a person first, or never runs. Every step emits an event a tracer
 or a UI can read, and `eval/` runs the same cases through several models,
 prompts or modes and reports accuracy, `Pass^k` and cost side by side.
 

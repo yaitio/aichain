@@ -180,6 +180,62 @@ def takes_run(tool) -> bool:
     return param is not None and param.kind == param.KEYWORD_ONLY
 
 
+#: What `policy=` takes, as a dict: the rules by risk class, the decision for
+#: a class no rule names, who answers when a rule says "approve", and the
+#: interceptors that act on each call. One place for everything that decides
+#: what happens to a call.
+POLICY_KEYS = ("rules", "default", "approve", "interceptors")
+
+#: The words `policy["approve"]` takes besides a function.
+APPROVE_WORDS = ("park", "deny")
+
+
+class ApprovalParked(Suspend):
+    """A call the policy wants a person for, under ``approve: "park"``: the
+    run parks with the question, and ``resume(run_id, signal={"approved":
+    True})`` runs the call — or ``False``, with a ``"reason"``, refuses it."""
+    approval = True
+
+
+def split_policy(policy, *, approve=None, interceptors=None, where: str = "policy"):
+    """``policy=`` as every primitive takes it, split into its three parts:
+    ``(permissions, approve, interceptors)``.
+
+    A `PermissionPolicy` is the rules alone. A dict of risk classes is the
+    rules too. ``{"rules": …, "default": …, "approve": …, "interceptors": …}``
+    is the whole of it, its keys checked — a misspelt ``"aprove"`` refused
+    rather than ignored. *approve* and *interceptors* are the separate
+    parameters the dict replaced, honoured beside it, never both.
+    """
+    from .tools._permissions import APPROVE, PermissionPolicy
+    rules_given = False
+    if policy is None:
+        permissions = None
+    elif hasattr(policy, "decide"):
+        permissions = policy
+    elif isinstance(policy, dict) and not (set(policy) & set(POLICY_KEYS)):
+        permissions = PermissionPolicy(policy)
+    elif isinstance(policy, dict):
+        if unknown := sorted(set(policy) - set(POLICY_KEYS)):
+            raise ValueError(f"{where} keys are {list(POLICY_KEYS)}; got {unknown}")
+        rules_given = "rules" in policy or "default" in policy
+        permissions = (PermissionPolicy(policy.get("rules"), default=policy.get("default", APPROVE))
+                       if rules_given else None)
+        for name, given in (("approve", approve), ("interceptors", interceptors)):
+            if name in policy and given is not None:
+                raise ValueError(f"{name} is given twice — in {where} and as {name}=; keep the "
+                                 f"one in {where}")
+        approve = policy.get("approve", approve)
+        interceptors = policy.get("interceptors", interceptors)
+    else:
+        raise TypeError(f"{where} is a PermissionPolicy or a dict, not {type(policy).__name__}")
+    if approve is not None and not callable(approve) and approve not in APPROVE_WORDS:
+        raise ValueError(f"{where}['approve'] is 'park', 'deny' or a function; got {approve!r}")
+    if interceptors is not None and not isinstance(interceptors, (list, tuple)):
+        raise ValueError(f"{where}['interceptors'] is a list; got {type(interceptors).__name__}")
+    return permissions, approve, list(interceptors or [])
+
+
 def as_policy(policy):
     """``policy=`` as Chain and Pool take it: a `PermissionPolicy`, a dict of
     rules, or ``{"rules": {...}, "default": ...}``; None for no policy of its own."""
@@ -355,7 +411,28 @@ class Dispatcher:
         request, run.pending = step.request, None
         approve = self.approve if self.approve is not None else next(
             (g.approve for g in reversed(_GOVERNING.get()) if g.approve is not None), None)
-        if approve is None:
+        if approve == "park" and self.approve != "park":
+            # A lead's "park" waits in the lead's run, which is where the store
+            # is; a worker or a chain inside it has nowhere to park, so a call
+            # of theirs that needs a person is refused, and says why.
+            approve = "deny"
+            parked_elsewhere = True
+        else:
+            parked_elsewhere = False
+        if approve == "park":
+            # A person answers later, maybe in another process: the run waits
+            # with the question, and `resume()` brings the answer.
+            raise ApprovalParked(
+                reason=f"approve {request.tool!r} ({request.risk})",
+                resume_with={"approved": "bool", "reason": "str"},
+                hint={"approval": True, "tool": request.tool, "risk": request.risk,
+                      "arguments": request.arguments})
+        if approve == "deny":
+            granted, reason = False, (
+                "it needs a person, and the run that can wait for one is the agent around "
+                "this one; give this one approve= of its own" if parked_elsewhere else
+                f"the policy refuses every call that needs approval ({request.risk!r} here)")
+        elif approve is None:
             granted = False
             reason = (f"no approver is attached. Pass Agent(approve=...) to "
                       f"decide per call, or set the policy rule for "
@@ -386,7 +463,7 @@ class Dispatcher:
         # something is what keeps the model's history well-formed, and a
         # denied call the model never hears about is one it will simply make
         # again. `tool_call.ended` then carries this as its error.
-        head = "needs approval and" if approve is None else "was not approved:"
+        head = "needs approval and" if approve in (None, "deny") else "was not approved:"
         return Denied(f"tool {request.tool!r} ({request.risk}) {head} {reason}")
 
     def decide(self, call, state: dict | None = None):
@@ -456,6 +533,7 @@ class Dispatcher:
 
 
 __all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "Block", "Interceptor",
+           "ApprovalParked", "split_policy", "POLICY_KEYS",
            "governing", "calling",
            "as_policy",
            "MAX_ARGUMENT_DEPTH", "depth"]

@@ -16,9 +16,9 @@ only the run_id and the store — no reference to the original chain object.
     Invocation 2  approval_webhook(run_id, approved) → chain.resume(...)
 
 Why a Chain and not an Agent: a chain's position is its state, so it can be
-parked and picked up by another process. An agent's state is its conversation,
-so it has no suspend — an agent that needs a human uses ``approve=`` instead
-(see 20_observability.py).
+parked and picked up by another process. An agent parks too — on a ``wait()``
+in its tools, or on any call its ``policy={"approve": "park"}`` sends to a
+person — and an approver that answers at once is 20_observability.py.
 
 Runs offline — no model, no key:
     python examples/18_chain_external_trigger.py

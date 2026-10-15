@@ -177,20 +177,20 @@ when the agent is made. → [Agent](../agents/overview.md)
 
 `risk` is a property of the tool — `read`, `draft`, `write` (the default),
 `external`, `financial`, `destructive`, `privileged` — and an agent's
-`PermissionPolicy` reads it before the tool runs: `allow` runs it, `deny` never
-does, `approve` asks your `approve=` function and runs only on a yes.
+`policy` reads it before the tool runs: `allow` runs it, `deny` never does,
+`approve` asks the policy's `approve` and runs only on a yes.
 
 ```python
-from yait_aichain.tools import ApprovalDecision, PermissionPolicy
+from yait_aichain.tools import ApprovalDecision
 
 agent = Agent(model, tools=[issue_refund],
-              permissions=PermissionPolicy({"financial": "approve"}),
-              approve=lambda request: request.arguments["amount"] <= 50
-                                      or ApprovalDecision(False, "over $50 needs a ticket"))
+              policy={"rules": {"financial": "approve"},
+                      "approve": lambda request: request.arguments["amount"] <= 50
+                                 or ApprovalDecision(False, "over $50 needs a ticket")})
 ```
 
-With `approve` in the policy and no `approve=` attached, the call is refused,
-and the refusal reaches the model with its reason. → [Permissions](../control/permissions.md)
+With an `approve` rule and no one to answer it, the call is refused, and the
+refusal reaches the model with its reason. → [Permissions](../control/permissions.md)
 
 ---
 

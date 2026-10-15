@@ -108,9 +108,10 @@ a message list — so an agent parks the same way a chain does, through a
 `agent.save()`. Nothing stops a run from outside it either: a run parks only
 where one of its own steps asked the world for something.
 
-A person deciding within the same call needs none of this: `approve=` on the
-agent asks them before the tool runs, and returns. Parking is for answers that
-outlive the process. → [Permissions](../control/permissions.md)
+A person deciding within the same call needs none of this: an `approve` function in the
+agent's `policy` asks them before the tool runs, and returns. Parking is for
+answers that outlive the process — `policy={"approve": "park"}` parks any call
+that needs one. → [Permissions](../control/permissions.md)
 
 ---
 

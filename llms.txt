@@ -82,7 +82,7 @@ Agent(model: Model, tools: list | None = None, instructions: str = '',
       approve: Callable[[ApprovalRequest], Any] | None = None,
       store: StateStore | None = None, max_cost: float | Budget | None = None,
       name: str | None = None, description: str | None = None, verbose: int = 0,
-      interceptors: list | None = None)
+      interceptors: list | None = None, policy: dict | PermissionPolicy | None = None)
 ```
 <!-- /g:signatures -->
 
@@ -240,10 +240,11 @@ one of `read`, `draft`, `write`, `external`, `financial`, `destructive`,
 say what they risk: `Shell.run` is `privileged`, a REST endpoint follows its method
 (`GET` `read`, `DELETE` `destructive`, other writes `external`), and an MCP tool its
 server's annotations — `privileged` when there are none. With
-`permissions=PermissionPolicy()` the shipped rules allow `read`/`draft`/`write`, ask
-`approve=` for `external`/`financial`/`privileged`, and deny `destructive`; with no
-policy every tool runs. In 4.0.0 the policy is consulted in the agent's own loop only —
-the `pool` tool, `execute()`, `resume()` and `Chain`/`Pool` steps do not consult it. A tool may keep state on its instance and define its own `__init__`.
+`policy={"rules": {}}` the shipped rules allow `read`/`draft`/`write`, ask a person
+for `external`/`financial`/`privileged`, and deny `destructive`; with no policy every
+tool runs. The policy holds wherever a tool runs — the loop, `pool`, `execute()`,
+`resume()`, `Chain` steps, `Pool` items — and the rules around a call govern what it
+starts: a pipeline in an agent's tool, a team member. A tool may keep state on its instance and define its own `__init__`.
 
 **Search, fetch and decide — a tool made by its provider's name.** `search("exa")`,
 `fetch("firecrawl")`, `decide("openai", questions=…)`. `run()` returns a `Record`: a
@@ -405,12 +406,16 @@ def approve(request):                   # request.tool, .risk, .arguments
     return ApprovalDecision(False, "over the limit")
 
 agent = Agent(Model("gpt-5.4-mini"), tools=[refund_tool],
-              permissions=PermissionPolicy({"financial": "approve"}), approve=approve)
+              policy={"rules": {"financial": "approve"}, "approve": approve})
 ```
 
 A rule maps a risk class to `"allow"`, `"approve"` or `"deny"`. `"deny"` never
-runs the tool, whatever the model asks; without `approve=`, an `"approve"` rule
-refuses too. A refusal reaches the model as a tool result carrying the reason.
+runs the tool, whatever the model asks; with no `approve` in the policy, an
+`"approve"` rule refuses too. `"approve": "park"` (with a `store=`) parks the run
+until `agent.resume(run_id, signal={"approved": True})`. A refusal reaches the model
+as a tool result carrying the reason. `policy` keys are `rules`, `default`, `approve`,
+`interceptors`, checked when the agent is built; `permissions=` and `approve=` are
+the deprecated spellings.
 
 ### Driving the loop yourself
 

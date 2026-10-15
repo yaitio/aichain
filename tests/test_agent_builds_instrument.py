@@ -34,8 +34,7 @@ BY_ID = {t.id: t for t in TASKS}
 MISTAKES = [
     ("agent-tool-ceiling", [("step_count(6)", "step_count(7)")]),
     ("chain-skip-failure", [('on_step_error="skip"', 'on_step_error="collect"')]),
-    ("agent-approval", [('permissions=PermissionPolicy({"financial": "approve"}), ', ""),
-                        ("approve=approve)", ")")]),
+    ("agent-approval", [(', "approve": approve})', "})")]),
     ("skill-two-providers", [('("claude-sonnet-4-6", "gpt-5.4-mini")', '("gpt-5.4-mini", "gpt-4o")')]),
     ("chain-pause-resume", [(', store=FileStore("runs"))', ")")]),
     ("pool-fanout", [("max_flows=3", "max_flows=6")]),

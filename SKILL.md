@@ -65,8 +65,9 @@ faster and more predictable than an Agent that rediscovers them.
    (`step_count(n)`), and a `check(fn)` when success can be verified in code.
    Add `max_cost=` when money matters — one budget across every step.
 5. **Gate side effects.** Give risky tools a `risk` class and the agent
-   `permissions=PermissionPolicy({...})` plus an `approve=` callable.
-6. **Observe.** Print `result.stopped_by`, `result.cost`, `chain.history` or
+   `policy={"rules": {...}, "approve": fn}` — or `"approve": "park"` with a
+   `store=` when a person answers later.
+6. **Observe.** Print `result.stopped_by`, `result.cost`, `result.history` or
    `pool.status`; attach `hooks=[Tracer()]` when debugging.
 
 ## Checklist before you finish

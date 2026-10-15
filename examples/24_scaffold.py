@@ -4,10 +4,10 @@
 
 The sixth cell of the design grid::
 
-    Agent(model, tools, mode="waterfall", team="auto")
+    Agent(model, tools, mode="waterfall", team={"extend": True})
 
 ``mode="waterfall"`` makes the agent write a plan at step 0 and hold to it.
-``team="auto"`` gives it ``delegate``: workers it describes itself, each
+``team={"extend": True}`` gives it ``delegate``: workers it describes itself, each
 running its own conversation with the parent's tools. Together they are the
 scaffold pattern — the coordinator composes the crew for *this* task, the
 crew does the work, the coordinator synthesizes. (Sakana's Fugu ships this
@@ -42,7 +42,7 @@ import textwrap
 MODEL = "gpt-6-luna"          # any provider you have a key for
 
 from yait_aichain import Agent, Model
-from yait_aichain.agent import step_count, cost_budget
+from yait_aichain.agent import step_count
 from yait_aichain.tools import Tool
 
 # ── Three quarterly reports — the bulk the coordinator should NOT read ────────
@@ -100,13 +100,14 @@ agent = Agent(
     planner_model = Model(MODEL),                       # designer: think
     tools         = [ReadReport()],
     mode          = "waterfall",
-    team          = "auto",
+    team          = {"extend": True},
     instructions  = (
         "You coordinate a review crew. First design the team as your plan: "
         "which workers, with what remit each. Then delegate accordingly — "
         "your own conversation is for the plan and the final synthesis only."
     ),
-    stop_when     = [step_count(12), cost_budget(0.50)],
+    stop_when     = [step_count(12)],
+    max_cost      = 0.50,
 )
 
 result = agent.run(

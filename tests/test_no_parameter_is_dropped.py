@@ -41,7 +41,6 @@ KEPT = {
     ("BudgetExceeded", "spent"): _OUT,
     ("BudgetExceeded", "what"): _OUT,
     ("UnsupportedOption", "adaptations"): _OUT,
-    ("Suspend", "reason"): "raised by a tool; the agent and Chain read it off the exception",
     ("Suspend", "resume_with"): "raised by a tool; the agent and Chain read it off the exception",
     ("Suspend", "hint"): "raised by a tool; the agent and Chain read it off the exception",
     ("PoolResult", "beacons"): _RESULT,

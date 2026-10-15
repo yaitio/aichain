@@ -68,7 +68,7 @@ from ._journal import Journal, evidence as _evidence, CHECK, MODEL_CLAIM, \
 from ._result  import AgentResult
 from .         import _prompts as prompts
 from .._events import Event, emit
-from ..models._calls import (ToolCallRequest, dangling_calls,
+from ..models._calls import (ToolCall, ToolCallRequest, dangling_calls,
                              tool_result_turn)
 from ..pool    import Pool
 from ..state   import RunContext, Suspend, SuspendedResult, current, using
@@ -338,37 +338,84 @@ _PLAN_SCHEMA = {
 }
 
 
-def _delegate_schema(team) -> dict:
+#: When to hand work down, put where the model reads it: in the tool. A
+#: delegation is a whole run of another agent, and small work handed down
+#: costs more than doing it.
+DELEGATE_WHEN = (
+    "Delegate only when one of these holds: specialisation — a member has tools, "
+    "knowledge or a model you lack; determinism — a member does exactly this job; "
+    "isolation — more than about five calls or a lot of raw material whose details the "
+    "answer does not need. Do not delegate what one to three of your own calls finish, "
+    "or what needs this whole conversation.")
+
+
+def _delegate_schema(team: dict) -> dict:
     props: dict = {"task": {"type": "string",
                             "description": "a self-contained task"}}
     required = ["task"]
-    if isinstance(team, list):
+    members = team.get("members") or []
+    if members:
         names = [getattr(w, "name", None) or f"worker{i}"
-                 for i, w in enumerate(team)]
+                 for i, w in enumerate(members)]
         # What each worker is for, beside its name. `description` was stored
         # and never read, so the lead chose between `worker0` and `worker1`
         # by guessing — a whole worker run lost on every wrong guess.
         roster = "; ".join(f"{n}: {getattr(w, 'description', None) or 'no description given'}"
-                           for n, w in zip(names, team))
+                           for n, w in zip(names, members))
         props["worker"] = {"type": "string", "enum": names,
-                           "description": f"which worker takes it — {roster}"}
-        required.append("worker")
-    else:                                              # "auto"
-        props["instructions"] = {"type": "string",
-                                 "description": "who this worker should be"}
+                           "description": f"which member takes it — {roster}"}
+        if not team.get("extend"):
+            required.append("worker")
+    if team.get("extend"):
+        props["instructions"] = {
+            "type": "string",
+            "description": ("who a new member should be, named as a role — 'translator', not "
+                            "'helper_for_task_3'; the same instructions reuse the same member"
+                            + ("; leave it out to give the task to a listed member" if members
+                               else ""))}
     return {
         "type": "function",
         "function": {
             "name": "delegate",
             "description": (
-                "Hand a scoped sub-task to a worker. The worker runs its own "
-                "conversation and returns a conclusion — use it to keep bulk "
-                "work out of this one."
-            ),
+                "Hand a scoped sub-task to a team member. It runs its own conversation "
+                "and returns a conclusion — use it to keep bulk work out of this one. "
+                + DELEGATE_WHEN),
             "parameters": {"type": "object", "properties": props,
                            "required": required},
         },
     }
+
+
+def _team_parts(team) -> dict | None:
+    """``team=`` in its one form: ``{"members": [...], "extend": bool, "max": N}``.
+    A list is the members; ``"auto"`` is ``{"extend": True}``, said."""
+    if team is None:
+        return None
+    if team == "auto":
+        warnings.warn("team='auto' goes in 5.0; say team={'extend': True} (and 'members': [...] "
+                      "for the ones you already have)", FutureWarning, stacklevel=4)
+        team = {"extend": True}
+    elif isinstance(team, (list, tuple)):
+        team = {"members": list(team)}
+    if not isinstance(team, dict):
+        raise ValueError(f"team is a dict {{'members': [...], 'extend': bool, 'max': N}}, a list "
+                         f"of agents, or None; got {type(team).__name__}")
+    if unknown := sorted(set(team) - {"members", "extend", "max"}):
+        raise ValueError(f"team keys are 'members', 'extend' and 'max'; got {unknown}")
+    members = list(team.get("members") or [])
+    if bad := [type(m).__name__ for m in members if not isinstance(m, Agent)]:
+        raise ValueError(f"a team member is an Agent; got {bad} — a Chain as a member is planned, "
+                         "not built")
+    extend = bool(team.get("extend", False))
+    cap = team.get("max")
+    if cap is not None and (isinstance(cap, bool) or not isinstance(cap, int) or cap < 1):
+        raise ValueError(f"team['max'] is a whole number of at least 1; got {cap!r}")
+    if cap is not None and len(members) > cap:
+        raise ValueError(f"team['max'] is {cap} and {len(members)} members are listed")
+    if not members and not extend:
+        return None
+    return {"members": members, "extend": extend, "max": cap}
 
 
 # ── Agent ────────────────────────────────────────────────────────────────────
@@ -466,10 +513,14 @@ class Agent:
     mode : "agile" | "waterfall"
         ``"agile"`` decides at every step. ``"waterfall"`` writes a plan at
         step 0 (via the ``write_plan`` tool) and holds to it.
-    team : list[Agent] | "auto" | None
-        Who else may do work. ``None`` removes ``delegate`` from the tool set
-        entirely; a list restricts it to those workers; ``"auto"`` lets the
-        model describe new ones.
+    team : dict | list[Agent] | None
+        Who else may do work: ``{"members": [...], "extend": bool, "max": N}``.
+        ``members`` are agents the lead hands tasks to, each read by its
+        ``name`` and ``description``; ``extend: True`` lets the lead add a
+        member when none fits — one role, by its instructions, made once and
+        reused; ``max`` bounds the team, added members included. A list is the
+        members. ``None`` removes ``delegate``. ``"auto"`` (``{"extend":
+        True}``) is deprecated since 4.2.9.
     planner_model : Model, optional
         ``waterfall`` only: the model that writes the plan. The freeze makes
         the plan the highest-leverage tokens of the run — everything after
@@ -483,13 +534,27 @@ class Agent:
     hooks : list | None, optional
         Callables given an ``Event`` at every step boundary; ``stream()`` yields
         the same events.
+    policy : dict | PermissionPolicy | None, optional
+        Everything that decides what happens to a call, in one place::
+
+            {"rules":   {"read": "allow", "external": "approve", "destructive": "deny"},
+             "default": "approve",        # a class no rule names
+             "approve": "park",           # or "deny", or a function
+             "interceptors": [...]}
+
+        ``rules`` map a tool's risk class to ``allow``, ``approve`` or
+        ``deny``. ``approve`` says who answers an ``approve``: ``"park"`` parks
+        the run with the question — ``resume(run_id, signal={"approved":
+        True})`` runs the call, and needs a ``store``; ``"deny"`` refuses it; a
+        function given an ``ApprovalRequest`` answers ``True``, ``False`` or
+        ``ApprovalDecision``. ``interceptors`` act on each call before and
+        after it runs — see :class:`~yait_aichain.Interceptor`. Keys are
+        checked when the agent is built. A ``PermissionPolicy`` or a dict of
+        rules is the ``rules`` alone. With no policy every tool runs.
     permissions : PermissionPolicy | None, optional
-        Maps a tool's ``risk`` class to ``allow``, ``approve`` or ``deny``,
-        checked before the tool runs. With none, every tool runs.
+        Deprecated since 4.2.9 — ``policy={"rules": ...}``. Removed in 5.0.
     approve : callable, optional
-        Asked when the policy says ``approve``: given an ``ApprovalRequest``,
-        returns ``True``, ``False`` or ``ApprovalDecision(False, reason)``.
-        With ``approve`` in the policy and none attached, the call is refused.
+        Deprecated since 4.2.9 — ``policy={"approve": ...}``. Removed in 5.0.
     store : StateStore, optional
         Where a run parked by a ``wait()`` or ``gate()`` in the agent's tools
         is kept until ``resume()``. Required when such a tool is given.
@@ -506,10 +571,7 @@ class Agent:
         ``0`` is silent, ``1`` logs each step, ``2`` logs everything, through the
         ``yait_aichain`` logger.
     interceptors : list | None, optional
-        Objects that act on a call before and after it runs — ``before(call,
-        run)`` may block it or change its arguments, before the policy decides;
-        ``after(call, result, run)`` may change its result. Every change is
-        written down. See :class:`~yait_aichain.Interceptor`.
+        Deprecated since 4.2.9 — ``policy={"interceptors": [...]}``. Removed in 5.0.
     """
 
     MODES = ("agile", "waterfall")
@@ -533,21 +595,21 @@ class Agent:
         description:   str | None = None,
         verbose:       int = 0,
         interceptors:  list | None = None,
+        policy:        dict | PermissionPolicy | None = None,
     ) -> None:
         if mode not in self.MODES:
             raise ValueError(f"mode must be one of {self.MODES}; got {mode!r}")
-        if team is not None and team != "auto" and not isinstance(team, (list, tuple)):
-            raise ValueError(
-                "team must be None, a list of agents, or \"auto\"; "
-                f"got {type(team).__name__}"
-            )
 
         self.model        = model
         self.tools        = list(tools or [])
         _check_tools(self.tools)
         self.instructions = instructions
         self.mode         = mode
-        self.team         = list(team) if isinstance(team, (list, tuple)) else team
+        # One form whatever was given — see `_team_parts`.
+        self.team         = _team_parts(team)
+        #: Members the lead added, by the instructions that made them, so one
+        #: role is made once and given the work again.
+        self._extended: dict = {}
         if planner_model is not None and mode != "waterfall":
             raise ValueError("planner_model applies to mode='waterfall' only — "
                              "no other mode has a planning phase")
@@ -561,6 +623,12 @@ class Agent:
                           stacklevel=3)
             self.stop_when.append(step_count(30))
         if any(getattr(c, "name", "") == "cost_budget" for c in self.stop_when):
+            # Two money limits that work differently: this one ends the run
+            # between turns, `max_cost` refuses to begin a call past it, on
+            # every primitive and shared between them. One is enough.
+            warnings.warn("cost_budget(...) in stop_when goes in 5.0; give max_cost= instead — it "
+                          "stops a call before it would pass the limit, where cost_budget "
+                          "stops the run after a turn already has", FutureWarning, stacklevel=3)
             from ..models._usage import _price_of
             if _price_of(getattr(model, "name", ""), getattr(model, "_provider", None)) is None:
                 warnings.warn(f"cost_budget on {getattr(model, 'name', model)!r}, which has no "
@@ -579,11 +647,22 @@ class Agent:
         # concurrent runs. Outside a run, `_idle` stands in, so the external
         # seams (`step()`, a direct `_do_delegate`) behave as before.
         self._idle: AgentRun | None = None
-        self.permissions  = permissions
-        # Who answers when the policy says "approve". A callable taking an
-        # ApprovalRequest and returning truthy to proceed. The library cannot
-        # ask a human; it can only make sure one is asked when a policy said
-        # to. Absent, an `approve` decision refuses — see `_permit`.
+        for old, value in (("permissions", permissions), ("approve", approve),
+                           ("interceptors", interceptors)):
+            if value is not None:
+                warnings.warn(f"Agent({old}=...) goes in 5.0; say it in policy="
+                              + ("{'rules': ...}" if old == "permissions" else f"{{{old!r}: ...}}"),
+                              FutureWarning, stacklevel=3)
+        if policy is not None and permissions is not None:
+            raise ValueError("the rules are given twice — policy= and permissions=; keep policy=")
+        from .._dispatch import split_policy
+        rules, approve, interceptors = split_policy(policy, approve=approve,
+                                                    interceptors=interceptors,
+                                                    where="Agent(policy=)")
+        # The rules, who answers an "approve" — a function, "park" or "deny" —
+        # and what acts on each call: the three parts of `policy=`, kept apart
+        # because each is read in its own place.
+        self.permissions  = rules if rules is not None else permissions
         self.approve      = approve
         # Where a parked run is kept. A tool that declares `suspends` can end
         # a turn with "the world must answer this before I go on", and the
@@ -592,6 +671,10 @@ class Agent:
         # pause, because a pause nobody can resume is otherwise discovered at
         # the worst possible moment: after the model asked.
         self.store        = store
+        if self.approve == "park" and store is None:
+            raise ValueError("policy approve='park' parks a run until a person answers, and "
+                             "there is nowhere to keep it: pass store=InMemoryStore() or "
+                             "store=FileStore(path)")
         if (parked := [t.name or type(t).__name__ for t in self.tools
                        if getattr(t, "suspends", False)]) and store is None:
             raise ValueError(
@@ -610,7 +693,7 @@ class Agent:
         self.name         = name
         self.description  = description
         self.verbose      = verbose
-        self.interceptors = list(interceptors or [])
+        self.interceptors = interceptors
         # How deep in a delegation this agent's runs start, and how deep they
         # may go. Not parameters: a run carries its own depth (`AgentRun`),
         # and `delegate` hands a worker its lead's plus one.
@@ -618,16 +701,16 @@ class Agent:
         self._max_depth   = 5
 
         self._tool_map   = {t.name: t for t in self.tools}
-        self._worker_map = ({(getattr(w, "name", None) or f"worker{i}"): w
-                             for i, w in enumerate(self.team)}
-                            if isinstance(self.team, list) else {})
-        if isinstance(self.team, list) and len(self._worker_map) != len(self.team):
-            names = [getattr(w, "name", None) or f"worker{i}" for i, w in enumerate(self.team)]
+        members = (self.team or {}).get("members") or []
+        self._worker_map = {(getattr(w, "name", None) or f"worker{i}"): w
+                            for i, w in enumerate(members)}
+        if len(self._worker_map) != len(members):
+            names = [getattr(w, "name", None) or f"worker{i}" for i, w in enumerate(members)]
             raise ValueError(f"two workers share a name in {names}; delegate picks a worker by "
                              "name, and the model could reach only one of them")
-        if isinstance(self.team, list):
+        if members:
             blind = [getattr(w, "name", None) or f"worker{i}"
-                     for i, w in enumerate(self.team)
+                     for i, w in enumerate(members)
                      if not getattr(w, "name", None) or not getattr(w, "description", None)]
             if blind:
                 warnings.warn(
@@ -1258,6 +1341,8 @@ class Agent:
                     yield from drain()
                     try:
                         step = self._dispatch.answer(step, state)
+                    except Suspend as susp:
+                        step = susp                  # parked below, as a tool's pause is
                     except Exception as exc:
                         messages.append(tool_result_turn(call.id, prompts.result_message(
                             None, f"approval failed: {type(exc).__name__}: {exc}")))
@@ -1266,6 +1351,8 @@ class Agent:
                     yield from drain()
 
                 try:
+                    if isinstance(step, Suspend):
+                        raise step
                     result, error = ((None, step.reason) if isinstance(step, Denied)
                                      else self._dispatch.execute(step.call or call, state))
                 except Suspend as susp:
@@ -1660,29 +1747,33 @@ class Agent:
             raise RuntimeError(f"maximum delegation depth {self._live.max_depth} reached")
 
         task = args.get("task") or ""
-        if isinstance(self.team, list):
+        if args.get("worker") or not self.team["extend"]:
             worker = self._worker_map.get(args.get("worker", ""))
             if worker is None:
                 raise ValueError(f"no worker named {args.get('worker')!r}. "
                                  f"Available: {sorted(self._worker_map)}")
             # A run of its own, one level down (below): a listed worker sat at
             # depth 0 whatever delegated to it, and the depth guard never fired.
-        else:                                            # "auto"
+        elif (instructions := str(args.get("instructions") or "")) in self._extended:
+            worker = self._extended[instructions]       # the same role, given work again
+        else:
+            cap = self.team["max"]
+            if cap is not None and len(self._worker_map) + len(self._extended) >= cap:
+                raise ValueError(f"the team is at its max of {cap}; give the task to a member: "
+                                 f"{sorted(self._worker_map) + list(self._extended)}")
             worker = Agent(
                 # Without the tools that park a run: a worker's pause has
                 # nowhere to go — `delegate` waits for an answer, not a resume.
                 self.model, tools=[t for t in self.tools if not getattr(t, "suspends", False)],
                 instructions=args.get("instructions", ""),
                 stop_when=self.stop_when, hooks=self._live.hooks,
-                # The approver travels with the policy: a worker that
-                # inherited the rules and not the answerer would refuse every
-                # gated call, which reads as the policy being stricter for
-                # children than for their parent.
-                permissions=self.permissions, approve=self.approve,
+                # No rules of its own: the lead's govern it from around the
+                # `delegate` call (`_dispatch.governing`), approver included.
                 max_cost=self.max_cost,
                 verbose=self.verbose,
             )
             worker._max_depth = self._live.max_depth
+            self._extended[instructions] = worker
 
         self._log(1, f"  ▽  delegate → {getattr(worker, 'name', None) or 'worker'}")
         with worker._opened(depth=self._live.depth + 1, parent_id=self._live.id,
@@ -1762,6 +1853,10 @@ class Agent:
         # reason and not the call it was for.
         awaiting = {"reason": susp.reason, "resume_with": dict(susp.resume_with),
                     "tool": call.name, "arguments": _copy(dict(call.arguments or {}))}
+        if getattr(susp, "approval", False):
+            # The question is a person's yes or no on this call (policy
+            # approve="park"), so a UI can render it as one.
+            awaiting["approval"] = True
         doc = self._save_parked(
             self._live.parked(messages, state, journal),
             {**awaiting, "hint": susp.hint, "call_id": call.id,
@@ -1821,8 +1916,25 @@ class Agent:
             return None, (f"no tool named {parked.get('tool')!r} on this agent "
                           "any more; the run was parked by a different "
                           "configuration")
+        call = ToolCall(id=parked.get("call_id") or "", name=tool.name,
+                        arguments=dict(parked.get("arguments") or {}))
+        dispatcher = self._dispatch
+        if (parked.get("hint") or {}).get("approval"):
+            # Parked for a person's answer, under policy approve="park": the
+            # answer decides, and the call runs as any approved call does.
+            answer = signal if isinstance(signal, dict) else {"approved": bool(signal)}
+            self._emit("approval.decided", name=tool.name,
+                       payload={"id": call.id, "tool": tool.name, "granted": bool(answer.get("approved")),
+                                "reason": answer.get("reason") or "", "agent": self.name or ""})
+            if not answer.get("approved"):
+                return None, (f"tool {tool.name!r} was not approved: "
+                              f"{answer.get('reason') or 'not approved'}")
+            return dispatcher.execute(call, {})
         try:
-            return tool.run(_signal=signal, **(parked.get("arguments") or {})), None
+            # Through the dispatcher, as every tool runs: the budget, the
+            # interceptors, the rules around. It ran the tool directly.
+            result = dispatcher.run_tool(call, extra={"_signal": signal}, check=False)
+            return dispatcher._after(call, result), None
         except Suspend as susp:
             return None, (f"tool {parked.get('tool')!r} asked to pause again on "
                           f"resume ({susp.reason or 'no reason given'}); a "
@@ -1922,8 +2034,9 @@ class Agent:
             _logger.log(lvl, "%s", message)
 
     def __repr__(self) -> str:
-        team = ("auto" if self.team == "auto"
-                else f"{len(self.team)} worker(s)" if self.team else "none")
+        team = ("none" if not self.team else
+                f"{len(self.team['members'])} member(s)"
+                + (", extends" if self.team["extend"] else ""))
         return (f"Agent(mode={self.mode!r}, tools={len(self.tools)}, "
                 f"team={team})")
 

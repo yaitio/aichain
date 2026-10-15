@@ -19,7 +19,7 @@ Quick start
     agent = Agent(
         Model("claude-haiku-5-5"),
         tools     = [search("exa"), fetch("local")],
-        stop_when = [step_count(20), cost_budget(0.50)],
+        stop_when = [step_count(20)], max_cost = 0.50,
     )
 
     result = agent.run("Find the latest breakthroughs in fusion energy "

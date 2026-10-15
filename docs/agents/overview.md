@@ -9,7 +9,7 @@ without paying a model to rediscover the order.
 
 ```python
 agent = Agent(Model("gpt-6-luna"), tools=[search("exa"), fetch("local")],
-              stop_when=[step_count(10), cost_budget(0.50)])
+              stop_when=[step_count(10)], max_cost=0.50)
 result = agent.run("Compare the three largest managed vector databases.")
 result.output, result.stopped_by, result.cost
 ```
@@ -80,8 +80,10 @@ and the same system prompt, a plain loop scored best with open-weight models
 model and an asset on a strong one; measure on yours before settling.
 → [Eval](../control/eval.md)
 
-`team=[historian, chemist]` delegates only to the agents named; `team="auto"`
-lets the model describe new workers as it needs them. A worker's report comes
+`team=[historian, chemist]` delegates only to the agents named, each read by
+its `name` and `description`; `team={"members": [...], "extend": True, "max": 6}`
+also lets the lead add a member when none fits — one role made once and reused,
+within `max`. Members are held to the lead: its rules, its budget, its hooks. A worker's report comes
 back as the model's word, not as a checked fact, and the result says so.
 
 ## How a run ends
@@ -90,7 +92,7 @@ The ordinary end is an answer — a reply with no tool calls. Everything else
 that can end a run is in `stop_when`, and there are three kinds, kept apart
 because they mean different things:
 
-- **A ceiling** — `step_count(n)`, `token_budget(n)`, `cost_budget(usd)` — ends
+- **A ceiling** — `step_count(n)`, `token_budget(n)` — ends
   the run as a **failure**. Reaching the limit is not an answer.
 - **A check** — `check(fn)` — ends it as a **success** on a fact your code
   verified. It is the only completion the harness can confirm itself;
@@ -123,8 +125,8 @@ what was attempted, each entry marked `check` when code verified it and
 
 ## Around the loop
 
-- **Permissions** — a tool's `risk` and the agent's `permissions=` decide, before
-  a call runs, whether it runs, asks `approve=` or never runs.
+- **Permissions** — a tool's `risk` and the agent's `policy` decide, before a
+  call runs, whether it runs, asks a person or never runs.
   → [Permissions](../control/permissions.md)
 - **Money** — `max_cost=` ends the run before a call that would pass it.
   → [Cost and budget](../control/cost-and-budget.md)
