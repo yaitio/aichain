@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.5.4] — 2026-10-15
+
+### Changed
+
+- Each provider family builds a request as named steps: the conversation, the
+  cache mark, sampling and reasoning, the answer's format — Anthropic's
+  `build_request` 282 → 18 lines, Google's 144 → 18, OpenAI's one function per
+  provider, the chat and Responses builders with their message encoding apart.
+  Every request is byte for byte what it was, held by the golden-master and
+  parameter-matrix tests.
+
 ## [4.5.3] — 2026-10-15
 
 ### Changed

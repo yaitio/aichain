@@ -96,6 +96,283 @@ def _anthropic_id(call_id: str) -> str:
     sides of the turn, so the call and its result still match."""
     return re.sub(r"[^A-Za-z0-9_-]", "_", call_id or "") or "call"
 
+def _encode_messages(messages) -> tuple:
+    """Universal messages as Anthropic's system blocks and alternating turns."""
+    system_parts: list[dict] = []
+    amsgs: list[dict] = []
+    for msg in messages:
+        role = msg["role"]
+
+        # One call's result: a tool_result block inside a USER message —
+        # Anthropic's wire shape. Consecutive results merge into one user
+        # message, because the API requires strict role alternation.
+        if role == "tool":
+            parts = msg.get("parts") or []
+            # Anthropic is the one family that takes an image inside the
+            # result, so a tool that renders something can be looked at
+            # without a second turn.
+            if any(p.get("type") != "text" for p in parts):
+                blocks = [_part_to_anthropic(p) for p in parts]
+                content = [b for b in blocks if b is not None]
+            else:
+                content = "\n".join(p.get("text", "") for p in parts
+                                    if p.get("type") == "text")
+            block = {"type": "tool_result",
+                     "tool_use_id": _anthropic_id(msg.get("call_id", "")),
+                     "content": content}
+            if msg.get("is_error"):
+                block["is_error"] = True
+            if amsgs and amsgs[-1]["role"] == "user" and \
+               all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
+                amsgs[-1]["content"].append(block)
+            else:
+                amsgs.append({"role": "user", "content": [block]})
+            continue
+
+        # The model's own request to act: tool_use blocks, with any
+        # accompanying prose as a text block in the same message.
+        if role == "assistant" and msg.get("tool_calls"):
+            blocks = list((msg.get("opaque") or {}).get("anthropic") or [])
+            blocks += [b for b in (_part_to_anthropic(p) for p in msg.get("parts") or [])
+                       if b is not None]
+            blocks += [{"type": "tool_use", "id": _anthropic_id(c.get("id", "")),
+                        "name": c["name"], "input": c.get("arguments", {})}
+                       for c in msg["tool_calls"]]
+            amsgs.append({"role": "assistant", "content": blocks})
+            continue
+
+        blocks = [_part_to_anthropic(p) for p in msg["parts"]]
+        blocks = [b for b in blocks if b is not None]
+        if not blocks:
+            continue
+        if role == "system":
+            system_parts.extend(blocks)
+        else:
+            amsgs.append({"role": role, "content": blocks})
+    return system_parts, amsgs
+
+
+def _mark_cache(body: dict, amsgs: list, system_parts: list, params: dict) -> None:
+    """Place the prompt-cache breakpoint ``params['cache_control']`` asks for."""
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    # ── prompt cache breakpoint ──────────────────────────────────────
+    # Everything up to and including the marked block is cached. The mark
+    # goes on the last block of the second-to-last message, so the newest
+    # turn stays outside it: on the next call that turn has become part of
+    # the stable prefix and is read back rather than recomputed. Marking
+    # the newest message instead would store a prefix that never repeats.
+    # ``cache_control`` may be True, which marks the second-to-last message,
+    # or an integer index naming the message the stable prefix ends at.
+    # The default guess is only right when the array grows by appending;
+    # a caller that rebuilds part of the array — a memory that sends
+    # retrieved context plus a sliding window of recent turns — has a
+    # prefix that ends well before the last message, and marking past it
+    # asks the provider to cache content that changes every call.
+    #
+    # ``cache_control="last"`` is the third placement, and the one an agent
+    # loop needs. It marks the last block of the last message, whatever
+    # its type — a ``tool_result`` as readily as text. ``True`` looks for a
+    # *text* block in the second-to-last message, and in a tool loop that
+    # message is the assistant's ``tool_use`` turn, which has none, so
+    # nothing would be marked. Marking the newest block is right here,
+    # unlike in a chat, because the next call sends exactly this history
+    # plus one more turn — the whole of it is the stable prefix.
+    mark = params.get("cache_control")
+    if mark == "last":
+        target = amsgs[-1]["content"] if amsgs else None
+        if target:
+            control = {"type": "ephemeral"}
+            if params.get("cache_ttl") == "1h":
+                control["ttl"] = "1h"
+            for blk in reversed(target):
+                # A thinking block cannot carry a mark; anything else can.
+                if isinstance(blk, dict) and blk.get("type") not in (
+                        "thinking", "redacted_thinking"):
+                    blk["cache_control"] = control
+                    _note_ttl(params)
+                    record(Adaptation(
+                        kind=ADAPTED, option="cache_control", asked=mark,
+                        sent="cache_control breakpoint",
+                        model=params["name"],
+                        why="marked the newest block, so the next call "
+                            "reads this whole history back"))
+                    break
+    by_index = isinstance(mark, int) and not isinstance(mark, bool)
+    if mark is True or by_index:
+        target = None
+        if by_index:
+            # Absolute index only, and index 0 is a real answer (a fixed
+            # preamble first), so the mark is not tested for truthiness.
+            # Python would read -1 as the *last* message, the opposite of
+            # "nothing is stable yet". An index that names no message marks
+            # nothing: an explicit index is an instruction, not a hint.
+            if 0 <= mark < len(amsgs):
+                target = amsgs[mark]["content"]
+        else:
+            if len(amsgs) >= 2:
+                target = amsgs[-2]["content"]
+            if target is None and system_parts:
+                # An all-text system prompt was collapsed into a string
+                # above, which has no block to carry the mark. Normalised
+                # back, ``cache_control=True`` works for the commonest
+                # skill shape — one system prompt, one short user message —
+                # where marking that message would cache a changing prefix.
+                if isinstance(body.get("system"), str):
+                    body["system"] = [{"type": "text", "text": body["system"]}]
+                target = body["system"]
+        if target:
+            control = {"type": "ephemeral"}
+            if params.get("cache_ttl") == "1h":
+                control["ttl"] = "1h"
+            for blk in reversed(target):
+                if isinstance(blk, dict) and blk.get("type") == "text":
+                    blk["cache_control"] = control
+                    _note_ttl(params)
+                    record(Adaptation(
+                        kind=ADAPTED, option="cache_control", asked=mark,
+                        sent="cache_control breakpoint",
+                        model=params["name"],
+                        why="marked the end of the stable prefix; this "
+                            "provider caches on an explicit breakpoint"))
+                    break
+
+
+def _sampling(body: dict, params: dict, output: dict, rmap: dict, default_max: int) -> None:
+    """Temperature, top_p, top_k and the thinking budget, as this API takes them."""
+    from ...models._adaptation import Adaptation, ADAPTED, DECLINED, record
+    reasoning = params.get("reasoning")
+    # The API's own range for temperature is 0 to 1; above it is a 400
+    # after the round trip, where it can be said here.
+    if (body.get("temperature") or 0) > 1.0:
+        record(Adaptation(
+            kind=ADAPTED, option="temperature", asked=body["temperature"], sent=1.0,
+            model=params["name"], why="this provider's range is 0 to 1"))
+        body["temperature"] = 1.0
+    if params.get("top_p") is not None:
+        body["top_p"] = params["top_p"]
+        # Claude takes one of the two, not both: the request is refused
+        # when both are set. The one the caller set by name wins.
+        if "temperature" in body:
+            record(Adaptation(
+                kind=ADAPTED, option="temperature", asked=body.pop("temperature"),
+                sent=None, model=params["name"],
+                why="this provider takes temperature or top_p, not both; top_p was set"))
+    if params.get("top_k") is not None:
+        body["top_k"] = params["top_k"]
+
+    if reasoning:
+        record(Adaptation(
+            kind=ADAPTED, option="reasoning", asked=reasoning,
+            sent="thinking", model=params["name"],
+            why="sent as a thinking budget, this provider's own control"))
+        budget = rmap.get(reasoning)
+        if budget is not None:
+            if output.get("format", {}).get("type") == "json_schema":
+                # Structured output here is a forced tool call, and the API
+                # does not take a forced tool with thinking on: refused
+                # before the round trip, as tools with a schema are below.
+                raise ValueError(
+                    "Anthropic cannot combine reasoning with output json_schema: "
+                    "structured output is a forced tool call, which extended thinking "
+                    "does not allow. Drop reasoning, or ask for format 'json'.")
+            body["thinking"]    = {"type": "enabled", "budget_tokens": budget}
+            if body.get("temperature") not in (None, 1.0):
+                record(Adaptation(
+                    kind=DECLINED, option="temperature",
+                    asked=body["temperature"], sent=1.0,
+                    model=params["name"],
+                    why="this provider requires temperature 1.0 while "
+                        "thinking is enabled"))
+            body["temperature"] = 1.0
+            if "top_p" in body:
+                # Thinking takes top_p only from 0.95, and not beside a
+                # temperature: the temperature it requires is the default.
+                body.pop("temperature")
+                if body["top_p"] < 0.95:
+                    record(Adaptation(
+                        kind=ADAPTED, option="top_p", asked=body["top_p"], sent=0.95,
+                        model=params["name"],
+                        why="extended thinking takes top_p from 0.95 to 1"))
+                    body["top_p"] = 0.95
+            if "top_k" in body:
+                record(Adaptation(
+                    kind=DECLINED, option="top_k", asked=body.pop("top_k"), sent=None,
+                    model=params["name"],
+                    why="extended thinking does not take top_k"))
+            if body["max_tokens"] <= budget:
+                # The budget has to fit inside the answer's ceiling, so a
+                # max_tokens smaller than it is raised rather than left to
+                # fail at the provider.
+                record(Adaptation(
+                    kind=ADAPTED, option="max_tokens",
+                    asked=body["max_tokens"], sent=budget + default_max,
+                    model=params["name"],
+                    why="raised above the thinking budget, which the "
+                        "answer ceiling has to contain"))
+                body["max_tokens"] = budget + default_max
+
+
+def _answer_format(body: dict, fmt: dict, tools, name: str) -> None:
+    """Tools and the answer's format: JSON by instruction, a schema by a forced tool."""
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    if tools:
+        # Structured output on this provider IS a forced tool call —
+        # tool_choice pins the model to one synthetic tool, which would
+        # make every real tool unreachable. The combination is not
+        # mergeable; saying so beats silently breaking one half.
+        if fmt.get("type") == "json_schema":
+            raise ValueError(
+                "Anthropic cannot combine native tools with "
+                "output json_schema: structured output is implemented as "
+                "a forced tool call, which would shadow the real tools. "
+                "Drop one of the two."
+            )
+        body["tools"] = [
+            {"name": t["function"]["name"],
+             "description": t["function"].get("description", ""),
+             "input_schema": t["function"].get("parameters",
+                                               {"type": "object"})}
+            if "function" in t else t
+            for t in tools
+        ]
+    if fmt.get("type") == "json":
+        # Anthropic has no JSON-mode field. Every other provider does, so
+        # this is absorbed rather than refused: the intent is portable,
+        # only the control is missing here.
+        #
+        # An instruction, not a prefilled `{`: prefilling is Anthropic's
+        # own trick and it works, but the opening brace is then missing
+        # from the reply, so every reader of the raw text — ours and the
+        # caller's — has to know it was done.
+        rule = ("Respond with a single valid JSON object and nothing "
+                "else: no prose, no code fence.")
+        existing = body.get("system")
+        if isinstance(existing, str):
+            body["system"] = f"{existing}\n\n{rule}"
+        elif isinstance(existing, list):
+            body["system"] = existing + [{"type": "text", "text": rule}]
+        else:
+            body["system"] = rule
+        record(Adaptation(
+            kind=ADAPTED, option="format.json", asked="json",
+            sent="a system instruction", model=name,
+            why="anthropic has no JSON-mode field; the requirement is "
+                "carried in the system prompt instead"))
+
+    if fmt.get("type") == "json_schema":
+        tool = fmt.get("name", "structured_output")
+        spec = {"name": tool,
+                "description": "Return the result matching the given schema.",
+                "input_schema": fmt["schema"]}
+        # Without this the schema is advisory: the provider forces the tool
+        # call but not its shape, so a model may fill one field and drop
+        # the rest.
+        if fmt.get("strict"):
+            spec["strict"] = True
+        body["tools"] = [spec]
+        body["tool_choice"] = {"type": "tool", "name": tool}
+
+
 class AnthropicClient(BaseClient):
 
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:
@@ -193,68 +470,9 @@ class AnthropicClient(BaseClient):
         return None
 
     def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
-        prov = self._data["provider"]
-        from ...models._adaptation import (Adaptation, ADAPTED, DECLINED,
-                                            record)
-        rmap = prov.get("reasoning_map", {})
-        default_max = prov["defaults"]["max_tokens"]
-        name        = params["name"]
-        reasoning   = params.get("reasoning")
-
-        system_parts: list[dict] = []
-        amsgs: list[dict] = []
-        for msg in messages:
-            role = msg["role"]
-
-            # One call's result: a tool_result block inside a USER message —
-            # Anthropic's wire shape. Consecutive results merge into one user
-            # message, because the API requires strict role alternation.
-            if role == "tool":
-                parts = msg.get("parts") or []
-                # Anthropic is the one family that takes an image inside the
-                # result, so a tool that renders something can be looked at
-                # without a second turn.
-                if any(p.get("type") != "text" for p in parts):
-                    blocks = [_part_to_anthropic(p) for p in parts]
-                    content = [b for b in blocks if b is not None]
-                else:
-                    content = "\n".join(p.get("text", "") for p in parts
-                                        if p.get("type") == "text")
-                block = {"type": "tool_result",
-                         "tool_use_id": _anthropic_id(msg.get("call_id", "")),
-                         "content": content}
-                if msg.get("is_error"):
-                    block["is_error"] = True
-                if amsgs and amsgs[-1]["role"] == "user" and \
-                   all(b.get("type") == "tool_result" for b in amsgs[-1]["content"]):
-                    amsgs[-1]["content"].append(block)
-                else:
-                    amsgs.append({"role": "user", "content": [block]})
-                continue
-
-            # The model's own request to act: tool_use blocks, with any
-            # accompanying prose as a text block in the same message.
-            if role == "assistant" and msg.get("tool_calls"):
-                blocks = list((msg.get("opaque") or {}).get("anthropic") or [])
-                blocks += [b for b in (_part_to_anthropic(p) for p in msg.get("parts") or [])
-                           if b is not None]
-                blocks += [{"type": "tool_use", "id": _anthropic_id(c.get("id", "")),
-                            "name": c["name"], "input": c.get("arguments", {})}
-                           for c in msg["tool_calls"]]
-                amsgs.append({"role": "assistant", "content": blocks})
-                continue
-
-            blocks = [_part_to_anthropic(p) for p in msg["parts"]]
-            blocks = [b for b in blocks if b is not None]
-            if not blocks:
-                continue
-            if role == "system":
-                system_parts.extend(blocks)
-            else:
-                amsgs.append({"role": role, "content": blocks})
-
+        system_parts, amsgs = _encode_messages(messages)
         body: dict = {
-            "model":       name,
+            "model":       params["name"],
             "messages":    amsgs,
             "max_tokens":  params["max_tokens"],
             "temperature": params["temperature"],
@@ -264,215 +482,10 @@ class AnthropicClient(BaseClient):
                 body["system"] = "\n\n".join(b["text"] for b in system_parts)
             else:
                 body["system"] = system_parts
-        # ── prompt cache breakpoint ──────────────────────────────────────
-        # Everything up to and including the marked block is cached. The mark
-        # goes on the last block of the second-to-last message, so the newest
-        # turn stays outside it: on the next call that turn has become part of
-        # the stable prefix and is read back rather than recomputed. Marking
-        # the newest message instead would store a prefix that never repeats.
-        # ``cache_control`` may be True, which marks the second-to-last message,
-        # or an integer index naming the message the stable prefix ends at.
-        # The default guess is only right when the array grows by appending;
-        # a caller that rebuilds part of the array — a memory that sends
-        # retrieved context plus a sliding window of recent turns — has a
-        # prefix that ends well before the last message, and marking past it
-        # asks the provider to cache content that changes every call.
-        #
-        # ``cache_control="last"`` is the third placement, and the one an agent
-        # loop needs. It marks the last block of the last message, whatever
-        # its type — a ``tool_result`` as readily as text. ``True`` looks for a
-        # *text* block in the second-to-last message, and in a tool loop that
-        # message is the assistant's ``tool_use`` turn, which has none, so
-        # nothing would be marked. Marking the newest block is right here,
-        # unlike in a chat, because the next call sends exactly this history
-        # plus one more turn — the whole of it is the stable prefix.
-        mark = params.get("cache_control")
-        if mark == "last":
-            target = amsgs[-1]["content"] if amsgs else None
-            if target:
-                control = {"type": "ephemeral"}
-                if params.get("cache_ttl") == "1h":
-                    control["ttl"] = "1h"
-                for blk in reversed(target):
-                    # A thinking block cannot carry a mark; anything else can.
-                    if isinstance(blk, dict) and blk.get("type") not in (
-                            "thinking", "redacted_thinking"):
-                        blk["cache_control"] = control
-                        _note_ttl(params)
-                        record(Adaptation(
-                            kind=ADAPTED, option="cache_control", asked=mark,
-                            sent="cache_control breakpoint",
-                            model=params["name"],
-                            why="marked the newest block, so the next call "
-                                "reads this whole history back"))
-                        break
-        by_index = isinstance(mark, int) and not isinstance(mark, bool)
-        if mark is True or by_index:
-            target = None
-            if by_index:
-                # Absolute index only, and index 0 is a real answer (a fixed
-                # preamble first), so the mark is not tested for truthiness.
-                # Python would read -1 as the *last* message, the opposite of
-                # "nothing is stable yet". An index that names no message marks
-                # nothing: an explicit index is an instruction, not a hint.
-                if 0 <= mark < len(amsgs):
-                    target = amsgs[mark]["content"]
-            else:
-                if len(amsgs) >= 2:
-                    target = amsgs[-2]["content"]
-                if target is None and system_parts:
-                    # An all-text system prompt was collapsed into a string
-                    # above, which has no block to carry the mark. Normalised
-                    # back, ``cache_control=True`` works for the commonest
-                    # skill shape — one system prompt, one short user message —
-                    # where marking that message would cache a changing prefix.
-                    if isinstance(body.get("system"), str):
-                        body["system"] = [{"type": "text", "text": body["system"]}]
-                    target = body["system"]
-            if target:
-                control = {"type": "ephemeral"}
-                if params.get("cache_ttl") == "1h":
-                    control["ttl"] = "1h"
-                for blk in reversed(target):
-                    if isinstance(blk, dict) and blk.get("type") == "text":
-                        blk["cache_control"] = control
-                        _note_ttl(params)
-                        record(Adaptation(
-                            kind=ADAPTED, option="cache_control", asked=mark,
-                            sent="cache_control breakpoint",
-                            model=params["name"],
-                            why="marked the end of the stable prefix; this "
-                                "provider caches on an explicit breakpoint"))
-                        break
-
-        # The API's own range for temperature is 0 to 1; above it is a 400
-        # after the round trip, where it can be said here.
-        if (body.get("temperature") or 0) > 1.0:
-            record(Adaptation(
-                kind=ADAPTED, option="temperature", asked=body["temperature"], sent=1.0,
-                model=params["name"], why="this provider's range is 0 to 1"))
-            body["temperature"] = 1.0
-        if params.get("top_p") is not None:
-            body["top_p"] = params["top_p"]
-            # Claude takes one of the two, not both: the request is refused
-            # when both are set. The one the caller set by name wins.
-            if "temperature" in body:
-                record(Adaptation(
-                    kind=ADAPTED, option="temperature", asked=body.pop("temperature"),
-                    sent=None, model=params["name"],
-                    why="this provider takes temperature or top_p, not both; top_p was set"))
-        if params.get("top_k") is not None:
-            body["top_k"] = params["top_k"]
-
-        if reasoning:
-            record(Adaptation(
-                kind=ADAPTED, option="reasoning", asked=reasoning,
-                sent="thinking", model=params["name"],
-                why="sent as a thinking budget, this provider's own control"))
-            budget = rmap.get(reasoning)
-            if budget is not None:
-                if output.get("format", {}).get("type") == "json_schema":
-                    # Structured output here is a forced tool call, and the API
-                    # does not take a forced tool with thinking on: refused
-                    # before the round trip, as tools with a schema are below.
-                    raise ValueError(
-                        "Anthropic cannot combine reasoning with output json_schema: "
-                        "structured output is a forced tool call, which extended thinking "
-                        "does not allow. Drop reasoning, or ask for format 'json'.")
-                body["thinking"]    = {"type": "enabled", "budget_tokens": budget}
-                if body.get("temperature") not in (None, 1.0):
-                    record(Adaptation(
-                        kind=DECLINED, option="temperature",
-                        asked=body["temperature"], sent=1.0,
-                        model=params["name"],
-                        why="this provider requires temperature 1.0 while "
-                            "thinking is enabled"))
-                body["temperature"] = 1.0
-                if "top_p" in body:
-                    # Thinking takes top_p only from 0.95, and not beside a
-                    # temperature: the temperature it requires is the default.
-                    body.pop("temperature")
-                    if body["top_p"] < 0.95:
-                        record(Adaptation(
-                            kind=ADAPTED, option="top_p", asked=body["top_p"], sent=0.95,
-                            model=params["name"],
-                            why="extended thinking takes top_p from 0.95 to 1"))
-                        body["top_p"] = 0.95
-                if "top_k" in body:
-                    record(Adaptation(
-                        kind=DECLINED, option="top_k", asked=body.pop("top_k"), sent=None,
-                        model=params["name"],
-                        why="extended thinking does not take top_k"))
-                if body["max_tokens"] <= budget:
-                    # The budget has to fit inside the answer's ceiling, so a
-                    # max_tokens smaller than it is raised rather than left to
-                    # fail at the provider.
-                    record(Adaptation(
-                        kind=ADAPTED, option="max_tokens",
-                        asked=body["max_tokens"], sent=budget + default_max,
-                        model=params["name"],
-                        why="raised above the thinking budget, which the "
-                            "answer ceiling has to contain"))
-                    body["max_tokens"] = budget + default_max
-
-        fmt = output.get("format", {})
-        if tools:
-            # Structured output on this provider IS a forced tool call —
-            # tool_choice pins the model to one synthetic tool, which would
-            # make every real tool unreachable. The combination is not
-            # mergeable; saying so beats silently breaking one half.
-            if fmt.get("type") == "json_schema":
-                raise ValueError(
-                    "Anthropic cannot combine native tools with "
-                    "output json_schema: structured output is implemented as "
-                    "a forced tool call, which would shadow the real tools. "
-                    "Drop one of the two."
-                )
-            body["tools"] = [
-                {"name": t["function"]["name"],
-                 "description": t["function"].get("description", ""),
-                 "input_schema": t["function"].get("parameters",
-                                                   {"type": "object"})}
-                if "function" in t else t
-                for t in tools
-            ]
-        if fmt.get("type") == "json":
-            # Anthropic has no JSON-mode field. Every other provider does, so
-            # this is absorbed rather than refused: the intent is portable,
-            # only the control is missing here.
-            #
-            # An instruction, not a prefilled `{`: prefilling is Anthropic's
-            # own trick and it works, but the opening brace is then missing
-            # from the reply, so every reader of the raw text — ours and the
-            # caller's — has to know it was done.
-            rule = ("Respond with a single valid JSON object and nothing "
-                    "else: no prose, no code fence.")
-            existing = body.get("system")
-            if isinstance(existing, str):
-                body["system"] = f"{existing}\n\n{rule}"
-            elif isinstance(existing, list):
-                body["system"] = existing + [{"type": "text", "text": rule}]
-            else:
-                body["system"] = rule
-            record(Adaptation(
-                kind=ADAPTED, option="format.json", asked="json",
-                sent="a system instruction", model=name,
-                why="anthropic has no JSON-mode field; the requirement is "
-                    "carried in the system prompt instead"))
-
-        if fmt.get("type") == "json_schema":
-            tool = fmt.get("name", "structured_output")
-            spec = {"name": tool,
-                    "description": "Return the result matching the given schema.",
-                    "input_schema": fmt["schema"]}
-            # Without this the schema is advisory: the provider forces the tool
-            # call but not its shape, so a model may fill one field and drop
-            # the rest.
-            if fmt.get("strict"):
-                spec["strict"] = True
-            body["tools"] = [spec]
-            body["tool_choice"] = {"type": "tool", "name": tool}
-
+        _mark_cache(body, amsgs, system_parts, params)
+        prov = self._data["provider"]
+        _sampling(body, params, output, prov.get("reasoning_map", {}), prov["defaults"]["max_tokens"])
+        _answer_format(body, output.get("format", {}), tools, params["name"])
         return "/v1/messages", body
 
     def parse_response(self, response, output) -> str | dict:

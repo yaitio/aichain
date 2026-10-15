@@ -169,17 +169,8 @@ def _text_of(msg: dict) -> str:
                      if p.get("type") == "text")
 
 
-def _build_openai_compat_request(
-    model,
-    messages: list,
-    output:   dict,
-    path:     str,
-    max_tokens_field: str = "max_completion_tokens",
-    tools:    list | None = None,
-) -> tuple[str, dict]:
-    """An OpenAI-compatible chat ``(path, body)``. *max_tokens_field* is the
-    output-limit key: ``max_completion_tokens``, or ``max_tokens`` on
-    providers that still name it so."""
+def _chat_messages(model, messages: list) -> list:
+    """Universal messages as Chat Completions messages, system ones first."""
     openai_messages: list[dict] = []
     # Media the tools of one turn produced, sent in one user message after the
     # last of that turn's results: the results of parallel calls must follow
@@ -266,7 +257,21 @@ def _build_openai_compat_request(
             why="a system message applies to the whole conversation on every "
                 "provider; three of them cannot express one that begins "
                 "mid-way, so it is made global here as well"))
+    return openai_messages
 
+
+def _build_openai_compat_request(
+    model,
+    messages: list,
+    output:   dict,
+    path:     str,
+    max_tokens_field: str = "max_completion_tokens",
+    tools:    list | None = None,
+) -> tuple[str, dict]:
+    """An OpenAI-compatible chat ``(path, body)``. *max_tokens_field* is the
+    output-limit key: ``max_completion_tokens``, or ``max_tokens`` on
+    providers that still name it so."""
+    openai_messages = _chat_messages(model, messages)
     body: dict = {
         "model":          model.name,
         "messages":       openai_messages,
@@ -841,15 +846,8 @@ def _should_use_responses_api(model_name: str) -> bool:
             and not model_name.startswith(_CHAT_COMPLETIONS_MODELS))
 
 
-def _build_responses_api_request(
-    model,
-    messages: list,
-    output:   dict,
-    tools:    list | None = None,
-) -> tuple[str, dict]:
-    """An ``/v1/responses`` ``(path, body)``: ``input`` for messages,
-    ``instructions`` for the system prompt, ``max_output_tokens``, and
-    ``text.format`` for structured output."""
+def _responses_input(messages: list) -> tuple:
+    """Universal messages as the Responses API's system texts and input items."""
     system_texts: list = []
     input_messages: list[dict] = []
     held: list = []                      # as in the chat builder: after the turn's results
@@ -908,6 +906,19 @@ def _build_responses_api_request(
             input_messages.append({"role": role, "content": items})
 
     release()
+    return system_texts, input_messages
+
+
+def _build_responses_api_request(
+    model,
+    messages: list,
+    output:   dict,
+    tools:    list | None = None,
+) -> tuple[str, dict]:
+    """An ``/v1/responses`` ``(path, body)``: ``input`` for messages,
+    ``instructions`` for the system prompt, ``max_output_tokens``, and
+    ``text.format`` for structured output."""
+    system_texts, input_messages = _responses_input(messages)
     # gpt-5-family models are reasoning models: the Responses API rejects
     # ``temperature``/``top_p`` for them ("Unsupported parameter"), so the
     # sampling knobs are deliberately omitted here.

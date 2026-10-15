@@ -154,6 +154,144 @@ def _part_to_google(part: dict) -> dict | None:
     return None
 
 
+def _encode_contents(messages) -> tuple:
+    """Universal messages as Gemini's system parts and contents."""
+    system_parts: list[dict] = []
+    contents: list[dict] = []
+    # Gemini wants every functionResponse of one turn in one content, as
+    # many as there were calls; media the tools produced follows them.
+    responses: list = []
+    held: list = []
+
+    def release():
+        if responses:
+            contents.append({"role": "user", "parts": list(responses)})
+            responses.clear()
+        gparts = [g for g in (_part_to_google(p) for p in held) if g is not None]
+        if gparts:
+            contents.append({"role": "user", "parts": gparts})
+        held.clear()
+
+    names: dict = {}                 # call id → function name, from the turns that asked
+    for msg in messages:
+        if msg["role"] == "assistant":
+            names.update({c.get("id", ""): c["name"] for c in msg.get("tool_calls") or []})
+        # One call's result: a functionResponse part in a USER turn.
+        if msg["role"] == "tool":
+            # A functionResponse carries JSON, not media. Anything a tool
+            # rendered is moved into a user message right after it, so the
+            # model still sees it on this turn instead of reading a
+            # description of it.
+            from ...models._calls import split_media_result
+            msg, follow_up = split_media_result(msg)
+            text = "\n".join(p.get("text", "")
+                              for p in msg.get("parts") or []
+                              if p.get("type") == "text")
+            responses.append({
+                "functionResponse": {
+                    # Gemini keys a result by the function's name: the
+                    # name of the call this result answers, by its id.
+                    "name": names.get(msg.get("call_id", ""), msg.get("call_id", "")),
+                    "response": {"error": text} if msg.get("is_error") else {"result": text},
+                }})
+            if follow_up:
+                held.extend(follow_up["parts"])
+            continue
+        release()
+        # The model's request to act: functionCall parts on a model turn.
+        if msg["role"] == "assistant" and (msg.get("opaque") or {}).get("google"):
+            contents.append({"role": "model", "parts": list(msg["opaque"]["google"])})
+            continue
+        if msg["role"] == "assistant" and msg.get("tool_calls"):
+            gparts = [_part_to_google(p) for p in msg.get("parts") or []]
+            gparts = [g for g in gparts if g is not None]
+            gparts += [{"functionCall": {"name": c["name"],
+                                         "args": c.get("arguments", {})}}
+                       for c in msg["tool_calls"]]
+            contents.append({"role": "model", "parts": gparts})
+            continue
+        gparts = [_part_to_google(p) for p in msg["parts"]]
+        gparts = [g for g in gparts if g is not None]
+        if not gparts:
+            continue
+        if msg["role"] == "system":
+            system_parts.extend(gparts)
+        else:
+            role = "model" if msg["role"] == "assistant" else "user"
+            contents.append({"role": role, "parts": gparts})
+
+    release()
+    return system_parts, contents
+
+
+def _generation_config(params: dict, rmap: dict) -> dict:
+    """Sampling and the thinking budget as a generationConfig."""
+    gc: dict = {"temperature": params["temperature"],
+                "maxOutputTokens": params["max_tokens"]}
+    if params.get("top_p") is not None:
+        gc["topP"] = params["top_p"]
+    if params.get("top_k") is not None:
+        gc["topK"] = params["top_k"]
+    if params.get("reasoning"):
+        from ...models._adaptation import Adaptation, ADAPTED, record
+        record(Adaptation(
+            kind=ADAPTED, option="reasoning", asked=params["reasoning"],
+            sent="thinkingConfig.thinkingBudget", model=params["name"],
+            why="sent as a thinking budget, this provider's own control"))
+        budget = rmap.get(params["reasoning"])
+        if budget is not None:
+            gc["thinkingConfig"] = {"thinkingBudget": budget}
+            # The budget is spent out of maxOutputTokens: a budget at or
+            # above it leaves nothing for the answer.
+            if budget > 0 and budget >= gc["maxOutputTokens"]:
+                raised = budget + gc["maxOutputTokens"]
+                record(Adaptation(
+                    kind=ADAPTED, option="max_tokens", asked=gc["maxOutputTokens"],
+                    sent=raised, model=params["name"],
+                    why=f"raised above the thinking budget of {budget}, which is "
+                        "spent out of the same allowance"))
+                gc["maxOutputTokens"] = raised
+    return gc
+
+
+def _answer_shape(gc: dict, output: dict, params: dict) -> None:
+    """The answer's modality and format: an image's shape, JSON, a schema."""
+    fmt = output.get("format", {})
+    ftype = fmt.get("type", "text")
+    modalities = output.get("modalities", ["text"])
+    # `format.type == "image"` is how every other provider is asked for a
+    # picture, so it is accepted here beside `modalities`.
+    if "image" in modalities or ftype == "image":
+        from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
+                                           record)
+        mods = ["IMAGE"] + (["TEXT"] if "text" in modalities else [])
+        gc["responseModalities"] = mods
+
+        # Shape control. This provider takes a ratio and picks the pixels.
+        ratio = fmt.get("aspect_ratio")
+        if ratio:
+            record(Adaptation(
+                kind=TRANSLATED, option="aspect_ratio", asked=ratio,
+                sent="imageConfig.aspectRatio", model=params["name"],
+                why="this provider's own name for the same thing"))
+        elif fmt.get("size"):
+            ratio = nearest_ratio(fmt["size"], _ASPECT_RATIOS)
+            if ratio:
+                record(Adaptation(
+                    kind=ADAPTED, option="size", asked=fmt["size"],
+                    sent=f"imageConfig.aspectRatio={ratio}",
+                    model=params["name"],
+                    why="this provider chooses the pixel count itself, so "
+                        "the shape was kept and the size left to it"))
+        if ratio:
+            gc["imageConfig"] = {"aspectRatio": ratio}
+    elif ftype == "json":
+        gc["responseMimeType"] = "application/json"
+    elif ftype == "json_schema":
+        gc["responseMimeType"] = "application/json"
+        gc["responseSchema"] = _sanitize_google_schema(fmt["schema"])
+
+
 class GoogleClient(BaseClient):
 
     def __init__(self, api_key: str, *, data: dict, **client_opts) -> None:
@@ -243,136 +381,9 @@ class GoogleClient(BaseClient):
                 if isinstance(usage, dict) and usage else None)
 
     def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
-        prov = self._data["provider"]
-        rmap = prov.get("reasoning_map", {})
-        name = params["name"]
-
-        system_parts: list[dict] = []
-        contents: list[dict] = []
-        # Gemini wants every functionResponse of one turn in one content, as
-        # many as there were calls; media the tools produced follows them.
-        responses: list = []
-        held: list = []
-
-        def release():
-            if responses:
-                contents.append({"role": "user", "parts": list(responses)})
-                responses.clear()
-            gparts = [g for g in (_part_to_google(p) for p in held) if g is not None]
-            if gparts:
-                contents.append({"role": "user", "parts": gparts})
-            held.clear()
-
-        names: dict = {}                 # call id → function name, from the turns that asked
-        for msg in messages:
-            if msg["role"] == "assistant":
-                names.update({c.get("id", ""): c["name"] for c in msg.get("tool_calls") or []})
-            # One call's result: a functionResponse part in a USER turn.
-            if msg["role"] == "tool":
-                # A functionResponse carries JSON, not media. Anything a tool
-                # rendered is moved into a user message right after it, so the
-                # model still sees it on this turn instead of reading a
-                # description of it.
-                from ...models._calls import split_media_result
-                msg, follow_up = split_media_result(msg)
-                text = "\n".join(p.get("text", "")
-                                  for p in msg.get("parts") or []
-                                  if p.get("type") == "text")
-                responses.append({
-                    "functionResponse": {
-                        # Gemini keys a result by the function's name: the
-                        # name of the call this result answers, by its id.
-                        "name": names.get(msg.get("call_id", ""), msg.get("call_id", "")),
-                        "response": {"error": text} if msg.get("is_error") else {"result": text},
-                    }})
-                if follow_up:
-                    held.extend(follow_up["parts"])
-                continue
-            release()
-            # The model's request to act: functionCall parts on a model turn.
-            if msg["role"] == "assistant" and (msg.get("opaque") or {}).get("google"):
-                contents.append({"role": "model", "parts": list(msg["opaque"]["google"])})
-                continue
-            if msg["role"] == "assistant" and msg.get("tool_calls"):
-                gparts = [_part_to_google(p) for p in msg.get("parts") or []]
-                gparts = [g for g in gparts if g is not None]
-                gparts += [{"functionCall": {"name": c["name"],
-                                             "args": c.get("arguments", {})}}
-                           for c in msg["tool_calls"]]
-                contents.append({"role": "model", "parts": gparts})
-                continue
-            gparts = [_part_to_google(p) for p in msg["parts"]]
-            gparts = [g for g in gparts if g is not None]
-            if not gparts:
-                continue
-            if msg["role"] == "system":
-                system_parts.extend(gparts)
-            else:
-                role = "model" if msg["role"] == "assistant" else "user"
-                contents.append({"role": role, "parts": gparts})
-
-        release()
-        gc: dict = {"temperature": params["temperature"],
-                    "maxOutputTokens": params["max_tokens"]}
-        if params.get("top_p") is not None:
-            gc["topP"] = params["top_p"]
-        if params.get("top_k") is not None:
-            gc["topK"] = params["top_k"]
-        if params.get("reasoning"):
-            from ...models._adaptation import Adaptation, ADAPTED, record
-            record(Adaptation(
-                kind=ADAPTED, option="reasoning", asked=params["reasoning"],
-                sent="thinkingConfig.thinkingBudget", model=params["name"],
-                why="sent as a thinking budget, this provider's own control"))
-            budget = rmap.get(params["reasoning"])
-            if budget is not None:
-                gc["thinkingConfig"] = {"thinkingBudget": budget}
-                # The budget is spent out of maxOutputTokens: a budget at or
-                # above it leaves nothing for the answer.
-                if budget > 0 and budget >= gc["maxOutputTokens"]:
-                    raised = budget + gc["maxOutputTokens"]
-                    record(Adaptation(
-                        kind=ADAPTED, option="max_tokens", asked=gc["maxOutputTokens"],
-                        sent=raised, model=params["name"],
-                        why=f"raised above the thinking budget of {budget}, which is "
-                            "spent out of the same allowance"))
-                    gc["maxOutputTokens"] = raised
-
-        fmt = output.get("format", {})
-        ftype = fmt.get("type", "text")
-        modalities = output.get("modalities", ["text"])
-        # `format.type == "image"` is how every other provider is asked for a
-        # picture, so it is accepted here beside `modalities`.
-        if "image" in modalities or ftype == "image":
-            from ...models._adaptation import (Adaptation, ADAPTED, TRANSLATED,
-                                               record)
-            mods = ["IMAGE"] + (["TEXT"] if "text" in modalities else [])
-            gc["responseModalities"] = mods
-
-            # Shape control. This provider takes a ratio and picks the pixels.
-            ratio = fmt.get("aspect_ratio")
-            if ratio:
-                record(Adaptation(
-                    kind=TRANSLATED, option="aspect_ratio", asked=ratio,
-                    sent="imageConfig.aspectRatio", model=params["name"],
-                    why="this provider's own name for the same thing"))
-            elif fmt.get("size"):
-                ratio = nearest_ratio(fmt["size"], _ASPECT_RATIOS)
-                if ratio:
-                    record(Adaptation(
-                        kind=ADAPTED, option="size", asked=fmt["size"],
-                        sent=f"imageConfig.aspectRatio={ratio}",
-                        model=params["name"],
-                        why="this provider chooses the pixel count itself, so "
-                            "the shape was kept and the size left to it"))
-            if ratio:
-                gc["imageConfig"] = {"aspectRatio": ratio}
-        elif ftype == "json":
-            gc["responseMimeType"] = "application/json"
-        elif ftype == "json_schema":
-            gc["responseMimeType"] = "application/json"
-            gc["responseSchema"] = _sanitize_google_schema(fmt["schema"])
-
+        system_parts, contents = _encode_contents(messages)
+        gc = _generation_config(params, self._data["provider"].get("reasoning_map", {}))
+        _answer_shape(gc, output, params)
         body: dict = {"contents": contents, "generationConfig": gc}
         if tools:
             body["tools"] = [{"functionDeclarations": [
@@ -385,7 +396,7 @@ class GoogleClient(BaseClient):
             ]}]
         if system_parts:
             body["system_instruction"] = {"parts": system_parts}
-        return f"/models/{name}:generateContent", body
+        return f"/models/{params['name']}:generateContent", body
 
     def parse_response(self, response, output) -> str | dict:
         ftype = output.get("format", {}).get("type", "text")

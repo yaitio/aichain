@@ -195,68 +195,8 @@ class OpenAIClient(BaseClient):
         return {"usage": usage} if isinstance(usage, dict) and usage else None
 
     def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
-        m   = self._wrap(params)
-        p   = self._provider
-
-        if p == "openai":
-            if _should_use_responses_api(m.name):
-                return _build_responses_api_request(m, messages, output, tools=tools)
-            if _is_openai_image_model(m.name):
-                if tools:
-                    raise ValueError(
-                        f"model {m.name!r} is an image model — it cannot "
-                        "take tool declarations")
-                # An input image + an editable image model ⇒ edit, else generate.
-                if _is_openai_editable_image_model(m.name) and _messages_have_image(messages):
-                    return _build_image_edits_request(m, messages, output, self._images_edits_path)
-                return _build_image_generations_request(m, messages, output, self._images_path)
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            # reasoning_effort is only valid on the o-series reasoning models;
-            # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
-            # routes through the Responses API branch above).
-            if _is_o_series_model(m.name):
-                _decline_sampling(m, body)
-                _set_effort(m, body)
-            return path, body
-
-        if p == "xai":
-            if _is_xai_image(m.name):
-                # An input image ⇒ edit (JSON /v1/images/edits), else generate.
-                if _messages_have_image(messages):
-                    return _build_xai_image_edit_request(m, messages, output, self._images_edits_path)
-                prompt = _last_user_text(messages)
-                body = {"model": m.name, "prompt": prompt,
-                        "n": 1, "response_format": "b64_json"}
-                # Shape control: aspect_ratio returns 1280x720 for 16:9 and
-                # honours every ratio exactly. `size` is refused outright by
-                # this API (HTTP 400 "Argument not supported"), so it becomes
-                # a ratio.
-                fmt = output.get("format", {})
-                ratio = fmt.get("aspect_ratio")
-                if ratio:
-                    body["aspect_ratio"] = ratio
-                    record(Adaptation(
-                        kind=TRANSLATED, option="aspect_ratio", asked=ratio,
-                        sent="aspect_ratio", model=m.name,
-                        why="passed through"))
-                elif fmt.get("size"):
-                    ratio = ratio_of(fmt["size"])
-                    if ratio:
-                        body["aspect_ratio"] = ratio
-                        record(Adaptation(
-                            kind=ADAPTED, option="size", asked=fmt["size"],
-                            sent=f"aspect_ratio={ratio}", model=m.name,
-                            why="this API refuses a pixel size; the shape was "
-                                "kept and the pixels left to the provider"))
-                return self._images_path, body
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
-            # grok models reject it (grok-4 reasoners think natively).
-            if m.name.startswith("grok-3-mini"):
-                _set_effort(m, body)
-            return path, body
-
-        if p in ("perplexity", "private"):
+        m = self._wrap(params)
+        if self._provider in ("perplexity", "private"):
             # private is the plain-compat case on purpose: the servers behind
             # it (vLLM, Ollama, LM Studio, TGI, SGLang, llama.cpp — or an
             # aggregator someone pointed it at) advertise OpenAI
@@ -266,105 +206,172 @@ class OpenAIClient(BaseClient):
             # it or says it doesn't.
             return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
 
-        if p == "kimi":
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            if m.reasoning is not None and m._REASONING_MAP.get(m.reasoning) == "enabled":
-                if body.get("temperature") not in (None, 1.0):
-                    record(Adaptation(
-                        kind=DECLINED, option="temperature",
-                        asked=body["temperature"], sent=1.0, model=m.name,
-                        why="this provider requires temperature 1.0 while "
-                            "thinking is enabled"))
-                body["temperature"] = 1.0
-                body["thinking"] = {"type": "enabled"}
-                record(Adaptation(
-                    kind=ADAPTED, option="reasoning", asked=m.reasoning,
-                    sent="thinking", model=m.name,
-                    why="sent as this provider's thinking switch"))
-            return path, body
-
-        if p == "deepseek":
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            if m.reasoning is not None and m.name not in ("deepseek-chat", "deepseek-reasoner"):
-                # The map is the chat/reasoner pair's: on deepseek-v4-pro even
-                # "low" sent deepseek-chat — another generation, retiring.
-                record(Adaptation(
-                    kind=DECLINED, option="reasoning", asked=m.reasoning, sent=None, model=m.name,
-                    why="reasoning here is a swap between deepseek-chat and deepseek-reasoner; "
-                        "this model is neither, and no setting of its own is known"))
-            elif m.reasoning is not None:
-                body["model"] = m._REASONING_MAP[m.reasoning]
-                if body["model"] != m.name:
-                    # The loudest kind: a different model answers, at a
-                    # different price, and a comparison that believes both
-                    # arms ran the same model is already invalid.
-                    record(Adaptation(
-                        kind=SWAPPED, option="reasoning", asked=m.reasoning,
-                        sent=body["model"], model=m.name,
-                        why="this provider expresses reasoning as a separate "
-                            "model, so the request goes to that one instead"))
-                else:
-                    record(Adaptation(
-                        kind=ADAPTED, option="reasoning", asked=m.reasoning,
-                        sent=body["model"], model=m.name,
-                        why="this level is served by this same model"))
-            if _is_deepseek_reasoner(body["model"]):
-                _decline_sampling(m, body)
-            fmt = output.get("format", {}); ft = fmt.get("type", "text")
-            if ft in ("json", "json_schema"):
-                body["response_format"] = {"type": "json_object"}
-                # A system message's content may be a list (multi-part) rather
-                # than a string — guard before calling .lower() on it.
-                has = any(isinstance(x.get("content"), str)
-                          and "json" in x["content"].lower()
-                          for x in body["messages"] if x.get("role") == "system")
-                # A schema always goes in, even when a system prompt already
-                # says "JSON": the answer is checked against it.
-                if ft == "json_schema":
-                    _json_in_prompt(body, fmt)
-                    record(Adaptation(
-                        kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
-                        model=m.name, why="this provider takes JSON but not a schema; the schema "
-                                          "is in the prompt and the answer is checked against it"))
-                elif not has:
-                    _json_in_prompt(body, {})
-            return path, body
-
-        if p == "qwen":
-            # wanx text-to-image is async and handled by QwenClient (the only
-            # client used for this provider); here we only do chat / vision.
-            path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
-            if _is_qwq(m.name):
-                # QwQ reasons on every call whatever it is asked; the level
-                # has nowhere to go. Saying so beats leaving a caller to
-                # believe "low" bought them anything.
-                body["enable_thinking"] = True
-                if m.reasoning:
-                    record(Adaptation(
-                        kind=DECLINED, option="reasoning", asked=m.reasoning,
-                        sent="enable_thinking=true", model=m.name,
-                        why="this model reasons on every call and takes no "
-                            "level; the setting changes nothing"))
-            elif _is_qwen3(m.name) and m.reasoning:
-                body["enable_thinking"] = True
-                record(Adaptation(
-                    kind=ADAPTED, option="reasoning", asked=m.reasoning,
-                    sent="enable_thinking", model=m.name,
-                    why="this provider has a thinking switch, not a level, so "
-                        "any level turns it on"))
-            elif m.reasoning:
-                record(Adaptation(
-                    kind=DECLINED, option="reasoning", asked=m.reasoning,
-                    sent=None, model=m.name,
-                    why="this model has no thinking switch"))
-            return path, body
-
+        own = {"openai": self._openai, "xai": self._xai, "kimi": self._kimi,
+               "deepseek": self._deepseek, "qwen": self._qwen}.get(self._provider)
+        if own is not None:
+            return own(m, messages, output, tools)
         # Every other provider on this family is described by its data: the
         # request is the compatible one, and what differs — how reasoning is
         # asked for, whether a JSON Schema is taken — is read from
         # `[provider.reasoning]` and `[provider.options]`. A new provider that
         # speaks this dialect is a data file, not a branch here (4.0).
         return self._described_request(m, messages, output, tools)
+
+    def _openai(self, m, messages, output, tools):
+        """Responses API, images, or chat with o-series reasoning."""
+        if _should_use_responses_api(m.name):
+            return _build_responses_api_request(m, messages, output, tools=tools)
+        if _is_openai_image_model(m.name):
+            if tools:
+                raise ValueError(
+                    f"model {m.name!r} is an image model — it cannot "
+                    "take tool declarations")
+            # An input image + an editable image model ⇒ edit, else generate.
+            if _is_openai_editable_image_model(m.name) and _messages_have_image(messages):
+                return _build_image_edits_request(m, messages, output, self._images_edits_path)
+            return _build_image_generations_request(m, messages, output, self._images_path)
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        # reasoning_effort is only valid on the o-series reasoning models;
+        # plain GPT chat models reject it with HTTP 400 (gpt-5.x already
+        # routes through the Responses API branch above).
+        if _is_o_series_model(m.name):
+            _decline_sampling(m, body)
+            _set_effort(m, body)
+        return path, body
+
+    def _xai(self, m, messages, output, tools):
+        """Grok images by ratio, or chat with grok-3-mini's effort."""
+        if _is_xai_image(m.name):
+            # An input image ⇒ edit (JSON /v1/images/edits), else generate.
+            if _messages_have_image(messages):
+                return _build_xai_image_edit_request(m, messages, output, self._images_edits_path)
+            prompt = _last_user_text(messages)
+            body = {"model": m.name, "prompt": prompt,
+                    "n": 1, "response_format": "b64_json"}
+            # Shape control: aspect_ratio returns 1280x720 for 16:9 and
+            # honours every ratio exactly. `size` is refused outright by
+            # this API (HTTP 400 "Argument not supported"), so it becomes
+            # a ratio.
+            fmt = output.get("format", {})
+            ratio = fmt.get("aspect_ratio")
+            if ratio:
+                body["aspect_ratio"] = ratio
+                record(Adaptation(
+                    kind=TRANSLATED, option="aspect_ratio", asked=ratio,
+                    sent="aspect_ratio", model=m.name,
+                    why="passed through"))
+            elif fmt.get("size"):
+                ratio = ratio_of(fmt["size"])
+                if ratio:
+                    body["aspect_ratio"] = ratio
+                    record(Adaptation(
+                        kind=ADAPTED, option="size", asked=fmt["size"],
+                        sent=f"aspect_ratio={ratio}", model=m.name,
+                        why="this API refuses a pixel size; the shape was "
+                            "kept and the pixels left to the provider"))
+            return self._images_path, body
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        # Only grok-3-mini / grok-3-mini-fast accept reasoning_effort; other
+        # grok models reject it (grok-4 reasoners think natively).
+        if m.name.startswith("grok-3-mini"):
+            _set_effort(m, body)
+        return path, body
+
+    def _kimi(self, m, messages, output, tools):
+        """Chat with Kimi's thinking switch."""
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        if m.reasoning is not None and m._REASONING_MAP.get(m.reasoning) == "enabled":
+            if body.get("temperature") not in (None, 1.0):
+                record(Adaptation(
+                    kind=DECLINED, option="temperature",
+                    asked=body["temperature"], sent=1.0, model=m.name,
+                    why="this provider requires temperature 1.0 while "
+                        "thinking is enabled"))
+            body["temperature"] = 1.0
+            body["thinking"] = {"type": "enabled"}
+            record(Adaptation(
+                kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                sent="thinking", model=m.name,
+                why="sent as this provider's thinking switch"))
+        return path, body
+
+    def _deepseek(self, m, messages, output, tools):
+        """Chat; reasoning is a swap to deepseek-reasoner, JSON by prompt."""
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        if m.reasoning is not None and m.name not in ("deepseek-chat", "deepseek-reasoner"):
+            # The map is the chat/reasoner pair's: on deepseek-v4-pro even
+            # "low" sent deepseek-chat — another generation, retiring.
+            record(Adaptation(
+                kind=DECLINED, option="reasoning", asked=m.reasoning, sent=None, model=m.name,
+                why="reasoning here is a swap between deepseek-chat and deepseek-reasoner; "
+                    "this model is neither, and no setting of its own is known"))
+        elif m.reasoning is not None:
+            body["model"] = m._REASONING_MAP[m.reasoning]
+            if body["model"] != m.name:
+                # The loudest kind: a different model answers, at a
+                # different price, and a comparison that believes both
+                # arms ran the same model is already invalid.
+                record(Adaptation(
+                    kind=SWAPPED, option="reasoning", asked=m.reasoning,
+                    sent=body["model"], model=m.name,
+                    why="this provider expresses reasoning as a separate "
+                        "model, so the request goes to that one instead"))
+            else:
+                record(Adaptation(
+                    kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                    sent=body["model"], model=m.name,
+                    why="this level is served by this same model"))
+        if _is_deepseek_reasoner(body["model"]):
+            _decline_sampling(m, body)
+        fmt = output.get("format", {}); ft = fmt.get("type", "text")
+        if ft in ("json", "json_schema"):
+            body["response_format"] = {"type": "json_object"}
+            # A system message's content may be a list (multi-part) rather
+            # than a string — guard before calling .lower() on it.
+            has = any(isinstance(x.get("content"), str)
+                      and "json" in x["content"].lower()
+                      for x in body["messages"] if x.get("role") == "system")
+            # A schema always goes in, even when a system prompt already
+            # says "JSON": the answer is checked against it.
+            if ft == "json_schema":
+                _json_in_prompt(body, fmt)
+                record(Adaptation(
+                    kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
+                    model=m.name, why="this provider takes JSON but not a schema; the schema "
+                                      "is in the prompt and the answer is checked against it"))
+            elif not has:
+                _json_in_prompt(body, {})
+        return path, body
+
+    def _qwen(self, m, messages, output, tools):
+        """Chat with Qwen's thinking switch; QwQ always reasons."""
+        # wanx text-to-image is async and handled by QwenClient (the only
+        # client used for this provider); here we only do chat / vision.
+        path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        if _is_qwq(m.name):
+            # QwQ reasons on every call whatever it is asked; the level
+            # has nowhere to go. Saying so beats leaving a caller to
+            # believe "low" bought them anything.
+            body["enable_thinking"] = True
+            if m.reasoning:
+                record(Adaptation(
+                    kind=DECLINED, option="reasoning", asked=m.reasoning,
+                    sent="enable_thinking=true", model=m.name,
+                    why="this model reasons on every call and takes no "
+                        "level; the setting changes nothing"))
+        elif _is_qwen3(m.name) and m.reasoning:
+            body["enable_thinking"] = True
+            record(Adaptation(
+                kind=ADAPTED, option="reasoning", asked=m.reasoning,
+                sent="enable_thinking", model=m.name,
+                why="this provider has a thinking switch, not a level, so "
+                    "any level turns it on"))
+        elif m.reasoning:
+            record(Adaptation(
+                kind=DECLINED, option="reasoning", asked=m.reasoning,
+                sent=None, model=m.name,
+                why="this model has no thinking switch"))
+        return path, body
 
     def _described_request(self, m, messages, output, tools):
         prov = self._data["provider"]
