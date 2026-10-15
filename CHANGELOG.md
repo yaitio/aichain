@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.2.5] — 2026-10-15
+
+4.2.3 and 4.2.4 were tagged and never published: the release gate stopped
+both, because the regenerated `llms.txt` was left out of their commits and the
+committed one no longer matched the code. This release is the two of them,
+with the file. Nothing else changes.
+
 ## [4.2.4] — 2026-10-15
 
 ### Added
