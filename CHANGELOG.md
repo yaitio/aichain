@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.2.8] — 2026-10-15
+
+### Added
+
+- `Chain.input_schema()` — what a run needs from its caller: every input a
+  step reads that no earlier step writes, with its type, its description and
+  whether it is required or has a default, read from what the steps already
+  say (a function's signature and docstring, a tool's schema, a Skill's
+  placeholders, an Agent's task, a nested chain's schema). An input nothing
+  describes is said. `Chain(inputs={...})` describes the rest.
+- `Chain.save()` keeps the chain's own policy and its input descriptions.
+
+### Deprecated — removed in 5.0
+
+- `chain.accumulated` and `chain.history`: the run's result carries both, as
+  `result.variables` and `result.history`.
+- `on_step_error=` on `run()` and `resume()`: put it on the chain, or on a step
+  with `Step(..., on_error=...)`.
+
+### Fixed
+
+- `Chain.save()` warned that a chain's policy is not saved; it is now, and
+  the warning names what cannot be — an approver and interceptors, which are
+  code.
+
 ## [4.2.7] — 2026-10-15
 
 ### Added

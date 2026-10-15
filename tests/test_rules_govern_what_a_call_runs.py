@@ -144,16 +144,18 @@ class TestAChainAndAPoolTakeRules(unittest.TestCase):
         self.assertEqual(nuke.ran, 0)
         self.assertEqual(result["next"], "went on")
 
-    def test_save_says_the_rules_are_not_kept(self):
+    def test_save_keeps_the_rules_and_says_what_it_cannot_keep(self):
         import tempfile
-        chain = Chain([(Nuke(), "out")], policy={"destructive": "deny"})
+        from yait_aichain.tools import Wait
+        chain = Chain([(Wait(reason="ok?"), "w")], policy={"destructive": "deny"},
+                      approve=lambda r: True)
         with warnings.catch_warnings(record=True) as seen, tempfile.TemporaryDirectory() as tmp:
             warnings.simplefilter("always")
-            try:
-                chain.save(os.path.join(tmp, "c.yaml"))
-            except Exception:
-                pass                                   # a Nuke step may not save; the warning comes first
-        self.assertTrue(any("not saved" in str(w.message) for w in seen))
+            path = os.path.join(tmp, "c.yaml")
+            chain.save(path)
+            back = Chain.load(path, trusted=True)
+        self.assertEqual(back.policy.rules["destructive"], "deny")
+        self.assertTrue(any("approver and interceptors are code" in str(w.message) for w in seen))
 
 
 if __name__ == "__main__":

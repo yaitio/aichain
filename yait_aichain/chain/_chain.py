@@ -380,6 +380,14 @@ def _resolve(value, accumulated: dict, where: str, top: bool = False):
     return value                                              # a number, a bool: a literal
 
 
+def _type_name(annotation) -> str:
+    """A JSON type for a Python annotation; "string" when it says nothing."""
+    import inspect
+    return {int: "integer", float: "number", bool: "boolean", dict: "object", list: "array",
+            str: "string"}.get(annotation if annotation is not inspect.Parameter.empty else str,
+                               "string")
+
+
 def _sources(input_map: dict) -> list:
     """The variable names an input map reads: a bare name or path, and every
     placeholder of a template, at any depth."""
@@ -461,6 +469,10 @@ class Chain:
     interceptors : list | None, optional
         Act on a tool step before and after it runs, as on an ``Agent``; each
         change goes out as an ``interceptor.changed`` event.
+    inputs : dict | None, optional
+        A description for an input the steps do not describe themselves —
+        ``{"language": "Target language, e.g. French"}`` — read by
+        :meth:`input_schema`.
 
     Raises
     ------
@@ -483,6 +495,7 @@ class Chain:
         policy=None,
         approve=None,
         interceptors=None,
+        inputs=None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
@@ -490,6 +503,10 @@ class Chain:
         self.policy  = as_policy(policy)
         self.approve = approve
         self.interceptors = list(interceptors or [])
+        if inputs is not None and not (isinstance(inputs, dict)
+                                       and all(isinstance(v, str) for v in inputs.values())):
+            raise ValueError("inputs maps an input's name to its description, a str")
+        self.inputs = dict(inputs or {})
         if on_step_error not in _VALID_ON_STEP_ERROR:
             raise ValueError(
                 f"on_step_error must be one of {sorted(_VALID_ON_STEP_ERROR)}; "
@@ -575,6 +592,114 @@ class Chain:
                 accumulated[key] = output        # the dict wins over a field of its own name
         elif extra["default_key"] and key != "result":
             accumulated["result"] = output
+
+    def input_schema(self) -> dict:
+        """
+        What a run needs from its caller: every input some step reads that no
+        earlier step writes, with its type, its description, and whether it is
+        required or has a default.
+
+        Read from what the steps already say — a function's signature and
+        docstring, a tool's schema, a Skill's template placeholders, an Agent's
+        task, a chain's own schema — with ``variables=`` as defaults and
+        ``inputs=`` as descriptions. An input nothing describes is said, since
+        a caller or a model filling it has only its name to go on::
+
+            {"url": {"type": "string", "description": "Article URL", "required": True},
+             "language": {"type": "string", "default": "English"}}
+        """
+        written: set = set()
+        schema: dict = {}
+        unread: dict = {}
+        for runner, key, input_map, kind, options in self._steps:
+            for name, spec, where in self._needs(runner, kind, input_map, options):
+                if name in written:
+                    continue
+                known = schema.setdefault(name, {})
+                for field_, value in spec.items():
+                    known.setdefault(field_, value)
+                if not known.get("description"):
+                    unread.setdefault(name, where)
+            written.add(key)
+        for name, spec in schema.items():
+            if name in self.variables:
+                spec.pop("required", None)
+                spec["default"] = self.variables[name]
+            if self.inputs.get(name):
+                spec["description"] = self.inputs[name]
+        for name, where in unread.items():
+            if not schema[name].get("description"):
+                warnings.warn(f"input {name!r} has no description (read only by {where}); "
+                              f"give one: Chain(..., inputs={{{name!r}: '...'}})", stacklevel=2)
+        return schema
+
+    @staticmethod
+    def _needs(runner, kind: str, input_map: dict, options: dict) -> list:
+        """``(name, spec, where)`` for each input one step reads."""
+        import inspect
+        from ..tools._base import _param_docs
+        out: list = []
+
+        def mapped(param: str, spec: dict, where: str) -> None:
+            """A parameter the input map fills reads its sources instead."""
+            source = input_map[param]
+            for name in _sources({param: source}):
+                head, _, rest = name.partition(".")
+                out.append((head, {"type": "object"} if rest else dict(spec), where))
+
+        label = _runner_name(runner) or type(runner).__name__
+        if kind == "call":
+            docs = _param_docs(inspect.getdoc(runner) or "")
+            for name, p in inspect.signature(runner).parameters.items():
+                if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
+                    continue
+                spec = {"type": _type_name(p.annotation)}
+                if docs.get(name):
+                    spec["description"] = docs[name]
+                if name in input_map:
+                    mapped(name, spec, f"{label}")
+                elif p.default is p.empty:
+                    out.append((name, {**spec, "required": True}, label))
+                else:
+                    out.append((name, {**spec, "default": p.default}, label))
+        elif kind == "tool":
+            params = getattr(runner, "parameters", {}) or {}
+            required = set(params.get("required") or ())
+            for name, prop in (params.get("properties") or {}).items():
+                spec = {k: v for k, v in prop.items() if k in ("type", "description", "enum")}
+                if name in input_map:
+                    mapped(name, spec, label)
+                else:
+                    out.append((name, {**spec, "required": True} if name in required else spec,
+                                label))
+            for name in input_map:
+                if name not in (params.get("properties") or {}):
+                    mapped(name, {}, label)
+        elif kind == "agent":
+            out.append((options.get("task_key", "task"),
+                        {"type": "string", "description": f"the task for {label}", "required": True},
+                        label))
+        elif isinstance(runner, Chain):
+            for name, spec in runner.input_schema().items():
+                out.append((name, dict(spec), label))
+        else:                                         # a Skill: its template's placeholders
+            defaults = getattr(runner, "variables", {}) or {}
+            names: list = []
+            for message in (getattr(runner, "_input", {}) or {}).get("messages", []):
+                for part in message.get("parts", []):
+                    text = part if isinstance(part, str) else (part.get("text") or "") \
+                        if isinstance(part, dict) else ""
+                    names += placeholder_names(text)
+            for name in dict.fromkeys(names):
+                if name in input_map:
+                    mapped(name, {"type": "string"}, f"a Skill template ({label})")
+                elif name in defaults:
+                    out.append((name, {"type": "string", "default": defaults[name]},
+                                f"a Skill template ({label})"))
+                else:
+                    out.append((name, {"type": "string", "required": True},
+                                f"a Skill template ({label})"))
+        return out
 
     def _check_flow(self) -> None:
         """What can be known before a run: a step reading what only a later
@@ -672,6 +797,10 @@ class Chain:
         ValueError
             If *on_step_error* override value is not recognised.
         """
+        if on_step_error is not None:
+            warnings.warn("on_step_error= on run() and resume() goes in 5.0; put it on the chain — "
+                          "Chain(..., on_step_error=...) — or on a step, Step(..., on_error=...)",
+                          FutureWarning, stacklevel=2)
         _on_error = self.on_step_error if on_step_error is None else on_step_error
         if _on_error not in _VALID_ON_STEP_ERROR:
             raise ValueError(
@@ -783,6 +912,10 @@ class Chain:
             The tenant and metadata for the resumed part; the stored one when
             omitted.
         """
+        if on_step_error is not None:
+            warnings.warn("on_step_error= on run() and resume() goes in 5.0; put it on the chain — "
+                          "Chain(..., on_step_error=...) — or on a step, Step(..., on_error=...)",
+                          FutureWarning, stacklevel=2)
         _on_error = self.on_step_error if on_step_error is None else on_step_error
         if _on_error not in _VALID_ON_STEP_ERROR:
             raise ValueError(
@@ -1158,9 +1291,15 @@ class Chain:
 
         Typical use — assembling a sectional document after all steps complete::
 
-            chain.run(variables=initial_vars)
-            document = assemble_document(chain.accumulated, sections)
+            result = chain.run(variables=initial_vars)
+            document = assemble_document(result.variables, sections)
+
+        Deprecated since 4.2.8: the result of the run carries the same, as
+        ``result.variables``, and does not change when the chain runs again.
+        Removed in 5.0.
         """
+        warnings.warn("chain.accumulated is the last run's result.variables; read it from "
+                      "the result — it goes in 5.0", FutureWarning, stacklevel=2)
         return dict(self._accumulated)
 
     @property
@@ -1180,6 +1319,8 @@ class Chain:
         ``output``     — raw output (``str`` or ``dict``)
         ``output_key`` — variable name used to store a ``str`` output
         """
+        warnings.warn("chain.history is the last run's result.history; read it from the "
+                      "result — it goes in 5.0", FutureWarning, stacklevel=2)
         return list(self._history)
 
     # ------------------------------------------------------------------
@@ -1219,11 +1360,16 @@ class Chain:
 
             chain.save("chains/analyse_and_translate.yaml")
         """
-        if self.policy is not None or self.approve is not None:
-            # Not written yet (PLAN-agent-chain.md, 6.7), and a chain loaded
-            # back without the rules it was given would run what they refused.
-            warnings.warn("this chain's policy and approver are not saved; give them to "
-                          "Chain.load(...)'s result again before running it", stacklevel=2)
+        if self.policy is not None and not (hasattr(self.policy, "rules")
+                                            and hasattr(self.policy, "default")):
+            warnings.warn("this chain's policy is not a PermissionPolicy and is not saved; give it "
+                          "to Chain.load(...)'s result again before running it", stacklevel=2)
+        if self.approve is not None or self.interceptors:
+            # Code, not settings: a file cannot carry a function. A chain
+            # loaded back without them refuses what needed a person, and runs
+            # what an interceptor would have changed.
+            warnings.warn("this chain's approver and interceptors are code and are not saved; "
+                          "give them to Chain.load(...)'s result again", stacklevel=2)
         steps_data = []
         for runner, output_key, input_map, kind, options in self._steps:
             if kind == "call":
@@ -1324,9 +1470,13 @@ class Chain:
             data["variables"] = self.variables
         if self.on_step_error != "raise":
             data["on_step_error"] = self.on_step_error
+        if hasattr(self.policy, "rules") and hasattr(self.policy, "default"):
+            data["policy"] = {"rules": dict(self.policy.rules), "default": self.policy.default}
+        if self.inputs:
+            data["inputs"] = dict(self.inputs)
         # Reorder so name/description/variables appear before steps
         ordered: dict = {}
-        for k in ("name", "description", "on_step_error", "variables", "steps"):
+        for k in ("name", "description", "on_step_error", "policy", "inputs", "variables", "steps"):
             if k in data:
                 ordered[k] = data[k]
 
@@ -1488,6 +1638,8 @@ class Chain:
             name           = data.get("name"),
             description    = data.get("description"),
             on_step_error  = data.get("on_step_error", "raise"),
+            policy         = data.get("policy"),
+            inputs         = data.get("inputs"),
         )
 
     # ------------------------------------------------------------------

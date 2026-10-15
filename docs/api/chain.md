@@ -22,6 +22,7 @@ Chain(
     policy=None,
     approve=None,
     interceptors=None,
+    inputs=None,
 )
 ```
 
@@ -80,11 +81,35 @@ result["french"], result.output, result.cost
   approver of an agent this chain runs inside.
 - `interceptors` (*list | None, optional*, default `None`) — Act on a tool step before and after it runs, as on an `Agent`; each
   change goes out as an `interceptor.changed` event.
+- `inputs` (*dict | None, optional*, default `None`) — A description for an input the steps do not describe themselves —
+  `{"language": "Target language, e.g. French"}` — read by
+  `input_schema`.
 
 **Raises**
 
 - `ValueError` — If *steps* is empty, a tuple has an unsupported shape, or
   *on_step_error* is not one of the four.
+
+### `Chain.input_schema()`
+
+```python
+Chain.input_schema() -> dict
+```
+
+What a run needs from its caller: every input some step reads that no
+earlier step writes, with its type, its description, and whether it is
+required or has a default.
+
+Read from what the steps already say — a function's signature and
+docstring, a tool's schema, a Skill's template placeholders, an Agent's
+task, a chain's own schema — with `variables=` as defaults and
+`inputs=` as descriptions. An input nothing describes is said, since
+a caller or a model filling it has only its name to go on:
+
+```python
+{"url": {"type": "string", "description": "Article URL", "required": True},
+ "language": {"type": "string", "default": "English"}}
+```
 
 ### `Chain.run()`
 
@@ -203,9 +228,13 @@ Returns an empty dict before the first `run()`.
 Typical use — assembling a sectional document after all steps complete:
 
 ```python
-chain.run(variables=initial_vars)
-document = assemble_document(chain.accumulated, sections)
+result = chain.run(variables=initial_vars)
+document = assemble_document(result.variables, sections)
 ```
+
+Deprecated since 4.2.8: the result of the run carries the same, as
+`result.variables`, and does not change when the chain runs again.
+Removed in 5.0.
 
 ### `Chain.history`
 
