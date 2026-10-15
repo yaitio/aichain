@@ -60,7 +60,9 @@ MAX_ARGUMENT_DEPTH = 64
 
 @dataclass(frozen=True)
 class Ready:
-    """Nothing stands between the call and its tool."""
+    """Nothing stands between the call and its tool. *call* is the call to run
+    — the one asked for, or an interceptor's rewrite of it."""
+    call: Any = None
 
 
 @dataclass(frozen=True)
@@ -73,9 +75,44 @@ class Denied:
 class NeedsApproval:
     """The policy wants a person; *request* is what they are shown."""
     request: Any
+    call: Any = None
 
 
 READY = Ready()
+
+
+@dataclass(frozen=True)
+class Block:
+    """What an interceptor's ``before`` returns to stop a call.
+
+    Parameters
+    ----------
+    reason : str
+        Why — what the model is told in place of the call's result.
+    """
+    reason: str
+
+
+class Interceptor:
+    """Acts on a call before and after it runs — where a hook only watches.
+
+    ``before(call, run)`` returns None to leave the call alone, a `Block` to
+    stop it, or a `ToolCall` with the same ``id`` and ``name`` and other
+    ``arguments`` to run that instead. It runs before the policy, so the
+    policy decides on what will actually run. ``after(call, result, run)``
+    returns None to leave the result alone, or the result to hand back
+    instead. Every change is written down — the journal of an agent's run, an
+    ``interceptor.changed`` event — with what it was and what it became, and an
+    interceptor that raises in ``before`` blocks the call rather than being
+    skipped: a guard that fails open guards nothing. They run in the order
+    given. Subclass it, or give any object with either method.
+    """
+
+    def before(self, call, run):                      # pragma: no cover - default
+        return None
+
+    def after(self, call, result, run):               # pragma: no cover - default
+        return None
 
 
 @dataclass(frozen=True)
@@ -119,6 +156,15 @@ def _decide(permissions, tool, arguments):
         return permissions.decide(tool, arguments)
     except TypeError:
         return permissions.decide(tool)          # a policy of another make
+
+
+def _short(value, limit: int = 160) -> str:
+    import json
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str, sort_keys=True)
+    except Exception:
+        text = repr(value)
+    return text if len(text) <= limit else text[:limit] + "…"
 
 
 def takes_run(tool) -> bool:
@@ -173,7 +219,8 @@ class Dispatcher:
 
     def __init__(self, *, tools: dict, builtins: dict, gated: Callable,
                  permissions, approve, max_cost, emit: Callable, who: str,
-                 run: Callable, log_call: Callable) -> None:
+                 run: Callable, log_call: Callable, interceptors=(),
+                 note: Callable | None = None) -> None:
         self.tools = tools
         self.builtins = builtins
         self._gated = gated
@@ -184,6 +231,53 @@ class Dispatcher:
         self._who = who
         self._run = run
         self._log_call = log_call
+        self.interceptors = list(interceptors or ())
+        self._note = note or (lambda text: None)
+
+    # ── interceptors ───────────────────────────────────────────────────────
+
+    def _changed(self, text: str) -> None:
+        self._emit("interceptor.changed", payload={"note": text, "agent": self._who})
+        self._note(text)
+
+    def _before(self, call):
+        """The call after every interceptor's ``before``, or a Denied."""
+        for each in self.interceptors:
+            hook = getattr(each, "before", None)
+            if hook is None:
+                continue
+            label = getattr(each, "name", None) or type(each).__name__
+            try:
+                out = hook(call, self._run())
+            except Exception as exc:
+                return Denied(f"interceptor {label} failed before {call.name!r}, so the call "
+                              f"was blocked: {type(exc).__name__}: {exc}")
+            if out is None:
+                continue
+            if isinstance(out, Block):
+                return Denied(f"blocked by interceptor {label}: {out.reason}")
+            if getattr(out, "name", None) != call.name or getattr(out, "id", None) != call.id:
+                return Denied(f"interceptor {label} turned {call.name!r} into another call "
+                              f"({getattr(out, 'name', out)!r}); it may change the arguments only")
+            if dict(out.arguments or {}) != dict(call.arguments or {}):
+                self._changed(f"interceptor {label} changed the arguments of {call.name!r}: "
+                              f"{_short(call.arguments)} → {_short(out.arguments)}")
+            call = out
+        return call
+
+    def _after(self, call, result):
+        """The result after every interceptor's ``after``."""
+        for each in self.interceptors:
+            hook = getattr(each, "after", None)
+            if hook is None:
+                continue
+            label = getattr(each, "name", None) or type(each).__name__
+            out = hook(call, result, self._run())
+            if out is not None and out is not result:
+                self._changed(f"interceptor {label} changed the result of {call.name!r}: "
+                              f"{_short(result)} → {_short(out)}")
+                result = out
+        return result
 
     # ── 1 resolve ──────────────────────────────────────────────────────────
 
@@ -202,6 +296,10 @@ class Dispatcher:
         case is where that matters most — otherwise the call simply fails and
         nothing says it was governance rather than a broken tool.
         """
+        intercepted = self._before(call)
+        if isinstance(intercepted, Denied):
+            return intercepted
+        call = intercepted
         tool = self.gated_tool(call)
         around = _GOVERNING.get()
         if tool is not None:
@@ -212,7 +310,7 @@ class Dispatcher:
         policies = [g.permissions for g in around if g.permissions] + (
             [self.permissions] if self.permissions else [])
         if tool is None or not policies:
-            return READY
+            return Ready(call)
         if depth(call.arguments) > MAX_ARGUMENT_DEPTH:
             # Refused before the approver's deep copy would raise on it.
             return Denied(f"tool {tool.name!r}: the arguments are nested more than "
@@ -228,7 +326,7 @@ class Dispatcher:
         decision = (next((d for d in decisions if d not in (ALLOW, APPROVE)), None)
                     or (APPROVE if APPROVE in decisions else ALLOW))
         if decision == ALLOW:
-            return READY
+            return Ready(call)
         risk = risk_of(tool, arguments)
         if decision == DENY:
             return Denied(f"tool {tool.name!r} denied by policy")
@@ -249,7 +347,7 @@ class Dispatcher:
                    payload={"id": run.pending.call_id, "tool": tool.name,
                             "risk": risk, "arguments": run.pending.arguments,
                             "agent": self._who})
-        return NeedsApproval(run.pending)
+        return NeedsApproval(run.pending, call)
 
     def answer(self, step: NeedsApproval, state: dict | None = None):
         """Ask the approver, then say what it answered: Ready or Denied."""
@@ -283,7 +381,7 @@ class Dispatcher:
                             "risk": request.risk, "granted": granted,
                             "reason": reason, "agent": self._who})
         if granted:
-            return READY
+            return Ready(step.call)
         # A refusal is a result, not a crash: every tool call coming back with
         # something is what keeps the model's history well-formed, and a
         # denied call the model never hears about is one it will simply make
@@ -311,8 +409,10 @@ class Dispatcher:
                 # Under the owner's budget too: a worker's spend is the
                 # team's, and a lead's `max_cost` bounded only its own calls.
                 with governing(self.permissions, self.approve, settled), lend(self.max_cost):
-                    return handler(call.arguments, state), None
-            return self.run_tool(call), None
+                    result = handler(call.arguments, state)
+            else:
+                result = self.run_tool(call)
+            return self._after(call, result), None
         except Suspend:
             # Not a failure, and the one exception this must not flatten: the
             # tool is saying the world has to answer before the run goes on.
@@ -355,6 +455,7 @@ class Dispatcher:
             return charged(tool, lambda: tool.run(**call_kwargs))
 
 
-__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "governing", "calling",
+__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "Block", "Interceptor",
+           "governing", "calling",
            "as_policy",
            "MAX_ARGUMENT_DEPTH", "depth"]

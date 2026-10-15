@@ -61,6 +61,9 @@ class AgentRun(Run):
     streaming: bool = False
     #: The working counters, once the loop has them.
     state: dict | None = None
+    #: The run's journal, once the loop has it — where an interceptor's
+    #: change to a call is written down.
+    journal: Any = None
 
     #: The counters that survive a pause, and only those. `adaptations` are
     #: per-request notices about what went on the wire and do not describe

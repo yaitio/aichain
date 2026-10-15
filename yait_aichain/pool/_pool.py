@@ -174,6 +174,8 @@ class Pool:
         Answers an item the policy wants a person for, as ``Agent(approve=)``
         does. Absent, such an item is refused — or asked of the approver of an
         agent this pool runs inside.
+    interceptors : list | None, optional
+        Act on each tool item before and after it runs, as on an ``Agent``.
 
     Examples
     --------
@@ -234,6 +236,7 @@ class Pool:
         max_cost=None,
         policy=None,
         approve=None,
+        interceptors=None,
     ) -> None:
         if not callable(getattr(runner, "run", None)):
             # A plain function had no `run`, and every item failed into a list
@@ -272,6 +275,7 @@ class Pool:
         from .._dispatch import as_policy
         self.policy     = as_policy(policy)
         self.approve    = approve
+        self.interceptors = list(interceptors or [])
 
         self._lock: threading.Lock = threading.Lock()
         self._history: list[dict]  = self._init_history()
@@ -553,12 +557,13 @@ class Pool:
             tools={runner.name: runner}, builtins={}, gated=lambda call: runner,
             permissions=self.policy, approve=self.approve, max_cost=self.max_cost,
             emit=lambda *a, **k: None, who=self.name or "", run=lambda: run,
-            log_call=lambda tool, kwargs: None)
+            log_call=lambda tool, kwargs: None, interceptors=self.interceptors)
         call = ToolCall(id="", name=runner.name, arguments=kwargs)
         step = dispatcher.decide(call)
         if isinstance(step, Denied):
             raise PermissionError(step.reason)
-        return dispatcher.run_tool(call, check=False)
+        call = step.call or call
+        return dispatcher._after(call, dispatcher.run_tool(call, check=False))
 
     def _dispatch(self, variables: dict) -> tuple[Any, Any]:
         """Route the call to the correct runner interface.

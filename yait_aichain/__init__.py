@@ -27,7 +27,7 @@ Full imports::
     from yait_aichain.tools  import fetch, search, embed
 """
 
-__version__ = "4.2.5"
+__version__ = "4.2.6"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -73,6 +73,7 @@ from .models import portable_schema, check_structure, SchemaNotExpressible
 from .models._adaptation import Adaptation, UnsupportedOption
 from ._budget import Budget, BudgetExceeded
 from .models._usage import Usage
+from ._dispatch import Block, Interceptor
 from .skills import Skill
 from .chain  import Chain
 from .pool   import Pool, PENDING, RUNNING, DONE, FAILED
@@ -108,7 +109,7 @@ from .clients import (
 __all__ = [
     "docs_dir",
     "Model", "portable_schema", "check_structure", "SchemaNotExpressible", "Adaptation", "UnsupportedOption",
-    "Budget", "BudgetExceeded", "Usage",
+    "Budget", "BudgetExceeded", "Usage", "Block", "Interceptor",
     "Skill", "Chain", "ChainResult", "Pool", "PoolResult", "PENDING", "RUNNING", "DONE", "FAILED",
     "Agent", "AgentResult",
     "Event", "Hook", "Tracer", "LoggingTracer",

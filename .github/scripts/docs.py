@@ -560,7 +560,7 @@ API_PAGES = {
     "api/tools/index.md": [("yait_aichain.tools", n) for n in ("tool", "Tool", "FunctionTool", "ToolResult", "Record", "media_part")],
     "api/control.md": [("yait_aichain", n) for n in ("Budget", "BudgetExceeded", "PermissionPolicy",
                                                      "ApprovalRequest", "ApprovalDecision", "Event", "Hook",
-                                                     "Tracer", "LoggingTracer", "docs_dir")]
+                                                     "Tracer", "LoggingTracer", "Interceptor", "Block", "docs_dir")]
                       + [("yait_aichain.tools", n) for n in ("RISK_CLASSES", "DECISIONS")],
     "api/state.md": [("yait_aichain.state", n) for n in ("RunContext", "current", "using", "Suspend",
                                                          "SuspendedResult", "StateStore", "InMemoryStore",

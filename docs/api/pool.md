@@ -20,6 +20,7 @@ Pool(
     max_cost=None,
     policy=None,
     approve=None,
+    interceptors=None,
 )
 ```
 
@@ -49,6 +50,7 @@ Parallel execution of one runner across many items.
 - `approve` (*callable | None, optional*, default `None`) — Answers an item the policy wants a person for, as `Agent(approve=)`
   does. Absent, such an item is refused — or asked of the approver of an
   agent this pool runs inside.
+- `interceptors` (*list | None, optional*, default `None`) — Act on each tool item before and after it runs, as on an `Agent`.
 
 **Examples**
 

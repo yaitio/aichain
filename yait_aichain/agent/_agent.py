@@ -505,6 +505,11 @@ class Agent:
     verbose : int, optional
         ``0`` is silent, ``1`` logs each step, ``2`` logs everything, through the
         ``yait_aichain`` logger.
+    interceptors : list | None, optional
+        Objects that act on a call before and after it runs — ``before(call,
+        run)`` may block it or change its arguments, before the policy decides;
+        ``after(call, result, run)`` may change its result. Every change is
+        written down. See :class:`~yait_aichain.Interceptor`.
     """
 
     MODES = ("agile", "waterfall")
@@ -527,6 +532,7 @@ class Agent:
         name:          str | None = None,
         description:   str | None = None,
         verbose:       int = 0,
+        interceptors:  list | None = None,
     ) -> None:
         if mode not in self.MODES:
             raise ValueError(f"mode must be one of {self.MODES}; got {mode!r}")
@@ -604,6 +610,7 @@ class Agent:
         self.name         = name
         self.description  = description
         self.verbose      = verbose
+        self.interceptors = list(interceptors or [])
         # How deep in a delegation this agent's runs start, and how deep they
         # may go. Not parameters: a run carries its own depth (`AgentRun`),
         # and `delegate` hands a worker its lead's plus one.
@@ -1084,7 +1091,7 @@ class Agent:
         step = self._dispatch.decide(call, state)
         if isinstance(step, Denied):
             return None, step.reason
-        return self._dispatch.execute(call, state)
+        return self._dispatch.execute(step.call or call, state)
 
     # ── The loop ─────────────────────────────────────────────────────────
 
@@ -1168,6 +1175,7 @@ class Agent:
             while sink:
                 yield sink.pop(0)
 
+        self._live.journal = journal        # where an interceptor's change is written
         while True:
             try:
                 # Walked, not called: the text deltas of a streamed turn reach
@@ -1259,7 +1267,7 @@ class Agent:
 
                 try:
                     result, error = ((None, step.reason) if isinstance(step, Denied)
-                                     else self._dispatch.execute(call, state))
+                                     else self._dispatch.execute(step.call or call, state))
                 except Suspend as susp:
                     try:
                         parked = self._park(susp, call, reply, messages,
@@ -1537,7 +1545,14 @@ class Agent:
             gated=self._gated_tool,
             permissions=self.permissions, approve=self.approve, max_cost=self.max_cost,
             emit=self._emit, who=self.name or "", run=lambda: self._live,
-            log_call=self._log_call)
+            log_call=self._log_call, interceptors=self.interceptors, note=self._noted)
+
+    def _noted(self, text: str) -> None:
+        """An interceptor's change, in the journal of the run it changed."""
+        journal = getattr(self._live, "journal", None)
+        if journal is not None:
+            journal.append("interceptor", outcome=_J_DONE,
+                           evidence=_evidence(CHECK, text), reason=text)
 
     def _gated_tool(self, call):
         """The tool a call will run, which the policy decides on. For `pool`

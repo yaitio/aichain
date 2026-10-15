@@ -21,6 +21,7 @@ Chain(
     max_cost=None,
     policy=None,
     approve=None,
+    interceptors=None,
 )
 ```
 
@@ -76,6 +77,8 @@ result["french"], result.output, result.cost
   `ApprovalRequest`, returns `True`, `False` or an
   `ApprovalDecision`. Absent, such a step is refused — or asked of the
   approver of an agent this chain runs inside.
+- `interceptors` (*list | None, optional*, default `None`) — Act on a tool step before and after it runs, as on an `Agent`; each
+  change goes out as an `interceptor.changed` event.
 
 **Raises**
 

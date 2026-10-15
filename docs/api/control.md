@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../control/cost-and-budget.md).
 
 <!-- g:api -->
-[`Budget`](#budget) · [`BudgetExceeded`](#budgetexceeded) · [`PermissionPolicy`](#permissionpolicy) · [`ApprovalRequest`](#approvalrequest) · [`ApprovalDecision`](#approvaldecision) · [`Event`](#event) · [`Hook`](#hook) · [`Tracer`](#tracer) · [`LoggingTracer`](#loggingtracer) · [`docs_dir`](#docs_dir) · [`RISK_CLASSES`](#risk_classes) · [`DECISIONS`](#decisions)
+[`Budget`](#budget) · [`BudgetExceeded`](#budgetexceeded) · [`PermissionPolicy`](#permissionpolicy) · [`ApprovalRequest`](#approvalrequest) · [`ApprovalDecision`](#approvaldecision) · [`Event`](#event) · [`Hook`](#hook) · [`Tracer`](#tracer) · [`LoggingTracer`](#loggingtracer) · [`Interceptor`](#interceptor) · [`Block`](#block) · [`docs_dir`](#docs_dir) · [`RISK_CLASSES`](#risk_classes) · [`DECISIONS`](#decisions)
 
 ---
 
@@ -307,6 +307,41 @@ LoggingTracer(event: Event)
 ```
 
 Call self as a function.
+
+---
+
+## `Interceptor`
+
+```python
+Interceptor()
+```
+
+Acts on a call before and after it runs — where a hook only watches.
+
+`before(call, run)` returns None to leave the call alone, a `Block` to
+stop it, or a `ToolCall` with the same `id` and `name` and other
+`arguments` to run that instead. It runs before the policy, so the
+policy decides on what will actually run. `after(call, result, run)`
+returns None to leave the result alone, or the result to hand back
+instead. Every change is written down — the journal of an agent's run, an
+`interceptor.changed` event — with what it was and what it became, and an
+interceptor that raises in `before` blocks the call rather than being
+skipped: a guard that fails open guards nothing. They run in the order
+given. Subclass it, or give any object with either method.
+
+---
+
+## `Block`
+
+```python
+Block(reason: str)
+```
+
+What an interceptor's `before` returns to stop a call.
+
+**Parameters**
+
+- `reason` (*str*) — Why — what the model is told in place of the call's result.
 
 ---
 

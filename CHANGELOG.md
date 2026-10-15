@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.2.6] — 2026-10-15
+
+### Added
+
+- `Interceptor` and `Block`, and `interceptors=` on `Agent`, `Chain` and
+  `Pool`. Where a hook watches, an interceptor acts: `before(call, run)` may
+  block a call or change its arguments — before the policy, so the policy
+  decides on what will really run — and `after(call, result, run)` may change
+  its result. Every change is written down with what it was and what it
+  became: an `interceptor` entry in the run's journal and an
+  `interceptor.changed` event. One that raises in `before` blocks the call
+  rather than being skipped, and one may change the arguments only, never
+  which call it is.
+
 ## [4.2.5] — 2026-10-15
 
 4.2.3 and 4.2.4 were tagged and never published: the release gate stopped

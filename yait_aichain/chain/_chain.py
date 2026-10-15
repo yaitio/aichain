@@ -397,6 +397,9 @@ class Chain:
         ``ApprovalRequest``, returns ``True``, ``False`` or an
         ``ApprovalDecision``. Absent, such a step is refused — or asked of the
         approver of an agent this chain runs inside.
+    interceptors : list | None, optional
+        Act on a tool step before and after it runs, as on an ``Agent``; each
+        change goes out as an ``interceptor.changed`` event.
 
     Raises
     ------
@@ -418,12 +421,14 @@ class Chain:
         max_cost=None,
         policy=None,
         approve=None,
+        interceptors=None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
         from .._dispatch import as_policy
         self.policy  = as_policy(policy)
         self.approve = approve
+        self.interceptors = list(interceptors or [])
         if on_step_error not in _VALID_ON_STEP_ERROR:
             raise ValueError(
                 f"on_step_error must be one of {sorted(_VALID_ON_STEP_ERROR)}; "
@@ -490,13 +495,15 @@ class Chain:
             tools={runner.name: runner}, builtins={}, gated=lambda call: runner,
             permissions=self.policy, approve=self.approve, max_cost=self.max_cost,
             emit=self._emit, who=self.name or "", run=lambda: run,
-            log_call=lambda tool, kwargs: None)
+            log_call=lambda tool, kwargs: None, interceptors=self.interceptors)
         call = ToolCall(id=f"step_{idx}", name=runner.name, arguments=kwargs)
         step = dispatcher.decide(call)
         if isinstance(step, Denied):
             raise PermissionError(step.reason)
-        return dispatcher.run_tool(call, extra=None if signal is None else {"_signal": signal},
-                                   check=False)
+        call = step.call or call
+        result = dispatcher.run_tool(call, extra=None if signal is None else {"_signal": signal},
+                                     check=False)
+        return dispatcher._after(call, result)
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch a step-boundary :class:`Event` to registered hooks."""

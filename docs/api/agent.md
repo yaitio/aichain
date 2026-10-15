@@ -26,6 +26,7 @@ Agent(
     name: str | None = None,
     description: str | None = None,
     verbose: int = 0,
+    interceptors: list | None = None,
 )
 ```
 
@@ -66,6 +67,10 @@ A loop that holds one growing conversation and acts on the world.
 - `description` (*str | None, optional*, default `None`) — What it does — what a lead agent reads when choosing a worker.
 - `verbose` (*int, optional*, default `0`) — `0` is silent, `1` logs each step, `2` logs everything, through the
   `yait_aichain` logger.
+- `interceptors` (*list | None, optional*, default `None`) — Objects that act on a call before and after it runs — `before(call,
+  run)` may block it or change its arguments, before the policy decides;
+  `after(call, result, run)` may change its result. Every change is
+  written down. See `Interceptor`.
 
 ### `Agent.run()`
 

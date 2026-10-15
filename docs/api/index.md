@@ -16,7 +16,7 @@ What a thing is for, and how to use it well, is in the guides.
 | [Tools — the base](tools/index.md) | `tool`, `Tool`, `FunctionTool`, `ToolResult`, `Record` |
 | Tools by family | [search](tools/search.md) · [fetch](tools/fetch.md) · [decide](tools/decide.md) · [speech](tools/speech.md) · [image](tools/image.md) · [embed](tools/embed.md) · [rerank](tools/rerank.md) · [wait and gate](tools/wait-gate.md) |
 | Utilities | [Vectors](utilities/vectors.md) · [Shell](utilities/shell.md) · [REST](utilities/rest.md) · [MCP](utilities/mcp.md) |
-| [Control](control.md) | `Budget`, `PermissionPolicy`, approvals, `Event`, `Tracer`, `docs_dir` |
+| [Control](control.md) | `Budget`, `PermissionPolicy`, approvals, `Interceptor`, `Event`, `Tracer`, `docs_dir` |
 | [State](state.md) | `RunContext`, `Suspend`, stores, `RunDocument` |
 | [Eval](eval.md) | `Eval`, `Case`, `Report`, the scorers |
 | [Errors](errors.md) | every exception a call can raise |
