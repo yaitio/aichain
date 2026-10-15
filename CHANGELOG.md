@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.5.2] — 2026-10-15
+
+### Changed
+
+- `Skill.run()` and `Skill.stream()` make a call through one function: the
+  retries, the budget, the `llm_call.*` events, the price and the parsing of a
+  structured answer are in one place, where two copies had drifted apart. On
+  the same answer the two give the same result, usage, cost and charge, held
+  by a test. A non-API failure of a buffered call — a socket error, a bad
+  response body — now emits its `llm_call.ended` with the error, as a
+  streamed one did.
+
 ## [4.5.1] — 2026-10-15
 
 ### Changed

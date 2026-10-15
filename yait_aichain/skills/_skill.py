@@ -405,75 +405,17 @@ class Skill:
     _open_call: "float | None" = None
 
     def _stream_on(self, model, messages, _tools, pieces):
-        outcome = None
-        for attempt in _attempts(self.max_retries, self.retry_delay):
-            t0 = self._started(model)
-            self._open_call = t0
-            try:
-                # The outcome is this stream's own, returned when it ends — not
-                # read back off a model another stream may be using.
-                outcome = yield from _tee(model.stream(messages, self._output, tools=_tools), pieces)
-                break
-            except Exception as exc:
-                self._open_call = None
-                self._ended(model, t0, error=exc)
-                # `pieces` is the whole condition that matters: once the
-                # caller has seen something, starting over would replay or
-                # contradict it. Before that, the attempt is discardable and
-                # there is no reason to be less reliable than `run()`.
-                if isinstance(exc, APIError) and not pieces and _retryable(exc, attempt, self.max_retries):
-                    _pause(exc, attempt, self.retry_delay)
-                    continue
-                raise
-
-        if outcome is None:                      # a model-shaped double that returns nothing
-            outcome = StreamOutcome(getattr(model, "last_stream_result", None),
-                                    getattr(model, "last_stream_usage", None),
-                                    list(getattr(model, "last_adaptations", []) or []))
-        self.last_adaptations = list(outcome.adaptations)
-        if getattr(outcome, "truncated", False) and not isinstance(outcome.result, ToolCallRequest):
-            self._cut_short(model)
-        raw_usage = outcome.usage
-        if raw_usage:
-            # `raw_usage` is already response-shaped — see
-            # `BaseClient.stream_usage` — so it reaches the same branch of
-            # `extract_usage` a buffered response does, per provider.
-            self.last_usage = attach_cost(
-                extract_usage(raw_usage), _priced_as(model, self.last_adaptations),
-                getattr(model, "cache_ttl", "5m"),
-                getattr(model, "_provider", None))
-            for budget in in_force(self.max_cost):
-                budget.charge(getattr(self.last_usage, "cost", None))
-
-        self._open_call = None
-        fmt = (self._output or {}).get("format") or {}
-        kind = fmt.get("type", "text")
-        whole = outcome.result
         try:
-            if isinstance(whole, ToolCallRequest) and kind == "json_schema" and not _tools:
-                # Anthropic's structured output is a forced call of a tool the
-                # library made up; its arguments are the answer, as run() has it.
-                whole = self._structured_call(whole, fmt)
-            if whole is not None and not isinstance(whole, str):
-                # The provider could not stream and answered in one piece; the
-                # object it answered with is the result, not the text it renders
-                # to. A tool call rendered to text and parsed back is not a tool
-                # call any more.
-                self.last_result = whole
-            elif kind in ("json", "json_schema"):
-                # Parsed the way run() parses it — fences stripped, the schema
-                # checked — and a failure raised, where it handed back the text.
-                self.last_result = "".join(pieces)
-                self.last_result = parse_structured(
-                    self.last_result, fmt.get("schema") if kind == "json_schema" else None,
-                    strip_fences=True)
-            else:
-                self.last_result = "".join(pieces)
+            result, usage, made = yield from self._call(
+                model, messages, self._output, self.max_retries, self.retry_delay, pieces)
         except Exception as exc:
-            self._ended(model, t0, self.last_usage, error=exc)
+            self.last_usage = getattr(exc, "_aichain_usage", None)
+            if pieces:
+                self.last_result = "".join(pieces)     # the text, kept when it would not parse
             raise
-        self.history = [self.last_result]
-        self._ended(model, t0, self.last_usage)
+        self.last_usage, self.last_adaptations = usage, made
+        self.last_result = result
+        self.history = [result]
 
     def _cut_short(self, model) -> None:
         """Mark the answer as cut at ``max_tokens``, and say so once per model."""
@@ -563,65 +505,99 @@ class Skill:
 
         return final
 
-    def _call_once(
-        self,
-        model:       "Model",
-        messages:    list,
-        output:      dict,
-        max_retries: int,
-        retry_delay: float,
-    ) -> "tuple[str | dict, Usage, list]":
-        """One model call with transient retries: ``(result, usage, adaptations)``,
-        the adaptations returned with their request, since a shared Model's
-        record may already be another call's."""
+    def _call_once(self, model, messages, output, max_retries, retry_delay):
+        """One buffered model call: ``(result, usage, adaptations)``."""
+        calls = self._call(model, messages, output, max_retries, retry_delay)
+        try:
+            next(calls)
+        except StopIteration as done:
+            return done.value
+        raise RuntimeError("a buffered call yielded a piece")   # pragma: no cover
+
+    def _call(self, model, messages, output, max_retries, retry_delay, pieces=None):
+        """One model call with retries, buffered or streamed into *pieces*:
+        ``(result, usage, adaptations)``. A stream retries only while nothing
+        has been yielded — after that a retry would replay what was seen."""
         _tools = getattr(self, "_tools", None)
         own = isinstance(model, Model)
-        if own:
+        streamed = pieces is not None
+        if streamed:
+            made: list = []
+        elif own:
             path, body, made = model.build(messages, output, _tools)
         else:
-            # This boundary accepts anything model-shaped (tests stub bare
-            # duck types), and a kwarg the double never heard of would break
-            # every caller that wants no tools at all.
+            # Anything model-shaped is accepted here (tests stub bare duck
+            # types); a `tools=` the double never heard of would break it.
             path, body = (model.to_request(messages, output, tools=_tools) if _tools
                           else model.to_request(messages, output))
             made = list(getattr(model, "last_adaptations", ()) or ())
 
         for attempt in _attempts(max_retries, retry_delay):
             t0 = self._started(model)
+            self._open_call = t0
             try:
-                response = json.loads(model.client.send(path, body, model.client._auth_headers()))
-                # ``cache_ttl`` is read leniently where ``name`` is not: a
-                # Model always has it, but this boundary accepts anything
-                # model-shaped, and the lifetime only picks a price multiplier.
-                # A cost estimate is the last thing that should abort a call
-                # that already succeeded.
+                if streamed:
+                    outcome = yield from _tee(model.stream(messages, output, tools=_tools), pieces)
+                    if outcome is None:          # a model-shaped double that returns nothing
+                        outcome = StreamOutcome(getattr(model, "last_stream_result", None),
+                                                getattr(model, "last_stream_usage", None),
+                                                list(getattr(model, "last_adaptations", []) or []))
+                    raw, made = outcome.usage, list(outcome.adaptations)
+                    cut = getattr(outcome, "truncated", False)
+                else:
+                    raw = json.loads(model.client.send(path, body, model.client._auth_headers()))
+                    cut = hit_ceiling(raw)
                 # Priced as the model that answered: a swap sends the request
-                # to another model at another rate.
-                usage    = attach_cost(extract_usage(response), _priced_as(model, made),
-                                       getattr(model, "cache_ttl", "5m"),
-                getattr(model, "_provider", None))
+                # to another model at another rate. A stream that reported no
+                # usage has none, rather than a zero nobody measured.
+                usage = attach_cost(extract_usage(raw), _priced_as(model, made),
+                                    getattr(model, "cache_ttl", "5m"),
+                                    getattr(model, "_provider", None)) if raw or not streamed else None
                 for budget in in_force(self.max_cost):
                     budget.charge(getattr(usage, "cost", None))
                 try:
-                    result = (model.from_response(response, output, tools_sent=bool(_tools)) if own
-                              else model.from_response(response, output))
+                    result = (self._streamed_result(outcome, output, pieces, _tools) if streamed
+                              else model.from_response(raw, output, tools_sent=bool(_tools)) if own
+                              else model.from_response(raw, output))
                 except Exception as exc:
                     # Paid for and unparseable: the usage rides the exception
                     # and an ended event says the call happened.
+                    self._open_call = None
                     self._ended(model, t0, usage, error=exc)
                     exc._aichain_usage = usage
                     raise
+                self._open_call = None
                 self._ended(model, t0, usage)
-                if isinstance(result, str) and hit_ceiling(response):
+                if cut and (not isinstance(result, ToolCallRequest) if streamed
+                            else isinstance(result, str)):
                     self._cut_short(model)
                 return result, usage, made
-            except APIError as exc:
+            except Exception as exc:
                 if hasattr(exc, "_aichain_usage"):
                     raise                         # a parse failure, already recorded
+                self._open_call = None
                 self._ended(model, t0, error=exc)
-                if not _retryable(exc, attempt, max_retries):
-                    raise
-                _pause(exc, attempt, retry_delay)
+                if isinstance(exc, APIError) and not pieces and _retryable(exc, attempt, max_retries):
+                    _pause(exc, attempt, retry_delay)
+                    continue
+                raise
+
+    def _streamed_result(self, outcome, output, pieces, _tools):
+        """A stream's whole answer, parsed as ``run()`` parses it."""
+        fmt = (output or {}).get("format") or {}
+        kind = fmt.get("type", "text")
+        whole = outcome.result
+        if isinstance(whole, ToolCallRequest) and kind == "json_schema" and not _tools:
+            # Anthropic's structured output is a forced call of a tool the
+            # library made up; its arguments are the answer, as run() has it.
+            whole = self._structured_call(whole, fmt)
+        if whole is not None and not isinstance(whole, str):
+            return whole
+        if kind in ("json", "json_schema"):
+            return parse_structured("".join(pieces),
+                                    fmt.get("schema") if kind == "json_schema" else None,
+                                    strip_fences=True)
+        return "".join(pieces)
 
     # ------------------------------------------------------------------
     # Persistence
