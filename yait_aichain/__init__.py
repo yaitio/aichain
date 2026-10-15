@@ -8,7 +8,7 @@ every provider in the registry, for skills, chains, pools, agents and tools.
 See docs/start/quickstart.md.
 """
 
-__version__ = "4.5.2"
+__version__ = "4.5.3"
 __author__  = "YAIT"
 
 # ── Logging ────────────────────────────────────────────────────────────────────

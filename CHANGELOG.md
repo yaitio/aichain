@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.5.3] — 2026-10-15
+
+### Changed
+
+- `Model.__init__` reads as its steps — the key, the checked options, the
+  cache settings, the reasoning level — and `Skill.__init__` as its own: the
+  input from `prompt=` or `input=`, the model or the fallback chain. No
+  behaviour changes.
+
 ## [4.5.2] — 2026-10-15
 
 ### Changed

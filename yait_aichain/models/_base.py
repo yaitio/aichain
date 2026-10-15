@@ -291,7 +291,49 @@ class Model:
         prov     = PROVIDERS[self._provider]["provider"]
         defaults = prov["defaults"]
 
-        # ── resolve API key (env var named in the provider data) ──────
+        self._resolve_key = api_key if callable(api_key) else None
+        resolved_key = self._key(api_key, prov)
+        # Do not store the raw key as a public attribute; keep it private.
+        self._api_key = resolved_key
+        opts = self._checked_options(options)
+        self.temperature   = opts.get("temperature",   defaults.get("temperature"))
+        self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
+        self.top_p         = opts.get("top_p",         defaults.get("top_p"))
+        self.top_k         = opts.get("top_k",         defaults.get("top_k"))
+        self._cache_settings(opts, defaults)
+        self.reasoning = self._reasoning(opts, prov)
+        # Whether a lost option is fatal is the caller's call, not the
+        # library's; see models._adaptation.STRICTNESS.
+        from ._adaptation import STRICTNESS
+        if on_unsupported not in STRICTNESS:
+            raise ValueError(
+                f"on_unsupported must be one of {', '.join(map(repr, STRICTNESS))}; "
+                f"got {on_unsupported!r}")
+        self.on_unsupported = on_unsupported
+
+        #: What the last :meth:`to_request` had to change to fit the provider.
+        #: Empty when the request went out as asked.
+        self.last_adaptations: list = []
+        self._sent_tools = False
+
+        #: Token counts from the last :meth:`stream`, when the provider sent
+        #: them. None rather than a guess: counting the text we happened to
+        #: see would be a number with no provider behind it.
+        self.last_stream_usage: dict | None = None
+
+        #: The last :meth:`stream`'s answer as an object, when the provider
+        #: could not stream and it came back whole. None on a real stream,
+        #: where the pieces are the answer.
+        self.last_stream_result = None
+
+        # ── build the family client (format + transport) ──────────────
+        self.client = _build_client(self._provider, resolved_key, client_options or {})
+        if self._resolve_key is not None:
+            # The client asks at header time, once per request.
+            self.client._resolve_key = self._resolve_key
+
+    def _key(self, api_key, prov: dict) -> str:
+        """The key a request carries, or "" for a resolver or an optional one."""
         # auth = "none": the key is optional, not absent — a local server
         # usually runs open but accepts a Bearer token, so it is still
         # resolved and sent when present.
@@ -299,7 +341,6 @@ class Model:
         # tenant, and resolving here would bind the first tenant's key to all.
         # It is handed the `RunContext`, which is written to disk with the run
         # document, so it carries the tenant's name and never the secret.
-        self._resolve_key = api_key if callable(api_key) else None
         resolved_key = "" if self._resolve_key else (
             api_key or os.getenv(prov["env_key"]))
         if not self._resolve_key and not resolved_key:
@@ -310,10 +351,10 @@ class Model:
                     f"No API key found for the {self._provider!r} provider. "
                     f"Pass api_key= or set the {prov['env_key']!r} environment variable."
                 )
-        # Do not store the raw key as a public attribute; keep it private.
-        self._api_key = resolved_key
+        return resolved_key
 
-        # ── merge options with provider defaults (from data) ──────────
+    def _checked_options(self, options) -> dict:
+        """The caller's options, checked: names, types and ranges."""
         # A copy: popping `extra` from the caller's dict would strip it from
         # the next Model built from the same options.
         opts = dict(options or {})
@@ -366,10 +407,9 @@ class Model:
             if note:
                 opts[name] = sent
                 self._clamped.append((name, value, sent, note))
-        self.temperature   = opts.get("temperature",   defaults.get("temperature"))
-        self.max_tokens    = opts.get("max_tokens",    defaults.get("max_tokens"))
-        self.top_p         = opts.get("top_p",         defaults.get("top_p"))
-        self.top_k         = opts.get("top_k",         defaults.get("top_k"))
+        return opts
+
+    def _cache_settings(self, opts: dict, defaults: dict) -> None:
         # Prompt caching, off by default: a cache breakpoint costs 1.25x to
         # store, so it only pays back when the same prefix is sent again.
         # True marks the second-to-last message; an int names the message the
@@ -399,6 +439,7 @@ class Model:
             )
         self.cache_ttl = ttl
 
+    def _reasoning(self, opts: dict, prov: dict):
         # Valid levels come from the provider's own reasoning_map, the single
         # source of truth: a second copy here would reject a level the
         # provider gains.
@@ -414,37 +455,7 @@ class Model:
                 f"reasoning for the {self._provider!r} provider must be None "
                 f"or one of: {allowed}; got {reasoning!r}"
             )
-        self.reasoning = reasoning
-
-        # Whether a lost option is fatal is the caller's call, not the
-        # library's; see models._adaptation.STRICTNESS.
-        from ._adaptation import STRICTNESS
-        if on_unsupported not in STRICTNESS:
-            raise ValueError(
-                f"on_unsupported must be one of {', '.join(map(repr, STRICTNESS))}; "
-                f"got {on_unsupported!r}")
-        self.on_unsupported = on_unsupported
-
-        #: What the last :meth:`to_request` had to change to fit the provider.
-        #: Empty when the request went out as asked.
-        self.last_adaptations: list = []
-        self._sent_tools = False
-
-        #: Token counts from the last :meth:`stream`, when the provider sent
-        #: them. None rather than a guess: counting the text we happened to
-        #: see would be a number with no provider behind it.
-        self.last_stream_usage: dict | None = None
-
-        #: The last :meth:`stream`'s answer as an object, when the provider
-        #: could not stream and it came back whole. None on a real stream,
-        #: where the pieces are the answer.
-        self.last_stream_result = None
-
-        # ── build the family client (format + transport) ──────────────
-        self.client = _build_client(self._provider, resolved_key, client_options or {})
-        if self._resolve_key is not None:
-            # The client asks at header time, once per request.
-            self.client._resolve_key = self._resolve_key
+        return reasoning
 
     # ------------------------------------------------------------------
     # Format — thin delegation to the family client

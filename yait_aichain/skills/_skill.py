@@ -96,6 +96,42 @@ _TEXT_OUTPUT: dict = {"modalities": ["text"], "format": {"type": "text"}}
 
 
 
+def _input_of(input, prompt):
+    """The messages spec: *input*, or one user message from *prompt*."""
+    # `prompt=` is the shortcut for the commonest shape there is: one
+    # user message, one text part. The long form stays the only way to say
+    # anything else — a system message, several turns, an image — because
+    # a shortcut that grows options becomes a second input format, and two
+    # ways to say the same thing is how the docs and the code drift apart.
+    if prompt is not None:
+        if input is not None:
+            raise ValueError(
+                "pass prompt= or input=, not both: prompt is shorthand "
+                "for input={'messages': [{'role': 'user', 'parts': "
+                "[prompt]}]}, so giving both leaves it ambiguous which "
+                "one the model should see.")
+        return {"messages": [{"role": "user", "parts": [prompt]}]}
+    if input is None:
+        raise ValueError(
+            "Skill needs input= (the full messages spec) or prompt= (one "
+            "user message).")
+    return input
+
+
+def _models_of(model) -> list:
+    """One model or a fallback chain, as a list; the first is the primary."""
+    # A single model or a fallback chain: on a transient failure
+    # (rate limit / server / network) the next model is tried.  A bare
+    # model is a chain of one — self.model is always the primary.
+    models = list(model) if isinstance(model, (list, tuple)) else [model]
+    if not models:
+        raise ValueError("Skill requires at least one model.")
+    named = [m for m in models if isinstance(m, str)]
+    if named:
+        raise TypeError(f"Skill takes a Model, not its name: Skill(Model({named[0]!r}), ...)")
+    return models
+
+
 class Skill:
     """
     A reusable, model-bound task unit.
@@ -165,37 +201,13 @@ class Skill:
                 "Skill takes no " + ", ".join(f"{k}=" for k in sorted(refused))
                 + (" — a model's options are Model(name, options={…}); Skill(options=…) was "
                    "stored and never applied" if "options" in refused else ""))
-        # `prompt=` is the shortcut for the commonest shape there is: one
-        # user message, one text part. The long form stays the only way to say
-        # anything else — a system message, several turns, an image — because
-        # a shortcut that grows options becomes a second input format, and two
-        # ways to say the same thing is how the docs and the code drift apart.
-        if prompt is not None:
-            if input is not None:
-                raise ValueError(
-                    "pass prompt= or input=, not both: prompt is shorthand "
-                    "for input={'messages': [{'role': 'user', 'parts': "
-                    "[prompt]}]}, so giving both leaves it ambiguous which "
-                    "one the model should see.")
-            input = {"messages": [{"role": "user", "parts": [prompt]}]}
-        if input is None:
-            raise ValueError(
-                "Skill needs input= (the full messages spec) or prompt= (one "
-                "user message).")
+        input = _input_of(input, prompt)
         input  = adapters.normalize_input(input)
         output = adapters.normalize_output(output)
         adapters.validate_input(input)
         adapters.validate_output(output)
 
-        # A single model or a fallback chain: on a transient failure
-        # (rate limit / server / network) the next model is tried.  A bare
-        # model is a chain of one — self.model is always the primary.
-        self.models = list(model) if isinstance(model, (list, tuple)) else [model]
-        if not self.models:
-            raise ValueError("Skill requires at least one model.")
-        named = [m for m in self.models if isinstance(m, str)]
-        if named:
-            raise TypeError(f"Skill takes a Model, not its name: Skill(Model({named[0]!r}), ...)")
+        self.models = _models_of(model)
         self.model       = self.models[0]
         self._input      = input
         self._output     = output
