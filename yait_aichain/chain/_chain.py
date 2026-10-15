@@ -386,6 +386,17 @@ class Chain:
     max_cost : float | Budget | None, optional
         A ceiling in dollars for the whole chain, shared by every step; a
         step that would begin past it is refused with ``BudgetExceeded``.
+    policy : PermissionPolicy | dict | None, optional
+        The rules a tool step is decided under — a ``PermissionPolicy``, a
+        dict of rules, or ``{"rules": {...}, "default": ...}``. A refused step
+        fails the way any step fails, under ``on_step_error``. Inside an
+        agent's tool call the agent's rules hold too, and the stricter word
+        of the two is the one taken.
+    approve : callable | None, optional
+        Answers a step the policy wants a person for: given an
+        ``ApprovalRequest``, returns ``True``, ``False`` or an
+        ``ApprovalDecision``. Absent, such a step is refused — or asked of the
+        approver of an agent this chain runs inside.
 
     Raises
     ------
@@ -405,9 +416,14 @@ class Chain:
         store=None,
         hooks:          list | None = None,
         max_cost=None,
+        policy=None,
+        approve=None,
     ) -> None:
         if not steps:
             raise ValueError("Chain requires at least one step.")
+        from .._dispatch import as_policy
+        self.policy  = as_policy(policy)
+        self.approve = approve
         if on_step_error not in _VALID_ON_STEP_ERROR:
             raise ValueError(
                 f"on_step_error must be one of {sorted(_VALID_ON_STEP_ERROR)}; "
@@ -460,6 +476,27 @@ class Chain:
         # Per-request RunContext for the current run() / resume() (tenant +
         # metadata); set while a run is in flight, restored on resume.
         self.context = None
+
+    def _run_tool(self, runner, idx: int, kwargs: dict, signal, run_id):
+        """A tool step, decided and run where every tool call is
+        (`_dispatch.py`): this chain's rules and any around it, the tool's
+        schema, the budget. Before, a step was only charged — a tool an
+        agent's policy refused ran when a chain inside its tool called it."""
+        from .._dispatch import Denied, Dispatcher
+        from ..models._calls import ToolCall
+        from ..state._run import Run
+        run = Run(owner=self, id=run_id, hooks=self.hooks)
+        dispatcher = Dispatcher(
+            tools={runner.name: runner}, builtins={}, gated=lambda call: runner,
+            permissions=self.policy, approve=self.approve, max_cost=self.max_cost,
+            emit=self._emit, who=self.name or "", run=lambda: run,
+            log_call=lambda tool, kwargs: None)
+        call = ToolCall(id=f"step_{idx}", name=runner.name, arguments=kwargs)
+        step = dispatcher.decide(call)
+        if isinstance(step, Denied):
+            raise PermissionError(step.reason)
+        return dispatcher.run_tool(call, extra=None if signal is None else {"_signal": signal},
+                                   check=False)
 
     def _emit(self, etype: str, **fields) -> None:
         """Dispatch a step-boundary :class:`Event` to registered hooks."""
@@ -769,11 +806,7 @@ class Chain:
 
                 elif kind == "tool":
                     kwargs = _build_tool_kwargs(runner, accumulated, input_map)
-                    from ..tools._base import charged
-                    if step_signal is not None:
-                        output = charged(runner, lambda: runner.run(_signal=step_signal, **kwargs))
-                    else:
-                        output = charged(runner, lambda: runner.run(**kwargs))
+                    output = self._run_tool(runner, idx, kwargs, step_signal, doc.run_id)
 
                 elif kind == "agent":
                     # An agent step always starts a run. An agent can park
@@ -1059,6 +1092,11 @@ class Chain:
 
             chain.save("chains/analyse_and_translate.yaml")
         """
+        if self.policy is not None or self.approve is not None:
+            # Not written yet (PLAN-agent-chain.md, 6.7), and a chain loaded
+            # back without the rules it was given would run what they refused.
+            warnings.warn("this chain's policy and approver are not saved; give them to "
+                          "Chain.load(...)'s result again before running it", stacklevel=2)
         steps_data = []
         for runner, output_key, input_map, kind, options in self._steps:
             if kind == "call":

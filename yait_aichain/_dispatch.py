@@ -28,12 +28,22 @@ person — and so that a run can be parked between the asking and the answer:
 A refusal is a result, not a crash: it goes back to the model as the call's
 error, so the history stays well-formed and the model hears why.
 
+**The rules around a call apply to everything it runs.** While a call
+executes, its owner's policy and approver are *governing*: a Chain, a Pool or
+an agent started inside it — a tool that runs a pipeline, a `delegate` worker
+— decides each of its own calls under the stricter of its own rules and every
+governing set around it (deny over approve over allow), and asks the nearest
+approver when it has none of its own. An agent's policy that stopped at its
+own tool list governed nothing the tool did.
+
 Phase 2 of PLAN-agent-chain.md moves what the agent already did here without
 changing it; Chain and Pool come through it in phase 3.
 """
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import copy
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -66,6 +76,57 @@ class NeedsApproval:
 
 
 READY = Ready()
+
+
+@dataclass(frozen=True)
+class Governor:
+    """A policy and its approver, in force around a call. *settled* names the
+    tools this call was already decided on — a `pool` asks once for the whole
+    list — under every policy then in force, so the items inside it are not
+    asked again."""
+    permissions: Any
+    approve: Any
+    settled: frozenset = frozenset()
+
+
+_GOVERNING: contextvars.ContextVar = contextvars.ContextVar("yait_aichain_governing",
+                                                            default=())
+
+
+@contextlib.contextmanager
+def governing(permissions, approve, settled: frozenset = frozenset()):
+    """Make *permissions* and *approve* hold for every call inside the block."""
+    if not permissions and not settled:
+        yield
+        return
+    token = _GOVERNING.set(_GOVERNING.get() + (Governor(permissions, approve, settled),))
+    try:
+        yield
+    finally:
+        _GOVERNING.reset(token)
+
+
+def _decide(permissions, tool, arguments):
+    try:
+        return permissions.decide(tool, arguments)
+    except TypeError:
+        return permissions.decide(tool)          # a policy of another make
+
+
+def as_policy(policy):
+    """``policy=`` as Chain and Pool take it: a `PermissionPolicy`, a dict of
+    rules, or ``{"rules": {...}, "default": ...}``; None for no policy of its own."""
+    if policy is None or hasattr(policy, "decide"):
+        return policy
+    if isinstance(policy, dict):
+        from .tools._permissions import APPROVE, PermissionPolicy
+        if "rules" in policy or "default" in policy:
+            unknown = sorted(set(policy) - {"rules", "default"})
+            if unknown:
+                raise ValueError(f"policy keys are 'rules' and 'default'; got {unknown}")
+            return PermissionPolicy(policy.get("rules"), default=policy.get("default", APPROVE))
+        return PermissionPolicy(policy)
+    raise TypeError(f"policy is a PermissionPolicy or a dict of rules, not {type(policy).__name__}")
 
 
 def depth(value, level: int = 0) -> int:
@@ -121,7 +182,15 @@ class Dispatcher:
         nothing says it was governance rather than a broken tool.
         """
         tool = self.gated_tool(call)
-        if tool is None or not self.permissions:
+        around = _GOVERNING.get()
+        if tool is not None:
+            # What was settled for this tool settled it under every policy
+            # around the call that settled it, so those are not asked again.
+            cut = max((i for i, g in enumerate(around) if tool.name in g.settled), default=-1)
+            around = around[cut + 1:]
+        policies = [g.permissions for g in around if g.permissions] + (
+            [self.permissions] if self.permissions else [])
+        if tool is None or not policies:
             return READY
         if depth(call.arguments) > MAX_ARGUMENT_DEPTH:
             # Refused before the approver's deep copy would raise on it.
@@ -132,10 +201,11 @@ class Dispatcher:
         # The call's arguments are the pool's own for `pool`: the policy is
         # asked about the tool it fans out, which takes them one entry at a time.
         arguments = None if call.name == "pool" else dict(call.arguments or {})
-        try:
-            decision = self.permissions.decide(tool, arguments)
-        except TypeError:
-            decision = self.permissions.decide(tool)          # a policy of another make
+        # The strictest word among every policy in force: a refusal anywhere
+        # refuses, a wish for a person anywhere asks one.
+        decisions = [_decide(p, tool, arguments) for p in policies]
+        decision = (next((d for d in decisions if d not in (ALLOW, APPROVE)), None)
+                    or (APPROVE if APPROVE in decisions else ALLOW))
         if decision == ALLOW:
             return READY
         risk = risk_of(tool, arguments)
@@ -164,7 +234,9 @@ class Dispatcher:
         """Ask the approver, then say what it answered: Ready or Denied."""
         run = self._run()
         request, run.pending = step.request, None
-        if self.approve is None:
+        approve = self.approve if self.approve is not None else next(
+            (g.approve for g in reversed(_GOVERNING.get()) if g.approve is not None), None)
+        if approve is None:
             granted = False
             reason = (f"no approver is attached. Pass Agent(approve=...) to "
                       f"decide per call, or set the policy rule for "
@@ -172,7 +244,7 @@ class Dispatcher:
                       "need gating here.")
         else:
             from .tools._permissions import ApprovalDecision
-            reply = self.approve(request)
+            reply = approve(request)
             # Only a yes that says yes: `bool("denied")` and
             # `bool({"approved": False})` both approved the call.
             if not isinstance(reply, (bool, ApprovalDecision)):
@@ -195,7 +267,7 @@ class Dispatcher:
         # something is what keeps the model's history well-formed, and a
         # denied call the model never hears about is one it will simply make
         # again. `tool_call.ended` then carries this as its error.
-        head = "needs approval and" if self.approve is None else "was not approved:"
+        head = "needs approval and" if approve is None else "was not approved:"
         return Denied(f"tool {request.tool!r} ({request.risk}) {head} {reason}")
 
     def decide(self, call, state: dict | None = None):
@@ -210,7 +282,12 @@ class Dispatcher:
         """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
         try:
             if (handler := self.builtins.get(call.name)) is not None:
-                return handler(call.arguments, state), None
+                # A built-in that runs another tool was decided on that tool,
+                # once, before it began: the decision covers what it runs.
+                gated = self.gated_tool(call)
+                settled = frozenset({gated.name}) if gated is not None else frozenset()
+                with governing(self.permissions, self.approve, settled):
+                    return handler(call.arguments, state), None
             return self.run_tool(call), None
         except Suspend:
             # Not a failure, and the one exception this must not flatten: the
@@ -221,10 +298,15 @@ class Dispatcher:
             self._run().failure = describe(exc)
             return None, f"{type(exc).__name__}: {exc}"
 
-    def run_tool(self, call) -> Any:
+    def run_tool(self, call, extra: dict | None = None, check: bool = True) -> Any:
         """The one place a tool runs. No permission check here: the caller
         resolved it before calling, so a second one would put the question to
-        a person twice."""
+        a person twice.
+
+        *check* holds the arguments to the tool's schema — the schema a model
+        is shown, which is for calls a model makes. A Chain or Pool fills
+        arguments from its own variables, credentials among them, and passes
+        ``check=False``, as it always did."""
         if depth(call.arguments) > MAX_ARGUMENT_DEPTH:
             # Told to the model, which made it.
             raise ValueError(f"the arguments are nested more than {MAX_ARGUMENT_DEPTH} "
@@ -233,13 +315,17 @@ class Dispatcher:
         if tool is None:
             raise ValueError(f"no tool named {call.name!r}. Available: {sorted(self.tools)}")
         kwargs = call.arguments or {}
-        if (problem := tool.check_args(kwargs)) is not None:
+        if check and (problem := tool.check_args(kwargs)) is not None:
             raise ValueError(problem)
         self._log_call(tool, kwargs)
-        # Under the owner's budget and every one around it.
-        with lend(self.max_cost):
-            return charged(tool, lambda: tool.run(**kwargs))
+        # *extra* is the library's own, never the model's: a Chain resuming a
+        # step hands the signal as `_signal`, which no schema declares.
+        call_kwargs = {**kwargs, **(extra or {})}
+        # Under the owner's budget and every one around it, and under its rules.
+        with lend(self.max_cost), governing(self.permissions, self.approve):
+            return charged(tool, lambda: tool.run(**call_kwargs))
 
 
-__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY",
+__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "governing",
+           "as_policy",
            "MAX_ARGUMENT_DEPTH", "depth"]

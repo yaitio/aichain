@@ -55,6 +55,23 @@ class ChainResult(Spend):
     usage:     Any = None
     run_id:    str = ""
 
+    @property
+    def cost(self) -> float | None:
+        """Dollars across every step that reported a price, agents included;
+        None when no step could be priced — never an invented zero."""
+        return getattr(self.usage, "cost", None)
+
+    @property
+    def evidence(self) -> str:
+        """What the output rests on: ``"check"`` when every step that ran was a
+        function or a tool — a programmatic fact — and ``"model_claim"`` when a
+        Skill or an Agent produced part of it, so it is a model's word.
+
+        The same two words the agent's journal uses, so a caller deciding
+        whether to re-check a result reads one vocabulary for both."""
+        kinds = {h.get("kind") for h in self.history}
+        return "check" if kinds and kinds <= {"call", "tool"} else "model_claim"
+
     def __getattr__(self, name):
         raise _hints.missing(self, name)
 

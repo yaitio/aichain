@@ -19,6 +19,8 @@ Chain(
     store=None,
     hooks: list | None = None,
     max_cost=None,
+    policy=None,
+    approve=None,
 )
 ```
 
@@ -65,6 +67,15 @@ result["french"], result.output, result.cost
 - `hooks` (*list | None, optional*, default `None`) — Callables given an `Event` at every step boundary.
 - `max_cost` (*float | Budget | None, optional*, default `None`) — A ceiling in dollars for the whole chain, shared by every step; a
   step that would begin past it is refused with `BudgetExceeded`.
+- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool step is decided under — a `PermissionPolicy`, a
+  dict of rules, or `{"rules": {...}, "default": ...}`. A refused step
+  fails the way any step fails, under `on_step_error`. Inside an
+  agent's tool call the agent's rules hold too, and the stricter word
+  of the two is the one taken.
+- `approve` (*callable | None, optional*, default `None`) — Answers a step the policy wants a person for: given an
+  `ApprovalRequest`, returns `True`, `False` or an
+  `ApprovalDecision`. Absent, such a step is refused — or asked of the
+  approver of an agent this chain runs inside.
 
 **Raises**
 
@@ -330,4 +341,18 @@ The outcome of one chain run.
   under its key. `result["key"]` reads from here.
 - `usage` (*Usage | None*, default `None`) — Tokens and cost summed across the steps that reported them.
 - `run_id` (*str*, default `''`) — The run document's id.
+
+### `ChainResult.cost`
+
+Dollars across every step that reported a price, agents included;
+None when no step could be priced — never an invented zero.
+
+### `ChainResult.evidence`
+
+What the output rests on: `"check"` when every step that ran was a
+function or a tool — a programmatic fact — and `"model_claim"` when a
+Skill or an Agent produced part of it, so it is a model's word.
+
+The same two words the agent's journal uses, so a caller deciding
+whether to re-check a result reads one vocabulary for both.
 <!-- /g:api -->

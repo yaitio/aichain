@@ -43,6 +43,10 @@ class Run:
     #: The hooks this run reports to: the owner's, plus anything the run adds
     #: for itself (a stream's collector), which must not outlive it.
     hooks: list = field(default_factory=list)
+    #: The approval request between going out and being answered.
+    pending: Any = None
+    #: How the last tool call failed, described, for the journal.
+    failure: dict | None = None
 
 
 @dataclass
@@ -50,12 +54,8 @@ class AgentRun(Run):
     #: The store document while this run is parked, so a second pause
     #: overwrites the first instead of leaking a second run id.
     doc_id: str | None = None
-    #: The approval request between going out and being answered.
-    pending: Any = None
     #: Whether a consumer walks this run; set by `stream()`, never by `run()`.
     streaming: bool = False
-    #: How the last tool call failed, described, for the journal.
-    failure: dict | None = None
     #: The working counters, once the loop has them.
     state: dict | None = None
 

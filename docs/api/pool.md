@@ -18,6 +18,8 @@ Pool(
     name: str | None = None,
     description: str | None = None,
     max_cost=None,
+    policy=None,
+    approve=None,
 )
 ```
 
@@ -40,6 +42,13 @@ Parallel execution of one runner across many items.
   not saved — so it changes no behaviour.
 - `max_cost` (*float | Budget | None, optional*, default `None`) — One ceiling in dollars for every item; an item that would begin past
   it fails with the budget's reason, handled by `on_error`.
+- `policy` (*PermissionPolicy | dict | None, optional*, default `None`) — The rules a tool runner is decided under, item by item — a
+  `PermissionPolicy`, a dict of rules, or `{"rules": {...},
+  "default": ...}`. A refused item fails under `on_error`. Inside an
+  agent's tool call the agent's rules hold too, the stricter word winning.
+- `approve` (*callable | None, optional*, default `None`) — Answers an item the policy wants a person for, as `Agent(approve=)`
+  does. Absent, such an item is refused — or asked of the approver of an
+  agent this pool runs inside.
 
 **Examples**
 

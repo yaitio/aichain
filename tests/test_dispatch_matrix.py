@@ -19,7 +19,6 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
@@ -167,8 +166,9 @@ class TestTheRowsReachTheTool(TestAgentPaths):
 class TestPathsOutsideTheLoop(unittest.TestCase):
     """Reached without the agent's gate. Each row names the phase that closes it."""
 
-    @pytest.mark.xfail(strict=True, reason="phase 4: an explicit member keeps its own (absent) policy")
     def test_delegate_to_an_explicit_member(self):
+        # Closed in phase 3, a phase early: the lead's rules govern whatever
+        # its `delegate` call runs, and the worker runs inside it.
         nuke = Nuke()
         worker = Agent(_model(_calls(("c", "nuke", {})), _text("done")), tools=[nuke],
                        name="cleaner", description="Cleans up.")
@@ -178,19 +178,18 @@ class TestPathsOutsideTheLoop(unittest.TestCase):
         lead.run("go")
         self.assertEqual(nuke.ran, 0)
 
-    @pytest.mark.xfail(strict=True, reason="phase 3: a Chain step is charged, never asked")
     def test_a_chain_step_on_its_own(self):
         nuke = Nuke()
-        Chain([(nuke, "out")], policy=DENY).run()
+        # A refused step fails the way any step fails — here, by raising.
+        with self.assertRaises(PermissionError):
+            Chain([(nuke, "out")], policy=DENY).run()
         self.assertEqual(nuke.ran, 0)
 
-    @pytest.mark.xfail(strict=True, reason="phase 3: a Pool item is charged, never asked")
     def test_a_pool_item_on_its_own(self):
         nuke = Nuke()
         Pool(nuke, items=[{"target": "a"}], policy=DENY, on_error="collect").run()
         self.assertEqual(nuke.ran, 0)
 
-    @pytest.mark.xfail(strict=True, reason="phase 3: the agent's policy does not reach a Chain it runs")
     def test_a_chain_inside_the_agent(self):
         nuke = Nuke()
 
@@ -203,7 +202,6 @@ class TestPathsOutsideTheLoop(unittest.TestCase):
         _agent(_calls(("t", "tidy", {})), _text("done"), tools=[tidy]).run("go")
         self.assertEqual(nuke.ran, 0)
 
-    @pytest.mark.xfail(strict=True, reason="phase 3: the agent's policy does not reach a Pool it runs")
     def test_a_pool_inside_the_agent(self):
         nuke = Nuke()
 
@@ -226,8 +224,6 @@ class TestOnePlaceRunsATool(unittest.TestCase):
 
     #: Where a tool runs outside the dispatcher, and the phase that removes it.
     NOT_YET = {
-        "chain/_chain.py": "phase 3",
-        "pool/_pool.py": "phase 3",
     }
 
     def test_only_the_dispatcher_runs_a_tool(self):

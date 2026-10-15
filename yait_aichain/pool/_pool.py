@@ -165,6 +165,15 @@ class Pool:
     max_cost : float | Budget | None, optional
         One ceiling in dollars for every item; an item that would begin past
         it fails with the budget's reason, handled by ``on_error``.
+    policy : PermissionPolicy | dict | None, optional
+        The rules a tool runner is decided under, item by item — a
+        ``PermissionPolicy``, a dict of rules, or ``{"rules": {...},
+        "default": ...}``. A refused item fails under ``on_error``. Inside an
+        agent's tool call the agent's rules hold too, the stricter word winning.
+    approve : callable | None, optional
+        Answers an item the policy wants a person for, as ``Agent(approve=)``
+        does. Absent, such an item is refused — or asked of the approver of an
+        agent this pool runs inside.
 
     Examples
     --------
@@ -223,6 +232,8 @@ class Pool:
         name:        str | None = None,
         description: str | None = None,
         max_cost=None,
+        policy=None,
+        approve=None,
     ) -> None:
         if not callable(getattr(runner, "run", None)):
             # A plain function had no `run`, and every item failed into a list
@@ -258,6 +269,9 @@ class Pool:
         self._on_error  = on_error
         self.name       = name
         self.description = description
+        from .._dispatch import as_policy
+        self.policy     = as_policy(policy)
+        self.approve    = approve
 
         self._lock: threading.Lock = threading.Lock()
         self._history: list[dict]  = self._init_history()
@@ -527,6 +541,25 @@ class Pool:
                 })
             raise
 
+    def _run_tool(self, runner, kwargs: dict):
+        """One item of a tool runner, decided and run where every tool call is
+        (`_dispatch.py`). Before, an item was only charged — a tool an agent's
+        policy refused ran when a pool inside its tool fanned it out."""
+        from .._dispatch import Denied, Dispatcher
+        from ..models._calls import ToolCall
+        from ..state._run import Run
+        run = Run(owner=self)
+        dispatcher = Dispatcher(
+            tools={runner.name: runner}, builtins={}, gated=lambda call: runner,
+            permissions=self.policy, approve=self.approve, max_cost=self.max_cost,
+            emit=lambda *a, **k: None, who=self.name or "", run=lambda: run,
+            log_call=lambda tool, kwargs: None)
+        call = ToolCall(id="", name=runner.name, arguments=kwargs)
+        step = dispatcher.decide(call)
+        if isinstance(step, Denied):
+            raise PermissionError(step.reason)
+        return dispatcher.run_tool(call, check=False)
+
     def _dispatch(self, variables: dict) -> tuple[Any, Any]:
         """Route the call to the correct runner interface.
 
@@ -541,8 +574,7 @@ class Pool:
 
         if _is_tool(runner):
             kwargs = _build_tool_kwargs(runner, variables)
-            from ..tools._base import charged
-            return charged(runner, lambda: runner.run(**kwargs)), None
+            return self._run_tool(runner, kwargs), None
 
         if _is_agent(runner):
             task = variables.get("task", "")

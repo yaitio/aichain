@@ -70,9 +70,10 @@ Skill(model: Model | list[Model], input: dict | None = None, *,
       hooks: list | None = None, max_cost: float | Budget | None = None, **refused)
 Chain(steps, variables: dict | None = None, name: str | None = None,
       description: str | None = None, on_step_error: str = 'raise', store = None,
-      hooks: list | None = None, max_cost = None)
+      hooks: list | None = None, max_cost = None, policy = None, approve = None)
 Pool(runner, items: list[dict], max_flows: int = 10, on_error: str = 'collect',
-     name: str | None = None, description: str | None = None, max_cost = None)
+     name: str | None = None, description: str | None = None, max_cost = None,
+     policy = None, approve = None)
 Agent(model: Model, tools: list | None = None, instructions: str = '',
       mode: str = 'agile', team: list[Agent] | str | None = None,
       planner_model: Model | None = None, stop_when: list | None = None,

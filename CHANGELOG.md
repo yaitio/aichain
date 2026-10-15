@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.2.3] — 2026-10-15
+
+### Added
+
+- `Chain(policy=, approve=)` and `Pool(policy=, approve=)`. A tool step or a
+  tool item is decided like an agent's call — a `PermissionPolicy`, a dict of
+  rules, or `{"rules": {...}, "default": ...}`, wrong keys refused when built —
+  and a refused one fails like any other, under `on_step_error` / `on_error`.
+- `ChainResult.cost` and `ChainResult.evidence` — `"check"` when only functions
+  and tools produced the output, `"model_claim"` when a Skill or an Agent did.
+
+### Changed
+
+- **The rules around a call govern everything it runs — stricter than
+  before.** While a call executes, its owner's policy and approver hold for
+  any Chain, Pool or agent it starts, which decides under the stricter word of
+  its own rules and every set around it and asks the nearest approver when it
+  has none. An agent whose policy refused a tool no longer has that tool run
+  by a pipeline inside one of its other tools, and a `delegate` worker given as
+  a team member is held to its lead's rules (it kept only its own). A `pool`
+  call is still decided once for its whole list.
+- A Chain step and a Pool item run their tools through `_dispatch.py`, where
+  they were only charged to the budget; a test now fails if any other place
+  runs a tool.
+
+### Fixed
+
+- `Chain.save()` says when it cannot keep a chain's policy or approver, which
+  it does not write yet.
+
 ## [4.2.2] — 2026-10-15
 
 ### Changed
