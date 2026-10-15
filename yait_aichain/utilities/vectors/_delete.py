@@ -71,15 +71,7 @@ class VectorDeleteTool(_VectorTool):
         input:   list[str] | None = None,
         options: dict | None       = None,
     ) -> dict:
-        opts   = options or {}
-        filter = opts.get("filter")
-        store  = self._with_collection(opts)
-
-        if not input and not filter:
-            raise ValueError(
-                "VectorDeleteTool: provide at least one non-empty 'input' "
-                "(IDs) or options['filter'] for bulk deletion.  An empty "
-                "list is rejected to avoid wiping the collection."
-            )
-        store.delete(ids=input, filter=filter)
+        opts = options or {}
+        # The store refuses an empty delete, so an empty list cannot wipe the collection.
+        self._with_collection(opts).delete(ids=input, filter=opts.get("filter"))
         return {"deleted": True}

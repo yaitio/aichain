@@ -6,7 +6,8 @@ nothing) unless ``risk=`` says otherwise. See docs/utilities/index.md.
 from __future__ import annotations
 
 from .._base import Utility
-from ._tools import DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted, _Server, discover, risk_from_annotations
+from ._tools import (DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_SETUP_TIMEOUT, MCPTool, _redacted,
+                     _Server, discover, risk_from_annotations)
 
 
 def _remote(tool) -> str:
@@ -27,37 +28,29 @@ class MCP(Utility):
                  prefix: str = "", trust_annotations: bool = True) -> None:
         # Two timeouts, two names: reaching the server and listing its tools,
         # and one call of a tool.
-        self.server = server
+        from ...tools._permissions import RISK_CLASSES
         self._conn = _Server(server, headers=headers, env=env, cwd=cwd, transport=transport,
                              call_timeout=call_timeout)
         if isinstance(filter, str) or not all(isinstance(n, str) for n in filter or ()):
             raise TypeError(f"MCP filter is a list of tool names, not {filter!r}")
-        self._filter = None if filter is None else list(filter)
-        self._connect_timeout = connect_timeout
-        self._tools: list | None = None
-        from ...tools._permissions import RISK_CLASSES
-        bad = {n: r for n, r in (risk or {}).items() if r not in RISK_CLASSES}
-        if bad:
+        if bad := {n: r for n, r in (risk or {}).items() if r not in RISK_CLASSES}:
             raise ValueError(f"MCP risk: {bad} — each must be one of {sorted(RISK_CLASSES)}")
-        self._risk = dict(risk or {})
-        self._prefix = prefix
-        self._trust = trust_annotations
+        self.server, self._connect_timeout, self._tools = server, connect_timeout, None
+        self._filter = None if filter is None else list(filter)
+        self._risk, self._prefix, self._trust = dict(risk or {}), prefix, trust_annotations
 
     @property
     def tools(self) -> list:
         if self._tools is None:
             tools = discover(self._conn, filter=self._filter, timeout=self._connect_timeout)
-            missing = sorted(set(self._risk) - {_remote(t) for t in tools})
-            if missing:
+            if missing := sorted(set(self._risk) - {_remote(t) for t in tools}):
                 raise KeyError(f"risk= names {missing}, which the server does not have; "
                                f"it has {[_remote(t) for t in tools]}")
             for t in tools:
                 # The server's own word lowers nothing when it is not trusted:
                 # every tool is privileged unless `risk=` says otherwise.
-                base = t.risk if self._trust else "privileged"
-                t.risk = self._risk.get(_remote(t), base)
-                if self._prefix:
-                    t.name = self._prefix + t.name
+                t.risk = self._risk.get(_remote(t), t.risk if self._trust else "privileged")
+                t.name = self._prefix + t.name
             self._tools = tools
         return list(self._tools)
 

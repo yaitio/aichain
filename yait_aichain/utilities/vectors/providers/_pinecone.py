@@ -7,24 +7,14 @@ stores only vectors and metadata. ``PINECONE_API_KEY`` is required. See docs/uti
 from __future__ import annotations
 
 import os
+import time
 from urllib.parse import urlencode
 
 from ....clients._errors import APIError
 from .._base import VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
 
-
-# ── Metric mapping ─────────────────────────────────────────────────────────────
-
-_METRIC_MAP: dict[str, str] = {
-    "cosine":    "cosine",
-    "euclidean": "euclidean",
-    "dot":       "dotproduct",
-}
-
 _CONTROL_URL = "https://api.pinecone.io"
 
-
-# ── PineconeBackend ────────────────────────────────────────────────────────────
 
 class PineconeBackend(VectorBackend):
     """
@@ -61,14 +51,13 @@ class PineconeBackend(VectorBackend):
         results = store.query("greeting", n=3)
     """
 
-    #: Default at class level as well as in `__init__`: half-built instances
-    #: exist (a test constructs one with `__new__`), and a missing attribute
-    #: there would turn a scoring question into an AttributeError.
-    _metric = "cosine"
-
     provider = "pinecone"
     FILTER   = ('Pinecone metadata filter: {"source": {"$eq": "arxiv"}}, '
                 '{"year": {"$gte": 2020}}, {"$and": [{...}, {...}]}')
+    _METRICS = {"cosine": "cosine", "euclidean": "euclidean", "dot": "dotproduct"}
+    _AUTH, _ENV_KEY = "Api-Key", "PINECONE_API_KEY"
+    #: How long a new index may take to come up before create gives up.
+    READY_TIMEOUT = 120.0
 
     def __init__(
         self,
@@ -81,49 +70,36 @@ class PineconeBackend(VectorBackend):
         metric:  str        = "cosine",
     ) -> None:
         # Named here because the data plane cannot discover it: the metric is
-        # a property of the index, on the control plane. Without it `score`
-        # would carry a cosine similarity in [-1, 1] on one collection and a
-        # squared distance — lower is nearer — on another, under one name.
-        self._metric = check_metric(metric, _METRIC_MAP, "Pinecone")
-        resolved_key = api_key or os.environ.get("PINECONE_API_KEY", "")
-        if not resolved_key:
+        # a property of the index, on the control plane.
+        self._metric = check_metric(metric, self._METRICS, "Pinecone")
+        if not (api_key or os.environ.get("PINECONE_API_KEY")):
             raise ValueError(
                 "No Pinecone API key found.  "
                 "Pass api_key= or set the 'PINECONE_API_KEY' environment variable."
             )
-        self._index     = index or os.environ.get("PINECONE_INDEX", "")
-        self._index_url = url or ""    # cached after first describe-index call
-        self._cloud     = cloud
-        self._region    = region
-
         # The control plane and the index host are both full URLs, so one pool
-        # — the base class's — serves both. _url is set once the host is known.
-        super().__init__(url=url or "", api_key=resolved_key)
+        # serves both; the host is discovered on the first data call when not given.
+        super().__init__(url=url, api_key=api_key)
+        self._index  = index or os.environ.get("PINECONE_INDEX", "")
+        self._index_url, self._cloud, self._region = url or "", cloud, region
 
-    # ── Auth headers ───────────────────────────────────────────────────────────
-
-    def _headers(self) -> dict:
-        # Pinecone uses Api-Key header, not Bearer
-        return {
-            "Api-Key":      self._api_key,
-            "Content-Type": "application/json",
-            "Accept":       "application/json",
-        }
-
-    # ── Index host resolution ──────────────────────────────────────────────────
-
-    def _index_url_resolved(self) -> str:
-        if self._index_url:
-            return self._index_url
-        if not self._index:
-            raise ValueError(
-                "No Pinecone index name configured.  "
-                "Pass index= to VectorDB() or set the 'PINECONE_INDEX' env var."
-            )
-        host = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}").get("host", "")
-        self._index_url = host if host.startswith("http") else f"https://{host}"
-        self._url       = self._index_url   # sync base URL for shared helpers
+    def _host(self) -> str:
+        """The index host, asked of the control plane once."""
+        if not self._index_url:
+            if not self._index:
+                raise ValueError("No Pinecone index name configured.  "
+                                 "Pass index= to VectorDB() or set the 'PINECONE_INDEX' env var.")
+            host = self._describe().get("host", "")
+            self._index_url = self._url = host if host.startswith("http") else f"https://{host}"
         return self._index_url
+
+    def _describe(self) -> dict:
+        return self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}")
+
+    def _record(self, match: dict) -> VectorRecord:
+        """One match or fetched vector; Pinecone's euclidean is the squared distance."""
+        metric = "sqeuclidean" if self._metric == "euclidean" else self._metric
+        return record_from_payload(match["id"], match.get("metadata"), match.get("score"), metric)
 
     # ── Abstract method implementations ───────────────────────────────────────
 
@@ -140,48 +116,21 @@ class PineconeBackend(VectorBackend):
         inside it.  This method creates the index if it does not exist.
         HTTP 409 (already exists) is treated as success.
         """
-        if not self._index:
-            self._index = collection  # use collection name as index name if unset
-        body = {
-            "name":      self._index,
-            "dimension": dimension,
-            "metric":    _METRIC_MAP[check_metric(metric, _METRIC_MAP, "Pinecone")],
-            "spec": {
-                "serverless": {
-                    "cloud":  self._cloud,
-                    "region": self._region,
-                }
-            },
-        }
+        self._index = self._index or collection   # the collection name as the index name if unset
+        body = {"name": self._index, "dimension": dimension, "metric": self._native(metric),
+                "spec": {"serverless": {"cloud": self._cloud, "region": self._region}}}
         try:
             self._call("POST", f"{_CONTROL_URL}/indexes", body)
         except APIError as exc:
-            if exc.status != 409:                 # 409: it exists already, which is the goal
+            if exc.status != 409:
                 raise
-            # …provided it is the index asked for: one of another dimension
-            # took every write and answered nothing, and its own metric is
-            # the one its scores are on.
-            info = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}")
-            if info.get("dimension") not in (None, dimension):
-                raise ValueError(f"Pinecone index {self._index!r} exists with dimension "
-                                 f"{info.get('dimension')}, not {dimension}") from None
-            back = {v: k for k, v in _METRIC_MAP.items()}
-            metric = back.get(info.get("metric"), metric)
+            info = self._describe()
+            metric = self._adopt(f"index {self._index!r}", dimension, metric,
+                                 info.get("dimension"), info.get("metric"))
         self._metric = metric
-        self._wait_ready()
-
-    #: How long a new index may take to come up before create gives up.
-    READY_TIMEOUT = 120.0
-
-    def _wait_ready(self) -> None:
-        """A serverless index takes seconds to come up, and a write before then
-        is refused; create returns once it is ready."""
-        import time
+        # A serverless index takes seconds to come up, and a write before then is refused.
         deadline = time.monotonic() + self.READY_TIMEOUT
-        while True:
-            info = self._call("GET", f"{_CONTROL_URL}/indexes/{self._index}")
-            if (info.get("status") or {}).get("ready", True):
-                return
+        while not (self._describe().get("status") or {}).get("ready", True):
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Pinecone index {self._index!r} was not ready after "
                                    f"{self.READY_TIMEOUT:.0f}s")
@@ -194,29 +143,12 @@ class PineconeBackend(VectorBackend):
         n:          int = 5,
         filter:     dict | None = None,
     ) -> list[VectorRecord]:
-        host = self._index_url_resolved()
-        body: dict = {
-            "vector":           vector,
-            "topK":             n,
-            "namespace":        collection,
-            "includeMetadata":  True,
-            "includeValues":    False,
-        }
+        body: dict = {"vector": vector, "topK": n, "namespace": collection,
+                      "includeMetadata": True, "includeValues": False}
         if filter:
             body["filter"] = filter
-
-        data = self._call("POST", f"{host}/query", body)
-
-        # Pinecone's metric is a property of the index and lives on the
-        # control plane, which this data-plane host cannot ask. It is taken at
-        # construction (`metric=`) and defaults to the same cosine everything
-        # else defaults to; `raw_score` keeps the original either way, so a
-        # caller who set a different metric and did not say so can still see
-        # what came back.
-        # Pinecone's euclidean is the squared distance.
-        metric = "sqeuclidean" if self._metric == "euclidean" else self._metric
-        return [record_from_payload(m["id"], m.get("metadata"), m.get("score"), metric)
-                for m in data.get("matches", [])]
+        data = self._call("POST", f"{self._host()}/query", body)
+        return [self._record(m) for m in data.get("matches", [])]
 
     def upsert(
         self,
@@ -224,26 +156,19 @@ class PineconeBackend(VectorBackend):
         records:    list[VectorRecord],
         vectors:    list[list[float]],
     ) -> None:
-        host    = self._index_url_resolved()
-        payload = []
-        for rec, vec in zip(records, vectors):
-            # store text inside metadata so fetch() can reconstruct it
-            meta = {**rec.metadata, "text": rec.text}
-            payload.append({"id": rec.id, "values": vec, "metadata": meta})
-        body = {"vectors": payload, "namespace": collection}
-        self._call("POST", f"{host}/vectors/upsert", body)
+        # The text rides in the metadata: Pinecone stores only vectors and metadata.
+        payload = [{"id": rec.id, "values": vec, "metadata": {**rec.metadata, "text": rec.text}}
+                   for rec, vec in zip(records, vectors)]
+        self._call("POST", f"{self._host()}/vectors/upsert", {"vectors": payload, "namespace": collection})
 
     def fetch(
         self,
         collection: str,
         ids:        list[str],
     ) -> list[VectorRecord]:
-        host   = self._index_url_resolved()
         params = urlencode([("ids", i) for i in ids] + [("namespace", collection)])
-        data = self._call("GET", f"{host}/vectors/fetch?{params}")
-
-        return [record_from_payload(rid, v.get("metadata"))
-                for rid, v in (data.get("vectors") or {}).items()]
+        data = self._call("GET", f"{self._host()}/vectors/fetch?{params}")
+        return [self._record({**v, "id": rid}) for rid, v in (data.get("vectors") or {}).items()]
 
     def delete(
         self,
@@ -251,18 +176,10 @@ class PineconeBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
-        # Nothing named would be `deleteAll` here — the whole namespace.
-        _one_of(ids, filter)
-        host  = self._index_url_resolved()
-        body: dict = {"namespace": collection}
-        if ids:
-            body["ids"] = ids
-        else:
-            body["filter"] = filter
-        self._call("POST", f"{host}/vectors/delete", body)
+        _one_of(ids, filter)   # nothing named would be `deleteAll` here — the whole namespace
+        body = {"namespace": collection, **({"ids": ids} if ids else {"filter": filter})}
+        self._call("POST", f"{self._host()}/vectors/delete", body)
 
     def count(self, collection: str) -> int:
-        host = self._index_url_resolved()
-        data = self._call("GET", f"{host}/describe_index_stats")
-        ns   = (data.get("namespaces") or {}).get(collection, {})
-        return int(ns.get("vectorCount", 0))
+        data = self._call("GET", f"{self._host()}/describe_index_stats")
+        return int((data.get("namespaces") or {}).get(collection, {}).get("vectorCount", 0))

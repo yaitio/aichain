@@ -93,14 +93,7 @@ def VectorDB(
             f"Supported: {supported}."
         )
 
-    backend_kwargs: dict = {}
-    if url:
-        backend_kwargs["url"] = url
-    if api_key:
-        backend_kwargs["api_key"] = api_key
-    backend_kwargs.update(kwargs)
-
-    backend = cls(**backend_kwargs)
+    backend = cls(url=url or None, api_key=api_key or None, **kwargs)
     return VectorStore(backend=backend, collection=collection, embedder=embedder)
 
 

@@ -39,42 +39,13 @@ _MD_TABLE_RE  = re.compile(r'\|\s*[-:]+\s*\|')
 _MD_INLINE_RE = re.compile(r'\*\*\S[^\n]*?\*\*|__\S[^\n]*?__|(?<![\w*])\*\S[^*\n]*\*(?![\w*])')
 
 def _is_markdown(text: str) -> bool:
-    for line in text.splitlines():
-        if line.startswith('#'):
-            return True
-    if _MD_FENCE_RE.search(text):
-        return True
-    if _MD_TABLE_RE.search(text):
-        return True
-    if _MD_INLINE_RE.search(text):
-        return True
-    return False
+    return (any(line.startswith('#') for line in text.splitlines())
+            or any(r.search(text) for r in (_MD_FENCE_RE, _MD_TABLE_RE, _MD_INLINE_RE)))
 
 
 # ---------------------------------------------------------------------------
-# Heading stack helpers
+# Text splitting
 # ---------------------------------------------------------------------------
-
-def _push_heading(
-    stack: list[tuple[int, str]],
-    level: int,
-    text:  str,
-) -> list[tuple[int, str]]:
-    return [(l, t) for l, t in stack if l < level] + [(level, text)]
-
-
-def _headings_list(stack: list[tuple[int, str]]) -> list[str]:
-    return [t for _, t in stack]
-
-
-# ---------------------------------------------------------------------------
-# Text splitting helpers
-# ---------------------------------------------------------------------------
-
-def _force_split(text: str, max_chars: int) -> list[str]:
-    """Cut by characters: the last resort, for one token longer than the limit."""
-    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
-
 
 def _split_by_priority(
     text:      str,
@@ -123,15 +94,14 @@ def _split_by_priority(
 
         return [c for c in chunks if c.strip()]
 
-    # No separator produced a split: one token longer than the limit.
-    return _force_split(text, max_chars)
+    # No separator produced a split: one token longer than the limit, cut by characters.
+    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
 
 
 # Chinese and Japanese end a sentence without a space after it. A line break
 # splits plain text too.
 _CJK_SEPS        = ["。", "！", "？"]
-_MD_TEXT_SEPS    = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
-_PLAIN_TEXT_SEPS = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
+_TEXT_SEPS = ["\n\n", "\n", ". ", *_CJK_SEPS, " "]
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +126,8 @@ def _pack(prefix: str, lines: list[str], suffix: str, max_chars: int,
         if len(line) > budget:
             flush(buf)
             buf = []
-            for piece in _force_split(line, budget):
-                flush([piece])
+            for i in range(0, len(line), budget):
+                flush([line[i:i + budget]])
         elif len(prefix + "\n".join(buf + [line]) + suffix) <= max_chars:
             buf.append(line)
         else:
@@ -190,7 +160,7 @@ def _chunk_table(table: str, max_chars: int) -> list[_Chunk]:
     # Not a table, or a header that leaves no room for a row: split as text.
     if sep_idx is None or len(header) + 2 >= max_chars:
         return [_Chunk(text=p.rstrip(), kind="table")
-                for p in _split_by_priority(table, max_chars, _MD_TEXT_SEPS)]
+                for p in _split_by_priority(table, max_chars, _TEXT_SEPS)]
     return _pack(header + "\n", [r for r in rows[sep_idx + 1:] if r.strip()], "", max_chars)
 
 
@@ -247,40 +217,24 @@ def _parse_markdown(text: str) -> list[_Segment]:
                     break
                 body_lines.append(lines[i])
                 i += 1
-            if closed:
-                segments.append(_Segment(
-                    kind    = "code",
-                    content = "\n".join(body_lines),
-                    header  = header,
-                    fence   = fence_chars,
-                ))
-            else:
-                # Unclosed — treat as plain text
-                segments.append(_Segment(
-                    kind    = "text",
-                    content = header + "\n" + "\n".join(body_lines),
-                ))
+            body = "\n".join(body_lines)
+            segments.append(_Segment("code", body, header=header, fence=fence_chars) if closed
+                            else _Segment("text", header + "\n" + body))  # unclosed: plain text
             continue
 
         # ── ATX heading ───────────────────────────────────────────────
         head_m = _HEADING_RE.match(line)
         if head_m:
-            segments.append(_Segment(
-                kind    = "heading",
-                content = head_m.group(2).strip(),
-                level   = len(head_m.group(1)),
-            ))
+            segments.append(_Segment("heading", head_m.group(2).strip(), level=len(head_m.group(1))))
             i += 1
             continue
 
         # ── Table ─────────────────────────────────────────────────────
         if _ROW_RE.match(line):
-            tbl_lines: list[str] = []
+            start = i
             while i < n and _ROW_RE.match(lines[i]):
-                tbl_lines.append(lines[i])
                 i += 1
-            if tbl_lines:
-                segments.append(_Segment(kind="table", content="\n".join(tbl_lines)))
+            segments.append(_Segment("table", "\n".join(lines[start:i])))
             continue
 
         # ── Plain text ────────────────────────────────────────────────
@@ -418,15 +372,7 @@ class Chunk(Tool):
             return []
         # Windows line ends: "\r\n\r\n" is a paragraph break too.
         input = input.replace("\r\n", "\n").replace("\r", "\n")
-        max_chars     = self._max_chars
-        overlap_chars = self._overlap_chars
-        merge_peers   = self._merge_enabled
-
-        if overlap_chars >= max_chars:
-            raise ValueError(
-                f"overlap_chars ({overlap_chars}) must be less than "
-                f"max_chars ({max_chars})."
-            )
+        max_chars, overlap_chars = self._max_chars, self._overlap_chars
 
         # ── Chunk ────────────────────────────────────────────────────────
         # Reserve room for the overlap tail up front.  Splitting to the full
@@ -444,7 +390,7 @@ class Chunk(Tool):
             return []
 
         # ── Merge peers ──────────────────────────────────────────────────
-        if merge_peers:
+        if self._merge_enabled:
             chunks = self._merge_peers(chunks, effective_max)
 
         # ── Apply overlap ────────────────────────────────────────────────
@@ -466,48 +412,30 @@ class Chunk(Tool):
     # ── Markdown chunking ─────────────────────────────────────────────────────
 
     def _chunk_markdown(self, text: str, max_chars: int) -> list[_Chunk]:
-        segments:      list[_Segment]       = _parse_markdown(text)
-        heading_stack: list[tuple[int, str]] = []
-        chunks:        list[_Chunk]          = []
-
-        for seg in segments:
+        stack:  list[tuple[int, str]] = []   # (level, heading) from the top down
+        chunks: list[_Chunk]          = []
+        for seg in _parse_markdown(text):
             if seg.kind == "heading":
-                heading_stack = _push_heading(heading_stack, seg.level, seg.content)
+                stack = [(l, t) for l, t in stack if l < seg.level] + [(seg.level, seg.content)]
                 continue
-
-            headings = _headings_list(heading_stack)
-
             if seg.kind == "code":
-                for c in _chunk_code(seg.header, seg.content, seg.fence, max_chars):
-                    c.headings = list(headings)
-                    chunks.append(c)
-
+                pieces = _chunk_code(seg.header, seg.content, seg.fence, max_chars)
             elif seg.kind == "table":
-                for c in _chunk_table(seg.content, max_chars):
-                    c.headings = list(headings)
-                    chunks.append(c)
-
-            else:  # text
-                for p in _split_by_priority(seg.content, max_chars, _MD_TEXT_SEPS):
-                    # Separators stay attached during splitting (lossless);
-                    # trailing whitespace is cosmetic at this point.
-                    chunks.append(_Chunk(text=p.rstrip(), headings=list(headings)))
-
+                pieces = _chunk_table(seg.content, max_chars)
+            else:
+                pieces = self._chunk_plain(seg.content, max_chars)
+            for c in pieces:
+                c.headings = [t for _, t in stack]
+                chunks.append(c)
         return chunks
 
-    # ── Plain text chunking ───────────────────────────────────────────────────
-
     def _chunk_plain(self, text: str, max_chars: int) -> list[_Chunk]:
-        return [
-            _Chunk(text=p.rstrip(), headings=[])
-            for p in _split_by_priority(text, max_chars, _PLAIN_TEXT_SEPS)
-        ]
+        # Separators stay attached while splitting; trailing whitespace is cosmetic here.
+        return [_Chunk(text=p.rstrip()) for p in _split_by_priority(text, max_chars, _TEXT_SEPS)]
 
     # ── Merge peers ───────────────────────────────────────────────────────────
 
     def _merge_peers(self, chunks: list[_Chunk], max_chars: int) -> list[_Chunk]:
-        if not chunks:
-            return chunks
         merged: list[_Chunk] = [chunks[0]]
         for chunk in chunks[1:]:
             prev = merged[-1]
@@ -555,8 +483,7 @@ class Chunk(Tool):
                 result.append(chunk)
                 continue
 
-            window = min(overlap_chars, available)
-            tail   = prev.text[-window:] if len(prev.text) > window else prev.text
+            tail = prev.text[-min(overlap_chars, available):]
 
             # Shift the left boundary of the tail right to the first space
             # so we don't start the overlap mid-word.
@@ -564,20 +491,10 @@ class Chunk(Tool):
             if space_idx > 0:
                 tail = tail[space_idx + 1:]
 
-            if tail:
-                new_text = tail + " " + chunk.text
-                # Final safety trim (guards against edge cases)
-                if len(new_text) > max_chars:
-                    new_text = chunk.text
-            else:
+            new_text = tail + " " + chunk.text if tail else chunk.text
+            if len(new_text) > max_chars:   # the joining space can tip it over
                 new_text = chunk.text
-
-            result.append(_Chunk(
-                text     = new_text,
-                headings = list(chunk.headings),
-                is_code  = chunk.is_code,
-                kind     = chunk.kind,
-            ))
+            result.append(_Chunk(new_text, list(chunk.headings), chunk.is_code, chunk.kind))
 
         return result
 
@@ -589,9 +506,3 @@ class Chunk(Tool):
             f"overlap_chars={self._overlap_chars}, "
             f"merge_peers={self._merge_enabled})"
         )
-
-
-# ---------------------------------------------------------------------------
-# Convenience factory
-# ---------------------------------------------------------------------------
-

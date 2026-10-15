@@ -77,16 +77,6 @@ def _without_options(parameters: dict, *keys: str) -> dict:
     return out
 
 
-def _deep_with_option(parameters: dict, key: str, spec: dict) -> dict:
-    """A copy of *parameters* with one more key under ``options``; a copy, since
-    changing the shared class attribute would add the key to every sibling."""
-    import copy
-    out = copy.deepcopy(parameters)
-    out.setdefault("properties", {}).setdefault(
-        "options", {}).setdefault("properties", {})[key] = spec
-    return out
-
-
 class Speech(Tool):
     """
     Synthesise speech from text and save to an audio file.
@@ -527,12 +517,7 @@ class ttsQwen(Speech):
         voice       = opts.get("voice",       self._DEFAULT_VOICE)
         model       = self.model
         fmt         = opts.get("format",      "wav")
-        if "region" in opts:
-            raise ValueError(f"{self.name}: region is a setting of the tool, not of a call — "
-                             "speech('qwen', region=…)")
-        base_url = self._base_url()
-
-        url = base_url + self._TTS_PATH
+        url = self._base_url() + self._TTS_PATH
 
         body = {
             "model": model,

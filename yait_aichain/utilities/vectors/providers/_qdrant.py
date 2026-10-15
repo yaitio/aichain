@@ -6,16 +6,16 @@ through as Qdrant's own JSON. ``QDRANT_URL`` and ``QDRANT_API_KEY`` (sent as
 
 from __future__ import annotations
 
-import os
 import uuid
 
 from ....clients._errors import APIError
-from .._base import ID_KEY as _ORIGINAL_ID_KEY, VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
+from .._base import ID_KEY, VectorBackend, VectorRecord, _one_of, check_metric, record_from_payload
+
 
 def _point_id(rec_id: str | int) -> int | str:
     """A record id as a Qdrant point id, which must be an unsigned integer or a
     UUID: a string id becomes a UUIDv5, the original kept in the payload under
-    ``_ORIGINAL_ID_KEY`` and restored on every read."""
+    ``ID_KEY`` and restored on every read."""
     s = str(rec_id)
     # Only an integer's own spelling: "007" and "7" must not be one point, and
     # "²" passes isdigit() but raises in int().
@@ -26,19 +26,6 @@ def _point_id(rec_id: str | int) -> int | str:
     except ValueError:
         return str(uuid.uuid5(uuid.NAMESPACE_URL, f"aichain:{s}"))
 
-
-# ── Metric mapping ─────────────────────────────────────────────────────────────
-
-# aichain metric name → Qdrant Distance enum string
-_METRIC_MAP: dict[str, str] = {
-    "cosine":    "Cosine",
-    "euclidean": "Euclid",
-    "dot":       "Dot",
-    "manhattan": "Manhattan",
-}
-
-
-# ── QdrantBackend ──────────────────────────────────────────────────────────────
 
 class QdrantBackend(VectorBackend):
     """
@@ -81,7 +68,9 @@ class QdrantBackend(VectorBackend):
     provider     = "qdrant"
     FILTER       = ('Qdrant filter: {"must": [{"key": "source", "match": {"value": "arxiv"}}]}, '
                     '{"must": [{"key": "year", "range": {"gte": 2020}}]}')
-    _DEFAULT_URL = "http://localhost:6333"
+    _METRICS     = {"cosine": "Cosine", "euclidean": "Euclid", "dot": "Dot", "manhattan": "Manhattan"}
+    _AUTH        = "api-key"
+    _ENV_URL, _ENV_KEY, _DEFAULT_URL = "QDRANT_URL", "QDRANT_API_KEY", "http://localhost:6333"
 
     def __init__(
         self,
@@ -90,23 +79,11 @@ class QdrantBackend(VectorBackend):
         api_key: str | None = None,
         metric:  str        = "cosine",
     ) -> None:
-        super().__init__(
-            url     = url     or os.environ.get("QDRANT_URL", self._DEFAULT_URL),
-            api_key = api_key or os.environ.get("QDRANT_API_KEY"),
-        )
-        self._metric = check_metric(metric, _METRIC_MAP, "Qdrant")
+        super().__init__(url=url, api_key=api_key)
+        self._metric = check_metric(metric, self._METRICS, "Qdrant")
 
-    # ── Auth header override ───────────────────────────────────────────────────
-
-    def _headers(self) -> dict:
-        # Qdrant uses "api-key" header, not "Authorization: Bearer"
-        h: dict = {
-            "Content-Type": "application/json",
-            "Accept":       "application/json",
-        }
-        if self._api_key:
-            h["api-key"] = self._api_key
-        return h
+    def _record(self, point: dict) -> VectorRecord:
+        return record_from_payload(point["id"], point.get("payload"), point.get("score"), self._metric)
 
     # ── Abstract method implementations ───────────────────────────────────────
 
@@ -116,28 +93,17 @@ class QdrantBackend(VectorBackend):
         dimension:  int,
         metric:     str = "cosine",
     ) -> None:
-        distance = _METRIC_MAP[check_metric(metric, _METRIC_MAP, "Qdrant")]
-        body     = {
-            "vectors": {
-                "size":     dimension,
-                "distance": distance,
-            }
-        }
         try:
-            self._put(f"/collections/{collection}", body)
+            self._put(f"/collections/{collection}",
+                      {"vectors": {"size": dimension, "distance": self._native(metric)}})
         except APIError as exc:
             # 409 on current Qdrant; 400 "already exists" on older releases.
             if not (exc.status == 409 or (exc.status == 400 and "exist" in str(exc).lower())):
                 raise
-            # It exists already, which is the goal — as on every other
-            # backend — and its own metric is the one its scores are on.
             info = self._get(f"/collections/{collection}").get("result") or {}
             vectors = ((info.get("config") or {}).get("params") or {}).get("vectors") or {}
-            if vectors.get("size") not in (None, dimension):
-                raise ValueError(f"Qdrant collection {collection!r} exists with dimension "
-                                 f"{vectors.get('size')}, not {dimension}") from None
-            back = {v: k for k, v in _METRIC_MAP.items()}
-            metric = back.get(vectors.get("distance"), metric)
+            metric = self._adopt(f"collection {collection!r}", dimension, metric,
+                                 vectors.get("size"), vectors.get("distance"))
         self._metric = metric
 
     def query(
@@ -147,27 +113,11 @@ class QdrantBackend(VectorBackend):
         n:          int = 5,
         filter:     dict | None = None,
     ) -> list[VectorRecord]:
-        body: dict = {
-            "vector":       vector,
-            "limit":        n,
-            "with_payload": True,
-        }
+        body: dict = {"vector": vector, "limit": n, "with_payload": True}
         if filter:
             body["filter"] = filter
         data = self._post(f"/collections/{collection}/points/search", body)
-
-        return [record_from_payload(p["id"], p.get("payload"), p.get("score"), self._metric)
-                for p in data.get("result", [])]
-
-    #: The metric this store was created with. Declared, not discovered.
-    #:
-    #: Asking the collection adds a network round trip with retries in front
-    #: of the first query, and when the host is unreachable that is a minute
-    #: of backoff before a search that would otherwise have failed fast. A hidden request is a bad trade
-    #: for a value the caller already knows — and `raw_score` keeps the
-    #: original either way, so a wrong declaration is visible rather than
-    #: baked into a number.
-    _metric = "cosine"
+        return [self._record(p) for p in data.get("result", [])]
 
     def upsert(
         self,
@@ -175,18 +125,9 @@ class QdrantBackend(VectorBackend):
         records:    list[VectorRecord],
         vectors:    list[list[float]],
     ) -> None:
-        points = []
-        for rec, vec in zip(records, vectors):
-            payload = {
-                **rec.metadata,
-                "text":           rec.text,
-                _ORIGINAL_ID_KEY: str(rec.id),
-            }
-            points.append({
-                "id":      _point_id(rec.id),
-                "vector":  vec,
-                "payload": payload,
-            })
+        points = [{"id": _point_id(rec.id), "vector": vec,
+                   "payload": {**rec.metadata, "text": rec.text, ID_KEY: str(rec.id)}}
+                  for rec, vec in zip(records, vectors)]
         # wait=true: Qdrant acknowledges a write before it is searchable, and a
         # query straight after an upsert found nothing.
         self._put(f"/collections/{collection}/points?wait=true", {"points": points})
@@ -196,11 +137,9 @@ class QdrantBackend(VectorBackend):
         collection: str,
         ids:        list[str],
     ) -> list[VectorRecord]:
-        # Qdrant: POST /collections/{name}/points with body {"ids": [...]}
-        body = {"ids": [_point_id(i) for i in ids], "with_payload": True}
-        data = self._post(f"/collections/{collection}/points", body)
-
-        return [record_from_payload(p["id"], p.get("payload")) for p in data.get("result", [])]
+        data = self._post(f"/collections/{collection}/points",
+                          {"ids": [_point_id(i) for i in ids], "with_payload": True})
+        return [self._record(p) for p in data.get("result", [])]
 
     def delete(
         self,
@@ -208,15 +147,10 @@ class QdrantBackend(VectorBackend):
         ids:        list[str] | None = None,
         filter:     dict | None      = None,
     ) -> None:
-        # The VectorStore layer guarantees at least one non-empty argument
-        # (an empty list/dict would otherwise mean "delete everything").
         _one_of(ids, filter)
         body: dict = {"points": [_point_id(i) for i in ids]} if ids else {"filter": filter}
         self._post(f"/collections/{collection}/points/delete?wait=true", body)
 
     def count(self, collection: str) -> int:
-        data = self._post(
-            f"/collections/{collection}/points/count",
-            {"exact": True},
-        )
+        data = self._post(f"/collections/{collection}/points/count", {"exact": True})
         return int((data.get("result") or {}).get("count", 0))

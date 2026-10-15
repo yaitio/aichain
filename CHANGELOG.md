@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.5.5] — 2026-10-15
+
+### Changed
+
+- `Vectors`: the rules live once in the shared base — the metric each backend
+  calls by its own word, the key and URL from the environment, the auth
+  headers, what happens when a create meets an existing collection — and each
+  backend translates a request and reads one record shape. −176 lines of code.
+  The base no longer accepts and ignores unknown keyword arguments.
+- `MCP`: one frozen `_Server` holds the connection settings, a dict server's
+  own headers, env, cwd and transport folded into it once, its repr redacted.
+  −67 lines.
+- The chunker writes its character cut inline and walks code, tables and text
+  in one loop, with the same output (checked on 1 500 generated documents);
+  the speech module's unused `_deep_with_option` and a second region check are
+  gone. −69 lines.
+
+### Fixed
+
+- Chroma scored an existing collection by the metric it asked for, not the one
+  the collection has: an `l2` collection opened with `metric="cosine"` was read
+  as cosine. It reads the collection's own now, as Qdrant and Pinecone do.
+- Chroma accepted an existing collection of another dimension, which the other
+  two backends refuse; it refuses it too.
+
 ## [4.5.4] — 2026-10-15
 
 ### Changed

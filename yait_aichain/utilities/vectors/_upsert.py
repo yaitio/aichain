@@ -90,7 +90,4 @@ class VectorUpsertTool(_VectorTool):
 
 
     def run(self, input: list[dict], options: dict | None = None) -> dict:
-        opts  = options or {}
-        store = self._with_collection(opts)
-        n     = store.upsert(input)
-        return {"upserted": n}
+        return {"upserted": self._with_collection(options or {}).upsert(input)}

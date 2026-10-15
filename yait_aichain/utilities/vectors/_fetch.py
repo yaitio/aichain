@@ -55,6 +55,4 @@ class VectorFetchTool(_VectorTool):
 
 
     def run(self, input: list[str], options: dict | None = None) -> list[dict]:
-        opts  = options or {}
-        store = self._with_collection(opts)
-        return [r.to_dict() for r in store.fetch(input)]
+        return [r.to_dict() for r in self._with_collection(options or {}).fetch(input)]

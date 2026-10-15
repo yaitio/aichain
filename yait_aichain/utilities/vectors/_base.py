@@ -7,32 +7,30 @@ See docs/utilities/index.md.
 
 from __future__ import annotations
 
-from ...tools._key import ApiKey
-
 import json
+import os
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlencode
 
-from yait_aichain.clients._base import make_http
-
+from ...clients._base import make_http
+from ...clients._constants import DEFAULT_RETRIES, TOOL_TIMEOUT
 from ...clients._http import request
-from ...clients._constants import TOOL_TIMEOUT, DEFAULT_RETRIES
+from ...tools._key import ApiKey
 
 
 # ---------------------------------------------------------------------------
 # VectorRecord
 # ---------------------------------------------------------------------------
 
-#: Metrics the library names, and how each backend's raw number becomes a
-#: similarity in [0, 1] where higher is better.
-#:
-#: The formulas are not interchangeable and the direction is the reason:
-#: cosine and dot are *similarities* (higher is nearer), euclidean is a
-#: *distance* (lower is nearer). Folding them into one field without
-#: converting is how a threshold tuned on one collection silently inverts on
-#: another.
-METRICS = ("cosine", "euclidean", "dot")
+#: The metrics a store may be created with; a backend takes those it has, and
+#: an unknown one is refused, not quietly created as cosine. Cosine and dot
+#: are *similarities* (higher is nearer), euclidean and manhattan *distances*
+#: (lower is nearer): folding them into one field without converting is how a
+#: threshold tuned on one collection silently inverts on another.
+METRICS = ("cosine", "euclidean", "dot", "manhattan")
 
 
 def normalise_score(raw: float | None, metric: str) -> float | None:
@@ -60,11 +58,6 @@ def normalise_score(raw: float | None, metric: str) -> float | None:
     if metric == "dot":
         return float(raw)
     raise ValueError(f"no metric {metric!r}; one of {list(METRICS)}")
-
-
-#: The metrics a store may be created with; a backend takes those it has.
-#: An unknown one is refused, not quietly created as cosine.
-METRICS = ("cosine", "euclidean", "dot", "manhattan")
 
 
 def check_metric(metric: str, accepted, who: str) -> str:
@@ -181,7 +174,7 @@ class VectorBackend(ABC):
       3. Implement the six abstract methods, and name the dialect its
          ``filter`` is written in as ``FILTER``.
 
-    Shared HTTP helpers (_get, _post, _put, _delete_req) handle JSON
+    Shared HTTP helpers (_get, _post, _put) handle JSON
     encoding/decoding and error checking so subclasses stay concise.
 
     Environment variables
@@ -196,22 +189,22 @@ class VectorBackend(ABC):
     provider: str = ""
     #: How a ``filter`` is written for this backend, shown to a model.
     FILTER: str = ""
+    #: The library's metric names, each as this backend spells it.
+    _METRICS: dict = {}
+    #: The metric a query's scores are read on: the one the store was created
+    #: with, declared rather than asked for (a hidden round trip in front of the
+    #: first query); `raw_score` keeps the original either way.
+    _metric = "cosine"
+    #: Where a key is sent, and the environment a URL and a key default from.
+    _AUTH = "Authorization"
+    _ENV_URL, _ENV_KEY, _DEFAULT_URL = "", "", ""
 
     # ── Construction ──────────────────────────────────────────────────────────
 
-    def __init__(
-        self,
-        *,
-        url:     str,
-        api_key: str | None = None,
-        **_kwargs: Any,
-    ) -> None:
-        self._url     = url.rstrip("/")
-        self._api_key = api_key
-        self._http    = make_http(
-            timeout = TOOL_TIMEOUT,
-            retries = DEFAULT_RETRIES,
-        )
+    def __init__(self, *, url: str | None = None, api_key: str | None = None) -> None:
+        self._url     = (url or os.environ.get(self._ENV_URL, self._DEFAULT_URL)).rstrip("/")
+        self._api_key = api_key or os.environ.get(self._ENV_KEY) or None
+        self._http    = make_http(timeout=TOOL_TIMEOUT, retries=DEFAULT_RETRIES)
 
     # ── What every backend implements ─────────────────────────────────────────
 
@@ -264,16 +257,28 @@ class VectorBackend(ABC):
     def count(self, collection: str) -> int:
         """Return the number of records in *collection*."""
 
+    # ── Shared rules ──────────────────────────────────────────────────────────
+
+    def _native(self, metric: str) -> str:
+        """*metric* in this backend's own word; one it lacks is refused."""
+        return self._METRICS[check_metric(metric, self._METRICS, self.provider.capitalize())]
+
+    def _adopt(self, what: str, dimension: int, metric: str, had_dimension, had_metric) -> str:
+        """The library metric of a collection that exists already, which a create
+        adopts: its own metric is the one its scores are on. Another dimension is refused."""
+        if had_dimension not in (None, dimension):
+            raise ValueError(f"{self.provider.capitalize()} {what} exists with dimension "
+                             f"{had_dimension}, not {dimension}") from None
+        return {v: k for k, v in self._METRICS.items()}.get(had_metric, metric)
+
     # ── Shared HTTP helpers ───────────────────────────────────────────────────
 
     def _headers(self) -> dict:
-        """Base headers.  Subclasses may override to change auth scheme."""
-        h: dict = {
-            "Content-Type": "application/json",
-            "Accept":       "application/json",
-        }
-        if self._api_key:
-            h["Authorization"] = f"Bearer {self._api_key}"
+        """Base headers, the key under ``_AUTH`` — as a bearer token in ``Authorization``."""
+        h: dict = {"Content-Type": "application/json", "Accept": "application/json"}
+        key = self._api_key
+        if key:
+            h[self._AUTH] = f"Bearer {key}" if self._AUTH == "Authorization" else key
         return h
 
     def _call(self, method: str, path: str, body: dict | None = None) -> Any:
@@ -285,7 +290,6 @@ class VectorBackend(ABC):
         return json.loads(raw) if raw.strip() else {}
 
     def _get(self, path: str, params: dict | None = None) -> Any:
-        from urllib.parse import urlencode
         return self._call("GET", path + ("?" + urlencode(params) if params else ""))
 
     def _post(self, path: str, body: dict) -> Any:
@@ -293,9 +297,6 @@ class VectorBackend(ABC):
 
     def _put(self, path: str, body: dict) -> Any:
         return self._call("PUT", path, body)
-
-    def _delete_req(self, path: str, body: dict | None = None) -> Any:
-        return self._call("DELETE", path, body)
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 
@@ -355,7 +356,6 @@ class VectorStore:
     ) -> None:
         self._backend    = backend
         # Part of every request's path: one that walks it, or ends it, is refused.
-        import re
         if not isinstance(collection, str) or not re.fullmatch(r"[A-Za-z0-9_\-][A-Za-z0-9_.\-]{0,254}",
                                                                 collection) or collection in (".", ".."):
             raise ValueError(f"a collection name is letters, digits, '_', '-' and '.'; "
@@ -432,7 +432,7 @@ class VectorStore:
         records = list(records)
         self._check_records(records)              # a bad record is refused before anything is written
         written = 0
-        for batch in self._write_batches(records, step):
+        for batch in (records[i:i + step] for i in range(0, len(records), step)):
             try:
                 recs, vectors = self._prepare_records(batch)
                 for part in self._by_bytes(recs, vectors):
@@ -441,11 +441,6 @@ class VectorStore:
             except Exception as exc:
                 raise PartialUpsert(written, len(records), exc) from exc
         return written
-
-    @staticmethod
-    def _write_batches(records: list[dict], step: int):
-        for i in range(0, len(records), step):
-            yield records[i:i + step]
 
     def _by_bytes(self, recs: list, vectors: list):
         """Split one batch where its estimated JSON passes the byte limit."""
@@ -511,62 +506,22 @@ class VectorStore:
             if not isinstance(r.get("metadata") or {}, dict):
                 raise TypeError(f"record {rid!r}: metadata is a dict, not "
                                 f"{type(r.get('metadata')).__name__}")
-        for r in raw:
             clash = sorted(set(r.get("metadata") or {}) & set(RESERVED))
             if clash:
-                raise ValueError(f"record {r['id']!r}: metadata may not use {clash} — the store "
+                raise ValueError(f"record {rid!r}: metadata may not use {clash} — the store "
                                  "keeps the record's text and id under those names")
-        if self._embedder is None:
-            for r in raw:
-                if "vector" not in r:
-                    raise ValueError(
-                        f"Record {r['id']!r} has no 'vector' and no embedder is set.  "
-                        f"Pass embedder= to VectorDB() or include 'vector' in every record.")
+            if self._embedder is None and "vector" not in r:
+                raise ValueError(f"Record {rid!r} has no 'vector' and no embedder is set.  "
+                                 f"Pass embedder= to VectorDB() or include 'vector' in every record.")
 
-    def _prepare_records(
-        self,
-        raw: list[dict],
-    ) -> tuple[list[VectorRecord], list[list[float]]]:
-        """``(records, vectors)`` from raw dicts; those without a ``vector`` are
-        embedded in one batched call."""
-        recs:    list[VectorRecord] = []
-        vectors: list[list[float]]  = []
-
-        needs_embed = [r for r in raw if "vector" not in r]
-
-        if needs_embed:
-            if self._embedder is None:
-                missing = needs_embed[0]["id"]
-                raise ValueError(
-                    f"Record {missing!r} has no 'vector' and no embedder is set.  "
-                    f"Pass embedder= to VectorDB() or include 'vector' in every record."
-                )
-            texts  = [r["text"] for r in needs_embed]
-            result = self._embedder.embed(texts, input_type="document")
-            # Pair embeddings to records POSITIONALLY (in input order), not by id.
-            # `needs_embed` follows the order of `raw`, so the same iterator
-            # consumed below assigns each freshly-embedded vector to its own
-            # record — correct even when two records share an id (an id-keyed
-            # map would collapse duplicates and mis-assign vectors).
-            embeds = iter(result.embeddings)
-        else:
-            embeds = iter(())
-
-        for r in raw:
-            clash = sorted(set(r.get("metadata") or {}) & set(RESERVED))
-            if clash:
-                raise ValueError(f"record {r['id']!r}: metadata may not use {clash} — the store "
-                                 "keeps the record's text and id under those names")
-            rec = VectorRecord(
-                id       = str(r["id"]),
-                text     = r["text"],
-                metadata = r.get("metadata") or {},
-            )
-            vec = r["vector"] if "vector" in r else next(embeds)
-            recs.append(rec)
-            vectors.append(vec)
-
-        return recs, vectors
+    def _prepare_records(self, raw: list[dict]) -> tuple[list[VectorRecord], list[list[float]]]:
+        """``(records, vectors)`` from checked dicts; those without a ``vector`` are
+        embedded in one batched call, paired back by position so a repeated id cannot mis-assign."""
+        missing = [r["text"] for r in raw if "vector" not in r]
+        embeds = iter(self._embedder.embed(missing, input_type="document").embeddings if missing else ())
+        recs = [VectorRecord(id=str(r["id"]), text=r["text"], metadata=r.get("metadata") or {})
+                for r in raw]
+        return recs, [r["vector"] if "vector" in r else next(embeds) for r in raw]
 
     # ── Dunder helpers ────────────────────────────────────────────────────────
 
