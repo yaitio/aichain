@@ -45,6 +45,9 @@ class ChainResult(Spend):
         Tokens and cost summed across the steps that reported them.
     run_id : str
         The run document's id.
+    renamed : dict
+        Keys an output used to be found under, mapped to its key now —
+        ``{"result": "fetch"}`` while the pre-4.2.7 key still works.
     """
 
     output:    Any
@@ -54,6 +57,9 @@ class ChainResult(Spend):
     variables: dict = field(default_factory=dict)
     usage:     Any = None
     run_id:    str = ""
+    #: Keys an output used to be found under, mapped to where it is now —
+    #: ``{"result": "fetch"}``: reading the old one still works and says so.
+    renamed:   dict = field(default_factory=dict, repr=False)
 
     @property
     def cost(self) -> float | None:
@@ -76,6 +82,21 @@ class ChainResult(Spend):
         raise _hints.missing(self, name)
 
     def __getitem__(self, key: str):
+        if key in self.renamed:
+            import warnings
+            warnings.warn(f"result[{key!r}] is result[{self.renamed[key]!r}] since 4.2.7 — a step "
+                          "is named after its runner; the old key goes in 5.0",
+                          FutureWarning, stacklevel=2)
+        if key not in self.variables and "." in key:
+            # A path into a stored dict: result["page.body"].
+            head, _, rest = key.partition(".")
+            value = self.variables.get(head)
+            for part in rest.split("."):
+                if not isinstance(value, dict) or part not in value:
+                    raise KeyError(f"{key!r}: no {part!r} there; available: "
+                                   f"{sorted(value) if isinstance(value, dict) else sorted(self.variables)}")
+                value = value[part]
+            return value
         try:
             return self.variables[key]
         except KeyError:

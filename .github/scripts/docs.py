@@ -550,7 +550,7 @@ API_PAGES = {
                     + [("yait_aichain.models", n) for n in ("ToolCall", "ToolCallRequest",
                                                             "tool_result_turn", "dangling_calls")],
     "api/skill.md": [("yait_aichain", "Skill")],
-    "api/chain.md": [("yait_aichain", n) for n in ("Chain", "ChainResult")],
+    "api/chain.md": [("yait_aichain", n) for n in ("Chain", "ChainResult")] + [("yait_aichain.chain", "Step")],
     "api/pool.md": [("yait_aichain", n) for n in ("Pool", "PoolResult", "PENDING", "RUNNING", "DONE", "FAILED")],
     "api/agent.md": [("yait_aichain.agent", n) for n in (
         "Agent", "AgentResult", "step_count", "token_budget", "cost_budget", "check", "nudge",

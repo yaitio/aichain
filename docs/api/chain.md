@@ -3,7 +3,7 @@
 Generated from the code's signatures and docstrings. What it is for and how to use it: [the guide](../pipelines/chain.md).
 
 <!-- g:api -->
-[`Chain`](#chain) · [`ChainResult`](#chainresult)
+[`Chain`](#chain) · [`ChainResult`](#chainresult) · [`Step`](#step)
 
 ---
 
@@ -31,8 +31,8 @@ A step is a `Skill`, a tool, an `Agent`, or a plain function or a
 utility's method, in any order. A Skill reads any variable in its prompt;
 a tool or a function gets the arguments its schema or signature names,
 filled from the variables or from the step's mapping. Each step's output
-is stored under its key; a plain dict a step returns is merged into the
-variables, so one step can write several.
+is stored under its key — the runner's name unless one is given — and a
+dict is read whole or by path, `"page.body"`.
 
 ```python
 chain = Chain(steps=[
@@ -54,7 +54,8 @@ result["french"], result.output, result.cost
   input_map, options)`. For an Agent step, *options* takes
   `task_key` (the variable holding its task, default `"task"`) and
   `output_field` (the `AgentResult` attribute stored, default
-  `"output"`). A bare runner is stored under `"result"`.
+  `"output"`). A bare runner, or `(runner, input_map)`, is stored
+  under the runner's name; a `Step` says the rest.
 - `variables` (*dict | None, optional*, default `None`) — Default variables for every `run()`; call-time values win.
 - `name` (*str | None, optional*, default `None`) — A label, shown in events and when the chain is a step elsewhere.
 - `description` (*str | None, optional*, default `None`) — What the chain does.
@@ -327,6 +328,7 @@ ChainResult(
     variables: dict = <factory>,
     usage: Any = None,
     run_id: str = '',
+    renamed: dict = <factory>,
 )
 ```
 
@@ -344,6 +346,8 @@ The outcome of one chain run.
   under its key. `result["key"]` reads from here.
 - `usage` (*Usage | None*, default `None`) — Tokens and cost summed across the steps that reported them.
 - `run_id` (*str*, default `''`) — The run document's id.
+- `renamed` (*dict*, default `<factory>`) — Keys an output used to be found under, mapped to its key now —
+  `{"result": "fetch"}` while the pre-4.2.7 key still works.
 
 ### `ChainResult.cost`
 
@@ -358,4 +362,35 @@ Skill or an Agent produced part of it, so it is a model's word.
 
 The same two words the agent's journal uses, so a caller deciding
 whether to re-check a result reads one vocabulary for both.
+
+---
+
+## `Step`
+
+```python
+Step(
+    runner: Any,
+    out: str | None = None,
+    inputs: dict | None = None,
+    on_error: str | None = None,
+    spread: bool | None = None,
+    options: dict = <factory>,
+)
+```
+
+One step of a `Chain`.
+
+**Parameters**
+
+- `runner` (*Skill | Tool | Agent | Chain | callable*) — What runs.
+- `out` (*str | None, optional*, default `None`) — The key the output is stored under; the runner's name by default.
+- `inputs` (*dict | None, optional*, default `None`) — Where each input comes from — a variable's name, a path into one
+  (`"page.body"`), or a template.
+- `on_error` (*str | None, optional*, default `None`) — This step's error policy, over the chain's: `"raise"`, `"stop"`,
+  `"skip"` or `"collect"`.
+- `spread` (*bool | None, optional*, default `None`) — A dict output's fields are also put among the chain's variables, as
+  every dict output was before 4.2.7. `None` keeps that for now, with a
+  warning; `True` keeps it on purpose; `False` keeps the dict under
+  its key alone.
+- `options` (*dict | None, optional*, default `<factory>`) — An Agent step's options: `task_key`, `output_field`.
 <!-- /g:api -->

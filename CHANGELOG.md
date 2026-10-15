@@ -1,5 +1,33 @@
 # Changelog
 
+## [4.2.7] — 2026-10-15
+
+### Added
+
+- `Step(runner, out=, inputs=, on_error=, spread=)` — a Chain step said in
+  full: its own error policy over the chain's, and whether a dict it returns
+  is spread among the variables. `(runner, inputs)` is a form too.
+- A path into a stored dict, wherever a variable's name goes: an input map's
+  `"page.body"`, and `result["page.body"]`. A wrong field is named with what
+  is there — `did you mean 'page.body'?`.
+
+### Changed — the old forms work for one version, with a warning
+
+- **A dict output is stored under its key.** It was spread into the
+  variables and its key was never written, so `result["page"]` raised. Its
+  fields are still spread too, with a `FutureWarning` once per step, until
+  5.0; `Step(..., spread=True)` keeps that on purpose, `spread=False` stops it.
+- **A step with no key is named after its runner** — a function's
+  `__name__`, a Skill's or Agent's `name` — where every unnamed step wrote one
+  shared `"result"` and the next overwrote it. It still writes `"result"` too,
+  and `result["result"]` warns and names the new key. A step whose runner has
+  no name keeps `"result"` with a warning; two unnamed steps of one runner are
+  refused when the chain is built.
+- A step reading what only a later step writes is refused when the chain is
+  built, where it failed when the run reached it. A name no step writes may be
+  a run variable, so it still fails at run time — and one letter from a
+  step's key is said when the chain is built.
+
 ## [4.2.6] — 2026-10-15
 
 ### Added

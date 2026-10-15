@@ -121,7 +121,7 @@ class TestChainInit(unittest.TestCase):
         s = _make_skill("s1", "ok")
         c = Chain([s])
         _, key, _imap, _kind, _opts = c._steps[0]
-        self.assertEqual(key, "result")
+        self.assertEqual(key, "s1")              # named after its runner since 4.2.7
 
     def test_tuple_step_uses_custom_output_key(self):
         s = _make_skill("s1", "ok")
@@ -152,7 +152,7 @@ class TestChainRepr(unittest.TestCase):
         r = repr(c)
         self.assertIn("analyser", r)
         self.assertIn("pipe",     r)
-        self.assertIn("result",   r)   # default output key
+        self.assertIn("→analyser", r)  # default output key: the runner's name
 
     def test_repr_shows_custom_output_key(self):
         s = _make_skill("analyser", "ok")
@@ -192,7 +192,7 @@ class TestChainRunSingleStep(unittest.TestCase):
         self.assertEqual(rec["step"],       0)
         self.assertEqual(rec["name"],       "named_skill")
         self.assertEqual(rec["output"],     "the output")
-        self.assertEqual(rec["output_key"], "result")
+        self.assertEqual(rec["output_key"], "named_skill")
         self.assertIn("x", rec["input"])
 
     def test_history_is_a_copy(self):

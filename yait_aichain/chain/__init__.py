@@ -106,5 +106,6 @@ saved.
 
 from ._chain import Chain
 from ._result import ChainResult
+from ._step import Step
 
-__all__ = ["Chain", "ChainResult"]
+__all__ = ["Chain", "ChainResult", "Step"]

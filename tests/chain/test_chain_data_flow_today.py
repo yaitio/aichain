@@ -1,13 +1,12 @@
 """
-How data moves through a Chain today, pinned before it is changed on purpose.
+How data moves through a Chain, pinned across the change phase 6 made on purpose.
 
-PLAN-agent-chain.md, phase 6, changes three of these: a dict output gets its
-own key instead of spreading flat, a step with no key is named after its
-runner instead of writing "result", and a wrong `input_map` name fails when
-the chain is built instead of when it runs. Until then this is the behaviour
-callers depend on, and the phases before 6 must not move it by accident. When
-phase 6 lands, each test marked *changes in phase 6* is rewritten to the new
-behaviour in the same commit — never deleted.
+Pinned before phase 6 (PLAN-agent-chain.md) and rewritten by it, in 4.2.7: a
+dict output now has its own key — and, for one version, is still spread flat
+too, with a warning; a step with no key is named after its runner — and still
+writes "result", which warns when read; a name no step writes may be a run
+variable, so it still fails when the run reaches it, while a name only a later
+step writes fails when the chain is built.
 """
 
 import json
@@ -51,17 +50,23 @@ def _skill():
 
 class TestDataFlowToday(unittest.TestCase):
 
-    def test_a_dict_output_spreads_flat_and_its_key_is_not_stored(self):
-        """Changes in phase 6: the dict will sit under "page"."""
-        result = Chain([(fetch, "page"), (count, "words", {"text": "body"})]).run(
-            variables={"url": "x"})
-        self.assertEqual(result["body"], "B x")
+    def test_a_dict_output_sits_under_its_key_and_is_still_spread_with_a_warning(self):
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            result = Chain([(fetch, "page"), (count, "words", {"text": "body"})]).run(
+                variables={"url": "x"})
+        self.assertEqual(result["page"], {"title": "T", "body": "B x"})
+        self.assertEqual(result["page.body"], "B x")
+        self.assertEqual(result["body"], "B x")               # the old spread, for one version
         self.assertEqual(result["words"], 2)
-        with self.assertRaises(KeyError):
-            result["page"]
+        self.assertTrue(any("spread" in str(w.message) for w in seen))
 
-    def test_a_step_with_no_key_writes_result_and_the_next_overwrites_it(self):
-        """Changes in phase 6: each output will be named after its runner."""
+    def test_a_path_reads_into_it(self):
+        result = Chain([(fetch, "page"), (count, "words", {"text": "page.body"})]).run(
+            variables={"url": "x"})
+        self.assertEqual(result["words"], 2)
+
+    def test_a_step_with_no_key_is_named_after_its_runner(self):
         def first(url: str):
             return "first"
 
@@ -69,15 +74,36 @@ class TestDataFlowToday(unittest.TestCase):
             return "second"
 
         result = Chain([first, second]).run(variables={"url": "x"})
-        self.assertEqual(result["result"], "second")
+        self.assertEqual((result["first"], result["second"]), ("first", "second"))
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            self.assertEqual(result["result"], "second")      # the old key, for one version
+        self.assertTrue(any("result['second']" in str(w.message) for w in seen))
 
-    def test_a_wrong_input_map_name_is_caught_at_run_not_at_build(self):
-        """Changes in phase 6: it will fail when the chain is built."""
-        chain = Chain([(count, "words", {"text": "bdy"})])
+    def test_a_name_no_step_writes_is_caught_when_the_run_reaches_it(self):
+        chain = Chain([(count, "words", {"text": "bdy"})])     # may be a run variable
         with self.assertRaises(ValueError) as caught:
             chain.run(variables={"url": "x"})
         self.assertIn("'bdy'", str(caught.exception))
         self.assertIn("['url']", str(caught.exception))
+
+
+class TestCaughtWhenBuilt(unittest.TestCase):
+
+    def test_reading_what_only_a_later_step_writes(self):
+        with self.assertRaises(ValueError) as caught:
+            Chain([(count, "words", {"text": "page.body"}), (fetch, "page")])
+        self.assertIn("only step 1 writes", str(caught.exception))
+
+    def test_a_wrong_field_is_named_with_what_is_there(self):
+        chain = Chain([(fetch, "page"), (count, "words", {"text": "page.bdy"})])
+        with self.assertRaises(ValueError) as caught:
+            chain.run(variables={"url": "x"})
+        self.assertIn("did you mean 'page.body'", str(caught.exception))
+
+    def test_two_steps_of_one_runner_with_no_keys(self):
+        with self.assertRaises(ValueError):
+            Chain([count, count])
 
 
 class TestInputMapByRunnerKind(unittest.TestCase):

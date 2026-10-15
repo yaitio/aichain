@@ -16,20 +16,30 @@ Step specification
 Each element of *steps* may be any of the following forms:
 
   * ``runner``
-        Bare Skill, tool, Agent, or function.  Output stored under
-        ``"result"``.
+        Bare Skill, tool, Agent, Chain or function.  Output stored under the
+        runner's name (a Skill's ``name``, a function's ``__name__``); one with
+        no name goes to ``"result"``, with a warning.
 
   * ``(runner, output_key: str)``
-        String output stored under *output_key*.
+        Output stored under *output_key*.
+
+  * ``(runner, input_map: dict)``
+        Output under the runner's name, inputs from *input_map*.
+
+  * ``Step(runner, out=..., inputs=..., on_error=..., spread=...)``
+        Everything a tuple says, plus this step's own error policy and
+        whether a dict it returns is spread among the variables.
 
   * ``(runner, output_key: str, input_map: dict)``
         Same as above **plus** an *input_map* that fills the step's
         arguments from the accumulated variables.
 
         ``input_map`` has the form ``{"param_name": value}``, where *value*
-        is a variable's name or a ``"{template}"``.  ``{"source": "url"}``
-        passes ``accumulated["url"]`` as the ``source`` argument;
-        ``{"text": "Title: {french}"}`` passes the template filled in.
+        is a variable's name, a path into one, or a ``"{template}"``.
+        ``{"source": "url"}`` passes ``accumulated["url"]`` as the ``source``
+        argument; ``{"text": "page.body"}`` passes the ``body`` field of the
+        dict stored under ``page``; ``{"text": "Title: {french}"}`` passes the
+        template filled in.
 
   * ``(runner, output_key: str, input_map: dict, options: dict)``
         Same as above **plus** an *options* dict for step-level settings.
@@ -72,10 +82,10 @@ Variable flow
      ``AgentResult`` field named by ``output_field`` (default:
      ``"output"``) is extracted as the step's output value.
 
-3. After each step the output is merged back into the accumulated dict:
-
-     * ``str`` output  →  ``accumulated[output_key] = output``
-     * ``dict`` output →  ``accumulated.update(output)``
+3. After each step the output is stored under its key —
+   ``accumulated[output_key] = output`` — a dict too, read whole or by path
+   (``"page.body"``). Until 5.0 a dict's fields are also spread among the
+   variables, with a warning, unless ``Step(spread=...)`` says otherwise.
 
 4. ``run()`` returns a :class:`ChainResult`: ``.output`` is the final step's
    output and ``result["key"]`` any step's.
@@ -108,6 +118,7 @@ import copy
 import importlib
 import logging
 import warnings
+from collections.abc import Mapping
 
 _skip_log = logging.getLogger("yait_aichain.chain")
 
@@ -191,6 +202,7 @@ def _usage_to_dict(usage) -> dict:
 
 
 from .._runners import is_tool as _is_tool, is_agent as _is_agent
+from ._step import Step
 from ..tools._permissions import PermissionPolicy
 
 
@@ -309,6 +321,44 @@ def _refuse_function_tool(t) -> None:
                         "tool a Tool subclass whose settings can be written down.")
 
 
+def _runner_name(runner) -> str | None:
+    """What a step's output is called when no key is given: the runner's own
+    name — a Skill's, an Agent's, a tool's, a Chain's, a function's. None for
+    one with no name to give, a lambda or an unnamed Skill."""
+    name = getattr(runner, "name", None)
+    if not name and callable(runner) and not hasattr(runner, "run"):
+        name = getattr(runner, "__name__", None)
+    if not isinstance(name, str) or not name.isidentifier():
+        return None
+    return name
+
+
+def _lookup(path: str, accumulated: dict, where: str):
+    """A variable, or a path into one: ``"page.body"`` is the ``body`` field
+    of the dict stored under ``page``. A wrong step names what is there."""
+    if path in accumulated:
+        return accumulated[path]
+    head, _, rest = path.partition(".")
+    if not rest or head not in accumulated:
+        import difflib
+        close = difflib.get_close_matches(head, list(accumulated), n=1)
+        hint = f"; did you mean {close[0]!r}?" if close else ""
+        raise ValueError(f"{where} is mapped to the variable {path!r}, which the chain does "
+                         f"not have; it has {sorted(accumulated)}{hint}")
+    value, walked = accumulated[head], head
+    for part in rest.split("."):
+        if not isinstance(value, Mapping) or part not in value:
+            import difflib
+            fields = sorted(value) if isinstance(value, Mapping) else []
+            close = difflib.get_close_matches(part, [str(f) for f in fields], n=1)
+            hint = (f"; did you mean {walked + '.' + close[0]!r}?" if close else
+                    f"; {walked!r} has {fields}" if fields else
+                    f"; {walked!r} is a {type(value).__name__}, not a dict")
+            raise ValueError(f"{where} reads {path!r}, and there is no {part!r} in {walked!r}{hint}")
+        value, walked = value[part], f"{walked}.{part}"
+    return value
+
+
 def _resolve(value, accumulated: dict, where: str, top: bool = False):
     """One value of a step's input_map, filled from the chain's variables."""
     if isinstance(value, str):
@@ -316,10 +366,7 @@ def _resolve(value, accumulated: dict, where: str, top: bool = False):
         if not names:
             if not top:
                 return value                                  # a literal inside a dict
-            if value not in accumulated:
-                raise ValueError(f"{where} is mapped to the variable {value!r}, which the chain does "
-                                 f"not have; it has {sorted(accumulated)}")
-            return accumulated[value]
+            return _lookup(value, accumulated, where)
         if missing := [n for n in dict.fromkeys(names) if n not in accumulated]:
             raise ValueError(f"{where}: the template {value!r} names {missing}, which the chain does "
                              f"not have; it has {sorted(accumulated)}")
@@ -333,6 +380,19 @@ def _resolve(value, accumulated: dict, where: str, top: bool = False):
     return value                                              # a number, a bool: a literal
 
 
+def _sources(input_map: dict) -> list:
+    """The variable names an input map reads: a bare name or path, and every
+    placeholder of a template, at any depth."""
+    out: list = []
+    for value in (input_map or {}).values():
+        if isinstance(value, str):
+            names = placeholder_names(value)
+            out += names if names else ([value] if value.replace(".", "_").isidentifier() else [])
+        elif isinstance(value, dict):
+            out += [n for v in value.values() if isinstance(v, str) for n in placeholder_names(v)]
+    return out
+
+
 class Chain:
     """
     Steps in a fixed order, sharing one set of variables.
@@ -341,8 +401,8 @@ class Chain:
     utility's method, in any order. A Skill reads any variable in its prompt;
     a tool or a function gets the arguments its schema or signature names,
     filled from the variables or from the step's mapping. Each step's output
-    is stored under its key; a plain dict a step returns is merged into the
-    variables, so one step can write several.
+    is stored under its key — the runner's name unless one is given — and a
+    dict is read whole or by path, ``"page.body"``.
 
     ::
 
@@ -365,7 +425,8 @@ class Chain:
         input_map, options)``. For an Agent step, *options* takes
         ``task_key`` (the variable holding its task, default ``"task"``) and
         ``output_field`` (the ``AgentResult`` attribute stored, default
-        ``"output"``). A bare runner is stored under ``"result"``.
+        ``"output"``). A bare runner, or ``(runner, input_map)``, is stored
+        under the runner's name; a :class:`Step` says the rest.
     variables : dict | None, optional
         Default variables for every ``run()``; call-time values win.
     name : str | None, optional
@@ -434,8 +495,9 @@ class Chain:
                 f"on_step_error must be one of {sorted(_VALID_ON_STEP_ERROR)}; "
                 f"got {on_step_error!r}"
             )
-        self._steps         = self._normalise(steps)
+        self._steps, self._extra = self._normalise(steps)
         self.variables      = variables or {}
+        self._check_flow()
         self.name           = name
         self.description    = description
         self.on_step_error  = on_step_error
@@ -481,6 +543,63 @@ class Chain:
         # Per-request RunContext for the current run() / resume() (tenant +
         # metadata); set while a run is in flight, restored on resume.
         self.context = None
+
+    def _store_output(self, idx: int, name: str, key: str, output, accumulated: dict) -> None:
+        """An output under its key — a dict too, read whole or by path
+        (``"page.body"``). Two pre-4.2.7 habits are kept for one version:
+
+        * a plain dict's fields are also spread among the variables, which is
+          said once per step unless ``Step(spread=...)`` decides it;
+        * a step whose key is its runner's name also writes ``"result"``.
+
+        A Record is one result, kept whole under its key, as it always was.
+        """
+        extra = self._extra[idx]
+        accumulated[key] = output
+        if isinstance(output, dict) and not isinstance(output, Record):
+            spread = extra["spread"]
+            if spread is None:
+                spread = True
+                # Once per step of this chain: a loop says it once, and a new
+                # chain is not silenced by an old one that had its id.
+                said = self.__dict__.setdefault("_spread_said", set())
+                if idx not in said:
+                    said.add(idx)
+                    warnings.warn(
+                        f"step {idx} ({name!r}) returned a dict: it is stored under {key!r}, and "
+                        f"its fields are also spread among the chain's variables, which ends in "
+                        f"5.0. Read {key + '.<field>'!r}, or say Step(..., spread=True) to keep it.",
+                        FutureWarning, stacklevel=5)
+            if spread:
+                accumulated.update(output)
+                accumulated[key] = output        # the dict wins over a field of its own name
+        elif extra["default_key"] and key != "result":
+            accumulated["result"] = output
+
+    def _check_flow(self) -> None:
+        """What can be known before a run: a step reading what only a later
+        step writes is an error now, where it failed when the run reached it.
+        A name no step writes may be a run variable, so it is left to the run
+        — unless it is one letter from a step's key, which is said."""
+        writes: dict = {}
+        for i, (_r, key, *_rest) in enumerate(self._steps):
+            writes.setdefault(key, i)
+        for i, (runner, _key, input_map, _kind, _opts) in enumerate(self._steps):
+            for source in _sources(input_map):
+                head = source.partition(".")[0]
+                if head in self.variables:
+                    continue
+                first = writes.get(head)
+                if first is not None and first >= i:
+                    raise ValueError(
+                        f"step {i} ({_runner_name(runner) or type(runner).__name__}) reads "
+                        f"{source!r}, which only step {first} writes — it has not run yet")
+                if first is None:
+                    import difflib
+                    earlier = [k for k, j in writes.items() if j < i]
+                    if close := difflib.get_close_matches(head, earlier, n=1, cutoff=0.8):
+                        warnings.warn(f"step {i} reads {source!r}, which no step writes; unless it "
+                                      f"is a run variable, did you mean {close[0]!r}?", stacklevel=3)
 
     def _run_tool(self, runner, idx: int, kwargs: dict, signal, run_id):
         """A tool step, decided and run where every tool call is
@@ -932,7 +1051,8 @@ class Chain:
                     "failure":    _describe(exc),
                 })
 
-                if on_error in ("raise", "stop"):
+                step_on_error = self._extra[idx]["on_error"] or on_error
+                if step_on_error in ("raise", "stop"):
                     # Terminal exit, with the step marked failed. A resumed run
                     # is kept so: the store already gave it up to this resume,
                     # and a transient failure after an approved step would
@@ -947,7 +1067,7 @@ class Chain:
                     self._history     = history
                     self._accumulated = dict(accumulated)
                     self.last_usage   = usage_total
-                    if on_error == "raise":
+                    if step_on_error == "raise":
                         raise
                     return self._result(doc, history, accumulated, usage_total, last_output)
 
@@ -959,7 +1079,7 @@ class Chain:
                 doc.failures.append({"step": idx, "name": name, "type": type(exc).__name__,
                                      "message": str(exc)})
                 checkpoint()
-                if on_error == "skip":
+                if step_on_error == "skip":
                     # Logged, every time: a warning is shown once per place in
                     # the code, and that place was inside the library.
                     _skip_log.warning(
@@ -978,19 +1098,14 @@ class Chain:
                 "output":     output,
                 "output_key": output_key,
                 "options":    options,
+                **({"default_key": True} if self._extra[idx]["default_key"] else {}),
             })
 
             step_usage = getattr(runner, "last_usage", None)
             if step_usage:
                 usage_total = step_usage if usage_total is None else usage_total + step_usage
 
-            # A plain dict is fields for the variables (a REST reply); a Record
-            # is one result, kept whole under its key so two steps' `results`
-            # or `cost` do not overwrite each other.
-            if isinstance(output, dict) and not isinstance(output, Record):
-                accumulated.update(output)
-            else:
-                accumulated[output_key] = output
+            self._store_output(idx, name, output_key, output, accumulated)
 
             last_output = output
 
@@ -1022,7 +1137,12 @@ class Chain:
         failed.sort(key=lambda r: r["step"])
         error = (f"step {failed[0]['step']} ({failed[0]['name']}): {failed[0]['error']}"
                  if failed else None)
-        return ChainResult(output=last_output, success=not failed, error=error,
+        renamed = {}
+        for r in history:
+            if r.get("default_key") and r.get("output_key") != "result" and not (
+                    isinstance(r.get("output"), dict) and not isinstance(r.get("output"), Record)):
+                renamed["result"] = r["output_key"]
+        return ChainResult(output=last_output, success=not failed, error=error, renamed=renamed,
                            history=list(history), variables=dict(accumulated),
                            usage=usage_total, run_id=doc.run_id)
 
@@ -1375,17 +1495,28 @@ class Chain:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _normalise(steps) -> list:
+    def _normalise(steps) -> tuple[list, list]:
         """
-        Validate and normalise *steps* into a list of
-        ``(runner, output_key, input_map, kind, options)`` 5-tuples.
+        Validate and normalise *steps* into ``(runner, output_key, input_map,
+        kind, options)`` 5-tuples, and beside them what each step says beyond
+        that: its own ``on_error``, ``spread``, and whether its key was given.
         """
-        result = []
+        result: list = []
+        extras: list = []
         for item in steps:
-            if isinstance(item, list):
+            extra: dict = {"on_error": None, "spread": None, "default_key": False}
+            if isinstance(item, Step):
+                runner, key = item.runner, item.out
+                input_map, options = dict(item.inputs or {}), dict(item.options or {})
+                extra.update(on_error=item.on_error, spread=item.spread)
+                item = None
+            elif isinstance(item, list):
                 item = tuple(item)                 # a step from YAML: [runner, "key"]
             if isinstance(item, tuple):
-                if len(item) == 2:
+                if len(item) == 2 and isinstance(item[1], dict):
+                    runner, input_map = item       # (runner, inputs): key is the name
+                    key, options = None, {}
+                elif len(item) == 2:
                     runner, key = item
                     input_map   = {}
                     options     = {}
@@ -1412,20 +1543,34 @@ class Chain:
                 else:
                     raise ValueError(
                         "Step tuples must have 2, 3, or 4 elements: "
-                        "(runner, output_key), "
+                        "(runner, output_key), (runner, input_map), "
                         "(runner, output_key, input_map), or "
                         "(runner, output_key, input_map, options); "
                         f"got a {len(item)}-element tuple"
                     )
-                if not isinstance(key, str):
+                if not isinstance(key, (str, type(None))):
                     raise ValueError(
                         f"output_key must be a str; got {key!r}"
                     )
-            else:
+            elif item is not None:
                 runner    = item
-                key       = "result"
+                key       = None
                 input_map = {}
                 options   = {}
+
+            if key is None:
+                # Named after its runner, where every unnamed step wrote one
+                # shared "result" and the next overwrote it. Still written
+                # there too for now; see `_store_output`.
+                key = _runner_name(runner)
+                extra["default_key"] = True
+                if key is None:
+                    warnings.warn(
+                        f"a step running {type(runner).__name__} has no key and its runner no "
+                        "name, so its output goes to 'result', which the next such step "
+                        "overwrites; from 5.0 this is an error. Give it one: (runner, 'key'), "
+                        "or name the runner.", FutureWarning, stacklevel=4)
+                    key, extra["default_key"] = "result", False
 
             if _is_tool(runner):
                 kind = "tool"
@@ -1460,8 +1605,18 @@ class Chain:
                                  f"this {kind} step was given {sorted(options)}, which nothing would read")
 
             result.append((runner, key, input_map, kind, options))
+            extras.append(extra)
 
-        return result
+        # Two steps named alike would write one key: the later wins, which is
+        # the overwrite the runner's name was meant to end.
+        seen: dict = {}
+        for i, ((runner, key, *_), extra) in enumerate(zip(result, extras)):
+            if extra["default_key"] and key in seen:
+                raise ValueError(f"steps {seen[key]} and {i} both write {key!r} — two steps run "
+                                 f"{key!r} with no key of their own; give one a key: "
+                                 f"({key}, '{key}_2')")
+            seen.setdefault(key, i)
+        return result, extras
 
     # ------------------------------------------------------------------
     # Dunder helpers
