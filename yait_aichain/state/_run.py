@@ -38,6 +38,9 @@ class Run:
     id: str | None = None
     #: The run that started this one — a worker's lead.
     parent_id: str | None = None
+    #: The call of that run this one runs inside — the `delegate` call, the
+    #: tool that started a pipeline — so a reader can put the two in one tree.
+    parent_call_id: str | None = None
     depth: int = 0
     max_depth: int = 5
     #: The hooks this run reports to: the owner's, plus anything the run adds

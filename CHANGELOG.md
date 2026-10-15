@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.2.4] — 2026-10-15
+
+### Added
+
+- A tool can ask for the run it is called in: a keyword-only ``run``
+  parameter (``def f(text: str, *, run: Run)``) is handed the current run and
+  left out of the schema a model sees.
+- A worker's events carry ``parent_call_id`` — the lead's `delegate` call they
+  ran inside — so a consumer can draw the run as a tree.
+
+### Changed
+
+- `delegate` and `write_plan` are asked about by the policy as `draft`, which
+  is allowed unless a policy says otherwise; they ran whatever it said.
+
+### Fixed
+
+- A team member's spend is charged to its lead's `max_cost`. The lead counted
+  it in its result and its budget did not: a lead with a $100 budget reported
+  $3.75 and its budget recorded $2.50.
+- A lead's hooks see what its team members do; they saw only the lead.
+
 ## [4.2.3] — 2026-10-15
 
 ### Added

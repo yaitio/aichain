@@ -699,6 +699,10 @@ class FunctionTool(Tool):
         lines = _param_docs(doc)
         props, required = {}, []
         for p in sig.parameters.values():
+            if p.name == "run" and p.kind == p.KEYWORD_ONLY:
+                # The run the call belongs to, handed in by the dispatcher —
+                # never an argument the model fills, so not in the schema.
+                continue
             if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
                 raise TypeError(f"@tool {label}: *{p.name} has no schema — a model passes named "
                                 "arguments; declare each one")
@@ -748,6 +752,11 @@ def tool(fn=None, *, name: str | None = None, description: str | None = None,
     does, and assuming it only reads would let a permission policy pass it
     unasked — saying ``risk="read"`` is the author's claim to make. Usable as
     ``@tool``, ``@tool(...)`` or ``tool(fn, ...)``.
+
+    **A keyword-only ``run`` is reserved.** ``def f(text: str, *, run: Run)``
+    is handed the run the call belongs to — its ``id``, ``depth``, ``hooks`` —
+    by whatever executes it, and is left out of the schema a model sees. An
+    ordinary parameter named ``run`` is an argument like any other.
 
     Parameters
     ----------

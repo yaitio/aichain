@@ -55,7 +55,7 @@ from ..models._adaptation import Adaptation
 from ..skills import Skill
 from ..utilities._base import Utility
 from ..state._run import AgentRun, active, opened
-from .._dispatch import Denied, Dispatcher, NeedsApproval
+from .._dispatch import Denied, Dispatcher, NeedsApproval, calling
 from .._dispatch import MAX_ARGUMENT_DEPTH  # noqa: F401  (named in the 4.0.1 notes)
 from ..state import StateStore
 from ..tools._permissions import ApprovalRequest, PermissionPolicy
@@ -438,6 +438,18 @@ _UNSET = _Unset()
 
 #: Names the loop's synthetic tools hold.
 _RESERVED = frozenset({"pool", "delegate", "write_plan"})
+
+
+class _Builtin:
+    """What the policy is asked about for a built-in that runs no other tool."""
+    def __init__(self, name: str, risk: str) -> None:
+        self.name, self.risk = name, risk
+
+
+#: `delegate` hands work to a worker and `write_plan` records a plan: neither
+#: changes the world by itself, which is what `draft` means.
+_DRAFTING = {"delegate": _Builtin("delegate", "draft"),
+             "write_plan": _Builtin("write_plan", "draft")}
 
 class Agent:
     """
@@ -1076,7 +1088,8 @@ class Agent:
 
     # ── The loop ─────────────────────────────────────────────────────────
 
-    def _opened(self, depth: int | None = None, parent_id: str | None = None):
+    def _opened(self, depth: int | None = None, parent_id: str | None = None,
+                hooks: list | None = None):
         """Open a run of this agent: its id, hooks and depth are its own.
 
         Replaces `_fork()`, which copied the whole agent per run to keep runs
@@ -1088,10 +1101,13 @@ class Agent:
             # Opened for this run by whoever starts it — `delegate`, with the
             # depth and the parent — and not begun yet: this is that run.
             return contextlib.nullcontext(waiting)
+        own = list(self.hooks)
         return opened(AgentRun(
-            owner=self, hooks=list(self.hooks),
+            # A worker reports to its lead's hooks as well as its own.
+            owner=self, hooks=own + [h for h in (hooks or ()) if h not in own],
             depth=self._depth if depth is None else depth,
-            max_depth=self._max_depth, parent_id=parent_id))
+            max_depth=self._max_depth, parent_id=parent_id,
+            parent_call_id=calling()))
 
     @property
     def _live(self) -> AgentRun:
@@ -1530,6 +1546,10 @@ class Agent:
         covers the whole list, which the request carries as its arguments."""
         if call.name == "pool":
             return self._tool_map.get((call.arguments or {}).get("tool") or "")
+        if call.name in _DRAFTING:
+            # Asked about like any tool, as `draft`: allowed unless a policy
+            # says otherwise, where they ran unasked whatever it said.
+            return _DRAFTING[call.name]
         return self._tool_map.get(call.name)
 
     def _log_call(self, tool, kwargs) -> None:
@@ -1650,7 +1670,8 @@ class Agent:
             worker._max_depth = self._live.max_depth
 
         self._log(1, f"  ▽  delegate → {getattr(worker, 'name', None) or 'worker'}")
-        with worker._opened(depth=self._live.depth + 1, parent_id=self._live.id):
+        with worker._opened(depth=self._live.depth + 1, parent_id=self._live.id,
+                            hooks=self._live.hooks):
             child = worker.run(task)
         state["tokens"] += child.tokens_used
         if child.cost is not None:
@@ -1849,6 +1870,7 @@ class Agent:
     def _stamping_hooks(self) -> list:
         """The caller's hooks, each seeing this run's id on every event."""
         hooks, run_id = self._live.hooks, self._live.id
+        parent_call_id = self._live.parent_call_id
         if not hooks or run_id is None:
             return hooks
         import dataclasses
@@ -1856,16 +1878,23 @@ class Agent:
         def stamp(event):
             if getattr(event, "run_id", None) is None:
                 event = dataclasses.replace(event, run_id=run_id)
+            if parent_call_id and "parent_call_id" not in (event.payload or {}):
+                event = dataclasses.replace(event, payload={**(event.payload or {}),
+                                                            "parent_call_id": parent_call_id})
             for hook in hooks:
                 emit([hook], event)
 
         return [stamp]
 
     def _emit(self, etype: str, **fields) -> None:
-        hooks = self._live.hooks
-        if hooks:
+        live = self._live
+        if live.hooks:
             fields.setdefault("name", self.name)
-            emit(hooks, Event(type=etype, run_id=self._live.id, **fields))
+            if live.parent_call_id:
+                # Where this run sits in its lead's: the call it runs inside.
+                fields["payload"] = {**(fields.get("payload") or {}),
+                                     "parent_call_id": live.parent_call_id}
+            emit(live.hooks, Event(type=etype, run_id=live.id, **fields))
 
     def _log(self, level: int, message: str = "") -> None:
         # This agent's verbosity, not the process's: the line goes to the

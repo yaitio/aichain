@@ -43,6 +43,11 @@ does, and assuming it only reads would let a permission policy pass it
 unasked — saying `risk="read"` is the author's claim to make. Usable as
 `@tool`, `@tool(...)` or `tool(fn, ...)`.
 
+**A keyword-only `run` is reserved.** `def f(text: str, *, run: Run)`
+is handed the run the call belongs to — its `id`, `depth`, `hooks` —
+by whatever executes it, and is left out of the schema a model sees. An
+ordinary parameter named `run` is an argument like any other.
+
 **Parameters**
 
 - `fn` (*callable, optional*, default `None`) — The function; omitted when used as `@tool(...)`.

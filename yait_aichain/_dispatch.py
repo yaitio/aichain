@@ -92,6 +92,14 @@ class Governor:
 _GOVERNING: contextvars.ContextVar = contextvars.ContextVar("yait_aichain_governing",
                                                             default=())
 
+#: The id of the call executing now, so a run started inside it can name it.
+_CALLING: contextvars.ContextVar = contextvars.ContextVar("yait_aichain_calling", default=None)
+
+
+def calling() -> str | None:
+    """The id of the tool call this code runs inside, if any."""
+    return _CALLING.get()
+
 
 @contextlib.contextmanager
 def governing(permissions, approve, settled: frozenset = frozenset()):
@@ -111,6 +119,19 @@ def _decide(permissions, tool, arguments):
         return permissions.decide(tool, arguments)
     except TypeError:
         return permissions.decide(tool)          # a policy of another make
+
+
+def takes_run(tool) -> bool:
+    """Whether *tool* asks for the run it is called in: a keyword-only ``run``
+    parameter on its ``run()``. Only that form is reserved — an ordinary
+    argument named ``run`` stays the model's."""
+    import inspect
+    try:
+        target = getattr(tool, "__wrapped__", None) or tool.run
+        param = inspect.signature(target).parameters.get("run")
+    except (TypeError, ValueError):
+        return False
+    return param is not None and param.kind == param.KEYWORD_ONLY
 
 
 def as_policy(policy):
@@ -280,13 +301,16 @@ class Dispatcher:
 
     def execute(self, call, state: dict) -> tuple[Any, str | None]:
         """Run one call: ``(result, error)``, or ``Suspend`` raised for a pause."""
+        token = _CALLING.set(getattr(call, "id", None) or None)
         try:
             if (handler := self.builtins.get(call.name)) is not None:
                 # A built-in that runs another tool was decided on that tool,
                 # once, before it began: the decision covers what it runs.
                 gated = self.gated_tool(call)
                 settled = frozenset({gated.name}) if gated is not None else frozenset()
-                with governing(self.permissions, self.approve, settled):
+                # Under the owner's budget too: a worker's spend is the
+                # team's, and a lead's `max_cost` bounded only its own calls.
+                with governing(self.permissions, self.approve, settled), lend(self.max_cost):
                     return handler(call.arguments, state), None
             return self.run_tool(call), None
         except Suspend:
@@ -297,6 +321,8 @@ class Dispatcher:
             from ._errors_policy import describe
             self._run().failure = describe(exc)
             return None, f"{type(exc).__name__}: {exc}"
+        finally:
+            _CALLING.reset(token)
 
     def run_tool(self, call, extra: dict | None = None, check: bool = True) -> Any:
         """The one place a tool runs. No permission check here: the caller
@@ -321,11 +347,14 @@ class Dispatcher:
         # *extra* is the library's own, never the model's: a Chain resuming a
         # step hands the signal as `_signal`, which no schema declares.
         call_kwargs = {**kwargs, **(extra or {})}
+        if takes_run(tool):
+            # The run this call belongs to: its id, its depth, its hooks.
+            call_kwargs["run"] = self._run()
         # Under the owner's budget and every one around it, and under its rules.
         with lend(self.max_cost), governing(self.permissions, self.approve):
             return charged(tool, lambda: tool.run(**call_kwargs))
 
 
-__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "governing",
+__all__ = ["Dispatcher", "Ready", "Denied", "NeedsApproval", "READY", "governing", "calling",
            "as_policy",
            "MAX_ARGUMENT_DEPTH", "depth"]
