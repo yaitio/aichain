@@ -43,6 +43,7 @@ include = ["yait_aichain*"]
 # docs/ and llms.txt there, so the wheel carries the pages of its own version.
 "yait_aichain" = ["py.typed", "_docs/*.md", "_docs/*.txt", "_docs/**/*.md"]
 "yait_aichain.models" = ["providers/*.toml"]
+"yait_aichain.tools.search" = ["*.json"]
 
 # Version is read from yait_aichain/__init__.py (__version__) — one place to bump.
 [tool.setuptools.dynamic]

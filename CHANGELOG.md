@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.5.6] — 2026-10-15
+
+### Changed
+
+- Tavily's country table is data beside its module
+  (`tools/search/tavily_countries.json`), where it was 37 lines of code. The
+  other providers' constants — endpoint, key variable, price and its source,
+  batch size — stay on their classes: three to five lines each, which a data
+  file would move rather than remove.
+- The release build checks that every data file the package reads — the
+  provider registry, the country table — is inside the wheel, not only the
+  documentation.
+
 ## [4.5.5] — 2026-10-15
 
 ### Changed
