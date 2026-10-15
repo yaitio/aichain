@@ -98,8 +98,7 @@ def _delegate_schema(team: dict) -> dict:
         if chains:
             props["inputs"] = {"type": "object",
                                "description": "for a chain member: its inputs by name, as its "
-                                              "description lists them; `task` fills a single "
-                                              "text input left out"}
+                                              "description lists them — required for a chain"}
         # What each worker is for, beside its name, or the lead chooses
         # between `worker0` and `worker1` by guessing — a whole worker run
         # lost on every wrong guess.
@@ -129,6 +128,11 @@ def _delegate_schema(team: dict) -> dict:
                            "required": required},
         },
     }
+
+
+#: A chain input the lead's task can fill when not given by name: one that is,
+#: by its name, the task. A URL or an id filled with a sentence fails far away.
+_TASK_LIKE = frozenset({"task", "question", "text", "query", "prompt", "topic", "input"})
 
 
 def _is_chain(worker) -> bool:
@@ -371,7 +375,8 @@ class _Builtins:
             warnings.simplefilter("ignore")
             schema = chain.input_schema()
         missing = [n for n, s in schema.items() if s.get("required") and n not in values]
-        if len(missing) == 1 and task and schema[missing[0]].get("type") in (None, "string"):
+        if len(missing) == 1 and task and missing[0] in _TASK_LIKE \
+                and schema[missing[0]].get("type") in (None, "string"):
             values[missing[0]] = task
             missing = []
         if missing:

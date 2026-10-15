@@ -13,42 +13,54 @@ python examples/01_skill.py
 
 ---
 
-## Skills
+## Skill and Model
 
-A **Skill** is the atomic unit — one prompt template, one model, one result.
+A **Skill** is one prompt, one model, one result; the **Model** behind it changes with one word.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`01_skill.py`](01_skill.py) | Run a prompt against a model. | `ANTHROPIC_API_KEY` |
-| [`02_skill_models.py`](02_skill_models.py) | Same prompt, three providers. | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` |
-| [`03_skill_multimodal.py`](03_skill_multimodal.py) | Text → Image → Text, three providers. | `ANTHROPIC_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` |
-| [`04_skill_save_load.py`](04_skill_save_load.py) | Save a skill to YAML, reload and run it. | `ANTHROPIC_API_KEY` |
-| [`19_image_edit.py`](19_image_edit.py) | Image → image (editing) across providers, one tool. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` `RECRAFT_API_TOKEN` `BFL_API_KEY` |
-| [`21_multi_turn.py`](21_multi_turn.py) | Directed multi-turn reasoning in ONE Skill. | `ANTHROPIC_API_KEY` |
+| [`01_skill.py`](01_skill.py) | One prompt, one model, one answer. | `ANTHROPIC_API_KEY` |
+| [`02_switch_provider.py`](02_switch_provider.py) | The provider changes with one word, and nothing else does. | any one of `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` |
+| [`03_structured_output.py`](03_structured_output.py) | Data from a model, not prose: an answer that fits a JSON schema. | `OPENAI_API_KEY` |
+| [`04_fallback_models.py`](04_fallback_models.py) | Survive a provider outage with one parameter: a list of models. | `ANTHROPIC_API_KEY` |
+| [`05_multi_turn.py`](05_multi_turn.py) | A directed sequence of refinements in one Skill, without a Chain. | `ANTHROPIC_API_KEY` |
+| [`06_media_input.py`](06_media_input.py) | An image, a PDF and a video to one model: the type follows the file. | `GOOGLE_AI_API_KEY` |
+| [`07_stream.py`](07_stream.py) | The answer printed as it is written: the same Skill, streamed. | `ANTHROPIC_API_KEY` |
+| [`08_skill_save_load.py`](08_skill_save_load.py) | A prompt kept in a file apart from the code; the key never reaches it. | `ANTHROPIC_API_KEY` |
+| [`09_private_model.py`](09_private_model.py) | A model on your own server: the data stays with you, the code is the same. | *(none)* |
+| [`10_what_was_sent.py`](10_what_was_sent.py) | The library never changes a request in silence. | *(none)* |
 
 ---
 
 ## Tools
 
-A **Tool** wraps any callable — a REST API, an MCP server, your own function.
+A **tool** is anything a model or a pipeline can call — your function, an API, an MCP server.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`05_tool_fetch.py`](05_tool_fetch.py) | A web page's text from its URL. | *(none)* |
-| [`06_tool_mcp.py`](06_tool_mcp.py) | An MCP server as a utility: discover its tools, call them. | *(none)* |
-| [`07_tool_custom.py`](07_tool_custom.py) | Make any function a tool, and use it in a Chain. | `ANTHROPIC_API_KEY` |
+| [`11_custom_tool.py`](11_custom_tool.py) | Any function becomes a tool: its docstring is the schema a model sees. | *(none)* |
+| [`12_image.py`](12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, six APIs. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` `RECRAFT_API_TOKEN` `BFL_API_KEY` |
+| [`13_speech.py`](13_speech.py) | Voice both ways through one interface: text to an mp3, and back to text. | `OPENAI_API_KEY` |
+| [`14_search_fetch.py`](14_search_fetch.py) | Search the web, then read the first result as a model would. | any one of `BRAVE_SEARCH_API_KEY` `EXA_API_KEY` `FIRECRAWL_API_KEY` `PARALLEL_API_KEY` `PERPLEXITY_API_KEY` `TAVILY_API_KEY` |
+| [`15_retrieval.py`](15_retrieval.py) | Answer from your own texts: chunk, embed, find, rerank, answer with the source. | `OPENAI_API_KEY` `DASHSCOPE_API_KEY` |
+| [`16_decide.py`](16_decide.py) | A closed set of answers with a visible price: classify support messages. | `OPENAI_API_KEY` |
+| [`17_mcp.py`](17_mcp.py) | An MCP server is a set of agent tools: discover them, call one. | *(none)* |
+| [`18_rest.py`](18_rest.py) | Your own API as tools, without code per method; the risk class follows the method. | *(none)* |
+| [`19_shell.py`](19_shell.py) | Shell under a policy that reads the command, not only the tool. | *(none)* |
 
 ---
 
-## Chains
+## Chain
 
-A **Chain** runs steps in order; each step's output flows into the next.
+A **Chain** runs steps in order, each step's result under its own key; it can park and resume.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`08_chain.py`](08_chain.py) | Two skills in sequence, two different providers. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
-| [`09_chain_tool_skill.py`](09_chain_tool_skill.py) | Tool + Skill in one chain. | `ANTHROPIC_API_KEY` |
-| [`10_chain_save_load.py`](10_chain_save_load.py) | Save a chain to YAML, reload and run it. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
+| [`20_chain.py`](20_chain.py) | Steps in order, each step's result under its own key: GPT writes, Claude reviews. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
+| [`21_chain_steps.py`](21_chain_steps.py) | Connect steps whose names differ, and let the chain say what it needs. | `ANTHROPIC_API_KEY` |
+| [`22_chain_save_load.py`](22_chain_save_load.py) | A pipeline as a file, with its policy: stored, versioned, run elsewhere. | `OPENAI_API_KEY` `ANTHROPIC_API_KEY` |
+| [`23_chain_human.py`](23_chain_human.py) | A person in the loop: the chain parks, the draft is not re-made. | *(none)* |
+| [`24_chain_webhook.py`](24_chain_webhook.py) | A run parks until an outside event resumes it. | *(none)* |
 
 ---
 
@@ -58,54 +70,70 @@ A **Pool** runs one runner over many items in parallel.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`11_pool.py`](11_pool.py) | Run the same skill in parallel for multiple inputs. | `ANTHROPIC_API_KEY` |
-| [`12_pool_chain.py`](12_pool_chain.py) | Chain as a Pool runner. | `ANTHROPIC_API_KEY` |
+| [`25_pool.py`](25_pool.py) | A list processed in parallel with one parameter, no threads in your code. | `ANTHROPIC_API_KEY` |
+| [`26_pool_chain.py`](26_pool_chain.py) | The primitives nest: a Chain is a Pool's runner, one per URL, all at once. | `ANTHROPIC_API_KEY` |
 
 ---
 
-## Agents
+## Agent
 
-An **Agent** runs one loop: each turn the model calls tools or answers, and `stop_when` decides when the run ends.
+An **Agent** runs one loop: each turn the model calls tools or answers, and `stop_when` decides when it ends.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`13_agent.py`](13_agent.py) | Basic agent with one tool. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
-| [`14_agent_tools.py`](14_agent_tools.py) | Agent with multiple tools, picks autonomously. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
-| [`15_agent_orchestrator.py`](15_agent_orchestrator.py) | Orchestrator agent spawns sub-agents. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
-| [`22_goal_mode.py`](22_goal_mode.py) | A stop condition the harness can verify | `ANTHROPIC_API_KEY` |
-| [`24_scaffold.py`](24_scaffold.py) | Scaffold — the model designs the team, then runs it | `OPENAI_API_KEY` |
+| [`27_agent.py`](27_agent.py) | An agent picks its own steps between search and fetch; the result says how it ended. | `ANTHROPIC_API_KEY` `BRAVE_SEARCH_API_KEY` `EXA_API_KEY` `TAVILY_API_KEY` `PARALLEL_API_KEY` `PERPLEXITY_API_KEY` `FIRECRAWL_API_KEY` |
+| [`28_agent_stop.py`](28_agent_stop.py) | "Done" on the model's word and "done" on a check are different ends. | `ANTHROPIC_API_KEY` |
+| [`29_agent_stream.py`](29_agent_stream.py) | One ordered stream of events: what an interface is built on. | *(none)* |
+| [`30_agent_team.py`](30_agent_team.py) | A lead hands work to its team: an agent that searches, a chain that reads. | `ANTHROPIC_API_KEY` `BRAVE_SEARCH_API_KEY` `EXA_API_KEY` `TAVILY_API_KEY` `PARALLEL_API_KEY` `PERPLEXITY_API_KEY` |
+| [`32_agent_pause.py`](32_agent_pause.py) | An agent waits for an outside event, and another process resumes it. | *(none)* |
+| [`33_agent_step.py`](33_agent_step.py) | Outside code drives the loop, one step per invocation. | *(none)* |
 
 ---
 
-## Pause and resume
+## Control
 
-A **Chain** can park itself until a signal arrives — a person, a webhook, a cron tick — and be resumed later, in another process, from a shared store. An agent does not park: its state is the conversation.
+What a run may spend, who allows what, what happened inside, whose key it ran on, and whether a change helped.
 
 | File | What it shows | Keys |
 |---|---|---|
-| [`17_chain_human_input.py`](17_chain_human_input.py) | Human-in-the-loop: pause a chain for manual input. | `OPENAI_API_KEY` |
-| [`18_chain_external_trigger.py`](18_chain_external_trigger.py) | Pause a run until an EXTERNAL trigger resumes it. | *(none)* |
+| [`34_budget.py`](34_budget.py) | One ceiling in money across a run: the next step is refused before it begins. | *(none)* |
+| [`35_policy.py`](35_policy.py) | Who allows a risky call, and how a call is changed before it runs. | *(none)* |
+| [`36_observe.py`](36_observe.py) | What happened inside a run, without print() in your code or a tracing SDK. | *(none)* |
+| [`37_tenant_keys.py`](37_tenant_keys.py) | One Model serves every tenant: each request carries its customer's key. | *(none)* |
+| [`38_eval.py`](38_eval.py) | Two prompts compared on repeated trials, not on one lucky run. | *(none)* |
 
 ---
 
-## Observe and govern
+## Renamed in 4.6
 
-What happened inside a run, and who is allowed to let a risky call through.
+The examples were rewritten in 4.6; an older link names a file below.
 
-| File | What it shows | Keys |
-|---|---|---|
-| [`16_debug.py`](16_debug.py) | Inspect intermediate steps in Chain, Pool, and Agent. | `ANTHROPIC_API_KEY` `PERPLEXITY_API_KEY` |
-| [`20_observability.py`](20_observability.py) | The step boundary: hooks, events, and an approval gate. | *(none)* |
-
----
-
-## Private models
-
-The model runs on hardware you control; nothing is sent to a vendor.
-
-| File | What it shows | Keys |
-|---|---|---|
-| [`23_private_model.py`](23_private_model.py) | Run a model on hardware you control. | *(none)* |
+| Was | Now |
+|---|---|
+| `01_skill.py` | [`01_skill.py`](01_skill.py) |
+| `02_skill_models.py` | [`02_switch_provider.py`](02_switch_provider.py) |
+| `03_skill_multimodal.py` | [`06_media_input.py`](06_media_input.py) |
+| `04_skill_save_load.py` | [`08_skill_save_load.py`](08_skill_save_load.py) |
+| `05_tool_fetch.py` | [`14_search_fetch.py`](14_search_fetch.py) |
+| `06_tool_mcp.py` | [`17_mcp.py`](17_mcp.py) |
+| `07_tool_custom.py` | [`11_custom_tool.py`](11_custom_tool.py) |
+| `08_chain.py` | [`20_chain.py`](20_chain.py) |
+| `09_chain_tool_skill.py` | [`21_chain_steps.py`](21_chain_steps.py) |
+| `10_chain_save_load.py` | [`22_chain_save_load.py`](22_chain_save_load.py) |
+| `11_pool.py` | [`25_pool.py`](25_pool.py) |
+| `12_pool_chain.py` | [`26_pool_chain.py`](26_pool_chain.py) |
+| `13_agent.py` | [`27_agent.py`](27_agent.py) |
+| `14_agent_tools.py` | [`27_agent.py`](27_agent.py) |
+| `15_agent_orchestrator.py` | [`30_agent_team.py`](30_agent_team.py) |
+| `16_debug.py` | [`36_observe.py`](36_observe.py) |
+| `17_chain_human_input.py` | [`23_chain_human.py`](23_chain_human.py) |
+| `18_chain_external_trigger.py` | [`24_chain_webhook.py`](24_chain_webhook.py) |
+| `19_image_edit.py` | [`12_image.py`](12_image.py) |
+| `20_observability.py` | [`35_policy.py`](35_policy.py) |
+| `21_multi_turn.py` | [`05_multi_turn.py`](05_multi_turn.py) |
+| `22_goal_mode.py` | [`28_agent_stop.py`](28_agent_stop.py) |
+| `23_private_model.py` | [`09_private_model.py`](09_private_model.py) |
+| `24_scaffold.py` | [`30_agent_team.py`](30_agent_team.py) |
 
 ---
 

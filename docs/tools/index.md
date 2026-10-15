@@ -219,6 +219,6 @@ another process. → [Pause and resume](../pipelines/pause-and-resume.md)
 
 ---
 
-▶ [`examples/05_tool_fetch.py`](../../examples/05_tool_fetch.py) ·
-[`examples/07_tool_custom.py`](../../examples/07_tool_custom.py) ·
-[`examples/14_agent_tools.py`](../../examples/14_agent_tools.py)
+▶ [`examples/14_search_fetch.py`](../../examples/14_search_fetch.py) ·
+[`examples/11_custom_tool.py`](../../examples/11_custom_tool.py) ·
+[`examples/27_agent.py`](../../examples/27_agent.py)

@@ -1,23 +1,11 @@
 """
-01_skill.py — Run a prompt against a model.
+01_skill.py — One prompt, one model, one answer.
 
-Required env vars:
-    ANTHROPIC_API_KEY
+Keys: ANTHROPIC_API_KEY.
 """
 
-import os
-from yait_aichain.models import Model
-from yait_aichain.skills import Skill
+from yait_aichain import Model, Skill
 
-skill = Skill(
-    model = Model("claude-haiku-5-5", api_key=os.getenv("ANTHROPIC_API_KEY")),
-    input = {
-        "messages": [{
-            "role": "user",
-            "parts": ["What is {topic} in one sentence?"],
-        }]
-    },
-)
-
-result = skill.run(variables={"topic": "machine learning"})
-print(result)
+# Key: ANTHROPIC_API_KEY from the environment; or Model("claude-haiku-5-5", api_key="...")
+skill = Skill(Model("claude-haiku-5-5"), prompt="What is {topic}, in one sentence?")
+print(skill.run(variables={"topic": "machine learning"}))

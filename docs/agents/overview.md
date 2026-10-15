@@ -122,7 +122,7 @@ identical from outside.
 
 The loop is only as good as the model driving it. Asked to find a number
 between 1 and 1000 in fifteen probes
-([`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)), one model ran a
+([`examples/28_agent_stop.py`](../../examples/28_agent_stop.py)), one model ran a
 clean binary search and finished in nine; a smaller one bisected for a while,
 then fell into counting up by one and hit the ceiling. Same harness both
 times — which is what the stop conditions are for.
@@ -157,7 +157,9 @@ what was attempted, each entry marked `check` when code verified it and
 
 ---
 
-▶ [`examples/13_agent.py`](../../examples/13_agent.py) ·
-[`examples/14_agent_tools.py`](../../examples/14_agent_tools.py) ·
-[`examples/15_agent_orchestrator.py`](../../examples/15_agent_orchestrator.py) ·
-[`examples/22_goal_mode.py`](../../examples/22_goal_mode.py)
+▶ [`examples/27_agent.py`](../../examples/27_agent.py) ·
+[`examples/28_agent_stop.py`](../../examples/28_agent_stop.py) ·
+[`examples/29_agent_stream.py`](../../examples/29_agent_stream.py) ·
+[`examples/30_agent_team.py`](../../examples/30_agent_team.py) ·
+[`examples/32_agent_pause.py`](../../examples/32_agent_pause.py) ·
+[`examples/33_agent_step.py`](../../examples/33_agent_step.py)

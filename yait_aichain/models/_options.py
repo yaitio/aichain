@@ -228,7 +228,7 @@ def why_absent(option: str, provider: str, model: str = "") -> str:
     # Declared as available, yet nothing arrived: either this particular model
     # narrows it, or it is wired for some paths and not others. Say what is
     # certain rather than guessing which.
-    return (f"{provider} has a {option} control, but it did not reach this "
+    return (f"{provider} has {'an' if option[:1] in 'aeiou' else 'a'} {option} control, but it did not reach this "
             "request — this model or this call does not take it")
 
 

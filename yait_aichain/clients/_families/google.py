@@ -89,6 +89,16 @@ def _sanitize_google_schema(schema: object, _root: dict | None = None, _depth: i
     return result
 
 
+def _declined(part: dict, why: str) -> None:
+    """A part this wire cannot carry: left out, and said."""
+    from ...models._adaptation import Adaptation, DECLINED, record
+    src = part.get("source") or {}
+    record(Adaptation(kind=DECLINED, option=f"{part.get('type')} input",
+                      asked=src.get("mime") or src.get("kind"), sent=None,
+                      why=f"{why}; the part was left out of the request"))
+    return None
+
+
 def _part_to_google(part: dict) -> dict | None:
     """One universal part as a Google part, or ``None`` (recorded as declined)
     for a source kind this wire cannot carry."""
@@ -133,6 +143,12 @@ def _part_to_google(part: dict) -> dict | None:
                 },
             }
 
+    if ptype == "document":
+        src = part["source"]
+        if src.get("kind") in ("base64", "file") and src.get("mime") == "application/pdf":
+            return {"inlineData": {"mimeType": "application/pdf", "data": src["data"]}}
+        return _declined(part, "Gemini reads a document as PDF bytes")
+
     if ptype == "audio":
         src  = part["source"]
         kind = src["kind"]
@@ -151,7 +167,7 @@ def _part_to_google(part: dict) -> dict | None:
                 },
             }
 
-    return None
+    return _declined(part, f"this wire carries no {ptype} from a {(part.get('source') or {}).get('kind')} source")
 
 
 def _encode_contents(messages) -> tuple:

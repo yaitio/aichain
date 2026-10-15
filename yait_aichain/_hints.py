@@ -211,6 +211,36 @@ TOOL_NAMES: dict = {
 }
 
 
+#: Example files renamed in 4.6, old name → new; rendered in examples/README.md
+#: for a reader who arrives by an old link.
+EXAMPLES: dict = {
+    '01_skill.py': '01_skill.py',
+    '02_skill_models.py': '02_switch_provider.py',
+    '03_skill_multimodal.py': '06_media_input.py',
+    '04_skill_save_load.py': '08_skill_save_load.py',
+    '05_tool_fetch.py': '14_search_fetch.py',
+    '06_tool_mcp.py': '17_mcp.py',
+    '07_tool_custom.py': '11_custom_tool.py',
+    '08_chain.py': '20_chain.py',
+    '09_chain_tool_skill.py': '21_chain_steps.py',
+    '10_chain_save_load.py': '22_chain_save_load.py',
+    '11_pool.py': '25_pool.py',
+    '12_pool_chain.py': '26_pool_chain.py',
+    '13_agent.py': '27_agent.py',
+    '14_agent_tools.py': '27_agent.py',
+    '15_agent_orchestrator.py': '30_agent_team.py',
+    '16_debug.py': '36_observe.py',
+    '17_chain_human_input.py': '23_chain_human.py',
+    '18_chain_external_trigger.py': '24_chain_webhook.py',
+    '19_image_edit.py': '12_image.py',
+    '20_observability.py': '35_policy.py',
+    '21_multi_turn.py': '05_multi_turn.py',
+    '22_goal_mode.py': '28_agent_stop.py',
+    '23_private_model.py': '09_private_model.py',
+    '24_scaffold.py': '30_agent_team.py',
+}
+
+
 #: Names ``yait_aichain.agent`` had, and what to write instead.
 AGENT_NAMES: dict = {
     n: ("removed in 4.6: nothing in the library read it — an agent's state is its "

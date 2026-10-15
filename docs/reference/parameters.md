@@ -268,8 +268,8 @@ without saying so. It may adapt; it may not do it quietly.
 
 | model | `size` | `aspect_ratio` | `quality` | `background` | `output_format` | `compression` | `seed` | `fidelity` |
 |---|---|---|---|---|---|---|---|---|
-| `gpt-image-2.5-flare (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | — |
-| `gpt-image-1.5 (edit)` | ✓ | — | ✓ | ✓ | ✓ | → `output_compression` | — | → `input_fidelity` |
+| `gpt-image-2.5-flare (edit)` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | — |
+| `gpt-image-1.5 (edit)` | ✓ | ≈ `size` | ✓ | ✓ | ✓ | → `output_compression` | — | → `input_fidelity` |
 | `grok-imagine-image (edit)` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `recraftv3 (edit)` | — | — | — | — | — | — | — | ≈ `strength` |
 

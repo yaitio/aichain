@@ -148,6 +148,6 @@ later step may read a value that is now stale.
 
 ---
 
-▶ [`examples/08_chain.py`](../../examples/08_chain.py) ·
-[`examples/09_chain_tool_skill.py`](../../examples/09_chain_tool_skill.py) ·
-[`examples/10_chain_save_load.py`](../../examples/10_chain_save_load.py)
+▶ [`examples/20_chain.py`](../../examples/20_chain.py) ·
+[`examples/21_chain_steps.py`](../../examples/21_chain_steps.py) ·
+[`examples/22_chain_save_load.py`](../../examples/22_chain_save_load.py)

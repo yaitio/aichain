@@ -115,8 +115,9 @@ keeps a record's own fields on what it returns.
 
 The models each takes: `cohere` — `rerank-v3.5`, `rerank-english-v3.0`,
 `rerank-multilingual-v3.0`; `voyage` — `rerank-2`, `rerank-2-lite`; `qwen` —
-`gte-rerank`, `gte-rerank-v2`, with its host chosen by `RerankQwen(region=…)`
-or `DASHSCOPE_REGION` as for embeddings. Cohere bills in search units, and
+`qwen3-rerank`, and `gte-rerank`, `gte-rerank-v2` where a workspace serves them
+(an international one answered "Model not exist" to both, 2026-10-15), with its
+host chosen by `RerankQwen(region=…)` or `DASHSCOPE_REGION` as for embeddings. Cohere bills in search units, and
 that is the number its result carries as `total_tokens`.
 
 ## As a pipeline

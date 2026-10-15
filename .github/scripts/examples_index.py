@@ -29,33 +29,26 @@ README = ROOT / "README.md"
 START, END = "<!-- examples:start -->", "<!-- examples:end -->"
 
 SECTIONS = [
-    ("Skills",
-     "A **Skill** is the atomic unit — one prompt template, one model, one result.",
-     ["01", "02", "03", "04", "19", "21"]),
+    ("Skill and Model",
+     "A **Skill** is one prompt, one model, one result; the **Model** behind it changes with one word.",
+     ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]),
     ("Tools",
-     "A **Tool** wraps any callable — a REST API, an MCP server, your own function.",
-     ["05", "06", "07"]),
-    ("Chains",
-     "A **Chain** runs steps in order; each step's output flows into the next.",
-     ["08", "09", "10"]),
+     "A **tool** is anything a model or a pipeline can call — your function, an API, an MCP server.",
+     ["11", "12", "13", "14", "15", "16", "17", "18", "19"]),
+    ("Chain",
+     "A **Chain** runs steps in order, each step's result under its own key; it can park and resume.",
+     ["20", "21", "22", "23", "24"]),
     ("Pool",
      "A **Pool** runs one runner over many items in parallel.",
-     ["11", "12"]),
-    ("Agents",
-     "An **Agent** runs one loop: each turn the model calls tools or answers, "
-     "and `stop_when` decides when the run ends.",
-     ["13", "14", "15", "22", "24"]),
-    ("Pause and resume",
-     "A **Chain** can park itself until a signal arrives — a person, a webhook, "
-     "a cron tick — and be resumed later, in another process, from a shared "
-     "store. An agent does not park: its state is the conversation.",
-     ["17", "18"]),
-    ("Observe and govern",
-     "What happened inside a run, and who is allowed to let a risky call through.",
-     ["16", "20"]),
-    ("Private models",
-     "The model runs on hardware you control; nothing is sent to a vendor.",
-     ["23"]),
+     ["25", "26"]),
+    ("Agent",
+     "An **Agent** runs one loop: each turn the model calls tools or answers, and `stop_when` "
+     "decides when it ends.",
+     ["27", "28", "29", "30", "32", "33"]),
+    ("Control",
+     "What a run may spend, who allows what, what happened inside, whose key it ran on, and "
+     "whether a change helped.",
+     ["34", "35", "36", "37", "38"]),
 ]
 
 HEADER = """\
@@ -130,22 +123,17 @@ def headline(path: Path) -> str:
 
 
 def keys(path: Path) -> str:
-    """What the `Required env vars:` block says, as a table cell."""
-    lines = _docstring(path).splitlines()
-    for i, line in enumerate(lines):
-        if line.strip().startswith("Required env vars"):
-            block = []
-            for nxt in lines[i + 1:]:
-                if not nxt.strip():
-                    break
-                block.append(nxt.strip())
-            text = " ".join(block)
-            names = re.findall(r"\b[A-Z][A-Z0-9_]*_(?:KEY|TOKEN)\b", text)
-            if names:
-                prefix = "any one of " if text.startswith("any one of") else ""
-                return prefix + " ".join(f"`{n}`" for n in names)
-            return f"*{text}*" if text else "*(none)*"
-    raise IndexError_(f"{path.name}: no 'Required env vars:' block in the docstring")
+    """What the docstring's ``Keys:`` line says, as a table cell."""
+    doc = _docstring(path)
+    match = re.search(r"^Keys:\s*(.+?)(?:\n\s*\n|\Z)", doc, re.M | re.S)
+    if not match:
+        raise IndexError_(f"{path.name}: no 'Keys:' line in the docstring")
+    text = " ".join(match.group(1).split())
+    names = re.findall(r"\b[A-Z][A-Z0-9_]*_(?:KEY|TOKEN)\b", text)
+    if not names:
+        return "*(none)*"
+    prefix = "any one of " if re.match(r"any (one )?of", text) else ""
+    return prefix + " ".join(f"`{n}`" for n in dict.fromkeys(names))
 
 
 def _assign() -> dict:
@@ -175,7 +163,13 @@ def render_index() -> str:
             path = next(p for n, p in files.items() if n.startswith(number + "_"))
             out.append(f"| [`{path.name}`]({path.name}) | {headline(path)} | {keys(path)} |")
         out.append("")
-    out += ["---", "", QUICK_REFERENCE]
+    sys.path.insert(0, str(ROOT))
+    from yait_aichain._hints import EXAMPLES as renamed
+    out += ["---", "", "## Renamed in 4.6", "",
+            "The examples were rewritten in 4.6; an older link names a file below.", "",
+            "| Was | Now |", "|---|---|"]
+    out += [f"| `{old}` | [`{new}`]({new}) |" for old, new in renamed.items()]
+    out += ["", "---", "", QUICK_REFERENCE]
     return "\n".join(out)
 
 

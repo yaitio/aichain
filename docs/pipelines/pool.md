@@ -88,5 +88,5 @@ item that would begin past it fails with the budget's reason, handled by
 
 ---
 
-▶ [`examples/11_pool.py`](../../examples/11_pool.py) ·
-[`examples/12_pool_chain.py`](../../examples/12_pool_chain.py)
+▶ [`examples/25_pool.py`](../../examples/25_pool.py) ·
+[`examples/26_pool_chain.py`](../../examples/26_pool_chain.py)

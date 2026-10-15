@@ -150,5 +150,5 @@ notebook into a pipeline, without being copied by hand.
 ---
 
 ▶ [`examples/01_skill.py`](../../examples/01_skill.py) ·
-[`examples/02_skill_models.py`](../../examples/02_skill_models.py) ·
-[`examples/21_multi_turn.py`](../../examples/21_multi_turn.py)
+[`examples/02_switch_provider.py`](../../examples/02_switch_provider.py) ·
+[`examples/05_multi_turn.py`](../../examples/05_multi_turn.py)

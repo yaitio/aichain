@@ -122,5 +122,5 @@ text.
 
 ---
 
-▶ [`examples/03_skill_multimodal.py`](../../examples/03_skill_multimodal.py) ·
-[`examples/19_image_edit.py`](../../examples/19_image_edit.py)
+▶ [`examples/06_media_input.py`](../../examples/06_media_input.py) ·
+[`examples/12_image.py`](../../examples/12_image.py)

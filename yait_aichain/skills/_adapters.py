@@ -23,6 +23,7 @@ _EXT_MIME = {
     ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
     ".ogg": "audio/ogg", ".flac": "audio/flac",
     ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+    ".pdf": "application/pdf",
 }
 
 
@@ -39,6 +40,8 @@ def _guess_mime(path: pathlib.Path, head: bytes) -> str:
         return "image/webp"
     if head[:4] == b"GIF8":
         return "image/gif"
+    if head[:4] == b"%PDF":
+        return "application/pdf"
     return "application/octet-stream"
 
 

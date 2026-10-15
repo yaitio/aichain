@@ -1,5 +1,41 @@
 # Changelog
 
+## [4.7.0] — 2026-10-15
+
+### Changed
+
+- The examples are rewritten: 37 files, one idea each and none over 60
+  lines, in the short forms — `Skill(model, prompt=…)`, `@tool`, `policy=`,
+  `max_cost=`, `result["key"]` — with no deprecated or private name. Twelve
+  run offline on `yait_aichain.testing` and are run on every commit, every
+  warning about what goes in 5.0 an error; the rest run nightly against their
+  providers, each skipped when its key is unset. New ones cover structured
+  output, fallback models, streaming, what was sent, speech both ways,
+  retrieval, decisions, REST, Shell under a policy, the event stream, a team of
+  an agent and a chain, a paused agent, a step-driven loop, a budget, keys per
+  tenant and an eval. An old example's name is mapped to its successor at the
+  foot of `examples/README.md`. The scaffold example returns with 5.0.
+- A chain member takes the lead's task as an input only when that input is,
+  by its name, the task (`task`, `question`, `text`, `query`, `prompt`,
+  `topic`, `input`); a URL filled with a sentence failed far from the cause.
+  Otherwise `delegate` names the inputs it needs.
+
+### Added
+
+- A path into a step's result reads a list by position: `"page.pages.0.text"`.
+
+### Fixed
+
+- A PDF passed to a model was `application/octet-stream`, by its name and by
+  its bytes, and Gemini dropped it without a word: the model answered about an
+  attachment it never saw. A PDF is `application/pdf` now and reaches Gemini;
+  a part Gemini cannot carry is declined and recorded, as on every other
+  family.
+- An OpenAI image edit dropped `aspect_ratio`, where a generation converts it
+  to a size; both convert it.
+- Qwen's rerank page named only `gte-rerank` models, which an international
+  workspace does not serve; `qwen3-rerank` is listed.
+
 ## [4.6.1] — 2026-10-15
 
 ### Removed
@@ -125,7 +161,7 @@ Each removed name, asked for, raises with the one to write instead.
 
 - A `Chain` can be a team member. The lead reads its inputs from its
   `input_schema()` — named in the `delegate` description — and gives them as
-  `inputs={...}`; a task alone fills a chain with a single text input. The
+  `inputs={...}`; a task alone fills an input that is, by its name, the task. The
   lead's rules, budget and hooks hold inside it, as for an agent member, and a
   chain that pauses is refused with the reason.
 - `team={"max_delegations": N}` bounds the delegations of one run.

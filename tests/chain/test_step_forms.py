@@ -97,3 +97,36 @@ class TestNamesThatCannotBeAKey(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAPathReadsAListByPosition(unittest.TestCase):
+
+    def test_a_number_in_a_path_is_a_position(self):
+        from yait_aichain import Chain
+        from yait_aichain.chain import Step
+
+        def pages() -> dict:
+            return {"pages": [{"text": "first"}, {"text": "second"}]}
+
+        def upper(text: str) -> str:
+            return text.upper()
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            result = Chain([(pages, "page"), Step(upper, inputs={"text": "page.pages.1.text"})]).run()
+        self.assertEqual(result.output, "SECOND")
+
+    def test_a_position_past_the_end_says_how_many_there_are(self):
+        from yait_aichain import Chain
+        from yait_aichain.chain import Step
+
+        def pages() -> dict:
+            return {"pages": [{"text": "only"}]}
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            with self.assertRaisesRegex(ValueError, "has 1 item"):
+                Chain([(pages, "page"), Step(len, inputs={"obj": "page.pages.3"})],
+                      on_step_error="raise").run()

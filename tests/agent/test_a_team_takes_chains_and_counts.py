@@ -88,10 +88,18 @@ class TestAChainIsAMember(unittest.TestCase):
                       delegate["parameters"]["properties"]["worker"]["description"])
         self.assertIn("inputs", delegate["parameters"]["properties"])
 
-    def test_the_task_fills_a_single_text_input(self):
-        lead_model = ScriptedModel([call("delegate", task="https://y", worker="reader"), "done"])
-        Agent(lead_model, team=[_reader()]).run("go")
+    def test_the_task_fills_an_input_that_is_the_task(self):
+        asks = Chain([Skill(ScriptedModel(["an answer"]), prompt="{question}", name="answer")],
+                     name="asks", description="Answers a question")
+        lead_model = ScriptedModel([call("delegate", task="why?", worker="asks"), "done"])
+        Agent(lead_model, team=[asks]).run("go")
         self.assertTrue(_told(lead_model)["success"])
+
+    def test_the_task_does_not_fill_a_url(self):
+        lead_model = ScriptedModel([call("delegate", task="Read https://y and summarise it",
+                                         worker="reader"), "done"])
+        Agent(lead_model, team=[_reader()]).run("go")
+        self.assertIn("needs the inputs ['url']", json.dumps(lead_model.requests[1].messages))
 
     def test_a_missing_input_is_named(self):
         two = Chain([Skill(ScriptedModel(["x"]), prompt="{a} {b}", name="both")], name="two",

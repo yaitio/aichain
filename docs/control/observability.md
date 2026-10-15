@@ -142,5 +142,5 @@ its state is the conversation, which the caller holds.
 
 ---
 
-▶ [`examples/16_debug.py`](../../examples/16_debug.py) ·
-[`examples/20_observability.py`](../../examples/20_observability.py)
+▶ [`examples/36_observe.py`](../../examples/36_observe.py) ·
+[`examples/35_policy.py`](../../examples/35_policy.py)

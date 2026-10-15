@@ -168,30 +168,43 @@ The skill alone works too: copy `plugin/skills/yait-aichain/` into
 <!-- examples:start -->
 | # | File | What it shows |
 |---|---|---|
-| 01 | [`01_skill.py`](examples/01_skill.py) | Run a prompt against a model. |
-| 02 | [`02_skill_models.py`](examples/02_skill_models.py) | Same prompt, three providers. |
-| 03 | [`03_skill_multimodal.py`](examples/03_skill_multimodal.py) | Text → Image → Text, three providers. |
-| 04 | [`04_skill_save_load.py`](examples/04_skill_save_load.py) | Save a skill to YAML, reload and run it. |
-| 05 | [`05_tool_fetch.py`](examples/05_tool_fetch.py) | A web page's text from its URL. |
-| 06 | [`06_tool_mcp.py`](examples/06_tool_mcp.py) | An MCP server as a utility: discover its tools, call them. |
-| 07 | [`07_tool_custom.py`](examples/07_tool_custom.py) | Make any function a tool, and use it in a Chain. |
-| 08 | [`08_chain.py`](examples/08_chain.py) | Two skills in sequence, two different providers. |
-| 09 | [`09_chain_tool_skill.py`](examples/09_chain_tool_skill.py) | Tool + Skill in one chain. |
-| 10 | [`10_chain_save_load.py`](examples/10_chain_save_load.py) | Save a chain to YAML, reload and run it. |
-| 11 | [`11_pool.py`](examples/11_pool.py) | Run the same skill in parallel for multiple inputs. |
-| 12 | [`12_pool_chain.py`](examples/12_pool_chain.py) | Chain as a Pool runner. |
-| 13 | [`13_agent.py`](examples/13_agent.py) | Basic agent with one tool. |
-| 14 | [`14_agent_tools.py`](examples/14_agent_tools.py) | Agent with multiple tools, picks autonomously. |
-| 15 | [`15_agent_orchestrator.py`](examples/15_agent_orchestrator.py) | Orchestrator agent spawns sub-agents. |
-| 16 | [`16_debug.py`](examples/16_debug.py) | Inspect intermediate steps in Chain, Pool, and Agent. |
-| 17 | [`17_chain_human_input.py`](examples/17_chain_human_input.py) | Human-in-the-loop: pause a chain for manual input. |
-| 18 | [`18_chain_external_trigger.py`](examples/18_chain_external_trigger.py) | Pause a run until an EXTERNAL trigger resumes it. |
-| 19 | [`19_image_edit.py`](examples/19_image_edit.py) | Image → image (editing) across providers, one tool. |
-| 20 | [`20_observability.py`](examples/20_observability.py) | The step boundary: hooks, events, and an approval gate. |
-| 21 | [`21_multi_turn.py`](examples/21_multi_turn.py) | Directed multi-turn reasoning in ONE Skill. |
-| 22 | [`22_goal_mode.py`](examples/22_goal_mode.py) | A stop condition the harness can verify |
-| 23 | [`23_private_model.py`](examples/23_private_model.py) | Run a model on hardware you control. |
-| 24 | [`24_scaffold.py`](examples/24_scaffold.py) | Scaffold — the model designs the team, then runs it |
+| 01 | [`01_skill.py`](examples/01_skill.py) | One prompt, one model, one answer. |
+| 02 | [`02_switch_provider.py`](examples/02_switch_provider.py) | The provider changes with one word, and nothing else does. |
+| 03 | [`03_structured_output.py`](examples/03_structured_output.py) | Data from a model, not prose: an answer that fits a JSON schema. |
+| 04 | [`04_fallback_models.py`](examples/04_fallback_models.py) | Survive a provider outage with one parameter: a list of models. |
+| 05 | [`05_multi_turn.py`](examples/05_multi_turn.py) | A directed sequence of refinements in one Skill, without a Chain. |
+| 06 | [`06_media_input.py`](examples/06_media_input.py) | An image, a PDF and a video to one model: the type follows the file. |
+| 07 | [`07_stream.py`](examples/07_stream.py) | The answer printed as it is written: the same Skill, streamed. |
+| 08 | [`08_skill_save_load.py`](examples/08_skill_save_load.py) | A prompt kept in a file apart from the code; the key never reaches it. |
+| 09 | [`09_private_model.py`](examples/09_private_model.py) | A model on your own server: the data stays with you, the code is the same. |
+| 10 | [`10_what_was_sent.py`](examples/10_what_was_sent.py) | The library never changes a request in silence. |
+| 11 | [`11_custom_tool.py`](examples/11_custom_tool.py) | Any function becomes a tool: its docstring is the schema a model sees. |
+| 12 | [`12_image.py`](examples/12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, six APIs. |
+| 13 | [`13_speech.py`](examples/13_speech.py) | Voice both ways through one interface: text to an mp3, and back to text. |
+| 14 | [`14_search_fetch.py`](examples/14_search_fetch.py) | Search the web, then read the first result as a model would. |
+| 15 | [`15_retrieval.py`](examples/15_retrieval.py) | Answer from your own texts: chunk, embed, find, rerank, answer with the source. |
+| 16 | [`16_decide.py`](examples/16_decide.py) | A closed set of answers with a visible price: classify support messages. |
+| 17 | [`17_mcp.py`](examples/17_mcp.py) | An MCP server is a set of agent tools: discover them, call one. |
+| 18 | [`18_rest.py`](examples/18_rest.py) | Your own API as tools, without code per method; the risk class follows the method. |
+| 19 | [`19_shell.py`](examples/19_shell.py) | Shell under a policy that reads the command, not only the tool. |
+| 20 | [`20_chain.py`](examples/20_chain.py) | Steps in order, each step's result under its own key: GPT writes, Claude reviews. |
+| 21 | [`21_chain_steps.py`](examples/21_chain_steps.py) | Connect steps whose names differ, and let the chain say what it needs. |
+| 22 | [`22_chain_save_load.py`](examples/22_chain_save_load.py) | A pipeline as a file, with its policy: stored, versioned, run elsewhere. |
+| 23 | [`23_chain_human.py`](examples/23_chain_human.py) | A person in the loop: the chain parks, the draft is not re-made. |
+| 24 | [`24_chain_webhook.py`](examples/24_chain_webhook.py) | A run parks until an outside event resumes it. |
+| 25 | [`25_pool.py`](examples/25_pool.py) | A list processed in parallel with one parameter, no threads in your code. |
+| 26 | [`26_pool_chain.py`](examples/26_pool_chain.py) | The primitives nest: a Chain is a Pool's runner, one per URL, all at once. |
+| 27 | [`27_agent.py`](examples/27_agent.py) | An agent picks its own steps between search and fetch; the result says how it ended. |
+| 28 | [`28_agent_stop.py`](examples/28_agent_stop.py) | "Done" on the model's word and "done" on a check are different ends. |
+| 29 | [`29_agent_stream.py`](examples/29_agent_stream.py) | One ordered stream of events: what an interface is built on. |
+| 30 | [`30_agent_team.py`](examples/30_agent_team.py) | A lead hands work to its team: an agent that searches, a chain that reads. |
+| 32 | [`32_agent_pause.py`](examples/32_agent_pause.py) | An agent waits for an outside event, and another process resumes it. |
+| 33 | [`33_agent_step.py`](examples/33_agent_step.py) | Outside code drives the loop, one step per invocation. |
+| 34 | [`34_budget.py`](examples/34_budget.py) | One ceiling in money across a run: the next step is refused before it begins. |
+| 35 | [`35_policy.py`](examples/35_policy.py) | Who allows a risky call, and how a call is changed before it runs. |
+| 36 | [`36_observe.py`](examples/36_observe.py) | What happened inside a run, without print() in your code or a tracing SDK. |
+| 37 | [`37_tenant_keys.py`](examples/37_tenant_keys.py) | One Model serves every tenant: each request carries its customer's key. |
+| 38 | [`38_eval.py`](examples/38_eval.py) | Two prompts compared on repeated trials, not on one lucky run. |
 <!-- examples:end -->
 
 ---

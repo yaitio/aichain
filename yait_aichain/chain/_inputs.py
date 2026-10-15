@@ -124,6 +124,12 @@ def _lookup(path: str, accumulated: dict, where: str):
                          f"not have; it has {sorted(accumulated)}{hint}")
     value, walked = accumulated[head], head
     for part in rest.split("."):
+        if isinstance(value, (list, tuple)) and part.isdigit():
+            # A list is read by position — "page.pages.0.text", "hits.results.0.url".
+            if int(part) >= len(value):
+                raise ValueError(f"{where} reads {path!r}, and {walked!r} has {len(value)} item(s)")
+            value, walked = value[int(part)], f"{walked}.{part}"
+            continue
         if not isinstance(value, Mapping) or part not in value:
             import difflib
             fields = sorted(value) if isinstance(value, Mapping) else []

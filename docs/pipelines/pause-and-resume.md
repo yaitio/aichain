@@ -115,5 +115,5 @@ that needs one. → [Permissions](../control/permissions.md)
 
 ---
 
-▶ [`examples/17_chain_human_input.py`](../../examples/17_chain_human_input.py) ·
-[`examples/18_chain_external_trigger.py`](../../examples/18_chain_external_trigger.py)
+▶ [`examples/23_chain_human.py`](../../examples/23_chain_human.py) ·
+[`examples/24_chain_webhook.py`](../../examples/24_chain_webhook.py)

@@ -564,6 +564,24 @@ def _is_o_series_model(name: str) -> bool:
     )
 
 
+def _ratio_as_size(fmt: dict, model) -> dict:
+    """A ratio as pixels for an API that takes only pixels — WxH in multiples of
+    16 between 1:3 and 3:1, which a 1024 short edge meets. Every other image
+    provider in the library takes both."""
+    if not fmt.get("aspect_ratio") or fmt.get("size"):
+        return fmt
+    size = size_from_ratio(fmt["aspect_ratio"], multiple=16)
+    if not size:
+        return fmt
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    record(Adaptation(
+        kind=ADAPTED, option="aspect_ratio", asked=fmt["aspect_ratio"],
+        sent=f"size={size}", model=model.name,
+        why="this provider takes pixels, not a ratio; the shape was "
+            "kept at a 1024 short edge"))
+    return {**fmt, "size": size}
+
+
 def _build_image_generations_request(
     model,
     messages: list,
@@ -584,21 +602,7 @@ def _build_image_generations_request(
     fmt: dict  = _drop_rejected(model, output.get("format", {}))
     body: dict = {"model": model.name, "prompt": prompt, "n": 1}
 
-    # This API takes pixels; a ratio has no field. Every other image provider
-    # in the library understands both, so the ratio is turned into a size
-    # rather than dropped. GPT Image 2.5 accepts any WIDTHxHEIGHT whose edges
-    # are multiples of 16 and whose ratio is between 1:3 and 3:1, which a
-    # 1024 short edge satisfies for every shape worth asking for.
-    if fmt.get("aspect_ratio") and not fmt.get("size"):
-        fmt = {**fmt, "size": size_from_ratio(fmt["aspect_ratio"], multiple=16)}
-        if fmt["size"]:
-            from ...models._adaptation import Adaptation, ADAPTED, record
-            record(Adaptation(
-                kind=ADAPTED, option="aspect_ratio",
-                asked=output["format"]["aspect_ratio"],
-                sent=f"size={fmt['size']}", model=model.name,
-                why="this provider takes pixels, not a ratio; the shape was "
-                    "kept at a 1024 short edge"))
+    fmt = _ratio_as_size(fmt, model)
 
     if fmt.get("size"):
         body["size"] = fmt["size"]
@@ -751,7 +755,7 @@ def _build_image_edits_request(
     field_name = "image[]" if model.name.startswith(_GPT_IMAGE) else "image"
 
     fields: list = [("model", model.name), ("prompt", _last_user_text(messages))]
-    fmt = _drop_rejected(model, output.get("format", {}))
+    fmt = _ratio_as_size(_drop_rejected(model, output.get("format", {})), model)
     # Our name on the left, the provider's on the wire.
     for ours, theirs in (("size", "size"), ("quality", "quality"),
                          ("background", "background"),
