@@ -347,12 +347,9 @@ class Embedder(Tool):
         _refuse_settings(self.name, opts)
         return self.embed(input, input_type=input_type)
 
-    def batch(self, input: list[str], options: dict | None = None) -> EmbeddingResult:
-        """Deprecated: the same as :meth:`run`, which takes a list. Removed in 5.0."""
-        import warnings
-        warnings.warn("Embedder.batch() is run() — call run(); batch() goes in 5.0",
-                      DeprecationWarning, stacklevel=2)
-        return self.run(input, options)
+    def __getattr__(self, name):
+        from ..._hints import missing
+        raise missing(self, name)
 
     # ------------------------------------------------------------------
     # Abstract method — must be implemented by subclasses

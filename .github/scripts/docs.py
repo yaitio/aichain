@@ -555,8 +555,7 @@ API_PAGES = {
     "api/agent.md": [("yait_aichain.agent", n) for n in (
         "Agent", "AgentResult", "step_count", "token_budget", "cost_budget", "check", "nudge",
         "stalled", "repeating", "verified", "Acceptance", "acceptance_from", "beacon", "Beacon", "ATTENTION",
-        "COORDINATION", "Journal", "JournalEntry", "evidence", "AgentMemory", "MemoryBackend",
-        "InMemoryBackend", "FileBackend")],
+        "COORDINATION", "Journal", "JournalEntry", "evidence")],
     "api/tools/index.md": [("yait_aichain.tools", n) for n in ("tool", "Tool", "FunctionTool", "ToolResult", "Record", "media_part")],
     "api/control.md": [("yait_aichain", n) for n in ("Budget", "BudgetExceeded", "PermissionPolicy",
                                                      "ApprovalRequest", "ApprovalDecision", "Event", "Hook",

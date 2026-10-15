@@ -132,6 +132,9 @@ ATTRIBUTES: dict = {
         "arun": "there is no async API; run many inputs in parallel with Pool(skill, items=[...])",
         "ainvoke": "there is no async API; run many inputs in parallel with Pool(skill, items=[...])",
     },
+    "Embedder": {"batch": "removed in 4.6; it was run() — embedder.run(texts)"},
+    "Journal": {n: "removed in 4.6: nothing called it; read journal.entries, or "
+                   "do_not_redo() for what failed" for n in ("recent", "progress_summary")},
     "SuspendedResult": {
         "variables": _SO_FAR,
         "state": _SO_FAR,
@@ -139,7 +142,9 @@ ATTRIBUTES: dict = {
                    "chain.resume(result.run_id, signal={...}), or agent.resume(...) for an "
                    "agent's run; " + _SO_FAR),
     },
-    "AgentResult": {"text": _OUTPUT, "content": _OUTPUT, "answer": _OUTPUT,
+    "AgentResult": {"memory": "removed in 4.6 with AgentMemory: an agent's state is its "
+                              "conversation, result.history",
+                    "text": _OUTPUT, "content": _OUTPUT, "answer": _OUTPUT,
                     "final_output": _OUTPUT, "response": _OUTPUT, "result": _OUTPUT},
     "ChainResult": {"text": _OUTPUT, "content": _OUTPUT, "final_output": _OUTPUT,
                     "response": _OUTPUT, "result": _OUTPUT,
@@ -204,6 +209,14 @@ TOOL_NAMES: dict = {
     **{n: "file conversion is not part of the library; a page by URL is fetch('local')"
        for n in ("convertToMD", "convertToHTML", "convertToPDF", "MarkItDownTool", "WeasyprintTool", "MistletoeTool")},
 }
+
+
+#: Names ``yait_aichain.agent`` had, and what to write instead.
+AGENT_NAMES: dict = {
+    n: ("removed in 4.6: nothing in the library read it — an agent's state is its "
+        "conversation. Keep values in a dict in process, or a StateStore on disk: "
+        "`from yait_aichain.state import FileStore`")
+    for n in ("AgentMemory", "MemoryBackend", "InMemoryBackend", "FileBackend")}
 
 
 def tool_name(name: str) -> ImportError:
@@ -272,7 +285,8 @@ def missing(obj, name: str) -> AttributeError:
     """The ``AttributeError`` for *name* on *obj*, with a hint when one is known.
     Called from ``__getattr__``, so only after normal lookup has failed."""
     owner = type(obj).__name__
-    hint = ATTRIBUTES.get(owner, {}).get(name)
+    hint = next((ATTRIBUTES[c.__name__][name] for c in type(obj).__mro__
+                 if name in ATTRIBUTES.get(c.__name__, {})), None)
     return AttributeError(f"{owner!r} object has no attribute {name!r}"
                           + (f" — {hint}" if hint else ""))
 

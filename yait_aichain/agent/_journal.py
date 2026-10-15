@@ -166,6 +166,10 @@ class JournalEntry:
 class Journal:
     """Append-only log of attempts, with the three views the loop needs."""
 
+    def __getattr__(self, name):
+        from .._hints import missing
+        raise missing(self, name)
+
     def __init__(self, entries: list[JournalEntry] | None = None) -> None:
         self._entries: list[JournalEntry] = list(entries or [])
 
@@ -221,9 +225,6 @@ class Journal:
         """Approaches already ruled out — the "do not redo" set."""
         return [e for e in self._entries if e.outcome == REFUTED]
 
-    def recent(self, n: int = 8) -> list[JournalEntry]:
-        return self._entries[-n:]
-
     def has_progress(self, last_k: int = 5) -> bool:
         """
         True when anything actually moved in the last *last_k* entries.
@@ -265,38 +266,6 @@ class Journal:
         actions = {_action_signature(e.action) for e in tail}
         return len(actions) == 1 and actions != {""}
 
-    # ── prompt view ──────────────────────────────────────────────────
-    def progress_summary(self, limit: int = 12) -> str:
-        """
-        Render the observation trail for the next action prompt.
-
-        Each recent attempt shows what was tried and what came back, failures
-        included; successes are marked ``verified`` or ``claimed`` by evidence kind.
-        Both halves are clipped — keep a large result in memory via ``artifact``.
-
-        Parameters
-        ----------
-        limit : int, optional
-            How many of the latest entries to render.
-        """
-        items = self._entries[-limit:]
-        if not items:
-            return ""
-        lines = []
-        for e in items:
-            if e.outcome == DONE:
-                kind = (e.evidence or {}).get("kind", MODEL_CLAIM)
-                mark = "verified" if kind == CHECK else "claimed"
-            else:
-                mark = e.outcome
-            stored = f" → memory['{e.artifact}']" if e.artifact else ""
-            lines.append(f"- [{mark}] {_label(e)}{stored}")
-            tried = _action_excerpt(e.action)
-            if tried:
-                lines.append(f"    tried:  {tried}")
-            if e.observation:
-                lines.append(f"    result: {e.observation}")
-        return "\n".join(lines)
 
     def do_not_redo(self, limit: int = 10) -> str:
         """

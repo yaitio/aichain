@@ -1,7 +1,7 @@
 {
   "code": {
-    "(top)": 1174,
-    "agent": 1707,
+    "(top)": 1185,
+    "agent": 1582,
     "chain": 1120,
     "clients": 2703,
     "eval": 584,
@@ -9,7 +9,7 @@
     "pool": 371,
     "skills": 655,
     "state": 335,
-    "tools": 4088,
+    "tools": 4086,
     "utilities": 1879
   },
   "long_docstrings": 28,

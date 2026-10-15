@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.6.0] — 2026-10-15
+
+### Removed
+
+- `AgentMemory`, `MemoryBackend`, `InMemoryBackend`, `FileBackend` and
+  `AgentResult.memory`: nothing in the library read them — an agent's state is
+  its conversation. Importing one raises and names what to use instead: a dict
+  in process, a `StateStore` (`yait_aichain.state.FileStore`) on disk.
+- `Journal.recent()` and `Journal.progress_summary()`, which nothing called;
+  `journal.entries` and `do_not_redo()` remain.
+- `Embedder.batch()`, which was `run()`.
+
+Each removed name, asked for, raises with the one to write instead.
+
 ## [4.5.6] — 2026-10-15
 
 ### Changed

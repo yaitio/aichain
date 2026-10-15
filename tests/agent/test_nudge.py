@@ -168,11 +168,9 @@ class TestTheJournalCanBeReadBack(unittest.TestCase):
         self.assertTrue(all(e["intent"] == "" for e in result.journal
                             if e["action"]))
 
-    def test_progress_summary_reads_an_agent_journal(self):
-        """The loop stores the action as text; the renderer called `.get`
-        on it and raised."""
+    def test_do_not_redo_reads_an_agent_journal(self):
+        """The loop stores the action as text; a renderer that called `.get`
+        on it raised."""
         from yait_aichain.agent import Journal
         _, result, _ = _run(_script("ok", "bad"), [step_count(20)])
-        summary = Journal.from_list(result.journal).progress_summary()
-        self.assertIn("fussy", summary)
-        self.assertNotIn("(no intent)", summary)
+        Journal.from_list(result.journal).do_not_redo()

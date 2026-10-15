@@ -42,8 +42,6 @@ class AgentResult:
         Each ``Adaptation`` the library made to fit the provider.
     history : list[dict]
         Empty for an agent, kept so every result has the same fields.
-    memory : dict
-        Always empty; deprecated, goes in 5.0.
     error : str | None
         Why it failed, when it did.
     journal : list[dict]
@@ -81,7 +79,6 @@ class AgentResult:
     #: a comparison.
     adaptations: list           = field(default_factory=list)
     history:     list[dict]     = field(default_factory=list)
-    memory:      dict           = field(default_factory=dict)
     error:       str | None     = None
     #: Append-only record of what was attempted (see ``agent._journal``): each
     #: entry carries an outcome and the evidence behind it. ``done`` entries
