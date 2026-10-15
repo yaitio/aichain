@@ -84,6 +84,44 @@ with them is yours: the library emits, the environment decides where it goes.
 the run does; a tenant's budget is a `Budget` you build per request.
 → [Cost and budget](control/cost-and-budget.md)
 
+## Testing without a provider
+
+A test should not need a key, a network or a bill. `yait_aichain.testing` has
+two stand-ins that go through the library's own request and response path, so
+what they exercise is the code that runs in production.
+
+`ScriptedModel` replays a script — answers, and tool calls written as
+`call(name, **arguments)` — and works wherever a `Model` does, `stream()`
+included. Give it `usage=` and `price=` and every call has a cost, so a budget
+or a report has something to count. `.requests` keeps what the loop sent.
+
+```python
+from yait_aichain import Agent
+from yait_aichain.testing import ScriptedModel, call
+
+model = ScriptedModel([call("issue_refund", amount=42), "Refunded."])
+result = Agent(model, tools=[issue_refund]).run("Refund order 7")
+assert result.output == "Refunded."
+assert model.requests[1].messages[-1]["role"] == "tool"
+```
+
+`recorded(model)` keeps a real `Model` — its name, options, adaptations and
+price — and replaces only its transport, so you can check what a request
+would have carried: the body, the headers (an auth header as a fingerprint,
+never the key) and what was adapted on the way.
+
+```python
+from yait_aichain import Model, Skill
+from yait_aichain.testing import recorded
+
+model = Model("gpt-5.5", options={"top_p": 0.9})
+with recorded(model) as rec:
+    Skill(model, prompt="Hi").run()
+assert rec.requests[0].body["model"] == "gpt-5.5"
+```
+
+→ [API: Testing](api/testing.md)
+
 ## What the library does not do
 
 It does not deploy. There is no daemon, no scheduler, no queue in it: a run is

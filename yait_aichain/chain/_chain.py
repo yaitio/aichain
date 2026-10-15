@@ -444,7 +444,8 @@ class Chain(_Flow, _Files):
         # chain.run()`, a chain inside a chain step, a chain in a Pool — and
         # the run document keeps it, so a resume in another process has it.
         context = context if context is not None else current()
-        with using(context), lend(self.max_cost):
+        from .._events import running
+        with using(context), lend(self.max_cost), running(doc.run_id):
             return self._run_from(doc, accumulated, start_idx=0, signal=None,
                                   usage_in=None, on_error=_on_error,
                                   context=context)
@@ -500,7 +501,7 @@ class Chain(_Flow, _Files):
         doc.steps[0]["status"]  = StepStatus.SUSPENDED
         doc.steps[0]["suspend"] = awaiting
         self._store.save(doc.run_id, doc.to_dict())
-        self._emit("run.armed", step=0, payload={"run_id": doc.run_id, **awaiting})
+        self._emit("run.armed", step=0, run_id=doc.run_id, payload={"run_id": doc.run_id, **awaiting})
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
 
@@ -609,7 +610,8 @@ class Chain(_Flow, _Files):
         usage_in = Usage(**{f.name: u[f.name] for f in _fields(Usage) if f.name in u}) if u else None
         start_run(self, spent=u.get("cost") or 0.0)     # the parked part was spent already
         from ..state import using
-        with using(context), lend(self.max_cost):
+        from .._events import running
+        with using(context), lend(self.max_cost), running(doc.run_id):
             return self._run_from(doc, accumulated, start_idx=start,
                                   signal=signal,
                                   usage_in=usage_in, on_error=_on_error,
@@ -636,6 +638,8 @@ class Chain(_Flow, _Files):
         self._accumulated = dict(accumulated)
         self.last_usage   = usage_total
         self._store.save(doc.run_id, doc.to_dict())
+        self._emit("run.suspended", step=idx, name=self.name, run_id=doc.run_id,
+                   payload={"run_id": doc.run_id, **awaiting})
         return SuspendedResult(run_id=doc.run_id, awaiting=awaiting,
                                document=doc.to_dict())
 
@@ -673,6 +677,8 @@ class Chain(_Flow, _Files):
                 warnings.warn(f"Chain run {doc.run_id}: not checkpointed after each step — {exc}",
                               RuntimeWarning, stacklevel=3)
 
+        self._emit("run.resumed" if resumed else "run.started", step=start_idx, name=self.name,
+                   run_id=doc.run_id, payload={"steps": len(self._steps)})
         for idx in range(start_idx, len(self._steps)):
             runner, output_key, input_map, kind, options = self._steps[idx]
             step_input  = dict(accumulated)          # snapshot before the step
@@ -680,7 +686,8 @@ class Chain(_Flow, _Files):
             step_signal = signal if idx == start_idx else None
             doc.steps[idx]["status"] = StepStatus.RUNNING
 
-            self._emit("step.started", step=idx, name=name, payload={"kind": kind})
+            self._emit("step.started", step=idx, name=name, run_id=doc.run_id,
+                       payload={"kind": kind})
 
             try:
                 if kind == "call":
@@ -871,7 +878,8 @@ class Chain(_Flow, _Files):
             doc.steps[idx].pop("suspend", None)
             checkpoint()
 
-            self._emit("step.ended", step=idx, name=name, payload={"kind": kind})
+            self._emit("step.ended", step=idx, name=name, run_id=doc.run_id,
+                       payload={"kind": kind})
 
         # Completed run: a finished run leaves no parked document (no-op when
         # the run never suspended and was therefore never stored).
@@ -879,7 +887,11 @@ class Chain(_Flow, _Files):
         self._history     = history
         self._accumulated = dict(accumulated)
         self.last_usage   = usage_total
-        return self._result(doc, history, accumulated, usage_total, last_output)
+        result = self._result(doc, history, accumulated, usage_total, last_output)
+        self._emit("run.finished", name=self.name, run_id=doc.run_id,
+                   payload={"success": result.success}, cost=result.cost,
+                   usage=usage_total.total_tokens if usage_total else None, error=result.error)
+        return result
 
     @staticmethod
     def _result(doc, history, accumulated, usage_total, last_output) -> ChainResult:
@@ -1022,12 +1034,24 @@ class Chain(_Flow, _Files):
                 key = _runner_name(runner)
                 extra["default_key"] = True
                 if key is None:
+                    named = getattr(runner, "name", None)
+                    why = (f"its runner's name {named!r} is not one a key can be "
+                           "(letters, digits and _)" if isinstance(named, str) and named
+                           else "its runner no name")
                     warnings.warn(
-                        f"a step running {type(runner).__name__} has no key and its runner no "
-                        "name, so its output goes to 'result', which the next such step "
+                        f"a step running {type(runner).__name__} has no key and {why}, "
+                        "so its output goes to 'result', which the next such step "
                         "overwrites; from 5.0 this is an error. Give it one: (runner, 'key'), "
                         "or name the runner.", FutureWarning, stacklevel=4)
                     key, extra["default_key"] = "result", False
+
+            if extra["spread"] is None:
+                from ..tools.general._wait import Gate, Wait
+                if isinstance(runner, (Wait, Gate)):
+                    # A pause's answer is the variables its `resume_with`
+                    # declares, so spreading it is what the step is for, not
+                    # the habit going in 5.0 — and it says nothing.
+                    extra["spread"] = True
 
             if _is_tool(runner):
                 kind = "tool"

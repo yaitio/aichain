@@ -38,13 +38,13 @@ trace row in a database — use events, which carry structure rather than text.
 ## Events: every boundary, in order
 
 A hook is any callable given an `Event`, passed as `hooks=[…]` to a Skill, a
-Chain or an Agent. A hook that raises is logged and never breaks the run,
+Chain, a Pool or an Agent. A hook that raises is logged and never breaks the run,
 and a hook cannot change what the run does: observation only.
 
 | Event | From | Carries |
 |---|---|---|
-| `run.started` · `run.finished` | Agent, Chain | the task and mode; the verdict and usage |
-| `step.started` · `step.ended` | Chain | one step and its kind |
+| `run.started` · `run.finished` | Agent, Chain, Pool | the task and mode; the verdict, usage and cost |
+| `step.started` · `step.ended` | Chain, Pool | one step and its kind; for a Pool, one item, its index as the step |
 | `tool_call.started` · `tool_call.ended` | Agent | one call: its id, its arguments, its raw result or error |
 | `text.started` · `text.delta` · `text.ended` | Agent, while streaming | the answer as it is written |
 | `approval.requested` · `approval.decided` | Agent | a gated call, before someone answers and after |

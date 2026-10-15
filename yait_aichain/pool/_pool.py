@@ -176,6 +176,10 @@ class Pool:
         agent this pool runs inside.
     interceptors : list | None, optional
         Act on each tool item before and after it runs, as on an ``Agent``.
+    hooks : list | None, optional
+        Callables given an ``Event``: ``run.started`` and ``run.finished`` for
+        the fan-out, ``step.started`` and ``step.ended`` for each item, its
+        index as the step. Observation only, as on a ``Chain``.
 
     Examples
     --------
@@ -237,6 +241,7 @@ class Pool:
         policy=None,
         approve=None,
         interceptors=None,
+        hooks:       list | None = None,
     ) -> None:
         if not callable(getattr(runner, "run", None)):
             # A plain function had no `run`, and every item failed into a list
@@ -284,6 +289,8 @@ class Pool:
             raise ValueError("Pool: approve='park' parks an agent's run; a pool cannot "
                              "be parked on a person's answer yet — give a function, or 'deny'")
 
+        self.hooks = list(hooks or [])
+        self._run_id = None
         self._lock: threading.Lock = threading.Lock()
         self._history: list[dict]  = self._init_history()
 
@@ -313,6 +320,8 @@ class Pool:
         """
         start_run(self)
         shared = variables or {}
+        import uuid
+        self._run_id = f"pool-{uuid.uuid4().hex[:12]}"
 
         # Pre-flight, in this thread: a runner that cannot be handed what the
         # items carry fails for every item, so say so once and now rather than
@@ -323,6 +332,7 @@ class Pool:
 
         # Reset history before each run
         self._history = self._init_history()
+        self._emit("run.started", payload={"items": len(self._items), "max_flows": self._max_flows})
 
         results: list = [None] * len(self._items)
 
@@ -334,7 +344,8 @@ class Pool:
         # with the context, and charged by every Skill inside an item.
         self._stop = threading.Event()
         self._stop_reason = ""
-        with collecting_beacons() as board, lend(self.max_cost):
+        from .._events import running
+        with collecting_beacons() as board, lend(self.max_cost), running(self._run_id):
             self._board = board
             executor = ThreadPoolExecutor(max_workers=self._max_flows)
             future_to_idx: dict = {}
@@ -400,8 +411,18 @@ class Pool:
         from ._result import PoolResult
         history = self.history
         self._board = None
-        return PoolResult(results, success=all(r["status"] == DONE for r in history),
-                          history=history, usage=self.usage, beacons=self._beacons)
+        result = PoolResult(results, success=all(r["status"] == DONE for r in history),
+                            history=history, usage=self.usage, beacons=self._beacons)
+        self._emit("run.finished", payload={"success": result.success}, cost=result.cost,
+                   error=result.error,
+                   usage=result.usage.total_tokens if result.usage else None)
+        return result
+
+    def _emit(self, etype: str, **fields) -> None:
+        if self.hooks:
+            from .._events import Event, emit
+            fields.setdefault("name", self.name)
+            emit(self.hooks, Event(type=etype, run_id=self._run_id, **fields))
 
     @property
     def beacons(self) -> list:
@@ -507,6 +528,7 @@ class Pool:
         with self._lock:
             self._history[index]["status"]    = RUNNING
             self._history[index]["variables"] = merged
+        self._emit("step.started", step=index)
 
         start = time.monotonic()
         try:
@@ -534,6 +556,7 @@ class Pool:
                     "duration": duration,
                     "usage":    usage,
                 })
+            self._emit("step.ended", step=index, duration=duration)
             return output
 
         except Exception as exc:
@@ -550,6 +573,8 @@ class Pool:
                     "failure":  _describe(exc),
                     "duration": duration,
                 })
+            self._emit("step.ended", step=index, duration=duration,
+                       error=str(exc) or type(exc).__name__)
             raise
 
     def _run_tool(self, runner, kwargs: dict):

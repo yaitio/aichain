@@ -263,17 +263,28 @@ class TestHooksSeeStepBoundaries(unittest.TestCase):
         tracer = Tracer()
         Chain(steps=[(Upper(), "text"), (Upper(), "again", {"text": "text"})],
               hooks=[tracer]).run({"text": "hi"})
-        self.assertEqual([(e.type, e.step) for e in tracer.events],
+        steps = [e for e in tracer.events if e.type.startswith("step.")]
+        self.assertEqual([(e.type, e.step) for e in steps],
                          [("step.started", 0), ("step.ended", 0),
                           ("step.started", 1), ("step.ended", 1)])
-        self.assertEqual(tracer.events[0].name, "upper")
+        self.assertEqual(steps[0].name, "upper")
+
+    def test_the_run_starts_and_finishes_and_every_event_carries_its_id(self):
+        tracer = Tracer()
+        result = Chain(steps=[(Upper(), "text")], hooks=[tracer], name="shout").run({"text": "hi"})
+        self.assertEqual((tracer.events[0].type, tracer.events[-1].type),
+                         ("run.started", "run.finished"))
+        self.assertEqual({e.run_id for e in tracer.events}, {result.run_id})
+        self.assertTrue(tracer.events[-1].payload["success"])
+        self.assertEqual(tracer.events[0].name, "shout")
 
     def test_a_failed_step_starts_and_never_ends(self):
         tracer = Tracer()
         Chain(steps=[(Boom(), "x"), (Upper(), "y")], hooks=[tracer],
               on_step_error="collect").run({"text": "hi"})
-        self.assertEqual([(e.type, e.step) for e in tracer.events],
+        self.assertEqual([(e.type, e.step) for e in tracer.events if e.type.startswith("step.")],
                          [("step.started", 0), ("step.started", 1), ("step.ended", 1)])
+        self.assertFalse(tracer.events[-1].payload["success"])
 
 
 class TestPerCallPolicy(unittest.TestCase):

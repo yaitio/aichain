@@ -320,3 +320,25 @@ class TestBeacons(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHooksSeeTheFanOut(unittest.TestCase):
+
+    def test_the_run_and_each_item_are_events_with_one_id(self):
+        from yait_aichain import Skill, Tracer
+        from yait_aichain.testing import ScriptedModel
+        tracer = Tracer()
+        Pool(Skill(ScriptedModel(["x"]), prompt="{n}"), items=[{"n": 1}, {"n": 2}],
+             hooks=[tracer], name="fan").run()
+        types = [e.type for e in tracer.events]
+        self.assertEqual((types[0], types[-1]), ("run.started", "run.finished"))
+        self.assertEqual(sorted(e.step for e in tracer.events if e.type == "step.ended"), [0, 1])
+        self.assertEqual(len({e.run_id for e in tracer.events}), 1)
+
+    def test_a_failed_item_ends_with_its_error(self):
+        from yait_aichain import Tracer
+        tracer = Tracer()
+        Pool(FailOn("a"), items=[{"value": "a"}], hooks=[tracer]).run()
+        ended = next(e for e in tracer.events if e.type == "step.ended")
+        self.assertTrue(ended.error)
+        self.assertFalse(tracer.events[-1].payload["success"])

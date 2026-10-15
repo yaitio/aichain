@@ -149,7 +149,8 @@ ATTRIBUTES: dict = {
         "variables": _SO_FAR,
         "state": _SO_FAR,
         "output": ("the run paused and has no output yet: resume it with "
-                   "chain.resume(result.run_id, signal={...}); " + _SO_FAR),
+                   "chain.resume(result.run_id, signal={...}), or agent.resume(...) for an "
+                   "agent's run; " + _SO_FAR),
     },
     "AgentResult": {"text": _OUTPUT, "content": _OUTPUT, "answer": _OUTPUT,
                     "final_output": _OUTPUT, "response": _OUTPUT, "result": _OUTPUT},

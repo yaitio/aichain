@@ -1,5 +1,37 @@
 # Changelog
 
+## [4.4.0] — 2026-10-15
+
+### Added
+
+- `yait_aichain.testing`: models for tests and offline runs that go through the
+  library's own request and response path. `ScriptedModel(replies, usage=,
+  price=)` replays answers and `call(name, **arguments)` tool calls, works
+  wherever a `Model` does — `stream()` included — and with a price every call
+  has a cost a budget can count; `.requests` keeps what was sent. `recorded(model)`
+  keeps a real `Model` and replaces only its transport, so its adaptations and
+  price are the library's real answers, an auth header kept as a fingerprint.
+- `Pool(hooks=...)`: `run.started` and `run.finished` for the fan-out,
+  `step.started` and `step.ended` for each item. A pool had no events at all.
+
+### Fixed
+
+- `Chain` emits `run.started`, `run.resumed`, `run.suspended` and
+  `run.finished`, which the observability page listed and no chain sent.
+- Every event of a run carries its `run_id` — a chain's step events had none —
+  and so do the model calls a Skill makes inside a Chain, a Pool or an
+  agent's tool.
+- A pause's answer — `wait(resume_with=...)`, `gate(...)` — reaches the next
+  step without the warning about dict outputs going in 5.0: spreading it is
+  what the step is for.
+- A step whose runner's name cannot be a key (`"step 1"`) was warned about as
+  having no name; the warning says the name is not one a key can be.
+- `docs/api/chain.md` lost `input_schema()`, `save()` and `load()` in 4.3.0,
+  when they moved into modules of their own; the reference reads the mixins a
+  class is cut into.
+- The hint on a paused result's `output` named `chain.resume` alone; an
+  agent's run resumes with `agent.resume`.
+
 ## [4.3.0] — 2026-10-15
 
 ### Changed

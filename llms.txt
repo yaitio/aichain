@@ -74,7 +74,7 @@ Chain(steps, variables: dict | None = None, name: str | None = None,
       interceptors = None, inputs = None)
 Pool(runner, items: list[dict], max_flows: int = 10, on_error: str = 'collect',
      name: str | None = None, description: str | None = None, max_cost = None,
-     policy = None, approve = None, interceptors = None)
+     policy = None, approve = None, interceptors = None, hooks: list | None = None)
 Agent(model: Model, tools: list | None = None, instructions: str = '',
       mode: str = 'agile', team: list[Agent] | str | None = None,
       planner_model: Model | None = None, stop_when: list | None = None,

@@ -21,6 +21,7 @@ Pool(
     policy=None,
     approve=None,
     interceptors=None,
+    hooks: list | None = None,
 )
 ```
 
@@ -51,6 +52,9 @@ Parallel execution of one runner across many items.
   does. Absent, such an item is refused — or asked of the approver of an
   agent this pool runs inside.
 - `interceptors` (*list | None, optional*, default `None`) — Act on each tool item before and after it runs, as on an `Agent`.
+- `hooks` (*list | None, optional*, default `None`) — Callables given an `Event`: `run.started` and `run.finished` for
+  the fan-out, `step.started` and `step.ended` for each item, its
+  index as the step. Observation only, as on a `Chain`.
 
 **Examples**
 

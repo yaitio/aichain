@@ -175,9 +175,17 @@ def _factory(obj):
 
 
 def public_methods(cls) -> list:
-    """Methods and properties a class defines or overrides, with a docstring."""
-    out = []
-    for name, member in cls.__dict__.items():
+    """Methods and properties a class defines or overrides, with a docstring —
+    its own, and those of the private mixins it is cut into (`_Flow`,
+    `_Files`), which are the class's surface under another file's name."""
+    out, seen = [], set()
+    own = [cls] + [b for b in cls.__mro__[1:]
+                   if b.__name__.startswith("_") and b.__module__.startswith("yait_aichain")]
+    members = [(n, m) for c in own for n, m in c.__dict__.items()]
+    for name, member in members:
+        if name in seen:
+            continue
+        seen.add(name)
         if name.startswith("_") and name not in ("__call__",):
             continue
         fn = member.__func__ if isinstance(member, (classmethod, staticmethod)) else member

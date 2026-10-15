@@ -155,6 +155,27 @@ class LoggingTracer(Hook):
 
 # ── Dispatch ───────────────────────────────────────────────────────────────────
 
+import contextlib as _contextlib
+import contextvars as _contextvars
+
+#: The run in flight — the innermost Chain, Pool or Agent — so a Skill's model
+#: calls inside it carry its id. Contextvars cross into a Pool's workers
+#: because the pool copies the context into each.
+_RUN_ID: "_contextvars.ContextVar[str | None]" = _contextvars.ContextVar(
+    "yait_aichain_run_id", default=None)
+
+
+@_contextlib.contextmanager
+def running(run_id):
+    """Make *run_id* — or a run object, whose ``id`` is read when an event is
+    sent — the id events without one are stamped with."""
+    token = _RUN_ID.set(run_id)
+    try:
+        yield
+    finally:
+        _RUN_ID.reset(token)
+
+
 def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
     """
     Dispatch *event* to every hook, swallowing hook errors.
@@ -164,6 +185,11 @@ def emit(hooks: Iterable[Callable[[Event], None]] | None, event: Event) -> None:
     """
     if not hooks:
         return
+    ambient = _RUN_ID.get()
+    ambient = getattr(ambient, "id", ambient)     # an agent's run fills its id late
+    if event.run_id is None and ambient is not None:
+        import dataclasses as _dataclasses
+        event = _dataclasses.replace(event, run_id=ambient)
     for hook in hooks:
         try:
             hook(event)

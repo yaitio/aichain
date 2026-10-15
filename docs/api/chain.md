@@ -231,6 +231,119 @@ Each record contains:
 `output`     — raw output (`str` or `dict`)
 `output_key` — variable name used to store a `str` output
 
+### `Chain.input_schema()`
+
+```python
+Chain.input_schema() -> dict
+```
+
+What a run needs from its caller: every input some step reads that no
+earlier step writes, with its type, its description, and whether it is
+required or has a default.
+
+Read from what the steps already say — a function's signature and
+docstring, a tool's schema, a Skill's template placeholders, an Agent's
+task, a chain's own schema — with `variables=` as defaults and
+`inputs=` as descriptions. An input nothing describes is said, since
+a caller or a model filling it has only its name to go on:
+
+```python
+{"url": {"type": "string", "description": "Article URL", "required": True},
+ "language": {"type": "string", "default": "English"}}
+```
+
+### `Chain.save()`
+
+```python
+Chain.save(path: str)
+```
+
+Serialise this chain to a YAML file at *path*.
+
+The file stores everything needed to recreate the chain:
+
+* Chain-level metadata — `name`, `description`, `variables`
+* Each step's `output_key` and `input_map`
+* For **Skill** steps — the model name, input template, output spec,
+  variables, and options (same fields as `Skill.save()`)
+* For **Tool** steps — the fully-qualified class path
+  (`"module.ClassName"`) and any serialisable `init_args`
+
+API keys are **never** written to the file; `load` resolves
+them from environment variables at load time.
+
+**Parameters**
+
+- `path` (*str*) — Destination file path.  Parent directories are created
+  automatically if they do not exist.
+
+**Raises**
+
+- `ImportError` — If PyYAML is not installed.
+
+**Examples**
+
+```python
+chain.save("chains/analyse_and_translate.yaml")
+```
+
+### `Chain.load()`
+
+```python
+Chain.load(path: str, api_key: str | None = None, *, trusted: bool = False) -> Chain
+```
+
+Load a chain from a YAML file previously created by `save`.
+
+.. warning:
+
+```python
+A chain file names tool classes by import path and instantiates
+them — loading one therefore imports and runs code. By default
+only classes under ``yait_aichain`` are allowed; pass
+``trusted=True`` ONLY for files you created or fully control.
+```
+
+Each step is reconstructed from the serialised data:
+
+* **Skill** steps — the model is re-created via
+  `Model` (API key resolved from the environment
+  unless *api_key* is supplied), then a `Skill` is
+  instantiated from the stored template.
+* **Tool** steps — the class is imported by its stored module path
+  and instantiated with the stored `init_args`; API keys are
+  resolved from environment variables automatically.
+
+**Parameters**
+
+- `path` (*str*) — The YAML file `save()` wrote.
+- `api_key` (*str | None, optional*, default `None`) — A key for every Skill step's model; each reads its own provider's from
+  the environment otherwise.
+- `trusted` (*bool, optional*, default `False`) — Allow tool classes outside `yait_aichain` to be imported. Loading a
+  chain file runs the code it names; pass `True` only for files you
+  wrote or control.
+
+**Returns**
+
+- `Chain` — A fully initialised `Chain` ready to call `run`.
+
+**Raises**
+
+- `FileNotFoundError` — If *path* does not exist.
+- `ImportError` — If PyYAML is not installed, or a tool's module cannot be imported.
+- `ValueError` — If a step's `kind` is unrecognised, or a required API key is
+  missing.
+
+**Examples**
+
+```python
+from yait_aichain.chain import Chain
+
+chain  = Chain.load("chains/analyse_and_translate.yaml")
+result = chain.run(variables={"topic": "AI safety",
+                              "language": "French"})
+```
+
 ---
 
 ## `ChainResult`

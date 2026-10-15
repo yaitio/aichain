@@ -19,6 +19,7 @@ What a thing is for, and how to use it well, is in the guides.
 | [Control](control.md) | `Budget`, `PermissionPolicy`, approvals, `Interceptor`, `Event`, `Tracer`, `docs_dir` |
 | [State](state.md) | `RunContext`, `Suspend`, stores, `RunDocument` |
 | [Eval](eval.md) | `Eval`, `Case`, `Report`, the scorers |
+| [Testing](testing.md) | `ScriptedModel`, `call`, `recorded` — models for tests and offline examples |
 | [Errors](errors.md) | every exception a call can raise |
 
 Data rather than code — the model registry, what each provider does with each

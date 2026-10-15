@@ -19,7 +19,7 @@ import _apidoc  # noqa: E402
 import docs  # noqa: E402
 
 MODULES = ("yait_aichain", "yait_aichain.agent", "yait_aichain.tools", "yait_aichain.utilities",
-           "yait_aichain.eval", "yait_aichain.state", "yait_aichain.models")
+           "yait_aichain.eval", "yait_aichain.state", "yait_aichain.models", "yait_aichain.testing")
 
 #: Public, and deliberately without an entry of its own.
 EXEMPT = {

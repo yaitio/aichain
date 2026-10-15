@@ -568,6 +568,7 @@ API_PAGES = {
     "api/eval.md": [("yait_aichain.eval", n) for n in ("Eval", "Case", "Record", "Report", "exact", "contains",
                                                        "regex", "numeric", "judge", "pairwise", "abstain",
                                                        "all_of", "adapt", "read", "write", "normalise", "se", "ci")],
+    "api/testing.md": [("yait_aichain.testing", n) for n in ("ScriptedModel", "call", "recorded", "Request")],
     "api/errors.md": [("yait_aichain", n) for n in ("APIError", "AuthenticationError", "RateLimitError",
                                                     "InvalidRequestError", "ContextWindowExceededError", "NotFoundError", "ServerError",
                                                     "NetworkError", "InsufficientCreditsError",

@@ -100,10 +100,12 @@ def active(owner) -> Run | None:
 @contextlib.contextmanager
 def opened(run: Run):
     """Make *run* the current one for the duration."""
-    token = _ACTIVE.set(run)
+    from .._events import _RUN_ID
+    token, stamp = _ACTIVE.set(run), _RUN_ID.set(run)
     try:
         yield run
     finally:
+        _RUN_ID.reset(stamp)
         _ACTIVE.reset(token)
 
 
