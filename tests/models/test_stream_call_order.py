@@ -26,7 +26,7 @@ class TestOrder(unittest.TestCase):
         self.assertEqual([c.name for c in a.request().calls], [f"t{i}" for i in range(12)])
 
     def test_two_google_calls_in_two_events_are_two_calls(self):
-        client = Model("gemini-2.5-flash", api_key="k").client
+        client = Model("gemini-3.1-flash-lite", api_key="k").client
         a = _ToolCallAssembly()
         for name, args in (("first", {"q": 1}), ("second", {"q": 2})):
             event = {"candidates": [{"index": 0, "content": {"parts": [

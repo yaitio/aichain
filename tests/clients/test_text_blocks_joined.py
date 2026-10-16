@@ -28,7 +28,7 @@ class TestJoined(unittest.TestCase):
         r = {"candidates": [{"content": {"parts": [{"text": "thinking", "thought": True},
                                                    {"text": "One, "}, {"text": "two."}]},
                              "finishReason": "STOP"}]}
-        self.assertEqual(Model("gemini-2.5-flash", api_key="k").from_response(r, OUT), "One, two.")
+        self.assertEqual(Model("gemini-3.1-flash-lite", api_key="k").from_response(r, OUT), "One, two.")
 
     def test_responses_api(self):
         r = {"status": "completed", "output": [{"type": "message", "content": [

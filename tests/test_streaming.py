@@ -216,7 +216,7 @@ FAMILIES = {
                   {"type": "message_delta", "usage": {"output_tokens": 3}}],
     },
     "google": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.1-flash-lite",
         "text":  lambda t: {"candidates": [
             {"content": {"parts": [{"text": t}]}}]},
         "empty": {"candidates": [{"content": {"parts": []}}]},
@@ -308,7 +308,7 @@ class TestTheTrapsPerFamily(unittest.TestCase):
         """`:streamGenerateContent` without `alt=sse` answers with one JSON
         array streamed as a single document — parseable only when complete,
         which is a slower non-stream wearing a stream's name."""
-        m = Model("gemini-2.5-flash", api_key="k")
+        m = Model("gemini-3.1-flash-lite", api_key="k")
         path, _ = m.client.build_stream_request(
             [{"role": "user", "parts": [{"type": "text", "text": "hi"}]}],
             {"format": {"type": "text"}}, m._params())
@@ -461,7 +461,7 @@ class TestToolCallsSurviveAStream(unittest.TestCase):
         """`args` is already an object, not a JSON string — the one family
         that needs no reassembly, handled by the same assembler rather than
         by a special case."""
-        _, skill = self._stream("gemini-2.5-flash", [
+        _, skill = self._stream("gemini-3.1-flash-lite", [
             {"candidates": [{"content": {"parts": [
                 {"functionCall": {"name": "echo",
                                   "args": {"value": "one"}}}]}}]},

@@ -39,7 +39,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Anthropic | 14 | — | 14 | — |
 | Black Forest Labs (FLUX) | — | 11 | — | 2 |
 | DeepSeek | 4 | — | — | — |
-| Google AI | 8 | 5 | 8 | 5 |
+| Google AI | 6 | 5 | 6 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
 | Krea | — | 4 | — | 1 |
 | Meta (Muse) | 5 | — | 5 | — |
@@ -151,8 +151,6 @@ deepseek-v4-pro    # $1.32 in / $3.96 out per 1M tokens
 ### `text-to-text`
 
 ```
-gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
 gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
 gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
 gemini-3.1-pro-preview  # $2 in / $12 out per 1M tokens
@@ -174,8 +172,6 @@ gemini-nano-banana-2.1       # per_image $0.0336
 ### `image-to-text`
 
 ```
-gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
 gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
 gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
 gemini-3.1-pro-preview  # $2 in / $12 out per 1M tokens

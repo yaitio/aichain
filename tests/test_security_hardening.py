@@ -43,7 +43,7 @@ class TestHardening(unittest.TestCase):
         _, body, _ = Model("claude-sonnet-4-5", api_key="k").build(msgs, {"format": {"type": "text"}})
         block = body["messages"][-1]["content"][0]
         self.assertTrue(block["is_error"])
-        _, body, _ = Model("gemini-2.5-flash", api_key="k").build(msgs, {"format": {"type": "text"}})
+        _, body, _ = Model("gemini-3.1-flash-lite", api_key="k").build(msgs, {"format": {"type": "text"}})
         self.assertIn("error", body["contents"][-1]["parts"][0]["functionResponse"]["response"])
 
     def test_a_page_cannot_close_its_fence(self):

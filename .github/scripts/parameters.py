@@ -81,7 +81,7 @@ IMAGE_FORMAT = {
 TEXT_MODELS = [
     "gpt-4o", "gpt-5.5",
     "claude-sonnet-4-6",
-    "gemini-2.5-flash",
+    "gemini-3.1-flash-lite",
     "deepseek-chat", "deepseek-reasoner",
     "kimi-k2.6",
     "grok-3", "grok-3-mini",

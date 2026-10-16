@@ -22,7 +22,7 @@ OPENAI_EDIT = {"usage": {
     "output_tokens_details": {"image_tokens": 196, "text_tokens": 0},
     "total_tokens": 1239}}
 
-# gemini-2.5-flash asked the colour of a 64x64 square
+# gemini-3.1-flash-lite asked the colour of a 64x64 square
 GOOGLE_VISION = {"usageMetadata": {
     "promptTokenCount": 267, "candidatesTokenCount": 1, "totalTokenCount": 503,
     "promptTokensDetails": [{"modality": "TEXT", "tokenCount": 9},

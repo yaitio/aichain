@@ -46,10 +46,10 @@ class TestEveryFamily(unittest.TestCase):
 
     def test_gemini(self):
         with self.assertRaises(TruncatedResponseError):
-            _parse("gemini-2.5-flash", {"candidates": [{"finishReason": "MAX_TOKENS",
+            _parse("gemini-3.1-flash-lite", {"candidates": [{"finishReason": "MAX_TOKENS",
                                                         "content": {"parts": []}}]})
         with self.assertRaisesRegex(ValueError, "SAFETY"):
-            _parse("gemini-2.5-flash", {"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]})
+            _parse("gemini-3.1-flash-lite", {"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]})
 
     def test_prose_cut_short_is_still_returned(self):
         self.assertEqual(_parse("deepseek-chat", {"choices": [{"message": {"content": "Partial"},
@@ -59,7 +59,7 @@ class TestEveryFamily(unittest.TestCase):
 class TestGeminiLeavesRoomToAnswer(unittest.TestCase):
 
     def test_a_thinking_budget_above_the_limit_raises_the_limit(self):
-        m = Model("gemini-2.5-flash", api_key="k", options={"reasoning": "high", "max_tokens": 1000})
+        m = Model("gemini-3.1-flash-lite", api_key="k", options={"reasoning": "high", "max_tokens": 1000})
         _, body = m.to_request([{"role": "user", "parts": [{"type": "text", "text": "hi"}]}], OUT)
         cfg = body["generationConfig"]
         self.assertGreater(cfg["maxOutputTokens"], cfg["thinkingConfig"]["thinkingBudget"])

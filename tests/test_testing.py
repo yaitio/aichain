@@ -111,7 +111,7 @@ class TestRecorded(unittest.TestCase):
         return model, rec, skill, out
 
     def test_every_text_family_answers_and_is_priced(self):
-        for name in ("gpt-5.5", "gpt-4o", "claude-haiku-5-5", "gemini-2.5-flash", "deepseek-chat"):
+        for name in ("gpt-5.5", "gpt-4o", "claude-haiku-5-5", "gemini-3.1-flash-lite", "deepseek-chat"):
             with self.subTest(model=name):
                 _, rec, skill, out = self._run(name)
                 self.assertEqual(out, "hello")
@@ -119,7 +119,7 @@ class TestRecorded(unittest.TestCase):
                 self.assertGreater(skill.last_usage.cost, 0)
 
     def test_the_key_is_a_fingerprint(self):
-        for name in ("gpt-4o", "claude-haiku-5-5", "gemini-2.5-flash"):
+        for name in ("gpt-4o", "claude-haiku-5-5", "gemini-3.1-flash-lite"):
             with self.subTest(model=name):
                 _, rec, _, _ = self._run(name)
                 text = json.dumps(rec.requests[0].headers, ensure_ascii=False)

@@ -53,7 +53,7 @@ _OUT_T = {"modalities": ["text"], "format": {"type": "text"}}
 _OUT_J = {"modalities": ["text"], "format": {"type": "json"}}
 
 _SAMPLE = {"openai": "gpt-4o", "anthropic": "claude-sonnet-4-6",
-           "google": "gemini-2.5-flash", "xai": "grok-3",
+           "google": "gemini-3.1-flash-lite", "xai": "grok-3",
            "perplexity": "sonar-pro", "kimi": "kimi-k2-0905-preview",
            "deepseek": "deepseek-chat", "qwen": "qwen-max"}
 

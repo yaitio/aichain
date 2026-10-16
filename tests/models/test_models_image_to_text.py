@@ -11,7 +11,7 @@ Covers:
 Providers with vision:
   OpenAI     gpt-4o          image_url content block
   Anthropic  claude-opus-4-6 source.type=url / source.type=base64
-  Google     gemini-2.5-flash fileData (URL) / inlineData (base64)
+  Google     gemini-3.1-flash-lite fileData (URL) / inlineData (base64)
   xAI        grok-3          image_url (same as OpenAI)
   Kimi       kimi-k2.5       image_url (OpenAI-compatible)
   Qwen       qwen-vl-max     image_url (OpenAI-compatible)
@@ -154,7 +154,7 @@ class TestAnthropicVisionToRequest(unittest.TestCase):
 class TestGoogleVisionToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = Model("gemini-2.5-flash")
+        self.model = Model("gemini-3.1-flash-lite")
 
     def _get_user_parts(self, messages):
         _, body = self.model.to_request(messages, _TEXT_OUTPUT)
@@ -269,7 +269,7 @@ class TestVisionFromResponse(unittest.TestCase):
         self.assertEqual(result, "A tabby cat.")
 
     def test_google_extracts_description(self):
-        result = Model("gemini-2.5-flash").from_response(
+        result = Model("gemini-3.1-flash-lite").from_response(
             self._google_resp("An orange cat."), _TEXT_OUTPUT
         )
         self.assertEqual(result, "An orange cat.")
@@ -352,7 +352,7 @@ class TestAnthropicVisionLive(unittest.TestCase):
 @unittest.skipUnless(_GOOGLE_REAL, "Set a real GOOGLE_AI_API_KEY to run live vision tests")
 class TestGoogleVisionLive(unittest.TestCase):
     def test_identifies_cat(self):
-        result = _vision_skill("gemini-2.5-flash").run()
+        result = _vision_skill("gemini-3.1-flash-lite").run()
         self.assertIsInstance(result, str)
         self.assertGreater(len(result), 0)
 

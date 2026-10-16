@@ -509,7 +509,7 @@ class TestGoogleKeyInHeader(unittest.TestCase):
     def test_model_path_has_no_key(self):
         from yait_aichain.models import Model
 
-        m = Model("gemini-2.5-pro", api_key="SECRET")
+        m = Model("gemini-3.1-pro-preview", api_key="SECRET")
         path, _body = m.to_request(_MSG, _OUT)
         self.assertNotIn("SECRET", path)
         self.assertIn("x-goog-api-key",

@@ -40,7 +40,7 @@ class TestOneLevelManyScales(unittest.TestCase):
         _, anthropic = _body("claude-sonnet-4-6", {"reasoning": "medium"})
         self.assertEqual(anthropic["thinking"]["budget_tokens"], 10000)
 
-        _, google = _body("gemini-2.5-flash", {"reasoning": "medium"})
+        _, google = _body("gemini-3.1-flash-lite", {"reasoning": "medium"})
         self.assertEqual(
             google["generationConfig"]["thinkingConfig"]["thinkingBudget"], 8192)
 

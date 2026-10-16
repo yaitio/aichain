@@ -50,7 +50,7 @@ class TestItReachesTheWire(unittest.TestCase):
         self.assertEqual(body["temperature"], 1.9)
 
     def test_it_works_on_every_provider(self):
-        for name in ("gpt-4o", "claude-fable-5", "gemini-2.5-flash",
+        for name in ("gpt-4o", "claude-fable-5", "gemini-3.1-flash-lite",
                      "deepseek-chat", "sonar"):
             with self.subTest(model=name):
                 body = _build(Model(name, api_key="k",

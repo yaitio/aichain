@@ -66,7 +66,7 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — vendor · the Gemini 2.x default (1.5 used 0.9)
 - `top_p` — vendor · Google's recommended default for controlled generation
 - `top_k` — vendor · Google's default for Gemini 2.x Flash; 1.5 Pro used 64
-- `max_tokens` — ours · applies to every current Gemini; 2.5-pro takes up to 65536 with thinking off
+- `max_tokens` — ours · applies to every current Gemini
 
 **`kimi`**
 
@@ -248,7 +248,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `gpt-4o` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `gpt-5.5` | — | — | — | → `max_output_tokens` | → `effort` | — |
 | `claude-sonnet-4-6` | ✓ | ✓ | ✓ | ✓ | ≈ `budget_tokens, max_tokens, type` | ≈ `text, type` |
-| `gemini-2.5-flash` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `maxOutputTokens, thinkingBudget` | — |
+| `gemini-3.1-flash-lite` | ✓ | → `topP` | → `topK` | → `maxOutputTokens` | ≈ `maxOutputTokens, thinkingBudget` | — |
 | `deepseek-chat` | ✓ | ✓ | — | ✓ | ⇄ `deepseek-chat → deepseek-reasoner` | — |
 | `deepseek-reasoner` | — | — | — | ✓ | — | — |
 | `kimi-k2.6` | ✓ | ✓ | — | ✓ | ≈ `type` | — |

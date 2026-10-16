@@ -115,25 +115,25 @@ class TestAnthropicReasoning(unittest.TestCase):
 class TestGoogleReasoning(unittest.TestCase):
 
     def test_reasoning_high_adds_thinking_config(self):
-        model = Model("gemini-2.5-pro", options={"reasoning": "high"})
+        model = Model("gemini-3.1-pro-preview", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 24576)
 
     def test_reasoning_medium_budget(self):
-        model = Model("gemini-2.5-pro", options={"reasoning": "medium"})
+        model = Model("gemini-3.1-pro-preview", options={"reasoning": "medium"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 8192)
 
     def test_reasoning_low_budget(self):
-        model = Model("gemini-2.5-pro", options={"reasoning": "low"})
+        model = Model("gemini-3.1-pro-preview", options={"reasoning": "low"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         tc = body["generationConfig"].get("thinkingConfig", {})
         self.assertEqual(tc.get("thinkingBudget"), 2048)
 
     def test_no_reasoning_omits_thinking_config(self):
-        model = Model("gemini-2.5-flash")
+        model = Model("gemini-3.1-flash-lite")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("thinkingConfig", body.get("generationConfig", {}))
 
@@ -298,7 +298,7 @@ class TestAnthropicJsonOutput(unittest.TestCase):
 class TestGoogleJsonOutput(unittest.TestCase):
 
     def test_json_sets_response_mime_type(self):
-        model  = Model("gemini-2.5-flash")
+        model  = Model("gemini-3.1-flash-lite")
         output = {"modalities": ["text"], "format": {"type": "json"}}
         _, body = model.to_request(_USER_MSG, output)
         self.assertEqual(
@@ -307,7 +307,7 @@ class TestGoogleJsonOutput(unittest.TestCase):
         )
 
     def test_json_schema_sets_response_schema(self):
-        model  = Model("gemini-2.5-flash")
+        model  = Model("gemini-3.1-flash-lite")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
         gc = body["generationConfig"]

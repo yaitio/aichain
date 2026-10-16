@@ -95,7 +95,7 @@ class TestTheHelloWorldStillRuns(unittest.TestCase):
     def test_the_provider_swaps_with_one_word(self):
         """The sentence under the example — "change this one word" — is the
         library's whole pitch, so it is a test and not a claim."""
-        for name in ("claude-sonnet-4-6", "gpt-4o", "gemini-2.5-pro",
+        for name in ("claude-sonnet-4-6", "gpt-4o", "gemini-3.1-pro-preview",
                      "grok-3"):
             with self.subTest(model=name):
                 skill = Skill(

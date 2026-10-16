@@ -92,7 +92,7 @@ class TestTheWholePath(unittest.TestCase):
     and not the path.
 
     Measured on the real path afterwards, sighted vs blind, three trials each:
-    gpt-4o-mini 3/6 → 6/6, gemini-2.5-flash 0/6 → 5/6, blind 0/6 throughout.
+    gpt-4o-mini 3/6 → 6/6, gemini-3.1-flash-lite 0/6 → 5/6, blind 0/6 throughout.
     """
 
     def _as_the_agent_does(self, result):

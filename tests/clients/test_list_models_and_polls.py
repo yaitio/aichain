@@ -29,7 +29,7 @@ class TestPages(unittest.TestCase):
         self.assertIn("after_id=a", client._get.call_args_list[1].args[0])
 
     def test_google_follows_the_page_token(self):
-        client = Model("gemini-2.5-flash", api_key="k").client
+        client = Model("gemini-3.1-flash-lite", api_key="k").client
         pages = [{"models": [{"name": "models/x"}], "nextPageToken": "t2"},
                  {"models": [{"name": "models/y"}]}]
         client._get = MagicMock(side_effect=[json.dumps(p).encode() for p in pages])

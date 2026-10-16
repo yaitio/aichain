@@ -59,7 +59,7 @@ class TestTheReportIsTrue(unittest.TestCase):
 
     def test_a_conversion_is_called_a_conversion(self):
         for name, sent in (("claude-sonnet-4-6", "thinking"),
-                           ("gemini-2.5-flash", "thinkingConfig.thinkingBudget")):
+                           ("gemini-3.1-flash-lite", "thinkingConfig.thinkingBudget")):
             with self.subTest(model=name):
                 made, _, _ = _build(name, reasoning="high")
                 a, = _for(made, "reasoning")

@@ -48,7 +48,7 @@ no key at all (see [Private models](../models/private-models.md)).
 Model("claude-fable-5")           # reads ANTHROPIC_API_KEY
 Model("flux-2-flex")              # reads BFL_API_KEY
 Model("deepseek-chat")            # reads DEEPSEEK_API_KEY
-Model("gemini-2.5-flash")         # reads GOOGLE_AI_API_KEY
+Model("gemini-3-flash-preview")   # reads GOOGLE_AI_API_KEY
 Model("kimi-k2.6")                # reads MOONSHOT_API_KEY
 Model("krea-2-large")             # reads KREA_API_KEY
 Model("muse-spark-1.1")           # reads META_API_KEY

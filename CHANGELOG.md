@@ -28,6 +28,13 @@
   written for one provider runs on another; a level outside none, low,
   medium and high is still refused, now naming them.
 
+### Removed
+
+- `gemini-2.5-pro` and `gemini-2.5-flash`: the 2.5 generation refuses a JSON
+  schema beside tools (HTTP 400, "Function calling with a response mime type
+  is unsupported"), which every Gemini 3.x takes; six 3.x models replace
+  them. `gemini-2.5-flash-image` stays.
+
 ### Fixed
 
 - Mistral Large 4, Medium 3.5 and Small 2603 answered HTTP 400 to

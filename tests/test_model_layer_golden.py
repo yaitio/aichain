@@ -47,8 +47,8 @@ _GOLDEN = {
         "scalars": {"model": "claude-sonnet-4-6", "max_tokens": 8192,
                     "temperature": 1.0, "system": "Be helpful."},
         "system_in_messages": False, "json_adds": None},
-    "google": {"name": "gemini-2.5-flash",
-        "path": "/models/gemini-2.5-flash:generateContent",
+    "google": {"name": "gemini-3.1-flash-lite",
+        "path": "/models/gemini-3.1-flash-lite:generateContent",
         "scalars": None, "system_in_messages": False, "json_adds": None},
     "xai": {"name": "grok-3", "path": "/v1/chat/completions",
         "scalars": {"model": "grok-3", "max_completion_tokens": 16384,
@@ -116,7 +116,7 @@ class TestModelLayerGolden(unittest.TestCase):
                 self.assertNotIn(spec["json_adds"], bt)
 
     def test_google_generation_config(self):
-        _, body = Model("gemini-2.5-flash", api_key="k").to_request(_MSG_SYS, _OUT_TEXT)
+        _, body = Model("gemini-3.1-flash-lite", api_key="k").to_request(_MSG_SYS, _OUT_TEXT)
         gc = body["generationConfig"]
         self.assertEqual(gc.get("temperature"), 1.0)
         self.assertEqual(gc.get("maxOutputTokens"), 8192)
@@ -158,7 +158,7 @@ class TestModalityGolden(unittest.TestCase):
         _, b = Model("claude-sonnet-4-6", api_key="k").to_request(msg, self._TEXT)
         self.assertEqual([c.get("type") for c in b["messages"][0]["content"]],
                          ["text", "image"])
-        _, b = Model("gemini-2.5-flash", api_key="k").to_request(msg, self._TEXT)
+        _, b = Model("gemini-3.1-flash-lite", api_key="k").to_request(msg, self._TEXT)
         self.assertEqual([list(p.keys())[0] for p in b["contents"][0]["parts"]],
                          ["text", "inlineData"])
 
@@ -166,7 +166,7 @@ class TestModalityGolden(unittest.TestCase):
         vid = [{"role": "user", "parts": [
             {"type": "video",
              "source": {"kind": "url", "url": "http://v.mp4", "mime": "video/mp4"}}]}]
-        _, bg = Model("gemini-2.5-flash", api_key="k").to_request(vid, self._TEXT)
+        _, bg = Model("gemini-3.1-flash-lite", api_key="k").to_request(vid, self._TEXT)
         self.assertEqual([list(p.keys())[0] for p in bg["contents"][0]["parts"]],
                          ["fileData"])
         _, bo = Model("gpt-4o", api_key="k").to_request(vid, self._TEXT)

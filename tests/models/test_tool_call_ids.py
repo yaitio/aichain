@@ -26,7 +26,7 @@ class TestIds(unittest.TestCase):
         self.assertTrue(all(ids))
 
     def test_gemini_two_calls_to_one_function(self):
-        m = Model("gemini-2.5-flash", api_key="k")
+        m = Model("gemini-3.1-flash-lite", api_key="k")
         reply = m.from_response({"candidates": [{"content": {"parts": [
             {"functionCall": {"name": "look", "args": {"q": 1}}},
             {"functionCall": {"name": "look", "args": {"q": 2}}}]}}]}, OUT)

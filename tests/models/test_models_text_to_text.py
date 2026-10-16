@@ -70,7 +70,7 @@ class TestModelFactory(unittest.TestCase):
         self.assertEqual(Model("claude-opus-4-6")._provider, "anthropic")
 
     def test_gemini_routes_to_google(self):
-        self.assertEqual(Model("gemini-2.5-flash")._provider, "google")
+        self.assertEqual(Model("gemini-3.1-flash-lite")._provider, "google")
 
     def test_grok_routes_to_xai(self):
         self.assertEqual(Model("grok-3")._provider, "xai")
@@ -196,11 +196,11 @@ class TestAnthropicToRequest(unittest.TestCase):
 class TestGoogleToRequest(unittest.TestCase):
 
     def setUp(self):
-        self.model = Model("gemini-2.5-flash")
+        self.model = Model("gemini-3.1-flash-lite")
 
     def test_path_contains_model_name(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
-        self.assertIn("gemini-2.5-flash", path)
+        self.assertIn("gemini-3.1-flash-lite", path)
 
     def test_path_contains_generate_content(self):
         path, _ = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
@@ -466,7 +466,7 @@ class TestAnthropicFromResponse(unittest.TestCase):
 class TestGoogleFromResponse(unittest.TestCase):
 
     def setUp(self):
-        self.model = Model("gemini-2.5-flash")
+        self.model = Model("gemini-3.1-flash-lite")
 
     def test_extracts_text_from_candidates(self):
         response = {
@@ -612,7 +612,7 @@ class TestGoogleLive(unittest.TestCase):
     def test_text_round_trip(self):
         from yait_aichain.skills import Skill
         skill = Skill(
-            model         = Model("gemini-2.5-flash"),
+            model         = Model("gemini-3.1-flash-lite"),
             input         = {"messages": [{"role": "user", "parts": [{"type": "text", "text": "Say 'ok'"}]}]},
         )
         result = skill.run()

@@ -37,7 +37,7 @@ def _body(name):
 class TestParallelResults(unittest.TestCase):
 
     def test_gemini_gets_one_content_with_every_response(self):
-        contents = _body("gemini-2.5-flash")["contents"]
+        contents = _body("gemini-3.1-flash-lite")["contents"]
         responses = [c for c in contents if any("functionResponse" in p for p in c["parts"])]
         self.assertEqual(len(responses), 1)
         self.assertEqual(len(responses[0]["parts"]), 2)
