@@ -113,6 +113,7 @@ class Gate(Tool):
         if decision is True:
             return self._tool.run(**kwargs)            # approved → run the action
         if decision is False:
-            return {self._decision_key: False, "skipped": True}
+            # The whole answer, so a refusal's reason reaches the model.
+            return {**_signal, "skipped": True}
         raise TypeError(f"gate {self.name!r} resumes with {{{self._decision_key!r}: True}} or "
                         f"{{{self._decision_key!r}: False}}; got {_signal!r}")

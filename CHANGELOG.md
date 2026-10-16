@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.10.1] — 2026-10-17
+
+### Fixed
+
+- A gate a person refused told the model only `{"approved": false,
+  "skipped": true}`: the rest of the answer — the manager's `note`, the reason
+  — was dropped, so the agent could not tell the customer why. The whole
+  answer now reaches the model, with `skipped: true` beside it. Found
+  building the `desk` cookbook.
+
 ## [4.10.0] — 2026-10-17
 
 ### Fixed

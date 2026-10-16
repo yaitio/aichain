@@ -85,6 +85,12 @@ class TestAGateOpensOnTrueAlone(unittest.TestCase):
         ran: list = []
         return Gate(wipe), ran
 
+    def test_a_refusal_carries_its_reason_to_the_model(self):
+        gate, ran = self._gate()
+        result = gate.run({"approved": False, "note": "outside the return window"}, table="t")
+        self.assertEqual(result, {"approved": False, "note": "outside the return window", "skipped": True})
+        self.assertEqual(ran, [])
+
     def test_only_the_boolean_true_runs_it(self):
         gate, ran = self._gate()
         self.assertEqual(gate.run({"approved": True}, table="t"), "wiped")
