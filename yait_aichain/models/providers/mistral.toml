@@ -54,14 +54,20 @@ field = "reasoning_effort"
 [models."mistral-large-4-0"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.36, output = 4.18, cache_read = 0.14 }
+reasoning_map = { low = "none", medium = "none" }   # HTTP 400 on low and medium: none or high, 2026-10-16
+reasoning_why = "this model takes reasoning_effort none or high; low and medium go as none"
 
 [models."mistral-medium-3-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.5, output = 7.5 }
+reasoning_map = { low = "none", medium = "none" }   # HTTP 400 on low and medium: none or high, 2026-10-16
+reasoning_why = "this model takes reasoning_effort none or high; low and medium go as none"
 
 [models."mistral-small-2603"]
 caps  = ["text-to-text"]
 price = { input = 0.15, output = 0.6 }
+reasoning_map = { low = "none", medium = "none" }   # HTTP 400 on low and medium: none or high, 2026-10-16
+reasoning_why = "this model takes reasoning_effort none or high; low and medium go as none"
 
 [models."ministral-14b-2512"]
 caps  = ["image-to-text", "text-to-text"]

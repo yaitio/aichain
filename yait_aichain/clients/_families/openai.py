@@ -97,6 +97,7 @@ class OpenAIClient(BaseClient):
     # ── format: model params → provider body ─────────────────────────
     def _wrap(self, params: dict):
         prov = self._data["provider"]
+        own = self._data.get("models", {}).get(params["name"], {})
         return SimpleNamespace(
             name             = params["name"],
             temperature      = params.get("temperature"),
@@ -104,7 +105,10 @@ class OpenAIClient(BaseClient):
             top_p            = params.get("top_p"),
             top_k            = params.get("top_k"),
             reasoning        = params.get("reasoning"),
-            _REASONING_MAP   = prov.get("reasoning_map", {}),
+            # A model may name its own levels over the provider's — Mistral
+            # Large 4 takes none and high only.
+            _REASONING_MAP   = {**prov.get("reasoning_map", {}), **own.get("reasoning_map", {})},
+            _REASONING_WHY   = own.get("reasoning_why"),
             _DEFAULT_MAX_TOKENS = prov["defaults"]["max_tokens"],
             # Parameters this model's API refuses. Carried on the wrapper
             # because that is all a request builder receives.
@@ -395,7 +399,7 @@ class OpenAIClient(BaseClient):
                 record(Adaptation(
                     kind=ADAPTED, option="reasoning", asked=level,
                     sent=", ".join([f"{field}={value}"] * levelled + list(extra or {})),
-                    model=m.name, why=how.get("why", "sent as this provider's reasoning setting")))
+                    model=m.name, why=m._REASONING_WHY or how.get("why", "sent as this provider's reasoning setting")))
         fmt = output.get("format", {})
         if fmt.get("type") == "json_schema" and not (prov.get("options") or {}).get("json_schema", True):
             # The provider takes JSON but not a schema: ask for JSON and carry

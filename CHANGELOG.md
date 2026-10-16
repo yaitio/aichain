@@ -30,6 +30,10 @@
 
 ### Fixed
 
+- Mistral Large 4, Medium 3.5 and Small 2603 answered HTTP 400 to
+  `reasoning="low"` or `"medium"`: they take none or high. Those two levels go
+  as `none` there, said in the notice. A model can now carry its own
+  `reasoning_map` over its provider's.
 - The thinking beside a tool call is read from `message.reasoning` as well
   as `reasoning_content`: vLLM renamed the field, and OpenRouter uses the
   new name.

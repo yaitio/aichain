@@ -195,6 +195,16 @@ class TestXiaomiAndStepFun(unittest.TestCase):
         self.assertNotIn("reasoning_effort", body)
         self.assertIn(("declined", "reasoning"), {(a.kind, a.option) for a in made})
 
+    def test_mistral_large_4_sends_low_and_medium_as_none_and_says_so(self):
+        for level, sent in (("low", "none"), ("medium", "none"), ("high", "high")):
+            with self.subTest(level=level), warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                _, body, made = Model("mistral-large-4-0", options={"reasoning": level},
+                                      api_key="k").build(MSGS, {"format": {"type": "text"}})
+                self.assertEqual(body["reasoning_effort"], sent)
+                note = next(a for a in made if a.option == "reasoning")
+                self.assertIn("none or high", note.why)
+
     def test_stepfun_sends_a_level(self):
         _, _, body = _request("step-5-preview", {"reasoning": "low"})
         self.assertEqual(body["reasoning_effort"], "low")
