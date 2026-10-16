@@ -1,0 +1,33 @@
+# The scenarios, and the state each must end in. run.py and simulate.py both
+# play them from here; --check scores the end state, not the wording.
+
+[[scenario]]
+id       = "small-refund"
+order    = "A-1007"
+message  = "My order A-1007 arrived broken, I want a refund."
+refunded = true
+parked   = false
+
+[[scenario]]
+id       = "big-refund-approved"
+order    = "A-1031"
+message  = "My order A-1031 arrived broken, I want a refund."
+approval = { approved = true, note = "approved" }
+refunded = true
+parked   = true
+
+[[scenario]]
+id       = "big-refund-refused"
+order    = "A-1042"
+message  = "My order A-1042 arrived broken, I want a refund."
+approval = { approved = false, note = "outside the return window" }
+refunded = false
+parked   = true
+mentions = "return window"
+
+[[scenario]]
+id       = "where-is-it"
+order    = "A-1003"
+message  = "Where is order A-1003?"
+refunded = false
+parked   = false
