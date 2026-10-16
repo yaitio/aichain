@@ -608,7 +608,9 @@ class Skill:
         if kind in ("json", "json_schema"):
             return parse_structured("".join(pieces),
                                     fmt.get("schema") if kind == "json_schema" else None,
-                                    strip_fences=True)
+                                    strip_fences=True,
+                                    finish_reason="max_tokens" if getattr(outcome, "truncated", False)
+                                    else "")
         return "".join(pieces)
 
     # ------------------------------------------------------------------

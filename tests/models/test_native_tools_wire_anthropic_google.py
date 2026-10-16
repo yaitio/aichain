@@ -81,13 +81,13 @@ class TestAnthropicWire(unittest.TestCase):
                          ["tool_result", "tool_result"])
         self.assertEqual([b["tool_use_id"] for b in results], ["t1", "t2"])
 
-    def test_tools_plus_json_schema_is_a_stated_conflict(self):
-        with self.assertRaises(ValueError) as ctx:
-            self._body(tools=[SEARCH],
-                       out={"modalities": ["text"],
-                            "format": {"type": "json_schema", "name": "r",
-                                       "schema": {"type": "object"}}})
-        self.assertIn("forced tool call", str(ctx.exception))
+    def test_tools_plus_json_schema_go_together(self):
+        body = self._body(tools=[SEARCH],
+                          out={"modalities": ["text"],
+                               "format": {"type": "json_schema", "name": "r",
+                                          "schema": {"type": "object"}}})
+        self.assertEqual([t["name"] for t in body["tools"]], ["search"])
+        self.assertIn("format", body["output_config"])
 
     def test_response_tool_use_parses_to_typed_calls(self):
         m = Model("claude-opus-5", api_key="k")

@@ -34,6 +34,30 @@ max_tokens  = 8192
 temperature = "vendor · Anthropic's API default. The range here is 0.0-1.0, not 0-2"
 max_tokens  = "ours · the API *requires* the field, so a number had to be picked; 8192 is safe across the family and Claude 4 takes up to 64000"
 top_p       = "ours · left unset on purpose: Anthropic asks for temperature or top_p, not both"
+# What each model takes, which the family code reads and never infers from a
+# name. Measured against the API 2026-10-16, every model below, raw requests:
+#   structured   "output_config" — output_config.format, every model here; or
+#                "forced_tool" — a synthetic tool and a forced tool_choice.
+#   reasoning    "budget" — thinking.type enabled with budget_tokens (4.6 and
+#                earlier); "adaptive" — thinking.type adaptive plus
+#                output_config.effort (4.7 and later reject a budget).
+#   thinking_off how reasoning="none" is said: "disabled"; "between_tools"
+#                (Sonnet 5.5's lowest); "never" (always thinks: Opus 5.5, Fable).
+#   sampling     "free"; or "fixed" — 4.7 and later reject a temperature other
+#                than 1 and any top_p or top_k ("deprecated for this model").
+#   forced_tools whether tool_choice "tool"/"any" is taken (Opus 5.5, Sonnet
+#                5.5 and Fable 5.1 refuse it).
+# A model not listed gets these, the newest generation's.
+[provider.mechanisms]
+structured   = "output_config"
+reasoning    = "adaptive"
+thinking_off = "disabled"
+sampling     = "fixed"
+forced_tools = false
+
+[provider.reasoning]
+off = true
+
 [provider.reasoning_map]
 low = 4000
 medium = 10000
@@ -47,60 +71,85 @@ high = 20000
 [models."claude-fable-5-1"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 10.0, output = 50.0, cache_read = 0.25 }
+thinking_off = "never"
 
 [models."claude-fable-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 10.0, output = 50.0, cache_read = 1.0 }
+forced_tools = true
+thinking_off = "never"
 
 [models."claude-opus-5-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 4.0, output = 20.0, cache_read = 0.20 }
+thinking_off = "never"
 
 [models."claude-opus-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+forced_tools = true
 
 [models."claude-opus-4-8"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+forced_tools = true
 
 [models."claude-opus-4-7"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+forced_tools = true
 
 [models."claude-opus-4-6"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+reasoning = "budget"
+sampling = "free"
+forced_tools = true
 
 [models."claude-opus-4-5-20251101"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 5.0, output = 25.0 }
+reasoning = "budget"
+sampling = "free"
+forced_tools = true
 
 [models."claude-sonnet-5-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 2.0, output = 10.0, cache_read = 0.10 }
+thinking_off = "between_tools"
 
 # The introductory 2.0/10.0 became the list price; the registry carried the
 # 3.0/15.0 it was expected to return to, and read half again too high.
 [models."claude-sonnet-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 2.0, output = 10.0 }
+forced_tools = true
 
 [models."claude-sonnet-4-6"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 3.0, output = 15.0 }
+reasoning = "budget"
+sampling = "free"
+forced_tools = true
 
 # Deprecated; retires 2026-11-30.
 [models."claude-sonnet-4-5-20250929"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 3.0, output = 15.0 }
+reasoning = "budget"
+sampling = "free"
+forced_tools = true
 
 # Past 100K prompt tokens the whole call is billed at the long-context rate —
 # five times the short one, so a long prompt is not a cheap call on this model.
 [models."claude-haiku-5-5"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 0.10, output = 0.50, cache_read = 0.01, long_context = { above = 100000, input = 0.50, output = 2.50 } }
+forced_tools = true
 
 [models."claude-haiku-4-5-20251001"]
 caps  = ["image-to-text", "text-to-text"]
 price = { input = 1.0, output = 5.0 }
+reasoning = "budget"
+sampling = "free"
+forced_tools = true

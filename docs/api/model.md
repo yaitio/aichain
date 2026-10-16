@@ -243,7 +243,7 @@ check_structure(value: object, schema: object, path: str = '$') -> list[str]
 Compare *value* against *schema*, returning one message per violation.
 
 Empty means nothing found, not full validity: types, required and
-unexpected properties, enums and array items are checked, recursively.
+unexpected properties, enums, items and limits, recursively.
 
 **Parameters**
 

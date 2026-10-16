@@ -27,10 +27,13 @@ def _build(output=TEXT, **options):
 
 class TestCombinations(unittest.TestCase):
 
-    def test_reasoning_with_a_schema_is_refused_here(self):
+    def test_reasoning_with_a_schema_goes_together(self):
+        # Structured output is output_config.format, not a forced tool, so it
+        # combines with thinking.
         schema = {"modalities": ["text"], "format": {"type": "json_schema", "schema": {"type": "object"}}}
-        with self.assertRaisesRegex(ValueError, "reasoning with output json_schema"):
-            _build(schema, reasoning="high")
+        body, _ = _build(schema, reasoning="high")
+        self.assertIn("thinking", body)
+        self.assertIn("format", body["output_config"])
 
     def test_top_p_drops_the_temperature(self):
         body, notes = _build(top_p=0.8, temperature=0.3)

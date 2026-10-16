@@ -40,12 +40,46 @@ def portable_schema(schema: object, target: str) -> object:
     raise ValueError(f"unknown target {target!r}; expected 'openai' or 'google'")
 
 
+#: (keyword, applies to, holds) — the limits a provider may strip from the
+#: schema it is sent (Anthropic's structured output takes none of them), so
+#: the answer is held to them here instead.
+_NUMBER = (int, float)
+_BOUNDS = (
+    ("minimum",          _NUMBER, lambda v, b: v >= b),
+    ("maximum",          _NUMBER, lambda v, b: v <= b),
+    ("exclusiveMinimum", _NUMBER, lambda v, b: v > b),
+    ("exclusiveMaximum", _NUMBER, lambda v, b: v < b),
+    ("multipleOf",       _NUMBER, lambda v, b: b == 0 or (v / b) == int(v / b)),
+    ("minLength",        str,     lambda v, b: len(v) >= b),
+    ("maxLength",        str,     lambda v, b: len(v) <= b),
+    ("minItems",         list,    lambda v, b: len(v) >= b),
+    ("maxItems",         list,    lambda v, b: len(v) <= b),
+    ("minProperties",    dict,    lambda v, b: len(v) >= b),
+    ("maxProperties",    dict,    lambda v, b: len(v) <= b),
+)
+
+
+def _bounds(value: object, schema: dict, path: str) -> list[str]:
+    out = []
+    for key, kind, holds in _BOUNDS:
+        bound = schema.get(key)
+        if (isinstance(bound, _NUMBER) and not isinstance(bound, bool)
+                and isinstance(value, kind) and not isinstance(value, bool)
+                and not holds(value, bound)):
+            out.append(f"{path}: {value!r} breaks {key}={bound!r}")
+    if schema.get("uniqueItems") is True and isinstance(value, list):
+        seen = [repr(v) for v in value]
+        if len(set(seen)) != len(seen):
+            out.append(f"{path}: items are not unique (uniqueItems)")
+    return out
+
+
 def check_structure(value: object, schema: object, path: str = "$") -> list[str]:
     """
     Compare *value* against *schema*, returning one message per violation.
 
     Empty means nothing found, not full validity: types, required and
-    unexpected properties, enums and array items are checked, recursively.
+    unexpected properties, enums, items and limits, recursively.
 
     Parameters
     ----------
@@ -76,6 +110,8 @@ def check_structure(value: object, schema: object, path: str = "$") -> list[str]
 
     if (enum := schema.get("enum")) is not None and value not in enum:
         problems.append(f"{path}: {value!r} is not one of {enum!r}")
+
+    problems.extend(_bounds(value, schema, path))
 
     if isinstance(value, dict):
         props = schema.get("properties") or {}

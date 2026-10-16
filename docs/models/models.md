@@ -58,7 +58,8 @@ You ask for `temperature`, `max_tokens`, `reasoning` the same way everywhere:
 <!-- /g:model-options -->
 
 `reasoning` is the clearest case of what one word has to do: it becomes a
-thinking budget of 10 000 tokens on Anthropic, 8 192 on Google, the word
+thinking budget of 10 000 tokens on Claude 4.5 and 4.6, adaptive thinking at
+that effort on Claude 4.7 and later, 8 192 tokens on Google, the word
 `medium` on OpenAI, a flag on Qwen, and a different model on DeepSeek. You
 write it once.
 

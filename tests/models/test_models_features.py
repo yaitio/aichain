@@ -270,13 +270,12 @@ class TestOpenAIJsonOutput(unittest.TestCase):
 
 class TestAnthropicJsonOutput(unittest.TestCase):
 
-    def test_json_schema_adds_tool_and_tool_choice(self):
+    def test_json_schema_goes_as_output_config(self):
         model  = Model("claude-opus-4-6")
         output = {"modalities": ["text"], "format": {"type": "json_schema", "schema": _JSON_SCHEMA}}
         _, body = model.to_request(_USER_MSG, output)
-        self.assertIn("tools", body)
-        self.assertIn("tool_choice", body)
-        self.assertEqual(body["tool_choice"]["type"], "tool")
+        self.assertEqual(body["output_config"]["format"]["type"], "json_schema")
+        self.assertNotIn("tool_choice", body)
 
     def test_json_schema_from_response_returns_input_dict(self):
         model  = Model("claude-opus-4-6")

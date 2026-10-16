@@ -16,6 +16,28 @@
   Krea's own list applied to the request, references priced by their size.
   Verified live: Krea 2 Medium, Turbo and a Krea 3 edit at 2K.
 
+### Fixed
+
+- Claude 5.5 models refused structured output and reasoning with HTTP 400:
+  the library forced a tool call for a schema and sent a thinking budget,
+  and opus-5-5, sonnet-5-5 and fable-5-1 take neither. What each Claude
+  model takes is data now (`[provider.mechanisms]` and per model in
+  `anthropic.toml`), read live on all fourteen on 2026-10-16:
+  * a schema goes as `output_config.format` on every Claude model, so it
+    combines with tools and with reasoning where it used to be refused;
+    the keywords structured output does not take (`minLength`, `maximum`
+    and the like) are left out of what is sent, said once, and the answer
+    is still held to them — the structural check now covers numeric,
+    length and count limits on every provider;
+  * `reasoning` is a token budget on 4.5 and 4.6 and adaptive thinking at
+    that effort on 4.7 and later; `reasoning="none"` turns thinking off in
+    each model's own word, and on the three that cannot turn it off says so;
+  * `temperature` other than 1, `top_p` and `top_k` are declined on 4.7 and
+    later, which reject or deprecate them;
+  * a refusal (`stop_reason="refusal"`) raises as one instead of as invalid
+    JSON, and a streamed structured answer cut at `max_tokens` raises
+    `TruncatedResponseError` as a buffered one does.
+
 ## [4.7.0] — 2026-10-15
 
 ### Changed
