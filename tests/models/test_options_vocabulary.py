@@ -117,7 +117,7 @@ class TestFlagsCannotBeTracedByValue(unittest.TestCase):
     def test_a_boolean_needs_the_site_to_speak(self):
         """`cache_control=True` was matching an unrelated `enable_thinking=
         True` and reading as delivered."""
-        made = _adapt("QwQ-32B", {"cache_control": True})
+        made = _adapt("qwen3.7-flash", {"cache_control": True, "reasoning": "low"})
         self.assertEqual(made["cache_control"].kind, "declined")
 
     def test_and_is_believed_when_it_does(self):

@@ -249,8 +249,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `grok-3` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `grok-3-mini` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
-| `QwQ-32B` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
-| `qwen3-32b` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `enable_thinking` | — |
+| `qwen3.7-flash` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `enable_thinking` | — |
 | `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — |
 | `glm-5.3` | ✓ | ✓ | — | ✓ | → `reasoning_effort, type` | — |
 | `muse-spark-1.3` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |

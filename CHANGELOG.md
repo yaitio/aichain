@@ -40,6 +40,15 @@
     JSON, and a streamed structured answer cut at `max_tokens` raises
     `TruncatedResponseError` as a buffered one does.
 
+### Removed
+
+- Six models that no longer answer: `gemini-2.5-flash-lite` (Google: "no
+  longer available to new users"), and `qwen3-max`, `qwen3-235b-a22b`,
+  `qwen3-72b`, `qwen3-32b` and `QwQ-32B` (`model_not_found` since
+  2026-10-13; newer Qwen models replace them). The QwQ-only branch that
+  forced thinking on went with it. Found by a live sweep of every text model
+  in the registry, 2026-10-16.
+
 ## [4.7.0] — 2026-10-15
 
 ### Changed

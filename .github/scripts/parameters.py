@@ -77,7 +77,7 @@ IMAGE_FORMAT = {
 #: The set has to be wide enough to exercise what the data claims: three
 #: providers first showed as "claims an option no model delivers", and in all
 #: three the declaration was right and this list was short — grok-3-mini,
-#: QwQ-32B and gpt-image-1.5 were the models that take them.
+#: QwQ-32B (since removed) and gpt-image-1.5 were the models that take them.
 TEXT_MODELS = [
     "gpt-4o", "gpt-5.5",
     "claude-sonnet-4-6",
@@ -85,7 +85,7 @@ TEXT_MODELS = [
     "deepseek-chat", "deepseek-reasoner",
     "kimi-k2.6",
     "grok-3", "grok-3-mini",
-    "qwen-max", "QwQ-32B", "qwen3-32b",
+    "qwen-max", "qwen3.7-flash",
     "sonar",
     "glm-5.3", "muse-spark-1.3", "mistral-small-2603", "mimo-v2.6-pro", "MiniMax-M3", "step-5-preview",
 ]

@@ -381,45 +381,7 @@
    ]
   }
  },
- "QwQ-32B": {
-  "temperature": {
-   "outcome": "passed",
-   "detail": "",
-   "said": []
-  },
-  "top_p": {
-   "outcome": "passed",
-   "detail": "",
-   "said": []
-  },
-  "top_k": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  },
-  "max_tokens": {
-   "outcome": "renamed",
-   "detail": "max_completion_tokens",
-   "said": []
-  },
-  "reasoning": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined+named"
-   ]
-  },
-  "cache_control": {
-   "outcome": "dropped",
-   "detail": "",
-   "said": [
-    "declined"
-   ]
-  }
- },
- "qwen3-32b": {
+ "qwen3.7-flash": {
   "temperature": {
    "outcome": "passed",
    "detail": "",

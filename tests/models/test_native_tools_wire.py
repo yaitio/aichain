@@ -281,13 +281,13 @@ class TestQwenWire(unittest.TestCase):
     """
 
     def test_tools_ride_the_compatible_mode_body(self):
-        m = Model("qwen3-max", api_key="k")
+        m = Model("qwen3.8-max", api_key="k")
         path, body = m.to_request(CONVO, OUT, tools=[SEARCH])
         self.assertIn("compatible-mode", path)
         self.assertEqual(body["tools"], [SEARCH])
 
     def test_the_conversation_serialises_like_chat_completions(self):
-        m = Model("qwen3-max", api_key="k")
+        m = Model("qwen3.8-max", api_key="k")
         _, body = m.to_request(CONVO, OUT, tools=[SEARCH])
         call_turn, result_turn = body["messages"][2], body["messages"][3]
         self.assertEqual(call_turn["tool_calls"][0]["function"]["name"], "search")
@@ -297,7 +297,7 @@ class TestQwenWire(unittest.TestCase):
         self.assertEqual(result_turn["tool_call_id"], "c1")
 
     def test_a_reply_with_tool_calls_parses_to_typed_calls(self):
-        m = Model("qwen3-max", api_key="k")
+        m = Model("qwen3.8-max", api_key="k")
         reply = m.from_response({
             "choices": [{"message": {
                 "content": None,
@@ -313,7 +313,7 @@ class TestQwenWire(unittest.TestCase):
     def test_a_stream_keeps_the_tools(self):
         # The seam that used to raise TypeError: `build_stream_request`
         # forwarded `tools` into an override that had no such parameter.
-        m = Model("qwen3-max", api_key="k")
+        m = Model("qwen3.8-max", api_key="k")
         path, body = m.client.build_stream_request(
             CONVO, OUT, m._params(), tools=[SEARCH])
         self.assertIn("compatible-mode", path)

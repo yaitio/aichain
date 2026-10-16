@@ -196,18 +196,13 @@ class TestKimiReasoning(unittest.TestCase):
 
 class TestQwenReasoning(unittest.TestCase):
 
-    def test_qwq_always_has_enable_thinking(self):
-        model = Model("QwQ-32B")
-        _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
-        self.assertTrue(body.get("enable_thinking"))
-
     def test_qwen3_with_reasoning_has_enable_thinking(self):
-        model = Model("qwen3-72b", options={"reasoning": "high"})
+        model = Model("qwen3.7-plus", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_without_reasoning_no_enable_thinking(self):
-        model = Model("qwen3-72b")
+        model = Model("qwen3.7-plus")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("enable_thinking", body)
 

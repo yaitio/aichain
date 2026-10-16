@@ -55,7 +55,7 @@ Model("MiniMax-M2")         # reads MINIMAX_API_KEY
 Model("codestral-2508")     # reads MISTRAL_API_KEY
 Model("gpt-4.1")            # reads OPENAI_API_KEY
 Model("sonar")              # reads PERPLEXITY_API_KEY
-Model("QwQ-32B")            # reads DASHSCOPE_API_KEY
+Model("qwen-flash")         # reads DASHSCOPE_API_KEY
 Model("recraft-vectorize")  # reads RECRAFT_API_TOKEN
 Model("step-3.5-flash")     # reads STEPFUN_API_KEY
 Model("grok-3")             # reads XAI_API_KEY

@@ -37,7 +37,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Anthropic | 14 | — | 14 | — |
 | Black Forest Labs (FLUX) | — | 11 | — | 2 |
 | DeepSeek | 4 | — | — | — |
-| Google AI | 9 | 5 | 9 | 5 |
+| Google AI | 8 | 5 | 8 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
 | Krea | — | 4 | — | 1 |
 | Meta (Muse) | 5 | — | 5 | — |
@@ -45,7 +45,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Mistral AI | 8 | — | 6 | — |
 | OpenAI | 20 | 7 | 20 | 7 |
 | Perplexity | 4 | — | — | — |
-| Qwen (DashScope) | 18 | 2 | 3 | 3 |
+| Qwen (DashScope) | 13 | 2 | 3 | 3 |
 | Recraft | — | 9 | — | 3 |
 | StepFun | 4 | — | 2 | — |
 | xAI | 14 | 3 | 13 | 3 |
@@ -150,7 +150,6 @@ deepseek-v4-pro    # $1.32 in / $3.96 out per 1M tokens
 
 ```
 gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-flash-lite   # $0.1 in / $0.4 out per 1M tokens
 gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
 gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
 gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
@@ -174,7 +173,6 @@ gemini-nano-banana-2.1       # per_image $0.0336
 
 ```
 gemini-2.5-flash        # $0.3 in / $2.5 out per 1M tokens
-gemini-2.5-flash-lite   # $0.1 in / $0.4 out per 1M tokens
 gemini-2.5-pro          # $1.25 in / $10 out per 1M tokens
 gemini-3-flash-preview  # $0.5 in / $3 out per 1M tokens
 gemini-3.1-flash-lite   # $0.25 in / $1.5 out per 1M tokens
@@ -421,24 +419,19 @@ sonar-reasoning-pro  # $2 in / $8 out per 1M tokens
 ### `text-to-text`
 
 ```
-QwQ-32B
-qwen-flash       # $0.05 in / $0.4 out per 1M tokens
-qwen-max         # $1.6 in / $6.4 out per 1M tokens
-qwen-plus        # $0.4 in / $1.2 out per 1M tokens
-qwen-turbo       # $0.05 in / $0.2 out per 1M tokens
-qwen3-235b-a22b  # $0.7 in / $2.8 out per 1M tokens
-qwen3-32b        # $0.16 in / $0.64 out per 1M tokens
-qwen3-72b
-qwen3-max        # $1.2 in / $6 out per 1M tokens
-qwen3-vl-plus    # $0.2 in / $1.6 out per 1M tokens
-qwen3.5-plus     # $0.4 in / $2.4 out per 1M tokens
-qwen3.6-flash    # $0.25 in / $1.5 out per 1M tokens
-qwen3.6-plus     # $0.5 in / $3 out per 1M tokens
-qwen3.7-flash    # $0.03 in / $0.13 out per 1M tokens
-qwen3.7-max      # $2.5 in / $7.5 out per 1M tokens
-qwen3.7-plus     # $0.4 in / $1.6 out per 1M tokens
-qwen3.8-flash    # $0.15 in / $0.47 out per 1M tokens
-qwen3.8-max      # $2 in / $6 out per 1M tokens
+qwen-flash     # $0.05 in / $0.4 out per 1M tokens
+qwen-max       # $1.6 in / $6.4 out per 1M tokens
+qwen-plus      # $0.4 in / $1.2 out per 1M tokens
+qwen-turbo     # $0.05 in / $0.2 out per 1M tokens
+qwen3-vl-plus  # $0.2 in / $1.6 out per 1M tokens
+qwen3.5-plus   # $0.4 in / $2.4 out per 1M tokens
+qwen3.6-flash  # $0.25 in / $1.5 out per 1M tokens
+qwen3.6-plus   # $0.5 in / $3 out per 1M tokens
+qwen3.7-flash  # $0.03 in / $0.13 out per 1M tokens
+qwen3.7-max    # $2.5 in / $7.5 out per 1M tokens
+qwen3.7-plus   # $0.4 in / $1.6 out per 1M tokens
+qwen3.8-flash  # $0.15 in / $0.47 out per 1M tokens
+qwen3.8-max    # $2 in / $6 out per 1M tokens
 ```
 
 ### `text-to-image`

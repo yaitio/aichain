@@ -90,9 +90,6 @@ class TestModelFactory(unittest.TestCase):
     def test_qwen_routes_to_qwen(self):
         self.assertEqual(Model("qwen-max")._provider, "qwen")
 
-    def test_qwq_routes_to_qwen(self):
-        self.assertEqual(Model("QwQ-32B")._provider, "qwen")
-
     def test_unknown_model_raises_value_error(self):
         with self.assertRaises(ValueError):
             Model("totally-unknown-model-xyz")
@@ -363,18 +360,13 @@ class TestQwenToRequest(unittest.TestCase):
         _, body = self.model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertIn("messages", body)
 
-    def test_qwq_always_gets_enable_thinking(self):
-        model = Model("QwQ-32B")
-        _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
-        self.assertTrue(body.get("enable_thinking"))
-
     def test_qwen3_gets_enable_thinking_when_reasoning_set(self):
-        model = Model("qwen3-72b", options={"reasoning": "high"})
+        model = Model("qwen3.7-plus", options={"reasoning": "high"})
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertTrue(body.get("enable_thinking"))
 
     def test_qwen3_no_enable_thinking_when_reasoning_none(self):
-        model = Model("qwen3-72b")
+        model = Model("qwen3.7-plus")
         _, body = model.to_request(_USER_MSG, _TEXT_OUTPUT)
         self.assertNotIn("enable_thinking", body)
 

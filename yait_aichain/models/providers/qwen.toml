@@ -48,10 +48,11 @@ high = true
 
 # Prices: Alibaba Cloud Model Studio, international (Singapore), read
 # 2026-10-10. USD per 1M tokens at the lowest input tier; image models per
-# picture. qwen3-max, qwen3-235b-a22b, qwen3-32b, qwen3-72b, QwQ-32B,
-# qwen-vl-max, qwen-vl-plus and the qwen-image-edit and wan2.2 models answer
-# "does not exist" to this project's key — they are on the international list,
-# so it is the account's workspace, not the catalogue; they are kept.
+# picture. qwen-vl-max, qwen-vl-plus and the qwen-image-edit and wan2.2
+# models answer "does not exist" to this project's key — they are on the
+# international list, so it is the account's workspace, not the catalogue;
+# they are kept. qwen3-max, qwen3-235b-a22b, qwen3-72b, qwen3-32b and QwQ-32B
+# were removed 2026-10-16: still not found, and newer models replace them.
 [models."qwen3.8-max"]
 caps  = ["text-to-text"]
 price = { input = 2.0, output = 6.0 }
@@ -88,11 +89,6 @@ price = { input = 0.25, output = 1.5 }
 caps  = ["text-to-text"]
 price = { input = 0.05, output = 0.4 }
 
-[models."qwen3-max"]
-unlisted = "on the international list; this project's workspace answers model_not_found (2026-10-13)"
-caps  = ["text-to-text"]
-price = { input = 1.2, output = 6.0 }
-
 [models."qwen-max"]
 caps  = ["text-to-text"]
 price = { input = 1.6, output = 6.4 }
@@ -105,24 +101,6 @@ price = { input = 0.4, output = 1.2 }
 unlisted = "not in /v1/models; answers (2026-10-13)"
 caps  = ["text-to-text"]
 price = { input = 0.05, output = 0.2 }
-
-[models."qwen3-235b-a22b"]
-unlisted = "on the international list; this project's workspace answers model_not_found (2026-10-13)"
-caps  = ["text-to-text"]
-price = { input = 0.7, output = 2.8 }
-
-[models."qwen3-72b"]
-unlisted = "on the international list; this project's workspace answers model_not_found (2026-10-13)"
-caps  = ["text-to-text"]
-
-[models."qwen3-32b"]
-unlisted = "on the international list; this project's workspace answers model_not_found (2026-10-13)"
-caps  = ["text-to-text"]
-price = { input = 0.16, output = 0.64 }
-
-[models."QwQ-32B"]
-unlisted = "on the international list; this project's workspace answers model_not_found (2026-10-13)"
-caps  = ["text-to-text"]
 
 [models."qwen3-vl-plus"]
 caps  = ["image-to-text", "text-to-text"]

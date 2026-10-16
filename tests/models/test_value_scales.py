@@ -49,7 +49,7 @@ class TestOneLevelManyScales(unittest.TestCase):
         self.assertEqual(openai["reasoning"]["effort"], "medium")
 
     def test_a_flag_where_the_provider_has_only_on_and_off(self):
-        _, qwen = _body("qwen3-32b", {"reasoning": "medium"})
+        _, qwen = _body("qwen3.7-flash", {"reasoning": "medium"})
         self.assertIs(qwen["enable_thinking"], True)
 
     def test_a_model_name_where_reasoning_is_a_separate_model(self):
