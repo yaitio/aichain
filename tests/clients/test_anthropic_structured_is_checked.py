@@ -31,12 +31,12 @@ class TestStructured(unittest.TestCase):
     def test_an_answer_off_the_schema_is_invalid(self):
         with self.assertRaises(InvalidStructuredOutputError) as caught:
             _parse({"stop_reason": "tool_use", "content": [
-                {"type": "tool_use", "id": "t", "name": "respond", "input": {"nom": "x"}}]})
+                {"type": "tool_use", "id": "t", "name": "structured_output", "input": {"nom": "x"}}]})
         self.assertTrue(caught.exception.problems)
 
     def test_a_good_answer_comes_back(self):
         self.assertEqual(_parse({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "id": "t", "name": "respond", "input": {"name": "Ann"}}]}), {"name": "Ann"})
+            {"type": "tool_use", "id": "t", "name": "structured_output", "input": {"name": "Ann"}}]}), {"name": "Ann"})
 
 
 if __name__ == "__main__":

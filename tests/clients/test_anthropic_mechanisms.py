@@ -157,6 +157,13 @@ class TestTheAnswer(unittest.TestCase):
         self.assertEqual(self._parse({"content": [{"type": "text", "text": '{"city": "Lisbon"}'}],
                                       "stop_reason": "end_turn"}), {"city": "Lisbon"})
 
+    def test_a_call_to_the_callers_tool_is_a_call_not_the_answer(self):
+        from yait_aichain.models._calls import ToolCallRequest
+        got = self._parse({"content": [{"type": "tool_use", "id": "t1", "name": "lookup",
+                                        "input": {"q": "Lisbon"}}], "stop_reason": "tool_use"})
+        self.assertIsInstance(got, ToolCallRequest)
+        self.assertEqual(got.calls[0].name, "lookup")
+
     def test_a_refusal_is_said_as_one(self):
         with self.assertRaisesRegex(InvalidStructuredOutputError, "refused"):
             self._parse({"content": [{"type": "text", "text": "I can't help"}], "stop_reason": "refusal"})

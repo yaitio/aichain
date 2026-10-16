@@ -672,10 +672,13 @@ class AnthropicClient(BaseClient):
     def parse_response(self, response, output) -> str | dict:
         ftype   = output.get("format", {}).get("type", "text")
         content = response.get("content", [])
-        if ftype == "json_schema":
-            # Answered through a forced tool call. No call is no answer — cut
-            # off, or refused — and raises, as on the other families, rather
-            # than returning `{}`.
+        answer_tool = output.get("format", {}).get("name", "structured_output")
+        if ftype == "json_schema" and not any(
+                b.get("type") == "tool_use" and b.get("name") != answer_tool for b in content):
+            # Answered in the text (`output_config.format`) or through the
+            # answer tool; a call to one of the caller's tools is a call, and
+            # goes on below. No answer — cut off, or refused — raises, as on
+            # the other families, rather than returning `{}`.
             schema = (output.get("format") or {}).get("schema")
             block = next((b for b in content if b.get("type") == "tool_use"), None)
             text = "".join(b.get("text", "") for b in content if b.get("type") == "text")

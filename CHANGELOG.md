@@ -24,7 +24,9 @@
   model takes is data now (`[provider.mechanisms]` and per model in
   `anthropic.toml`), read live on all fourteen on 2026-10-16:
   * a schema goes as `output_config.format` on every Claude model, so it
-    combines with tools and with reasoning where it used to be refused;
+    combines with tools and with reasoning where it used to be refused —
+    a call to one of the caller's tools beside a schema comes back as a
+    call, not read as the answer;
     the keywords structured output does not take (`minLength`, `maximum`
     and the like) are left out of what is sent, said once, and the answer
     is still held to them — the structural check now covers numeric,
