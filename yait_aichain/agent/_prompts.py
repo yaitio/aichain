@@ -68,6 +68,12 @@ def result_message(result, error: str | None = None):
     return str(result)
 
 
+def closing_request(stop: str) -> str:
+    """What a run asks for after a ``check(..., answer=True)`` passed."""
+    return (f"The check {stop} passed: the work is done. Write your answer for the "
+            "caller now, from what the tools returned. Do not call a tool.")
+
+
 def observation_text(result, error: str | None = None) -> str:
     """Always a string: what the journal records about one call's result."""
     from ..models._calls import carries_media, MEDIA_PARTS

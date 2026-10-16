@@ -41,7 +41,8 @@ MISTAKES = [
     ("agent-stall-nudge", [(", stalled(3)]", "]")]),
     ("chain-two-skills", [('prompt="Turn this into a tweet: {description}"',
                            'prompt="Write a tweet about {product}."')]),
-    ("agent-verified-stop", [('check(lambda state: "answer" in store, name="stored"), ', "")]),
+    ("agent-verified-stop", [('check(lambda state: "answer" in store, name="stored",\n'
+                              '                               output=lambda state: store["answer"]), ', "")]),
 ]
 
 

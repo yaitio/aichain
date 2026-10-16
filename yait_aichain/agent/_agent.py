@@ -263,7 +263,10 @@ class Agent(_Loop, _Builtins):
         # beginning, and the two compose — one is a decision, the other a
         # limit.
         self.max_cost = as_budget(max_cost)
-        self._own_budget = self.max_cost        # see _budget.start_run
+        # Its own only when made here from a number: a Budget handed in — an
+        # agent's, to the Skill of each turn — is shared, and start_run must
+        # not replace it, or the ceiling holds for one turn at a time.
+        self._own_budget = None if isinstance(max_cost, Budget) else self.max_cost
         self.name         = name
         self.description  = description
         self.verbose      = verbose
@@ -512,6 +515,8 @@ class Agent(_Loop, _Builtins):
         # action finally runs, or does not. Answering the call from here
         # instead would make every gate a rubber stamp.
         result, error = self._complete(parked, signal)
+        if not error and result is not None:
+            self._live.evidence = result
         messages.append(tool_result_turn(call_id,
                                          prompts.result_message(result, error)))
         journal.append(

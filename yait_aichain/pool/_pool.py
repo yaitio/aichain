@@ -38,7 +38,7 @@ CANCELLED = 4
 # One vocabulary with Chain — see `_errors_policy`. Here `stop` means "start
 # no more items", which is what a fan-out can offer where a sequence stops
 # running steps.
-from .._budget import as_budget, lend, start_run
+from .._budget import Budget, as_budget, lend, start_run
 
 #: The bounds of a nested call's events: arguments per call, calls per parent.
 MAX_NESTED_ARGUMENTS = 8 * 1024
@@ -179,7 +179,10 @@ class Pool:
         # would let every worker spend the full amount. `Budget` takes a lock
         # for exactly this.
         self.max_cost = as_budget(max_cost)
-        self._own_budget = self.max_cost        # see _budget.start_run
+        # Its own only when made here from a number: a Budget handed in — an
+        # agent's, to the Skill of each turn — is shared, and start_run must
+        # not replace it, or the ceiling holds for one turn at a time.
+        self._own_budget = None if isinstance(max_cost, Budget) else self.max_cost
         self._items     = list(items)
         self._max_flows = max_flows
         self._on_error  = on_error

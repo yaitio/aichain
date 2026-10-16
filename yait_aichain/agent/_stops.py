@@ -169,25 +169,27 @@ def repeating(last_k: int = 5):
                  name="repeating")
 
 
-def check(fn, name: str = "check"):
-    """
-    Stop when *fn* says the objective is met — and call that a **success**.
-
-    The only completion the harness can verify itself. Everything else the
-    agent reports about its own progress is the model's word for it.
+def check(fn, name: str = "check", *, output=None, answer: bool = False):
+    """Stop when *fn* says the objective is met — a **success**, the only one the
+    harness verifies itself. The output is what *output* returns, else with *answer*
+    the model's closing reply, else the last tool result; ``output_from`` says which.
 
     Parameters
     ----------
     fn : callable
-        Given the run's state; returns true when the objective is met.
+        Given the run's state; true when the objective is met.
     name : str, optional
-        How the stop is reported: ``stopped_by="check:<name>"``.
+        Reported as ``stopped_by="check:<name>"``.
+    output : callable | None, optional
+        Given the run's state; returns the output.
+    answer : bool, optional
+        One more model reply, without tools, as the output; it costs a call.
     """
     def _c(state):
         # A raise is the loop's to report, as `condition_error`, the way a
         # ceiling's or a nudge's is.
         return f"check:{name}" if fn(state) else None
-    _c.kind, _c.name = "check", name
+    _c.kind, _c.name, _c.output, _c.answer = "check", name, output, answer
     return _c
 
 

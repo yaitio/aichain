@@ -23,8 +23,9 @@ exist, and each raises with the one to use: `orchestrator=`, `max_steps=`,
 1. **An agent's limit is `stop_when`, never `max_steps`.**
    `Agent(model, tools=[...], stop_when=[step_count(10)])`; the default is
    `[step_count(30)]`. A ceiling ends the run as a failure; `check(fn)` ends it
-   on a fact your code verified; `stalled(k)` / `repeating(k)` nudge the model
-   and let it continue.
+   on a fact your code verified, its output the last tool result unless
+   `output=fn` or `answer=True` says otherwise; `stalled(k)` / `repeating(k)`
+   nudge the model and let it continue.
 2. **A Skill takes `prompt=` or `input=`, not both.** `prompt="Summarise:
    {text}"` is one user message. `input={"messages": [...]}` is the full spec,
    and a message is `{"role": "system" | "user" | "assistant", "parts": [...]}`
@@ -366,7 +367,9 @@ print(result.success, result.output, result.stopped_by, result.cost)
 
 Add `check(fn, name="…")` to `stop_when` when success can be verified in code:
 `fn(state)` returning True ends the run and `result.stopped_by` reads
-`check:<name>`. Otherwise `stopped_by` is `answered` (the model gave its final
+`check:<name>`. The output is `output(state)` given `output=`, the model's
+closing reply given `answer=True`, else the last tool result (a dict stays a
+dict); `result.output_from` says which. Otherwise `stopped_by` is `answered` (the model gave its final
 answer), the name of the ceiling that ended it (`step_count`, `token_budget`),
 or `llm_error`.
 `result.journal` records what was attempted. Each `run()` is a new

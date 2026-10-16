@@ -31,6 +31,8 @@ _RESULT = "a result's field, handed to the caller"
 
 #: (class, attribute) → why nothing in the library reads it.
 KEPT = {
+    **{(cls, "_own_budget"): "read by _budget.start_run, through getattr on the owner"
+       for cls in ("Agent", "Chain", "Pool")},
     ("APIError", "status"): _OUT,
     ("APIError", "message"): _OUT,
     ("APIError", "retry_after"): _OUT,

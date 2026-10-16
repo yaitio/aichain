@@ -201,8 +201,10 @@ class Save(Tool):
         store["answer"] = input
         return "stored"
 agent = Agent(Model("gpt-5.4-mini"), tools=[Save()],
-              stop_when=[check(lambda state: "answer" in store, name="stored"), step_count(10)])
-print(agent.run("What is the tallest mountain? Store the answer.").stopped_by)
+              stop_when=[check(lambda state: "answer" in store, name="stored",
+                               output=lambda state: store["answer"]), step_count(10)])
+result = agent.run("What is the tallest mountain? Store the answer.")
+print(result.output, result.stopped_by)
 ```
 
 ### Build an agent with a refund tool marked as a financial-risk action. Refunds must be approved by a function that allows amounts up to 50 and refuses larger ones with a reason. Ask the agent to refund 80 for order 42. Print the result.

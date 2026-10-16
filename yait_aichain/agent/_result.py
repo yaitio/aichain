@@ -23,7 +23,13 @@ class AgentResult:
     success : bool
         ``True`` when the agent answered, or a ``check()`` passed.
     output : str | dict | None
-        The answer. ``None`` when *success* is ``False``.
+        The answer. Never ``None`` on success; on a failure, ``None`` or the
+        text cut at ``max_tokens``.
+    output_from : str
+        Where *output* came from: ``"answer"`` (the model answered), and for
+        a run a ``check()`` ended, ``"check"`` (its ``output=``),
+        ``"check_answer"`` (its ``answer=True``), ``"tool_result"`` (the last
+        tool call that succeeded) or ``"none"`` (only the check's name).
     mode : str
         ``"agile"`` or ``"waterfall"``.
     steps_taken : int
@@ -70,6 +76,9 @@ class AgentResult:
     #: that finished and a run that ran out of budget look identical from the
     #: outside.
     stopped_by:  str | None = None
+    #: Where the output came from — a checked run's may be a tool's dict
+    #: rather than prose, and a caller that needs prose can tell.
+    output_from: str            = "answer"
     plan:        list[dict]     = field(default_factory=list)
     #: Everything the library changed about this run's requests to fit the
     #: provider — reasoning expressed as a thinking budget, sampling a

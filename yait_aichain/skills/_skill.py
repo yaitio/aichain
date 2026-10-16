@@ -6,7 +6,7 @@ See docs/pipelines/skills.md.
 """
 
 
-from .._budget import as_budget, in_force, start_run
+from .._budget import Budget, as_budget, in_force, start_run
 import json
 import random
 import time
@@ -243,7 +243,10 @@ class Skill:
         # each level spend the full amount, which is the failure this exists
         # to prevent.
         self.max_cost = as_budget(max_cost)
-        self._own_budget = self.max_cost        # see _budget.start_run
+        # Its own only when made here from a number: a Budget handed in — an
+        # agent's, to the Skill of each turn — is shared, and start_run must
+        # not replace it, or the ceiling holds for one turn at a time.
+        self._own_budget = None if isinstance(max_cost, Budget) else self.max_cost
 
         self.last_usage: Usage | None = None
         #: What the library had to change about the last call to fit the

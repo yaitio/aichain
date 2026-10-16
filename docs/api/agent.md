@@ -261,6 +261,7 @@ AgentResult(
     tokens_used: int,
     cost: float | None = None,
     stopped_by: str | None = None,
+    output_from: str = 'answer',
     plan: list[dict] = <factory>,
     adaptations: list = <factory>,
     history: list[dict] = <factory>,
@@ -277,7 +278,12 @@ cost. `bool(result)` is `result.success`.
 **Attributes**
 
 - `success` (*bool*) — `True` when the agent answered, or a `check()` passed.
-- `output` (*str | dict | None*) — The answer. `None` when *success* is `False`.
+- `output` (*str | dict | None*) — The answer. Never `None` on success; on a failure, `None` or the
+  text cut at `max_tokens`.
+- `output_from` (*str*, default `'answer'`) — Where *output* came from: `"answer"` (the model answered), and for
+  a run a `check()` ended, `"check"` (its `output=`),
+  `"check_answer"` (its `answer=True`), `"tool_result"` (the last
+  tool call that succeeded) or `"none"` (only the check's name).
 - `mode` (*str*) — `"agile"` or `"waterfall"`.
 - `steps_taken` (*int*) — Model turns taken.
 - `tokens_used` (*int*) — Tokens across every model call of the run, input and output together.
@@ -356,18 +362,19 @@ length of a reply is not known before it is paid for.
 ## `check()`
 
 ```python
-check(fn, name: str = 'check')
+check(fn, name: str = 'check', *, output=None, answer: bool = False)
 ```
 
-Stop when *fn* says the objective is met — and call that a **success**.
-
-The only completion the harness can verify itself. Everything else the
-agent reports about its own progress is the model's word for it.
+Stop when *fn* says the objective is met — a **success**, the only one the
+harness verifies itself. The output is what *output* returns, else with *answer*
+the model's closing reply, else the last tool result; `output_from` says which.
 
 **Parameters**
 
-- `fn` (*callable*) — Given the run's state; returns true when the objective is met.
-- `name` (*str, optional*, default `'check'`) — How the stop is reported: `stopped_by="check:<name>"`.
+- `fn` (*callable*) — Given the run's state; true when the objective is met.
+- `name` (*str, optional*, default `'check'`) — Reported as `stopped_by="check:<name>"`.
+- `output` (*callable | None, optional*, default `None`) — Given the run's state; returns the output.
+- `answer` (*bool, optional*, default `False`) — One more model reply, without tools, as the output; it costs a call.
 
 ---
 

@@ -11,7 +11,7 @@ import logging
 import time
 import uuid
 
-from .._budget import start_run
+from .._budget import BudgetExceeded, start_run
 from ..clients._errors import ContextWindowExceededError, TruncatedResponseError
 from ..models._adaptation import Adaptation
 from ..skills import Skill
@@ -84,8 +84,10 @@ class _Loop:
                 # Its own stop: the history is longer than the model can read,
                 # and that is not the same failure as a revoked key.
                 full = isinstance(exc, ContextWindowExceededError)
+                spent = isinstance(exc, BudgetExceeded)
                 return self._result(state, False, None,
-                                    "truncated" if cut else "context_overflow" if full else "llm_error",
+                                    "truncated" if cut else "context_overflow" if full
+                                    else "cost_budget" if spent else "llm_error",
                                     error=f"{type(exc).__name__}: {exc}")
             yield from drain()
 
@@ -173,6 +175,8 @@ class _Loop:
                     yield from drain()
                     return parked
                 failure, self._live.failure = self._live.failure, None
+                if not error and result is not None:
+                    self._live.evidence = result     # a checked run's output, unless it names one
                 if not error:
                     # What a `verified()` gate reads: the last change not yet
                     # looked at. Any later call that succeeds clears it.
@@ -227,8 +231,14 @@ class _Loop:
             if fired:
                 kind = getattr(fired[1], "kind", "ceiling")
                 if kind == "check":
+                    try:
+                        output, source = yield from self._checked_output(
+                            fired[1], fired[0], messages, state, journal, drain)
+                    except Exception as exc:
+                        yield from drain()
+                        return self._callback_failed(state, "a check's output", exc)
                     self._log(1, f"\n[Done] ✓ {fired[0]} · {state['steps']} step(s)")
-                    return self._result(state, True, None, fired[0])
+                    return self._result(state, True, output, fired[0], output_from=source)
                 self._log(1, f"\n[Stop] ✗ {fired[0]} · {state['steps']} step(s)")
                 self._note_unfinished(journal, state, fired[0])
                 return self._result(
@@ -248,6 +258,38 @@ class _Loop:
                 messages.append({"role": "user",
                                  "parts": [{"type": "text", "text": note}]})
                 yield from drain()
+
+    def _checked_output(self, cond, stop: str, messages: list, state: dict, journal, drain):
+        """``(output, output_from)`` of a run *cond* ended — never ``None``, which
+        every caller of a verified run read as nothing."""
+        if callable(getattr(cond, "output", None)):
+            return cond.output(state), "check"
+        if getattr(cond, "answer", False):
+            messages.append({"role": "user", "parts": [{"type": "text",
+                                                        "text": prompts.closing_request(stop)}]})
+            try:
+                asking = self._ask_events(messages, state)
+                while True:
+                    try:
+                        next(asking)
+                    except StopIteration as done:
+                        reply = done.value
+                        break
+                    yield from drain()
+                why = ("it called a tool instead" if isinstance(reply, ToolCallRequest)
+                       else "it was cut at max_tokens" if state.get("truncated")
+                       else "it was empty" if not str(reply).strip() else None)
+                if why is None:
+                    return str(reply), "check_answer"
+            except Exception as exc:              # a spent budget, a failed call
+                why = f"{type(exc).__name__}: {exc}"
+            yield from drain()
+            journal.append("", action=f"closing answer after {stop}", outcome=_J_FAILED,
+                           evidence=_evidence(CHECK, why), reason=why,
+                           observation="the output is the last tool result", step=state["steps"])
+        if self._live.evidence is not None:
+            return self._live.evidence, "tool_result"
+        return f"{stop} passed", "none"
 
     def _callback_failed(self, state: dict, where: str, exc: BaseException) -> AgentResult:
         """One handling for every caller-supplied callback that raises — a check, a
@@ -399,9 +441,11 @@ class _Loop:
 
     # ── Executing one call ───────────────────────────────────────────────
 
-    def _result(self, state, success, output, stopped_by, error=None) -> AgentResult:
+    def _result(self, state, success, output, stopped_by, error=None,
+                output_from=None) -> AgentResult:
         return AgentResult(
             success=success, output=output, mode=self.mode,
+            output_from=output_from or ("answer" if output is not None else "none"),
             steps_taken=state["steps"], tokens_used=state["tokens"],
             cost=state["cost"], stopped_by=stopped_by, error=error,
             plan=[{"goal": g} for g in (state["plan"] or [])],
@@ -418,7 +462,8 @@ class _Loop:
         result.beacons = board.all()
         result.acceptance = acceptance_from(result.journal)
         self._emit("run.finished", payload={"success": result.success,
-                                            "stopped_by": result.stopped_by},
+                                            "stopped_by": result.stopped_by,
+                                            "output_from": result.output_from},
                    usage=result.tokens_used, error=result.error)
         if self._live.doc_id is not None:
             # The parked run reached its end; the store holds suspended runs

@@ -52,6 +52,10 @@ class AgentRun(Run):
     #: The run's journal, once the loop has it — where an interceptor's
     #: change to a call is written down.
     journal: Any = None
+    #: The result of the last tool call that succeeded: the output of a run
+    #: a check ends, when nothing else names one. Not parked — what resumes
+    #: is the conversation, which holds it.
+    evidence: Any = None
 
     #: The counters that survive a pause, and only those. `adaptations` are
     #: per-request notices about what went on the wire and do not describe

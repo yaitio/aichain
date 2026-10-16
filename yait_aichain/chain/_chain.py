@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..state import SuspendedResult
 
-from .._budget import as_budget, lend, start_run
+from .._budget import Budget, as_budget, lend, start_run
 
 import logging
 import warnings
@@ -178,7 +178,10 @@ class Chain(_Flow, _Files):
         # cannot be given "its share" when nobody knows in advance which step
         # will be the expensive one.
         self.max_cost = as_budget(max_cost)
-        self._own_budget = self.max_cost        # see _budget.start_run
+        # Its own only when made here from a number: a Budget handed in — an
+        # agent's, to the Skill of each turn — is shared, and start_run must
+        # not replace it, or the ceiling holds for one turn at a time.
+        self._own_budget = None if isinstance(max_cost, Budget) else self.max_cost
 
         self.last_usage: Usage | None = None
         # Per-request RunContext for the current run() / resume() (tenant +

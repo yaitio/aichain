@@ -62,7 +62,8 @@ faster and more predictable than an Agent that rediscovers them.
    {"arg": "Template {var}"}), …])`, `Pool(runner, items=[…])`, or
    `Agent(model, tools=[…], stop_when=[…])`.
 4. **Bound it.** Every Agent gets `stop_when` with a ceiling
-   (`step_count(n)`), and a `check(fn)` when success can be verified in code.
+   (`step_count(n)`), and a `check(fn, output=…)` when success can be verified
+   in code — `output=` names what the run returns.
    Add `max_cost=` when money matters — one budget across every step.
 5. **Gate side effects.** Give risky tools a `risk` class and the agent
    `policy={"rules": {...}, "approve": fn}` — or `"approve": "park"` with a

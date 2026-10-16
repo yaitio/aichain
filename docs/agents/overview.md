@@ -110,7 +110,12 @@ because they mean different things:
   the run as a **failure**. Reaching the limit is not an answer.
 - **A check** — `check(fn)` — ends it as a **success** on a fact your code
   verified. It is the only completion the harness can confirm itself;
-  everything else is the model's word for it.
+  everything else is the model's word for it. Its output is what
+  `check(fn, output=…)` returns; with `answer=True`, one more reply from the
+  model, which costs a call; otherwise the result of the last tool call that
+  succeeded, as the tool returned it — a dict stays a dict.
+  `result.output_from` says which: `"check"`, `"check_answer"`,
+  `"tool_result"`.
 - **A nudge** — `stalled(k)`, `repeating(k)` — ends nothing. When the last *k*
   attempts moved nothing, or were the same move, the model is told so in an
   ordinary, logged message, and the loop goes on.

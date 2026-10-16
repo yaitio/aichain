@@ -1,5 +1,28 @@
 # Changelog
 
+## [4.10.0] — 2026-10-17
+
+### Fixed
+
+- A run a `check()` ended returned `success=True` with `output=None`, so a
+  verified run handed its caller nothing: a lead's `delegate` got `None`, a
+  Chain step stored `None`, a Pool item looked like a failed one, and `Eval`
+  rejected the agent as "empty outputs". It now has an output — what
+  `check(fn, output=…)` returns; with `answer=True`, one more reply from the
+  model (a call, counted in cost; if it fails the run is still a success and
+  the journal says why); otherwise the result of the last tool call that
+  succeeded, as the tool returned it; and only if no tool succeeded,
+  `"check:<name> passed"`. `AgentResult.output_from` — `answer`, `check`,
+  `check_answer`, `tool_result`, `none` — says which, and so does
+  `run.finished`. **Behaviour change:** code that relied on `output is None`
+  after a check gets a value. Reported from building on 4.9.0.
+- An agent's `max_cost` held for one turn at a time. Each turn's Skill took
+  the agent's `Budget` for its own and gave itself a fresh one at the start
+  of its run, so the turn after the ceiling began anyway: a $0.50 agent spent
+  $2. A budget handed in is now shared, never replaced, in `Skill`, `Chain`,
+  `Pool` and `Agent`; the turn that would pass the ceiling does not begin, and
+  the run ends `stopped_by="cost_budget"` rather than `llm_error`.
+
 ## [4.9.0] — 2026-10-16
 
 ### Added
