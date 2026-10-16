@@ -59,3 +59,6 @@ mutants/
 # Local plans and specs, kept beside the code and never shipped
 /PLAN-*.md
 /SPEC_*.md
+
+# Cookbook run artefacts: downloads, conversions, the vector store
+/cookbooks/*/data/

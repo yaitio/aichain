@@ -1,0 +1,79 @@
+# The answer key. An answerable check passes when a citation names the right
+# regulation and article and its quote is in that article's converted text;
+# a refusal passes when the answer is refused with no citations.
+threshold = 0.9
+
+[[check]]
+id         = "gdpr-fine"
+question   = "What is the maximum administrative fine under GDPR for infringing the basic principles for processing?"
+regulation = "GDPR"
+article    = "83"
+
+[[check]]
+id         = "gdpr-breach"
+question   = "Within how many hours must a controller notify the supervisory authority of a personal data breach?"
+regulation = "GDPR"
+article    = "33"
+
+[[check]]
+id         = "gdpr-child"
+question   = "From what age can a child consent on their own to an information society service processing their personal data?"
+regulation = "GDPR"
+article    = "8"
+
+[[check]]
+id         = "ai-transparency-fine"
+question   = "What is the maximum fine if an AI system breaks the AI Act's transparency obligations for providers and deployers?"
+regulation = "AI Act"
+article    = "99"
+
+[[check]]
+id         = "ai-emotions"
+question   = "May an employer use an AI system to infer the emotions of its employees at work?"
+regulation = "AI Act"
+article    = "5"
+
+[[check]]
+id         = "ai-applies"
+question   = "From which date does the AI Act apply in general?"
+regulation = "AI Act"
+article    = "113"
+
+[[check]]
+id         = "data-switching-charges"
+question   = "From when may providers of data processing services no longer charge customers for switching?"
+regulation = "Data Act"
+article    = "29"
+
+[[check]]
+id         = "data-notice-period"
+question   = "What is the longest notice period a contract may set before a customer can start switching cloud providers?"
+regulation = "Data Act"
+article    = "25"
+
+[[check]]
+id         = "data-applies"
+question   = "From which date does the Data Act apply?"
+regulation = "Data Act"
+article    = "50"
+
+[[check]]
+id         = "privacy-act-damages"
+question   = "Under the US Privacy Act of 1974, what is the least a person receives in damages when an agency acted intentionally or willfully?"
+regulation = "Privacy Act of 1974"
+article    = "S. 3418, page 7"
+
+[[check]]
+id       = "ccpa"
+question = "What does the California Consumer Privacy Act require for opt-out links?"
+refuse   = true
+
+[[check]]
+id       = "dsa"
+question = "How often must very large online platforms carry out risk assessments under the Digital Services Act?"
+refuse   = true
+
+[[check]]
+id       = "tax"
+question = "What is the standard rate of corporate income tax in Ireland?"
+refuse   = true

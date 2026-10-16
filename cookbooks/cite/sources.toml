@@ -1,0 +1,37 @@
+# Every input this recipe downloads, pinned by hash. A publisher's edit is
+# reported on the next run ("source changed: …") and does not stop it.
+#
+# EUR-Lex: reuse is authorised with acknowledgement of the source — Commission
+# Decision 2011/833/EU and the EUR-Lex legal notice, checked 2026-10-16.
+
+[[source]]
+id      = "gdpr"
+url     = "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32016R0679"
+sha256  = "bd84e63f5b622b739a83389afc3b30d240f792bb88d8eb03a816c9a82b0c2499"
+licence = "EUR-Lex, Commission Decision 2011/833/EU — reuse permitted with acknowledgement"
+file    = "gdpr.pdf"
+
+[[source]]
+id      = "ai_act"
+url     = "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32024R1689"
+sha256  = "bba630444b3278e881066774002a1d7824308934f49ccfa203e65be43692f55e"
+licence = "EUR-Lex, Commission Decision 2011/833/EU — reuse permitted with acknowledgement"
+file    = "ai_act.pdf"
+
+[[source]]
+id      = "data_act"
+url     = "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32023R2854"
+sha256  = "0d100d513136adfaa5655d77784d3af00f477b8588471cbb51dea7aff8687838"
+licence = "EUR-Lex, Commission Decision 2011/833/EU — reuse permitted with acknowledgement"
+file    = "data_act.pdf"
+
+# Page 75 of the White House bill file for S. 3418, the US Privacy Act of 1974:
+# page 7 of the enrolled act as printed, with damages and criminal penalties.
+# A scan with no text layer, so it is read by a vision model.
+# https://commons.wikimedia.org/wiki/File:1974-12-31_S3418_Privacy_Act_of_1974_(2)_-_DPLA_-_24cb81db1f778c8dbcc455245c63e133.pdf
+[[source]]
+id      = "scan"
+url     = "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/1974-12-31_S3418_Privacy_Act_of_1974_%282%29_-_DPLA_-_24cb81db1f778c8dbcc455245c63e133.pdf/page75-1280px-1974-12-31_S3418_Privacy_Act_of_1974_%282%29_-_DPLA_-_24cb81db1f778c8dbcc455245c63e133.pdf.jpg"
+sha256  = "2b34d58bd4887c492a01b8a3ad6e023d343f57af2f77001f38c26b16e9ca4996"
+licence = "Public domain — a work of the US federal government, Gerald R. Ford Presidential Library via Wikimedia Commons"
+file    = "privacy_act_1974_p7.jpg"
