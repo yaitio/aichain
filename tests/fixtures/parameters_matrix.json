@@ -1097,6 +1097,114 @@
    ]
   }
  },
+ "krea-2-medium": {
+  "size": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "aspect_ratio": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
+ "krea-3": {
+  "size": {
+   "outcome": "converted",
+   "detail": "aspect_ratio",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "aspect_ratio": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "quality": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "background": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "output_format": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "compression": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "seed": {
+   "outcome": "passed",
+   "detail": "",
+   "said": []
+  },
+  "fidelity": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
  "gpt-image-2.5-flare (edit)": {
   "size": {
    "outcome": "passed",

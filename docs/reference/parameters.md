@@ -19,6 +19,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `deepseek` | `1.0` | `1.0` | — | `4096`\* |
 | `google` | `1.0` | `0.95` | `40` | `8192`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
+| `krea` | `1.0`\* | — | — | `4096`\* |
 | `meta` | `1.0` | — | — | `16384`\* |
 | `minimax` | `1.0` | `0.95` | — | `16384`\* |
 | `mistral` | `0.7`\* | `1.0` | — | `16384`\* |
@@ -71,6 +72,11 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — vendor · Kimi's default, and the API *enforces* 1.0 while thinking is on. The non-thinking recommendation of 0.6 has to be asked for explicitly
 - `top_p` — vendor · Kimi's default
 - `max_tokens` — vendor · Kimi's own default, which is why this one is the largest in the table
+
+**`krea`**
+
+- `temperature` — unused · this provider renders images and reads neither of these
+- `max_tokens` — unused · this provider renders images and reads neither of these
 
 **`meta`**
 
@@ -162,13 +168,13 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 
 | option | what it does | values | who takes it |
 |---|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `xai` |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any | `bfl`, `google`, `openai`, `qwen`, `recraft`, `xai` |
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | any | `bfl`, `google`, `krea`, `openai`, `qwen`, `recraft`, `xai` |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | any | `bfl`, `google`, `krea`, `openai`, `qwen`, `recraft`, `xai` |
 | `quality` | how much work to spend on the render | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (gpt-image-2.5-flare); `low`, `medium`, `high`, `auto` (gpt-image-1.5) | `openai` |
 | `background` | transparent, opaque, or let the model decide | `transparent`, `opaque`, `auto` | `openai` |
 | `output_format` | the file format to return: png, jpeg, webp | `png`, `jpeg`, `webp` | `bfl`, `openai` |
 | `compression` | compression level for jpeg and webp, 0-100 | `0`–`100` | `openai` |
-| `seed` | fix the randomness so the same prompt renders the same way | any | `bfl` |
+| `seed` | fix the randomness so the same prompt renders the same way | any | `bfl`, `krea` |
 | `fidelity` | how much of the original survives an edit: 0 to 1, or 'low'/'high'. One axis, and providers run it both ways — OpenAI asks how much to preserve, Recraft how much to change, so the number is inverted for the latter | `0.0`–`1.0` | `openai`, `recraft` |
 
 ## 2. What each provider declares it takes
@@ -182,6 +188,7 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `deepseek` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
+| `krea` | `aspect_ratio`, `seed`, `size` |
 | `meta` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `minimax` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `mistral` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
@@ -263,6 +270,8 @@ without saying so. It may adapt; it may not do it quietly.
 | `recraftv3` | ✓ | ≈ `size` | — | — | — | — | — | — |
 | `grok-imagine-image` | ≈ `aspect_ratio` | ✓ | — | — | — | — | — | — |
 | `wan2.2-t2i-flash` | ≈ `size` | ≈ `size` | — | — | — | — | — | — |
+| `krea-2-medium` | — | ✓ | — | — | — | — | ✓ | — |
+| `krea-3` | ≈ `aspect_ratio` | ✓ | — | — | — | — | ✓ | — |
 
 ### Output format (image edits)
 

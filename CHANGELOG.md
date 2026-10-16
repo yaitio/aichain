@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.8.0] — 2026-10-16
+
+### Added
+
+- Krea as an image provider: `image("krea", model=…)` with `krea-2-medium`,
+  `krea-2-large`, `krea-2-turbo` and `krea-3`, key `KREA_API_KEY`. A request
+  is a job — submitted, polled, downloaded — behind the same tool and option
+  vocabulary as the other six providers. Each model takes its own list of
+  ratios and a resolution tier; an `aspect_ratio` it lacks goes as the
+  nearest and a `size` as a ratio and a tier, each said in the notices. Krea 3
+  edits with up to eight images. Krea 2 generates only: given an image it
+  redraws it rather than follows the edit, so `images=` is refused there,
+  pointing at `krea-3`. A job reports no price, so the cost in the result is
+  Krea's own list applied to the request, references priced by their size.
+  Verified live: Krea 2 Medium, Turbo and a Krea 3 edit at 2K.
+
 ## [4.7.0] — 2026-10-15
 
 ### Changed

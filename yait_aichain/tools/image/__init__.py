@@ -8,7 +8,7 @@ raises and points here. See docs/tools/media.md.
 from ._tool import OPTIONS, Image
 
 #: The providers with image models — the ones `image()` takes.
-SERVICES = ("openai", "google", "bfl", "xai", "qwen", "recraft")
+SERVICES = ("openai", "google", "bfl", "xai", "qwen", "recraft", "krea")
 
 #: Providers that were here and closed, with what to say instead of "unknown".
 CLOSED = {"reve": "Reve closed its API on 2026-08-14"}

@@ -436,7 +436,7 @@ class TestRegistry(unittest.TestCase):
             set(registry.PROVIDERS),
             {"openai", "anthropic", "google", "xai", "perplexity",
              "kimi", "deepseek", "qwen", "recraft", "bfl", "zai", "meta", "mistral",
-             "xiaomi", "minimax", "stepfun"},
+             "xiaomi", "minimax", "stepfun", "krea"},
         )
 
 

@@ -28,7 +28,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
+`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -39,6 +39,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | DeepSeek | 4 | — | — | — |
 | Google AI | 9 | 5 | 9 | 5 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — |
+| Krea | — | 4 | — | 1 |
 | Meta (Muse) | 5 | — | 5 | — |
 | MiniMax | 8 | — | 1 | — |
 | Mistral AI | 8 | — | 6 | — |
@@ -212,6 +213,27 @@ kimi-k3                   # $3 in / $15 out per 1M tokens
 
 ```
 kimi-k2.6  # $0.95 in / $4 out per 1M tokens
+```
+
+---
+
+## Krea
+
+`provider = "krea"` · key `KREA_API_KEY`
+
+### `text-to-image`
+
+```
+krea-2-large   # per_image $0.06
+krea-2-medium  # per_image $0.03
+krea-2-turbo   # per_image $0.015
+krea-3         # per_image $0.03
+```
+
+### `image-to-image`
+
+```
+krea-3  # per_image $0.03
 ```
 
 ---
@@ -672,7 +694,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

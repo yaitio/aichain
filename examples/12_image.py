@@ -2,7 +2,7 @@
 12_image.py — Make an image, then edit it on every provider whose key is set: one tool, six APIs.
 
 Keys: any of OPENAI_API_KEY, GOOGLE_AI_API_KEY, XAI_API_KEY, DASHSCOPE_API_KEY, RECRAFT_API_TOKEN,
-BFL_API_KEY. Images go to AICHAIN_EXAMPLES_DIR (the temp directory by default).
+BFL_API_KEY, KREA_API_KEY. Images go to AICHAIN_EXAMPLES_DIR (the temp directory by default).
 """
 
 import os
@@ -19,7 +19,8 @@ PROVIDERS = [("OPENAI_API_KEY", "openai", "gpt-image-1-mini"),
              ("XAI_API_KEY", "xai", "grok-imagine-image"),
              ("DASHSCOPE_API_KEY", "qwen", "qwen-image-edit"),
              ("RECRAFT_API_TOKEN", "recraft", "recraftv3"),
-             ("BFL_API_KEY", "bfl", "flux-kontext-pro")]
+             ("BFL_API_KEY", "bfl", "flux-kontext-pro"),
+             ("KREA_API_KEY", "krea", "krea-3")]
 ready = [p for p in PROVIDERS if os.getenv(p[0])]
 if not ready:
     raise SystemExit("set one of: " + ", ".join(p[0] for p in PROVIDERS))

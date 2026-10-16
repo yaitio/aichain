@@ -96,6 +96,7 @@ IMAGE_MODELS = [
     "recraftv3",
     "grok-imagine-image",
     "wan2.2-t2i-flash",
+    "krea-2-medium", "krea-3",
 ]
 
 # A system prompt is included because that is where a cache mark goes: the

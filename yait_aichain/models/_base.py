@@ -35,6 +35,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
     from ..clients._families.qwen       import QwenClient
     from ..clients._families.recraft    import RecraftClient
     from ..clients._families.bfl        import BFLClient
+    from ..clients._families.krea       import KreaClient
 
     family = {
         "openai":     OpenAIClient,
@@ -44,6 +45,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
         "qwen":       QwenClient,
         "recraft":    RecraftClient,
         "bfl":        BFLClient,
+        "krea":       KreaClient,
     }[ctype]
     _hints.check_client_options(ctype, client_options)
     return family(api_key, data=data, **client_options)
@@ -63,6 +65,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^(qwen|qwq|wanx|wan\d)"),                            "qwen"),
     (re.compile(r"^recraft"),                                          "recraft"),
     (re.compile(r"^flux"),                                             "bfl"),
+    (re.compile(r"^krea-"),                                            "krea"),
     (re.compile(r"^glm-"),                                             "zai"),
     (re.compile(r"^muse-"),                                            "meta"),
     (re.compile(r"^mimo-"),                                            "xiaomi"),

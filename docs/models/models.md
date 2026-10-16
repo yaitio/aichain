@@ -47,13 +47,13 @@ You ask for `temperature`, `max_tokens`, `reasoning` the same way everywhere:
 
 | Key | What it asks for | ✓ | Providers that read it |
 |---|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
 | `quality` | how much work to spend on the render |  | OpenAI |
 | `background` | transparent, opaque, or let the model decide | ✓ | OpenAI |
 | `output_format` | the file format to return: png, jpeg, webp | ✓ | Black Forest Labs (FLUX), OpenAI |
 | `compression` | compression level for jpeg and webp, 0-100 | ✓ | OpenAI |
-| `seed` | fix the randomness so the same prompt renders the same way | ✓ | Black Forest Labs (FLUX) |
+| `seed` | fix the randomness so the same prompt renders the same way | ✓ | Black Forest Labs (FLUX), Krea |
 | `fidelity` | how much of the original survives an edit: 0 to 1, or 'low'/'high'. One axis, and providers run it both ways — OpenAI asks how much to preserve, Recraft how much to change, so the number is inverted for the latter | ✓ | OpenAI, Recraft |
 <!-- /g:model-options -->
 

@@ -39,7 +39,7 @@ A **tool** is anything a model or a pipeline can call — your function, an API,
 | File | What it shows | Keys |
 |---|---|---|
 | [`11_custom_tool.py`](11_custom_tool.py) | Any function becomes a tool: its docstring is the schema a model sees. | *(none)* |
-| [`12_image.py`](12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, six APIs. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` `RECRAFT_API_TOKEN` `BFL_API_KEY` |
+| [`12_image.py`](12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, six APIs. | any one of `OPENAI_API_KEY` `GOOGLE_AI_API_KEY` `XAI_API_KEY` `DASHSCOPE_API_KEY` `RECRAFT_API_TOKEN` `BFL_API_KEY` `KREA_API_KEY` |
 | [`13_speech.py`](13_speech.py) | Voice both ways through one interface: text to an mp3, and back to text. | `OPENAI_API_KEY` |
 | [`14_search_fetch.py`](14_search_fetch.py) | Search the web, then read the first result as a model would. | any one of `BRAVE_SEARCH_API_KEY` `EXA_API_KEY` `FIRECRAWL_API_KEY` `PARALLEL_API_KEY` `PERPLEXITY_API_KEY` `TAVILY_API_KEY` |
 | [`15_retrieval.py`](15_retrieval.py) | Answer from your own texts: chunk, embed, find, rerank, answer with the source. | `OPENAI_API_KEY` `DASHSCOPE_API_KEY` |

@@ -81,7 +81,7 @@ repeat a few seconds of speech in the joined text. A runnable version is the
 A model, in this library, is what can be an agent's mind: it reads, reasons
 and calls tools. An image model does none of that, so since 3.9.0 it is
 reached as a tool — `image(service, model=…)` with `openai`, `google`, `bfl`,
-`xai`, `qwen` or `recraft`. An agent given one draws when it decides a picture
+`xai`, `qwen`, `recraft` or `krea`. An agent given one draws when it decides a picture
 is needed, the way it searches when it decides it needs to know something.
 
 The request underneath is the one the model layer always built, with one
@@ -93,6 +93,18 @@ notice in the result, not as a silent difference in the picture.
 Passing `images=[…]` — paths or URLs — makes the call an edit, or gives the
 model references. `registry.models(task="image-to-image")` lists the models
 that edit.
+
+**Krea** runs its own models as jobs — submitted, polled every two seconds,
+downloaded — with `KREA_API_KEY`, billed from the workspace's API balance in
+dollars, which is separate from the compute units the web app spends (an
+empty one answers HTTP 402). `krea-2-medium`, `krea-2-large` and
+`krea-2-turbo` generate; they redraw an image given to them rather than follow
+an edit, so `images=` is refused there and `krea-3` (early access) is the one
+that edits, with up to eight images. Each model takes its own list of ratios
+and a resolution tier, `1K` or, on Krea 3, `2K`: a `size` becomes the nearest
+ratio and the tier, said in the notices. A job reports no price, so the cost
+in the result is Krea's own list applied to the request — the tier, each
+reference by its size, `thinking_mode="high"` passed through `extra`.
 
 ## Where the bytes go
 

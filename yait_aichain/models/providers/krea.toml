@@ -1,0 +1,89 @@
+# krea — Krea's own image models. Provider settings + models (data tier).
+#
+# Asynchronous: POST the model's path, get {job_id}; poll GET /jobs/{id} until
+# status == "completed", then download result.urls[0]. Auth is a Bearer token.
+# Billed from the workspace's API balance in USD — separate from the web app's
+# compute units, which the API does not draw on (HTTP 402 when it is empty).
+# Krea also resells other vendors' models (Flux, Nano Banana, GPT Image…);
+# those are reached here at their own providers, so only Krea's are listed.
+# Verified live 2026-10-16 (krea-2-medium: a 1K PNG in 24 s).
+
+[provider]
+key      = "krea"
+client   = "krea"
+base_url = "https://api.krea.ai"
+env_key  = "KREA_API_KEY"
+label    = "Krea"
+auth     = "bearer"
+
+[provider.options]
+# Which universal options this provider has a control for at all — not which
+# a given model takes on a given call, which is reported when it happens.
+# An image provider: none of the text options apply. A size becomes the
+# nearest ratio this model takes and its resolution tier.
+format_accepts = ["size", "aspect_ratio", "seed"]
+accepts = []
+
+# The most images an edit takes; more are left out and said (Krea 3 takes 8).
+max_input_images = 8
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096
+
+[provider.default_notes]
+aspect_ratio = "ours · Krea 2 requires a ratio and documents no default; 1:1 when none is asked"
+temperature = "unused · this provider renders images and reads neither of these"
+max_tokens  = "unused · this provider renders images and reads neither of these"
+
+# Each model: its path, the ratios and resolution tiers it takes, and where an
+# input image goes. Krea 2 does not follow an edit instruction: its image_url is
+# image-to-image at a strength of 0.99 by default, and the box asked to be put
+# on a counter came back a different box (2026-10-16). It generates only here;
+# extra={"image_url": ..., "strength": ...} reaches that mode on purpose.
+#
+# Prices: Krea's model pages, read 2026-10-16. Krea reports no cost on a job,
+# so the client prices each one from these and returns it as the call's cost;
+# `per_image` is the base for the registry's own reports. Krea 2's are without
+# style references or moodboards, which cost more and are not sent here.
+[models."krea-2-medium"]
+caps          = ["text-to-image"]
+path          = "/generate/image/krea/krea-2/medium"
+aspect_ratios = ["1:1", "4:3", "3:2", "16:9", "2.35:1", "4:5", "3:4", "2:3", "9:16"]
+resolutions   = ["1K"]
+ratio_required = true
+price         = { per_image = 0.03 }
+
+[models."krea-2-large"]
+caps          = ["text-to-image"]
+path          = "/generate/image/krea/krea-2/large"
+aspect_ratios = ["1:1", "4:3", "3:2", "16:9", "2.35:1", "4:5", "3:4", "2:3", "9:16"]
+resolutions   = ["1K"]
+ratio_required = true
+price         = { per_image = 0.06 }
+
+[models."krea-2-turbo"]
+caps          = ["text-to-image"]
+path          = "/generate/image/krea/krea-2/medium-turbo"
+aspect_ratios = ["1:1", "4:3", "3:2", "16:9", "2.35:1", "4:5", "3:4", "2:3", "9:16"]
+resolutions   = ["1K"]
+ratio_required = true
+price         = { per_image = 0.015 }
+
+# Krea 3: generation and instruction-following edits, early access only.
+[models."krea-3"]
+caps          = ["text-to-image", "image-to-image"]
+path          = "/generate/image/krea/krea-3"
+aspect_ratios = ["1:1", "4:5", "3:4", "2:3", "9:16", "5:4", "4:3", "3:2", "16:9", "21:9"]
+resolutions   = ["1K", "2K"]
+edit_field    = "image_urls"
+max_input_images = 8
+price         = { per_image = 0.03 }
+
+# Krea 3 is priced by its output tier, each reference image by its own tier
+# (a reference whose size cannot be read is priced at 2K), and the high
+# thinking mode adds a fixed amount.
+[models."krea-3".tiers]
+output    = { "1K" = 0.03, "2K" = 0.06 }
+reference = { "1K" = 0.02, "2K" = 0.07 }
+thinking_high = 0.02
