@@ -346,6 +346,7 @@ class OpenAIClient(BaseClient):
         # wanx text-to-image is async and handled by QwenClient (the only
         # client used for this provider); here we only do chat / vision.
         path, body = _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
+        self._qwen_schema(m, body, output.get("format", {}), tools)
         if _is_qwen3(m.name) and m.reasoning:
             body["enable_thinking"] = True
             record(Adaptation(
@@ -359,6 +360,28 @@ class OpenAIClient(BaseClient):
                 sent=None, model=m.name,
                 why="this model has no thinking switch"))
         return path, body
+
+    def _qwen_schema(self, m, body, fmt, tools) -> None:
+        """Put the schema in the prompt where DashScope would drop it."""
+        # Older models turn json_schema into json_object, which wants "json" in
+        # the messages (HTTP 400); beside tools, newer ones answer in prose
+        # about one time in four. The schema in the prompt took 21 misses in 80
+        # to 4 (2026-10-16); the answer is checked against the schema either way.
+        if fmt.get("type") != "json_schema" or not fmt.get("schema"):
+            return
+        if self._data.get("models", {}).get(m.name, {}).get("json_schema") is False:
+            body["response_format"] = {"type": "json_object"}
+            _json_in_prompt(body, fmt)
+            record(Adaptation(
+                kind=ADAPTED, option="format", asked="json_schema", sent="json_object",
+                model=m.name, why="this model takes JSON but not a schema; the schema "
+                                  "is in the prompt and the answer is checked against it"))
+        elif tools:
+            _json_in_prompt(body, fmt)
+            record(Adaptation(
+                kind=ADAPTED, option="format", asked="json_schema", sent="json_schema + prompt",
+                model=m.name, why="beside tools this model may answer in prose rather than by "
+                                  "the schema; the schema is repeated in the prompt"))
 
     def _described_request(self, m, messages, output, tools):
         prov = self._data["provider"]

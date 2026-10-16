@@ -75,6 +75,12 @@ ceiling raises `TruncatedResponseError`, and one that arrived whole but does
 not match raises `InvalidStructuredOutputError` naming where — two different
 problems, told apart.
 
+Not every provider enforces a schema. Where one cannot, the schema goes in the
+prompt instead and the notice says so; the check on return is the same. Some
+models still answer in prose now and then — Qwen 3.6 Flash and 3.7 Flash with
+tools beside the schema, about half the time when measured — and that is the
+`InvalidStructuredOutputError`, never a wrong value.
+
 Images are not a Skill's job any more: an image model is a tool,
 `image(service, model=…)`. → [Images](../tools/media.md)
 

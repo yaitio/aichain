@@ -37,6 +37,15 @@
 
 ### Fixed
 
+- Qwen 3.6 Plus, 3.5 Plus, 3.6 Flash and Max answered HTTP 400 to a JSON
+  schema: DashScope makes it `json_object` and then wants the word "json" in
+  the messages. They are sent `json_object` with the schema in the prompt,
+  said in the notice, and the answer is checked against the schema. And
+  beside tools, every Qwen gets the schema in the prompt too, since some
+  answered in prose there. Measured live: 21 prose answers in 80 before, 4
+  after; through the library, every Qwen answered a schema without tools
+  (72 of 72), and with tools the misses left are Qwen 3.6 Flash and 3.7
+  Flash, which raise `InvalidStructuredOutputError`.
 - Mistral Large 4, Medium 3.5 and Small 2603 answered HTTP 400 to
   `reasoning="low"` or `"medium"`: they take none or high. Those two levels go
   as `none` there, said in the notice. A model can now carry its own

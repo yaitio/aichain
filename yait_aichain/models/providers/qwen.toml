@@ -68,10 +68,12 @@ price = { input = 0.4, output = 1.6 }
 [models."qwen3.6-plus"]
 caps  = ["text-to-text"]
 price = { input = 0.5, output = 3.0 }
+json_schema = false   # DashScope makes a schema json_object and wants "json" in the messages: HTTP 400, 2026-10-16
 
 [models."qwen3.5-plus"]
 caps  = ["text-to-text"]
 price = { input = 0.4, output = 2.4 }
+json_schema = false   # DashScope makes a schema json_object and wants "json" in the messages: HTTP 400, 2026-10-16
 
 [models."qwen3.8-flash"]
 caps  = ["text-to-text"]
@@ -84,6 +86,7 @@ price = { input = 0.03, output = 0.13 }
 [models."qwen3.6-flash"]
 caps  = ["text-to-text"]
 price = { input = 0.25, output = 1.5 }
+json_schema = false   # DashScope makes a schema json_object and wants "json" in the messages: HTTP 400, 2026-10-16
 
 [models."qwen-flash"]
 caps  = ["text-to-text"]
@@ -92,6 +95,7 @@ price = { input = 0.05, output = 0.4 }
 [models."qwen-max"]
 caps  = ["text-to-text"]
 price = { input = 1.6, output = 6.4 }
+json_schema = false   # DashScope makes a schema json_object and wants "json" in the messages: HTTP 400, 2026-10-16
 
 [models."qwen-plus"]
 caps  = ["text-to-text"]
