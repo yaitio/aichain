@@ -443,9 +443,11 @@
    "said": []
   },
   "reasoning": {
-   "outcome": "refused",
-   "detail": "reasoning for the 'perplexity' provider must be None or one of: (none for this provider); got 'high'",
-   "warned": false
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",
@@ -593,9 +595,11 @@
    "said": []
   },
   "reasoning": {
-   "outcome": "refused",
-   "detail": "reasoning for the 'xiaomi' provider must be None or one of: (none for this provider); got 'high'",
-   "warned": false
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
   },
   "cache_control": {
    "outcome": "dropped",

@@ -46,6 +46,10 @@ UNIVERSAL_OPTIONS: dict = {
 }
 
 
+#: The levels `reasoning` takes anywhere. A provider names the ones it has in
+#: its reasoning map; one without a map declines these and refuses the rest.
+REASONING_LEVELS = frozenset({"none", "low", "medium", "high"})
+
 #: Keys of ``output["format"]``. A second vocabulary because it is asked for
 #: per call rather than per model — and an **open** one, unlike the options
 #: above: providers legitimately extend it with names of their own (Recraft's

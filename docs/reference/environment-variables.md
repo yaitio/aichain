@@ -30,6 +30,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `XAI_API_KEY` | xAI | <https://console.x.ai/> |
 | `MIMO_API_KEY` | Xiaomi (MiMo) | <https://platform.xiaomimimo.com> |
 | `ZAI_API_KEY` | Z.ai (GLM) | <https://z.ai/manage-apikey/apikey-list> |
+| `OPENROUTER_API_KEY` | OpenRouter | <https://openrouter.ai/settings/keys> |
 <!-- /g:env-providers -->
 
 Private servers are the exception to "required": the `private/` prefix works with
@@ -44,23 +45,24 @@ no key at all (see [Private models](../models/private-models.md)).
 
 <!-- g:env-resolve -->
 ```python
-Model("claude-fable-5")     # reads ANTHROPIC_API_KEY
-Model("flux-2-flex")        # reads BFL_API_KEY
-Model("deepseek-chat")      # reads DEEPSEEK_API_KEY
-Model("gemini-2.5-flash")   # reads GOOGLE_AI_API_KEY
-Model("kimi-k2.6")          # reads MOONSHOT_API_KEY
-Model("krea-2-large")       # reads KREA_API_KEY
-Model("muse-spark-1.1")     # reads META_API_KEY
-Model("MiniMax-M2")         # reads MINIMAX_API_KEY
-Model("codestral-2508")     # reads MISTRAL_API_KEY
-Model("gpt-4.1")            # reads OPENAI_API_KEY
-Model("sonar")              # reads PERPLEXITY_API_KEY
-Model("qwen-flash")         # reads DASHSCOPE_API_KEY
-Model("recraft-vectorize")  # reads RECRAFT_API_TOKEN
-Model("step-3.5-flash")     # reads STEPFUN_API_KEY
-Model("grok-3")             # reads XAI_API_KEY
-Model("mimo-v2.6-flash")    # reads MIMO_API_KEY
-Model("glm-4.5")            # reads ZAI_API_KEY
+Model("claude-fable-5")           # reads ANTHROPIC_API_KEY
+Model("flux-2-flex")              # reads BFL_API_KEY
+Model("deepseek-chat")            # reads DEEPSEEK_API_KEY
+Model("gemini-2.5-flash")         # reads GOOGLE_AI_API_KEY
+Model("kimi-k2.6")                # reads MOONSHOT_API_KEY
+Model("krea-2-large")             # reads KREA_API_KEY
+Model("muse-spark-1.1")           # reads META_API_KEY
+Model("MiniMax-M2")               # reads MINIMAX_API_KEY
+Model("codestral-2508")           # reads MISTRAL_API_KEY
+Model("gpt-4.1")                  # reads OPENAI_API_KEY
+Model("sonar")                    # reads PERPLEXITY_API_KEY
+Model("qwen-flash")               # reads DASHSCOPE_API_KEY
+Model("recraft-vectorize")        # reads RECRAFT_API_TOKEN
+Model("step-3.5-flash")           # reads STEPFUN_API_KEY
+Model("grok-3")                   # reads XAI_API_KEY
+Model("mimo-v2.6-flash")          # reads MIMO_API_KEY
+Model("glm-4.5")                  # reads ZAI_API_KEY
+Model("openrouter/vendor/model")  # reads OPENROUTER_API_KEY
 
 Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 ```
@@ -119,6 +121,7 @@ export STEPFUN_API_KEY="…"
 export XAI_API_KEY="…"
 export MIMO_API_KEY="…"
 export ZAI_API_KEY="…"
+export OPENROUTER_API_KEY="…"
 export BRAVE_SEARCH_API_KEY="…"
 export COHERE_API_KEY="…"
 export EXA_API_KEY="…"

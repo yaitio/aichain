@@ -33,7 +33,11 @@ from yait_aichain.models._data import PROVIDERS                 # noqa: E402
 #: One text model per provider. The image-only ones are excluded by name
 #: rather than skipped silently — a provider that grows a text model should
 #: turn up here rather than stay quietly out of the comparison.
-IMAGE_ONLY = {"bfl", "recraft", "krea", "private"}
+IMAGE_ONLY = {"bfl", "recraft", "krea"}
+
+#: Providers with no registry: the server decides what it serves, so a name is
+#: chosen here and sent as written.
+PASS_THROUGH = {"private": "private/llama3.3", "openrouter": "openrouter/openai/gpt-6-luna"}
 
 SYSTEM = {"role": "system", "parts": [{"type": "text",
                                        "text": "You are terse."}]}
@@ -43,6 +47,9 @@ USER = {"role": "user", "parts": [{"type": "text", "text": "Say hi."}]}
 def _text_models():
     for provider in sorted(PROVIDERS):
         if provider in IMAGE_ONLY:
+            continue
+        if provider in PASS_THROUGH:
+            yield provider, PASS_THROUGH[provider]
             continue
         names = [n for n in _models(provider=provider)
                  if "image" not in n and "edit" not in n]
@@ -137,7 +144,9 @@ class TestTheSameInputReachesEveryProvider(unittest.TestCase):
         for provider, name in _text_models():
             with self.subTest(provider=provider):
                 path, body = _build(name, {"format": {"type": "text"}})
-                self.assertIn(name, str(body) + path)
+                # A provider prefix picks the provider and is not sent.
+                wire = name.split("/", 1)[1] if provider in PASS_THROUGH else name
+                self.assertIn(wire, str(body) + path)
 
 
 class TestWhereTheyLegitimatelyDiffer(unittest.TestCase):

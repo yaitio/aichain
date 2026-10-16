@@ -24,6 +24,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `minimax` | `1.0` | `0.95` | — | `16384`\* |
 | `mistral` | `0.7`\* | `1.0` | — | `16384`\* |
 | `openai` | `1.0` | `1.0` | — | `16384`\* |
+| `openrouter` | `1.0` | — | — | `8192`\* |
 | `perplexity` | `0.2`\* | `0.9` | — | `8192`\* |
 | `private` | `1.0`\* | — | — | `4096`\* |
 | `qwen` | `0.7` | `0.8` | — | `8192`\* |
@@ -100,6 +101,11 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — vendor · OpenAI's API default; the o-series ignores it
 - `top_p` — vendor · OpenAI's default. They advise altering this or temperature, not both
 - `max_tokens` — ours · safe for GPT-4o and GPT-4.1; goes out as max_completion_tokens
+
+**`openrouter`**
+
+- `temperature` — vendor · OpenRouter's documented default, passed to the vendor behind the model
+- `max_tokens` — ours · OpenRouter sets no ceiling of its own; room for an answer and the thinking before it
 
 **`perplexity`**
 
@@ -250,11 +256,11 @@ without saying so. It may adapt; it may not do it quietly.
 | `grok-3-mini` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `qwen-max` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `qwen3.7-flash` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `enable_thinking` | — |
-| `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | ⊘ <sub>reasoning for the 'perplexity' provider must be None or one </sub> | — |
+| `sonar` | ✓ | ✓ | — | → `max_completion_tokens` | — | — |
 | `glm-5.3` | ✓ | ✓ | — | ✓ | → `reasoning_effort, type` | — |
 | `muse-spark-1.3` | ✓ | ✓ | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 | `mistral-small-2603` | ✓ | ✓ | — | ✓ | → `reasoning_effort` | — |
-| `mimo-v2.6-pro` | ✓ | ✓ | — | ✓ | ⊘ <sub>reasoning for the 'xiaomi' provider must be None or one of: </sub> | — |
+| `mimo-v2.6-pro` | ✓ | ✓ | — | ✓ | — | — |
 | `MiniMax-M3` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `type` | — |
 | `step-5-preview` | ✓ | ✓ | — | ✓ | → `reasoning_effort` | — |
 

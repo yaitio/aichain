@@ -1,0 +1,57 @@
+# openrouter — one key for many vendors' models, OpenAI-compatible (data tier)
+#
+# A model is named as OpenRouter names it, after the prefix:
+#
+#     Model("openrouter/anthropic/claude-sonnet-5.5")
+#     Model("openrouter/qwen/qwen3.8-flash")
+#
+# There is no [models] section, deliberately: OpenRouter serves hundreds of
+# models and its own /v1/models is the authority on which. The price is not
+# looked up either — every response carries the call's bill in `usage.cost`,
+# which the library reads and reports as the cost.
+#
+# OpenRouter forwards a request to the vendor and translates it. What a given
+# vendor does with an option (Claude 4.7 and later ignore temperature, for
+# one) is OpenRouter's translation, which the library cannot see; the
+# notices say what was sent, not what the vendor finally received.
+#
+# Verified live 2026-10-16 on openai/gpt-6-luna, anthropic/claude-haiku-5.5
+# and qwen/qwen3.8-flash: `reasoning: {effort}` with low, high and none
+# (none switches thinking off), top_k accepted, `usage.cost` on
+# every call, the reasoning text in `message.reasoning`. Fifteen models from
+# eleven vendors answered a JSON schema, and one with tools beside it.
+
+[provider]
+key      = "openrouter"
+client   = "openai"
+base_url = "https://openrouter.ai/api"
+env_key  = "OPENROUTER_API_KEY"
+label    = "OpenRouter"
+keys_url = "https://openrouter.ai/settings/keys"
+auth     = "bearer"
+max_tokens_field = "max_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+# Which universal options this provider has a control for at all — not which
+# a given model takes on a given call, which is reported when it happens.
+accepts = ["temperature", "top_p", "top_k", "max_tokens", "reasoning"]
+
+[provider.reasoning_map]
+none   = { effort = "none" }
+low    = { effort = "low" }
+medium = { effort = "medium" }
+high   = { effort = "high" }
+
+[provider.reasoning]
+field = "reasoning"
+why   = "sent as OpenRouter's reasoning.effort, which it translates for the vendor behind the model"
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 8192
+
+[provider.default_notes]
+temperature = "vendor · OpenRouter's documented default, passed to the vendor behind the model"
+max_tokens  = "ours · OpenRouter sets no ceiling of its own; room for an answer and the thinking before it"

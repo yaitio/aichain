@@ -32,6 +32,8 @@ registry.accepts("openai")                   # the options this provider has a c
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
+`openrouter` is registry-less too: it serves its own catalogue, named after the prefix — `Model("openrouter/vendor/model")` — and bills in the response, key `OPENROUTER_API_KEY`.
+
 | Provider | `text-to-text` | `text-to-image` | `image-to-text` | `image-to-image` |
 |---|---|---|---|---|
 | Anthropic | 14 | — | 14 | — |

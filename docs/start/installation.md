@@ -53,6 +53,7 @@ on your own server needs no key and sends nothing outside your network.
 | xAI | `XAI_API_KEY` | <https://console.x.ai/> |
 | Xiaomi (MiMo) | `MIMO_API_KEY` | <https://platform.xiaomimimo.com> |
 | Z.ai (GLM) | `ZAI_API_KEY` | <https://z.ai/manage-apikey/apikey-list> |
+| OpenRouter | `OPENROUTER_API_KEY` | <https://openrouter.ai/settings/keys> |
 | Brave Search | `BRAVE_SEARCH_API_KEY` | <https://brave.com/search/api> |
 | Cohere | `COHERE_API_KEY` | <https://dashboard.cohere.com> |
 | TypeSafe | `TYPESAFE_API_KEY` | <https://console.typesafe.ai> |

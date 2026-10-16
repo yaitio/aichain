@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from .. import _hints
 from ._data import PROVIDERS
+from ._options import REASONING_LEVELS
 
 if TYPE_CHECKING:
     from ..clients._base import BaseClient
@@ -452,8 +453,19 @@ class Model:
         # it says so as `[provider.reasoning] off`; "none" is then a level too.
         if (prov.get("reasoning") or {}).get("off"):
             rmap.setdefault("none", None)
+        # A provider with no reasoning control at all declines a known level
+        # when the request is built, said in its notices, so code written for
+        # one provider runs on another; a level outside the vocabulary is a
+        # typo, refused here.
+        if not rmap and reasoning in REASONING_LEVELS:
+            return reasoning
         if reasoning is not None and reasoning not in rmap:
-            allowed = ", ".join(repr(k) for k in rmap) or "(none for this provider)"
+            if not rmap:
+                raise ValueError(
+                    f"reasoning must be None or one of: none, low, medium, high; got "
+                    f"{reasoning!r} (the {self._provider!r} provider has no reasoning control, "
+                    "so a level is declined, said in the notices)")
+            allowed = ", ".join(repr(k) for k in rmap)
             raise ValueError(
                 f"reasoning for the {self._provider!r} provider must be None "
                 f"or one of: {allowed}; got {reasoning!r}"

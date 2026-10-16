@@ -1,5 +1,39 @@
 # Changelog
 
+## [4.9.0] — 2026-10-16
+
+### Added
+
+- OpenRouter as a provider: `Model("openrouter/anthropic/claude-sonnet-5.5")`,
+  key `OPENROUTER_API_KEY`, any model OpenRouter serves, named as it names
+  them. A data file with no model list — OpenRouter's own is the authority —
+  and no price table: every response carries its bill in `usage.cost`, which
+  is the cost reported. `reasoning` goes as `reasoning: {effort}`, `none`
+  included, and `top_k` is sent. Verified live on fifteen models from eleven
+  vendors: a JSON schema, reasoning, both together, and a schema beside
+  tools, all but Qwen with tools, which ignores the schema there as it does
+  on DashScope.
+
+### Changed
+
+- `private` takes `reasoning`, as `reasoning_effort` — the spelling Ollama,
+  vLLM and OpenRouter share — and every call that sends it says the server
+  decides: on vLLM it needs gpt-oss, or a model whose template reads
+  `enable_thinking` started with `--reasoning-parser`. Anything else goes
+  through `extra=`; `docs/models/private-models.md` has the table.
+  `private` is now described by its data like the other OpenAI-compatible
+  providers, rather than by a branch of its own.
+- A provider with no reasoning control (Perplexity, Xiaomi) declines a
+  `reasoning` level in the notices instead of refusing the model, so code
+  written for one provider runs on another; a level outside none, low,
+  medium and high is still refused, now naming them.
+
+### Fixed
+
+- The thinking beside a tool call is read from `message.reasoning` as well
+  as `reasoning_content`: vLLM renamed the field, and OpenRouter uses the
+  new name.
+
 ## [4.8.0] — 2026-10-16
 
 ### Added

@@ -62,8 +62,36 @@ chat_path        = "/v1/chat/completions"
 # Which universal options this provider has a control for at
 # all — not which a given model takes on a given call, which is
 # a runtime adaptation and is reported when it happens.
-# The plain OpenAI-compatible case. What the server behind it takes is the server's business; only the common three are claimed.
-accepts = ["temperature", "top_p", "max_tokens"]
+# The plain OpenAI-compatible case. What the server behind it takes is the
+# server's business; the common three are claimed, and reasoning in the one
+# spelling vLLM, Ollama and OpenRouter all take (below).
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+
+# Reasoning goes as `reasoning_effort`, the field of the OpenAI API, which is
+# what this provider is written for:
+#
+#   * Ollama takes it on its /v1 for every model that thinks.
+#   * vLLM takes it for gpt-oss, which has the levels, and maps it to the
+#     chat template's `enable_thinking` for a model whose template reads that
+#     switch — Qwen3, Gemma 4, Granite 4.2 — where low, medium and high are
+#     the same "on" and none is "off". Started with `--reasoning-parser` (qwen3,
+#     gemma4, granite_thinking_parser…) to keep the thinking out of the answer,
+#     and `--enable-auto-tool-choice --tool-call-parser …` for tools.
+#   * Another model or another server may ignore the field. Every call that
+#     sends it says so in its notice; the server's own field goes through
+#     `extra=`, e.g. extra={"chat_template_kwargs": {"thinking": True}} for
+#     DeepSeek-V3.1 on vLLM. docs/models/private-models.md has the table.
+[provider.reasoning_map]
+none   = "none"
+low    = "low"
+medium = "medium"
+high   = "high"
+
+[provider.reasoning]
+field = "reasoning_effort"
+why   = """sent as reasoning_effort; whether it takes effect is the server's: vLLM needs a \
+model that reads it (gpt-oss) or reads enable_thinking (Qwen3, Gemma 4), Ollama takes it for \
+a model that thinks; for anything else send the server's own field through extra="""
 
 [provider.defaults]
 temperature = 1.0

@@ -195,21 +195,16 @@ class OpenAIClient(BaseClient):
 
     def build_request(self, messages, output, params, tools=None) -> tuple[str, dict]:
         m = self._wrap(params)
-        if self._provider in ("perplexity", "private"):
-            # private is the plain-compat case on purpose: the servers behind
-            # it (vLLM, Ollama, LM Studio, TGI, SGLang, llama.cpp — or an
-            # aggregator someone pointed it at) advertise OpenAI
-            # compatibility and nothing more, so any quirk branch we added
-            # here would be guessing about six different servers at once. The
-            # model name is passed through verbatim; the server either serves
-            # it or says it doesn't.
+        if self._provider == "perplexity":
             return _build_openai_compat_request(m, messages, output, self._chat_path, self._mtf, tools=tools)
 
         own = {"openai": self._openai, "xai": self._xai, "kimi": self._kimi,
                "deepseek": self._deepseek, "qwen": self._qwen}.get(self._provider)
         if own is not None:
             return own(m, messages, output, tools)
-        # Every other provider on this family is described by its data: the
+        # Every other provider on this family is described by its data —
+        # private too, whose data is the one spelling the servers behind it
+        # share (reasoning_effort) and nothing they differ on: the
         # request is the compatible one, and what differs — how reasoning is
         # asked for, whether a JSON Schema is taken — is read from
         # `[provider.reasoning]` and `[provider.options]`. A new provider that
@@ -368,6 +363,9 @@ class OpenAIClient(BaseClient):
         # reasoning_split, which keeps its thinking out of the answer's text.
         for key, val in ((prov.get("request") or {}).get("always") or {}).items():
             body.setdefault(key, val)
+        # OpenAI's wire has no top_k; a provider that claims it takes it as is.
+        if m.top_k is not None and "top_k" in (prov.get("options") or {}).get("accepts", ()):
+            body["top_k"] = m.top_k
         how = prov.get("reasoning") or {}
         if m.reasoning is not None and "reasoning" in m._REJECTS:
             record(Adaptation(

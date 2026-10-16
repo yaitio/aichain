@@ -140,9 +140,12 @@ Model("private/llama3.3", api_key="my-server-key")
 
 ## Using an aggregator (and why that is not private)
 
-Together, Fireworks, OpenRouter, Groq, DeepInfra and friends host the same
-open weights behind the same OpenAI-compatible `/v1`. This provider talks to
-them, and that is deliberately allowed:
+Together, Fireworks, Groq, DeepInfra and friends host the same open weights
+behind the same OpenAI-compatible `/v1`. This provider talks to them, and that
+is deliberately allowed. OpenRouter has a provider of its own,
+`Model("openrouter/anthropic/claude-sonnet-5.5")` with `OPENROUTER_API_KEY`:
+its reasoning field is not this one, and it bills in the response, so its
+`cost` is the real figure.
 
 ```python
 import os
@@ -175,6 +178,24 @@ itself the signal that someone else's machine is answering. And `usage.cost`
 stays `None`, because the library carries no price table for their catalogue;
 their pricing page and your token counts give you the real figure.
 
+## Reasoning: `reasoning_effort`, and the server decides
+
+`options={"reasoning": "low"}` goes as `reasoning_effort`, the OpenAI field,
+which is the one spelling these servers share. Whether it changes anything is
+the server's, so every call that sends it says so in its notice:
+
+| Server | Model | Started with | `reasoning` does |
+|---|---|---|---|
+| Ollama | any model that thinks | `ollama run qwen3` | low / medium / high, `none` off |
+| vLLM | gpt-oss | `vllm serve openai/gpt-oss-20b` | low / medium / high |
+| vLLM | Qwen3, Gemma 4, Granite 4.2 | `--reasoning-parser qwen3` (or `gemma4`, `granite_thinking_parser`) | on for any level, off for `none` |
+| vLLM | DeepSeek-V3.1, Granite 3.2 | `--reasoning-parser deepseek_v3` (or `granite`) | nothing: send `extra={"chat_template_kwargs": {"thinking": True}}` |
+| vLLM | Llama and other models that do not reason | — | nothing |
+
+On vLLM, `--reasoning-parser` is what keeps the thinking out of the answer's
+text, and tools need `--enable-auto-tool-choice --tool-call-parser …` for the
+model. A field the table does not cover goes through `extra=`, verbatim.
+
 ## What `cost` means here: `None`
 
 `usage.cost` on a private call is `None`, and that is an answer, not a gap.
@@ -189,9 +210,8 @@ you can compute your own rate from your hardware cost.
   not routed to private servers yet, even where the server supports them.
 - **No quirk handling.** Cloud providers get per-model branches (reasoning
   flags, JSON-mode hints); a private server gets the plain OpenAI-compatible
-  request. If your server needs a special flag, it won't be sent.
-- **Reasoning options are not translated.** `options={"reasoning": ...}` is
-  ignored here rather than mapped to server-specific flags.
+  request and `reasoning_effort`. If your server needs a special flag, send it
+  through `extra=`.
 - **Verified at the wire level** — request shape, routing, auth, URL forms —
   against the OpenAI-compatible contract these servers document, plus the
   live suite below against a real one.

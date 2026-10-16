@@ -487,7 +487,10 @@ def _parse_openai_compat_response(response: dict, output: dict, *,
     refuse_cut_off(finish, spent, calls=bool(message.get("tool_calls")),
                    text=content_text(message.get("content")))
     if message.get("tool_calls"):
+        # vLLM renamed the field to `reasoning`, as OpenRouter has it.
         thought = message.get("reasoning_content")
+        if not isinstance(thought, str):
+            thought = message.get("reasoning") if isinstance(message.get("reasoning"), str) else None
         return _tool_call_request(
             ((c.get("function", {}).get("name", ""),
               c.get("function", {}).get("arguments"),

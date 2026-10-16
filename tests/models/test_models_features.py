@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import unittest
+import warnings
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -214,14 +215,18 @@ class TestQwenReasoning(unittest.TestCase):
 
 class TestPerplexityReasoning(unittest.TestCase):
 
-    def test_reasoning_on_a_provider_without_it_is_a_loud_error(self):
-        # This test used to assert the opposite — that the option is silently
-        # ignored. Asking for reasoning and getting none, with no error
-        # anywhere, is a silent failure; valid levels now come from the
-        # provider's own reasoning_map, and a provider without one says so.
-        with self.assertRaises(ValueError) as ctx:
-            Model("sonar", options={"reasoning": "high"})
-        self.assertIn("perplexity", str(ctx.exception))
+    def test_reasoning_on_a_provider_without_it_is_declined_and_said(self):
+        # Asking for reasoning and getting none with nothing said is a silent
+        # failure. It was an error at construction; since 4.9.0 it is a
+        # declined notice, so code written for one provider runs on another,
+        # and a level outside the vocabulary is still a typo, refused.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _, _, made = Model("sonar", options={"reasoning": "high"}, api_key="k").build(
+                _USER_MSG, _TEXT_OUTPUT)
+        self.assertIn(("declined", "reasoning"), {(a.kind, a.option) for a in made})
+        with self.assertRaisesRegex(ValueError, "low, medium, high"):
+            Model("sonar", options={"reasoning": "hgh"})
 
     def test_no_reasoning_option_stays_fine(self):
         model = Model("sonar")

@@ -188,8 +188,12 @@ class TestMiniMaxJSON(unittest.TestCase):
 class TestXiaomiAndStepFun(unittest.TestCase):
 
     def test_xiaomi_claims_no_reasoning_control(self):
-        with self.assertRaisesRegex(ValueError, "reasoning for the 'xiaomi' provider"):
-            Model("mimo-v2.6-pro", options={"reasoning": "high"})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _, body, made = Model("mimo-v2.6-pro", options={"reasoning": "high"},
+                                  api_key="k").build(MSGS, {"format": {"type": "text"}})
+        self.assertNotIn("reasoning_effort", body)
+        self.assertIn(("declined", "reasoning"), {(a.kind, a.option) for a in made})
 
     def test_stepfun_sends_a_level(self):
         _, _, body = _request("step-5-preview", {"reasoning": "low"})

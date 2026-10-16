@@ -48,6 +48,15 @@ def cloud() -> list:
     return registry.providers()
 
 
+def registry_less() -> list:
+    """Cloud providers whose catalogue is their own, not ours: a key, no list."""
+    return [p for p in DATA if not DATA[p].get("models") and DATA[p]["provider"].get("auth") != "none"]
+
+
+def keyed() -> list:
+    return cloud() + registry_less()
+
+
 TASK_DESCRIPTION = {
     "text-to-text":   "Text prompt → text response. Chat, reasoning, code.",
     "text-to-image":  "Text prompt → image.",
@@ -257,6 +266,7 @@ def b_modalities() -> str:
     for task in registry.TASKS:
         names = ", ".join(label(p) for p in registry.providers(task=task))
         if task == "text-to-text":
+            names += "".join(f", {label(p)}" for p in registry_less())
             names += ", [your own private server](models/private-models.md)"
         rows.append(f"| **{TASK_TITLE[task]}** | {names} |")
     search = sorted(n for c, ns in tool_classes().items()
@@ -284,6 +294,10 @@ def b_registry_models() -> str:
             "to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves "
             "works and none is listed here. See "
             "[Private models](../models/private-models.md).", ""]
+    out += [f"`{p}` is registry-less too: it serves its own catalogue, named after the "
+            f"prefix — `Model(\"{p}/vendor/model\")` — and bills in the response, "
+            f"key `{DATA[p]['provider']['env_key']}`." for p in registry_less()]
+    out += [""] if registry_less() else []
     out += ["| Provider | " + " | ".join(f"`{t}`" for t in registry.TASKS) + " |",
             "|---|" + "---|" * len(registry.TASKS)]
     for p in cloud():
@@ -333,7 +347,7 @@ def _tool_env() -> dict:
 
 def b_env_providers() -> str:
     rows = ["| Variable | Provider | Where to get it |", "|---|---|---|"]
-    for p in cloud():
+    for p in keyed():
         d = DATA[p]["provider"]
         url = d.get("keys_url")
         rows.append(f"| `{d['env_key']}` | {label(p)} | {f'<{url}>' if url else '—'} |")
@@ -342,9 +356,9 @@ def b_env_providers() -> str:
 
 def b_env_resolve() -> str:
     lines = []
-    for p in cloud():
-        first = (registry.models(provider=p, task="text-to-text")
-                 or registry.models(provider=p))[0]
+    for p in keyed():
+        first = ((registry.models(provider=p, task="text-to-text")
+                  or registry.models(provider=p) or [f"{p}/vendor/model"])[0])
         lines.append((f'Model("{first}")', f"# reads {DATA[p]['provider']['env_key']}"))
     width = max(len(a) for a, _ in lines) + 2
     body = [f"{a:<{width}}{b}" for a, b in lines]
@@ -362,14 +376,14 @@ def b_env_tools() -> str:
 
 
 def b_exports() -> str:
-    keys = [DATA[p]["provider"]["env_key"] for p in cloud()]
+    keys = [DATA[p]["provider"]["env_key"] for p in keyed()]
     keys += [k for k in _tool_env() if k not in keys]
     return "```bash\n" + "\n".join(f'export {k}="…"' for k in keys) + "\n```"
 
 
 def b_install_keys() -> str:
     rows = ["| Service | Environment variable | Get a key |", "|---|---|---|"]
-    for p in cloud():
+    for p in keyed():
         d = DATA[p]["provider"]
         url = d.get("keys_url")
         rows.append(f"| {label(p)} | `{d['env_key']}` | {f'<{url}>' if url else '—'} |")
