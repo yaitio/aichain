@@ -1,0 +1,9 @@
+# The one download: TruthfulQA's multiple-choice set (Lin, Hilton and Evans,
+# 2021). Apache-2.0, checked 2026-10-17.
+
+[[source]]
+id      = "truthfulqa_mc"
+url     = "https://raw.githubusercontent.com/sylinrl/TruthfulQA/main/data/mc_task.json"
+sha256  = "c90d853454fd48c676accb33e16923ac438dbb6fb37ecc7c6a70e33c9e556e87"
+licence = "Apache-2.0"
+file    = "mc_task.json"
