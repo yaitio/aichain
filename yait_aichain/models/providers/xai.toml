@@ -133,3 +133,21 @@ price = { per_image = 0.04 }
 [models."grok-imagine-image-quality"]
 caps  = ["text-to-image", "image-to-image"]
 price = { per_image = 0.05 }
+
+# Video — Grok Imagine, through video(): POST /v1/videos/generations, poll
+# /v1/videos/{id}, download video.url. The job reports its own cost, in ticks
+# of 1e-10 USD, which wins over the rate here. Verified live 2026-10-17 (1.5
+# Lite, 1 s at 480p, in 16 s, $0.02).
+[models."grok-imagine-video-1.5"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [1, 15]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "5:2"]
+price          = { per_second = 0.08 }
+
+[models."grok-imagine-video-1.5-lite"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [1, 15]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "5:2"]
+price          = { per_second = 0.02 }

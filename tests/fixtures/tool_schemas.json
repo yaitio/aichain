@@ -1418,6 +1418,64 @@
    ]
   }
  },
+ "yait_aichain.tools.video._tool.Video": {
+  "name": "videoGoogle",
+  "description": "Make a video with google's veo-3.1-lite-generate-preview — from a prompt, or from an image as its first frame. Takes minutes. Returns where the video was saved, or that it went back to the code.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "input": {
+     "type": "string",
+     "description": "What the video shows."
+    },
+    "images": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1,
+     "description": "One image as the first frame — a file path or a URL. None for text alone."
+    },
+    "options": {
+     "type": "object",
+     "description": "How to make it.",
+     "properties": {
+      "duration": {
+       "type": "integer",
+       "description": "Seconds; the nearest length the model makes."
+      },
+      "resolution": {
+       "type": "string",
+       "description": "480p, 720p, 1080p or 4k; the nearest the model has."
+      },
+      "aspect_ratio": {
+       "type": "string",
+       "description": "e.g. '16:9'; the nearest the model takes."
+      },
+      "size": {
+       "type": "string",
+       "description": "Pixels, e.g. '1280x720'; becomes a ratio and a resolution."
+      },
+      "seed": {
+       "type": "integer",
+       "description": "For a repeatable video where the model honours it."
+      },
+      "audio": {
+       "type": "boolean",
+       "description": "With sound or without, where the model lets you choose."
+      },
+      "negative_prompt": {
+       "type": "string",
+       "description": "What the video should not show, where the model takes it."
+      }
+     }
+    }
+   },
+   "required": [
+    "input"
+   ]
+  }
+ },
  "yait_aichain.utilities.shell._browse.LocalBrowseTool": {
   "name": "local_browse",
   "description": "List the contents of a local directory as a tree. Use this to explore the filesystem and understand project structure.",

@@ -148,3 +148,43 @@ price = { per_image = 0.03 }
 unlisted = "not in /v1/models; not probed, the edit endpoint bills per image"
 caps  = ["image-to-image"]
 price = { per_image = 0.075 }
+
+# Video — Wan, through video(): an asynchronous task (X-DashScope-Async), polled
+# at /api/v1/tasks/{id}, output.video_url downloaded (it lasts 24 hours). Wan
+# 2.7 reads resolution and ratio; Wan 2.2 reads a pixel size, "W*H", and ignores
+# a resolution — measured live 2026-10-17: 480P asked, 1920*1080 delivered and
+# billed. Each model says which it reads. Wan generates its own audio. Prices
+# per second, Singapore, from the Model Studio price list.
+[models."wan2.7-t2v"]
+caps           = ["text-to-video"]
+duration_range = [2, 15]
+resolutions    = ["720p", "1080p"]
+aspect_ratios  = ["16:9", "9:16", "1:1", "4:3", "3:4"]
+shape          = "ratio"
+audio          = "always"
+seed           = true
+negative_prompt = true
+price          = { per_second = { "720p" = 0.10, "1080p" = 0.15 } }
+
+[models."wan2.7-i2v"]
+caps           = ["image-to-video"]
+frame          = "media"
+duration_range = [2, 15]
+resolutions    = ["720p", "1080p"]
+aspect_ratios  = ["16:9", "9:16", "1:1", "4:3", "3:4"]
+shape          = "ratio"
+audio          = "always"
+seed           = true
+negative_prompt = true
+price          = { per_second = { "720p" = 0.10, "1080p" = 0.15 } }
+
+[models."wan2.2-t2v-plus"]
+caps          = ["text-to-video"]
+durations     = [5]
+resolutions   = ["480p", "1080p"]
+aspect_ratios = ["16:9", "9:16", "1:1"]
+shape         = "size"
+sizes         = { "480p" = { "16:9" = "832*480", "9:16" = "480*832", "1:1" = "624*624" }, "1080p" = { "16:9" = "1920*1080", "9:16" = "1080*1920", "1:1" = "1440*1440" } }
+seed          = true
+negative_prompt = true
+price         = { per_second = { "480p" = 0.02, "1080p" = 0.10 } }

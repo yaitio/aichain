@@ -34,7 +34,7 @@ SECTIONS = [
      ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]),
     ("Tools",
      "A **tool** is anything a model or a pipeline can call — your function, an API, an MCP server.",
-     ["11", "12", "13", "14", "15", "16", "17", "18", "19"]),
+     ["11", "12", "13", "14", "15", "16", "17", "18", "19", "39"]),
     ("Chain",
      "A **Chain** runs steps in order, each step's result under its own key; it can park and resume.",
      ["20", "21", "22", "23", "24"]),

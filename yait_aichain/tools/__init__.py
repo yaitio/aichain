@@ -1,6 +1,6 @@
 """What a model, a chain and your code can all call: the tool factories
 (``search``, ``fetch``, ``decide``, ``chunk``, ``embed``, ``rerank``,
-``speech``, ``transcribe``, ``image``, ``wait``, ``gate``), ``@tool``, the
+``speech``, ``transcribe``, ``image``, ``video``, ``wait``, ``gate``), ``@tool``, the
 ``Tool`` base, the permission vocabulary, and the classes behind each factory
 by their own names. See docs/tools/index.md.
 """
@@ -23,6 +23,7 @@ from .rerank     import RerankBase, RerankResult, RerankCohere, RerankVoyage, Re
 from .speech     import Speech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
 from .transcribe import Transcription, sttGoogle, sttOpenAI
 from .image._tool import Image
+from .video._tool import Video
 from .chunk._chunk import Chunk
 
 def __getattr__(name):
@@ -47,8 +48,9 @@ if _TC:
     from .transcribe import transcribe
     from .chunk      import chunk
     from .image      import image
+    from .video      import video
 else:
-    from . import search, fetch, embed, rerank, speech, transcribe, chunk, image
+    from . import search, fetch, embed, rerank, speech, transcribe, chunk, image, video
     from . import decision as decide
 
 __all__ = [
@@ -56,7 +58,7 @@ __all__ = [
     "tool", "media_part", "Tool", "FunctionTool", "ToolResult", "Record",
     # the factories
     "search", "fetch", "decide", "chunk", "embed", "rerank", "speech", "transcribe", "image",
-    "wait", "gate",
+    "video", "wait", "gate",
     # the classes behind them
     "Search", "searchPerplexity", "searchBrave", "searchExa", "searchFirecrawl", "searchTavily",
     "searchParallel",
@@ -68,7 +70,7 @@ __all__ = [
     "RerankBase", "RerankResult", "RerankCohere", "RerankVoyage", "RerankQwen",
     "Speech", "ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen",
     "Transcription", "sttOpenAI", "sttGoogle",
-    "Image", "Wait", "Gate",
+    "Image", "Video", "Wait", "Gate",
     # permissions
     "PermissionPolicy", "ApprovalRequest", "ApprovalDecision",
     "RISK_CLASSES", "DECISIONS",

@@ -1,12 +1,12 @@
-# Speech, transcription, images
+# Speech, transcription, images, video
 
 Text in, text out is a model's job. Turning text into audio, audio into text,
-or a prompt into a picture is done by services that write no prose and cannot
+or a prompt into a picture or a clip is done by services that write no prose and cannot
 reason — so here they are tools: things your code, a chain or an agent call,
 never an agent's mind.
 
 ```python
-from yait_aichain.tools import speech, transcribe, image
+from yait_aichain.tools import speech, transcribe, image, video
 
 speech("openai").run("Your order has shipped.", {"voice": "nova"})     # the audio file's path
 transcribe("openai").run("call.mp3", {"language": "ru"})               # the transcript
@@ -14,9 +14,13 @@ transcribe("openai").run("call.mp3", {"language": "ru"})               # the tra
 painter = image("openai", model="gpt-image-1.5", output_dir="images")
 out = painter.run("a lighthouse at dawn, watercolor", options={"aspect_ratio": "16:9"})
 out["images"][0]["path"], out["cost"]
+
+clip = video("google", model="veo-3.1-fast-generate-preview", output_dir="videos")
+out = clip.run("a paper boat on a puddle", options={"duration": 6})   # waits minutes
+out["videos"][0]["path"], out["cost"]
 ```
 
-→ Every parameter: [API: speech and transcribe](../api/tools/speech.md) · [API: image](../api/tools/image.md)
+→ Every parameter: [API: speech and transcribe](../api/tools/speech.md) · [API: image](../api/tools/image.md) · [API: video](../api/tools/video.md)
 
 ---
 
@@ -134,5 +138,51 @@ text.
 
 ---
 
+## Video: a job, not a call
+
+A video takes from ten seconds to several minutes to render, so `video()` is
+built around a job. `submit()` starts one and returns it at once — a small dict,
+`{"service", "model", "id", …}`, that you can store, queue or hand to another
+process; `collect(job)` waits for it, downloads the file and prices it; `run()`
+is the two together, waiting up to `timeout` (ten minutes by default).
+
+```python
+clip = video("xai", model="grok-imagine-video-1.5-lite", output_dir="videos")
+job = clip.submit("a paper boat on a puddle", images=["boat.png"], options={"duration": 3})
+...                                   # another process, a queue, a cron
+result = video("xai", model="grok-imagine-video-1.5-lite", output_dir="videos").collect(job)
+```
+
+A wait that runs out raises with the job, so it can be collected again rather
+than paid for twice. `images` is one image, the clip's first frame.
+
+| Service | Models | Price per second |
+|---|---|---|
+| `google` | `veo-3.1-generate-preview`, `-fast-`, `-lite-` | $0.05–0.60 by model and resolution; sound always on |
+| `xai` | `grok-imagine-video-1.5`, `-1.5-lite` | $0.08, $0.02; the job reports its own cost |
+| `qwen` | `wan2.7-t2v`, `wan2.7-i2v`, `wan2.2-t2v-plus` | $0.02–0.15 by resolution |
+
+OpenAI closed Sora and its video API on 2026-09-24.
+
+**One vocabulary for the shape**: `duration`, `resolution` (480p, 720p,
+1080p, 4k), `aspect_ratio`, `size` (pixels, turned into a ratio and a
+resolution), `seed`, `audio`, `negative_prompt`. Each model takes some lengths,
+some resolutions and some ratios; the nearest goes, and the notice says what
+changed — Veo makes 1080p and 4k at 8 seconds only, Wan 2.2 reads a pixel size
+where Wan 2.7 reads a resolution. A control a model lacks is declined and said.
+
+**The file is downloaded, always**: written to `output_dir`, or returned as
+bytes in `videos[0]["data"]`. A provider's link is not the result — Google's
+needs the key, Wan's lasts a day.
+
+**What it costs**: the provider's own figure where it gives one (xAI), else the
+seconds delivered at the registry's rate for the resolution delivered; `cost_basis`
+says which. A clip whose estimate is more than a budget in force has left is
+warned about and made; a budget with nothing left stops it before it starts.
+`image()` warns the same way.
+
+---
+
 ▶ [`examples/06_media_input.py`](../../examples/06_media_input.py) ·
-[`examples/12_image.py`](../../examples/12_image.py)
+[`examples/12_image.py`](../../examples/12_image.py) ·
+[`examples/39_video.py`](../../examples/39_video.py)

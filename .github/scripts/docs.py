@@ -62,9 +62,12 @@ TASK_DESCRIPTION = {
     "text-to-image":  "Text prompt → image.",
     "image-to-text":  "Image (+ optional text) → text response.",
     "image-to-image": "Image (+ instruction) → edited image.",
+    "text-to-video":  "Text prompt → video, through the `video()` tool.",
+    "image-to-video": "Image (as the first frame) + prompt → video, through `video()`.",
 }
 TASK_TITLE = {"text-to-text": "Text → Text", "text-to-image": "Text → Image",
-              "image-to-text": "Image → Text", "image-to-image": "Image → Image"}
+              "image-to-text": "Image → Text", "image-to-image": "Image → Image",
+              "text-to-video": "Text → Video", "image-to-video": "Image → Video"}
 
 # Where a tool's key comes from, for the services that are not model providers.
 # The one hand-kept table in this file: no class carries a sign-up URL.
@@ -143,8 +146,9 @@ def instance(cls):
         # Embedders and rerankers take the model first; their schema does not
         # depend on which, so any name builds the instance the page reads.
         if list(params)[1:2] == ["model"] and params["model"].default is params["model"].empty:
-            # An image tool resolves its model in the registry; the others take any name.
-            return cls("gpt-image-1.5" if cls.__name__ == "Image" else "doc-model")
+            # An image or video tool resolves its model in the registry; the others take any name.
+            registered = {"Image": "gpt-image-1.5", "Video": "veo-3.1-lite-generate-preview"}
+            return cls(registered.get(cls.__name__, "doc-model"))
         if all(p.default is not p.empty or p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
                for p in list(params.values())[1:]):
             return cls()
@@ -403,6 +407,7 @@ TOOL_PAGES = {
     "api/tools/embed.md":       ("Embeddings: text → vectors", ["EmbeddingOpenAI", "EmbeddingCohere", "EmbeddingVoyage", "EmbeddingGoogle", "EmbeddingQwen"]),
     "api/tools/rerank.md":      ("Reranking: documents → in order", ["RerankCohere", "RerankVoyage", "RerankQwen"]),
     "api/tools/image.md":       ("Images: prompt → picture", ["Image"]),
+    "api/tools/video.md":       ("Video: prompt → clip", ["Video"]),
     "api/tools/fetch.md":       ("Fetch: link → page", ["fetchFirecrawl", "fetchTavily", "fetchExa", "fetchParallel", "fetchLocal"]),
     "api/tools/speech.md":      ("Speech: text ↔ audio",
                              ["ttsOpenAI", "ttsGoogle", "ttsXAI", "ttsQwen",
@@ -427,7 +432,7 @@ NOT_PAGED = {"Search": "abstract base of the search tools",
              "Speech": "base of the tts* tools",
              "Transcription": "base of the stt* tools"}
 GROUP = {"vectors": "Vector store", "shell": "Local", "rest": "HTTP", "search": "Search", "fetch": "Fetch", "embed": "Embeddings", "rerank": "Reranking",
-         "speech": "Speech", "transcribe": "Speech", "chunk": "Vector store", "general": "Pause", "image": "Image", "convert": "Conversion", "decision": "Decision", "local": "Local",
+         "speech": "Speech", "transcribe": "Speech", "chunk": "Vector store", "general": "Pause", "image": "Image", "video": "Video", "convert": "Conversion", "decision": "Decision", "local": "Local",
          "vectordb": "Vector store", "rest_api": "HTTP", "mcp": "MCP", "_wait": "Pause"}
 
 
@@ -530,7 +535,7 @@ def _tool_section(n, level) -> list:
 TOOL_PAGE_LEAD = {
     "api/tools/search.md": ["search"], "api/tools/fetch.md": ["fetch"],
     "api/tools/decide.md": ["decide"], "api/tools/speech.md": ["speech", "transcribe"],
-    "api/tools/image.md": ["image"], "api/tools/embed.md": ["embed", "EmbeddingResult"],
+    "api/tools/image.md": ["image"], "api/tools/video.md": ["video"], "api/tools/embed.md": ["embed", "EmbeddingResult"],
     "api/tools/rerank.md": ["rerank", "RerankResult"], "api/tools/wait-gate.md": ["wait", "gate"],
     "api/utilities/vectors.md": ["Vectors", "chunk"], "api/utilities/shell.md": ["Shell"],
     "api/utilities/rest.md": ["REST"], "api/utilities/mcp.md": ["MCP"],

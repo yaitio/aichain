@@ -32,6 +32,7 @@ Chains and Agents identically.
 | Reranking | [`rerankVoyage`](../api/tools/rerank.md#rerankvoyage) | `RerankVoyage` | Reranker for the Voyage AI Rerank API. | `VOYAGE_API_KEY` | `read` |
 | Reranking | [`rerankQwen`](../api/tools/rerank.md#rerankqwen) | `RerankQwen` | Reranker for the Alibaba DashScope Text-Rerank API. | `DASHSCOPE_API_KEY` | `read` |
 | Image | [`imageOpenai`](../api/tools/image.md) | `Image` | An image model as a tool — generation from a prompt, and editing when the call carries images. Made by `tools.image` — `image("openai", model="gpt-image-1.5")`. | — | `draft` |
+| Video | [`videoGoogle`](../api/tools/video.md) | `Video` | A video model as a tool — from a prompt, or from an image as the first frame. Made by `tools.video` — `video("google", model="veo-3.1-fast-generate-preview")`. | — | `draft` |
 | Fetch | [`fetchFirecrawl`](../api/tools/fetch.md#fetchfirecrawl) | `fetchFirecrawl` | A web page's text by Firecrawl Scrape — the main content, as Markdown, with the page's metadata. | `FIRECRAWL_API_KEY` | `read` |
 | Fetch | [`fetchTavily`](../api/tools/fetch.md#fetchtavily) | `fetchTavily` | Web pages' text by Tavily Extract — up to 20 URLs a call, as Markdown. | `TAVILY_API_KEY` | `read` |
 | Fetch | [`fetchExa`](../api/tools/fetch.md#fetchexa) | `fetchExa` | Web pages' text by Exa Contents — up to 100 URLs a call, with title, date and author. | `EXA_API_KEY` | `read` |

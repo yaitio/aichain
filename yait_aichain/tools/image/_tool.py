@@ -88,6 +88,7 @@ class Image(Tool):
         skill = Skill(self._model, input={"messages": [{"role": "user", "parts": parts}]},
                       output={"modalities": ["image"], "format": {"type": "image", **opts}},
                       _image=True)
+        over = self._over_budget(price_per_image(self.model))
         out = skill.run()
         picture = {"url": out.get("url"), "base64": out.get("base64"), "mime_type": out.get("mime_type"),
                    "revised_prompt": out.get("revised_prompt"), "path": None}
@@ -106,13 +107,26 @@ class Image(Tool):
                 budget.charge(cost)
         # "translated" is an option passed exactly, in the provider's word; the
         # rest change what was asked — those are what a reader needs to know.
-        notices = [_notice(a) for a in skill.last_adaptations if getattr(a, "kind", "") != "translated"]
+        notices = [_notice(a) for a in skill.last_adaptations if getattr(a, "kind", "") != "translated"] + over
         return Record({"images": [picture], "model": self.model, "service": self.service, "notices": notices,
                        "cost": cost,
                        "cost_basis": (basis if cost is not None
                                       else f"not known — {self.service} reports no usage for {self.model} "
                                            "and the registry has no price for it"),
                        "usage": _usage_dict(usage)}, self.render)
+
+    def _over_budget(self, estimate: float | None) -> list:
+        """Warn, and go ahead, when the picture's price is more than a budget in force has left."""
+        from ..._budget import in_force
+        out = []
+        for budget in in_force(None):
+            if estimate is not None and not budget.exhausted and estimate > budget.remaining:
+                message = (f"{self.name}: this image is priced at ${estimate:.3f} and the budget has "
+                           f"${budget.remaining:.3f} left; it goes ahead and the budget will be overspent")
+                import warnings
+                warnings.warn(message, RuntimeWarning, stacklevel=3)
+                out.append(f"budget: {message}")
+        return out
 
     def render(self, out: dict) -> str:
         """What a model reads: what was made and where it is — never the bytes."""

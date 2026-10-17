@@ -427,7 +427,8 @@ class TestRegistry(unittest.TestCase):
     def test_tasks_constant_entries(self):
         self.assertEqual(
             set(registry.TASKS),
-            {"text-to-text", "text-to-image", "image-to-text", "image-to-image"},
+            {"text-to-text", "text-to-image", "image-to-text", "image-to-image",
+             "text-to-video", "image-to-video"},
         )
 
     def test_providers_constant_entries(self):

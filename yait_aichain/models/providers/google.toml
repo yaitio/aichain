@@ -100,3 +100,38 @@ price = { per_image = 0.0336 }
 caps  = ["text-to-image", "image-to-image"]
 price = { per_image = 0.039 }
 
+
+# Video — Veo 3.1, through video(), not a Skill: a long-running operation
+# (predictLongRunning), polled, the file downloaded with the API key. Audio is
+# always generated. 1080p and 4k come at 8 seconds only. Prices per second of
+# video with audio, by resolution, from the Gemini API pricing page; verified
+# live 2026-10-17 (Lite, 4 s at 720p, in 31 s).
+[models."veo-3.1-generate-preview"]
+caps          = ["text-to-video", "image-to-video"]
+durations     = [4, 6, 8]
+resolutions   = ["720p", "1080p", "4k"]
+aspect_ratios = ["16:9", "9:16"]
+full_length   = ["1080p", "4k"]
+audio         = "always"
+seed          = true
+price         = { per_second = { "720p" = 0.40, "1080p" = 0.40, "4k" = 0.60 } }
+
+[models."veo-3.1-fast-generate-preview"]
+caps          = ["text-to-video", "image-to-video"]
+durations     = [4, 6, 8]
+resolutions   = ["720p", "1080p", "4k"]
+aspect_ratios = ["16:9", "9:16"]
+full_length   = ["1080p", "4k"]
+audio         = "always"
+seed          = true
+price         = { per_second = { "720p" = 0.10, "1080p" = 0.12, "4k" = 0.30 } }
+
+[models."veo-3.1-lite-generate-preview"]
+caps          = ["text-to-video", "image-to-video"]
+durations     = [4, 6, 8]
+resolutions   = ["720p", "1080p"]
+aspect_ratios = ["16:9", "9:16"]
+full_length   = ["1080p"]
+audio         = "always"
+seed          = true
+price         = { per_second = { "720p" = 0.05, "1080p" = 0.08 } }

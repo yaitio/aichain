@@ -19,6 +19,7 @@ import os
 import sys
 import tempfile
 import unittest
+import warnings
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -88,6 +89,16 @@ class TestACall(unittest.TestCase):
         self.assertEqual(parts[0]["source"], {"kind": "file", "path": path})
         self.assertEqual(parts[1]["source"], {"kind": "url", "url": "https://e.com/r.png"})
         self.assertEqual(parts[2], {"type": "text", "text": "stormy sky"})
+
+    def test_a_picture_dearer_than_the_budget_left_is_warned_about_and_made(self):
+        from yait_aichain import Budget
+        from yait_aichain._budget import lend
+        fake, _ = _run_with({"base64": PNG, "mime_type": "image/png"})
+        with fake, lend(Budget(0.05, spent=0.04)), warnings.catch_warnings(record=True) as warned:
+            warnings.simplefilter("always")
+            out = image("google", model="gemini-2.5-flash-image").run("a lighthouse")
+        self.assertTrue(any("will be overspent" in str(w.message) for w in warned))
+        self.assertTrue(any(n.startswith("budget:") for n in out["notices"]))
 
     def test_mistakes_are_said_before_a_request(self):
         t = image("google", model="gemini-2.5-flash-image")

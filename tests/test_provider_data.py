@@ -78,7 +78,7 @@ class TestProviderDataConsistency(unittest.TestCase):
         # — an image model the provider bills by the picture — a per_image
         # price and nothing else. Every key is one estimate_cost reads.
         known = {"input", "output", "image_input", "cache_read", "long_context", "per_image",
-                 "per_request"}
+                 "per_request", "per_second"}
         priced = 0
         for prov, data in PROVIDERS.items():
             for name, mdl in data.get("models", {}).items():
@@ -86,6 +86,12 @@ class TestProviderDataConsistency(unittest.TestCase):
                     priced += 1
                     price = mdl["price"]
                     self.assertLessEqual(set(price), known, name)
+                    if "per_second" in price:               # video, by the second, maybe by resolution
+                        self.assertEqual(set(price), {"per_second"}, name)
+                        rate = price["per_second"]
+                        rates = rate.values() if isinstance(rate, dict) else [rate]
+                        self.assertTrue(all(isinstance(r, (int, float)) for r in rates), name)
+                        continue
                     if "per_image" in price:
                         self.assertEqual(set(price), {"per_image"}, name)
                         self.assertIsInstance(price["per_image"], (int, float), name)

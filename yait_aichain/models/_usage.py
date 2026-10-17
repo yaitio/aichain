@@ -283,6 +283,16 @@ def price_per_image(model_name: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
+def price_per_second(model_name: str, resolution: str | None = None) -> float | None:
+    """USD per second of video for a model priced by the second — by *resolution*
+    where the price has tiers — else ``None``."""
+    price = _price_of(model_name)
+    value = price.get("per_second") if price else None
+    if isinstance(value, dict):
+        value = value.get(resolution or "")
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 def attach_cost(usage: Usage, model_name: str, cache_ttl: str = "5m",
                 provider: str | None = None) -> Usage:
     """Return *usage* with its ``cost`` filled in: what the provider reported

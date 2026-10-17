@@ -69,10 +69,10 @@ you to find out from the output.
 |---|---|
 | **[Deterministic pipelines](docs/pipelines/chain.md)** | `Skill` — one model call with a template and an output format. `Chain` — steps in order, each output passed on by name. `Pool` — one Skill or Chain over many inputs at once. |
 | **[Agents, by how hard the task is](docs/agents/overview.md)** | `mode="agile"` decides at every turn. `mode="waterfall"` writes a plan first — from a stronger `planner_model` if you like — and holds to it. `team=` lets it delegate to workers with conversations of their own. On τ²-bench a plain loop did best with a weak model and a planned run with a strong one. |
-| **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
+| **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, video, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
 | **[Utilities](docs/utilities/index.md)** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
 | **[Control and measurement](docs/control/cost-and-budget.md)** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class in one `policy`, and a person to decide — now or later. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
-| **[Models](docs/models/models.md)** | **<!-- g:count-models -->165 models from 17 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
+| **[Models](docs/models/models.md)** | **<!-- g:count-models -->173 models from 17 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 
@@ -207,6 +207,7 @@ The skill alone works too: copy `plugin/skills/yait-aichain/` into
 | 36 | [`36_observe.py`](examples/36_observe.py) | What happened inside a run, without print() in your code or a tracing SDK. |
 | 37 | [`37_tenant_keys.py`](examples/37_tenant_keys.py) | One Model serves every tenant: each request carries its customer's key. |
 | 38 | [`38_eval.py`](examples/38_eval.py) | Two prompts compared on repeated trials, not on one lucky run. |
+| 39 | [`39_video.py`](examples/39_video.py) | A video takes minutes: submit returns a job at once, collect waits for it. |
 <!-- examples:end -->
 
 ---

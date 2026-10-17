@@ -58,7 +58,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
 
 _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^claude-"),                                          "anthropic"),
-    (re.compile(r"^gemini-"),                                          "google"),
+    (re.compile(r"^(gemini-|veo-)"),                                   "google"),
     (re.compile(r"^grok-"),                                            "xai"),
     (re.compile(r"^(sonar|r1-1776)"),                                  "perplexity"),
     (re.compile(r"^kimi-"),                                            "kimi"),
@@ -793,6 +793,7 @@ class Model:
 #: Canonical task vocabulary.
 TASKS: tuple[str, ...] = (
     "text-to-text", "text-to-image", "image-to-text", "image-to-image",
+    "text-to-video", "image-to-video",
 )
 
 

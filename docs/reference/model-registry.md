@@ -25,6 +25,8 @@ registry.accepts("openai")                   # the options this provider has a c
 | `text-to-image` | Text prompt → image. |
 | `image-to-text` | Image (+ optional text) → text response. |
 | `image-to-image` | Image (+ instruction) → edited image. |
+| `text-to-video` | Text prompt → video, through the `video()` tool. |
+| `image-to-video` | Image (as the first frame) + prompt → video, through `video()`. |
 
 ## Providers
 
@@ -34,25 +36,25 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 
 `openrouter` is registry-less too: it serves its own catalogue, named after the prefix — `Model("openrouter/vendor/model")` — and bills in the response, key `OPENROUTER_API_KEY`.
 
-| Provider | `text-to-text` | `text-to-image` | `image-to-text` | `image-to-image` |
-|---|---|---|---|---|
-| Anthropic | 14 | — | 14 | — |
-| Black Forest Labs (FLUX) | — | 11 | — | 2 |
-| DeepSeek | 4 | — | — | — |
-| Google AI | 6 | 5 | 6 | 5 |
-| Kimi (Moonshot AI) | 4 | — | 1 | — |
-| Krea | — | 4 | — | 1 |
-| Meta (Muse) | 5 | — | 5 | — |
-| MiniMax | 8 | — | 1 | — |
-| Mistral AI | 8 | — | 6 | — |
-| OpenAI | 20 | 7 | 20 | 7 |
-| Perplexity | 4 | — | — | — |
-| Qwen (DashScope) | 13 | 2 | 3 | 3 |
-| Recraft | — | 9 | — | 3 |
-| StepFun | 4 | — | 2 | — |
-| xAI | 14 | 3 | 13 | 3 |
-| Xiaomi (MiMo) | 3 | — | 3 | — |
-| Z.ai (GLM) | 11 | — | 2 | — |
+| Provider | `text-to-text` | `text-to-image` | `image-to-text` | `image-to-image` | `text-to-video` | `image-to-video` |
+|---|---|---|---|---|---|---|
+| Anthropic | 14 | — | 14 | — | — | — |
+| Black Forest Labs (FLUX) | — | 11 | — | 2 | — | — |
+| DeepSeek | 4 | — | — | — | — | — |
+| Google AI | 6 | 5 | 6 | 5 | 3 | 3 |
+| Kimi (Moonshot AI) | 4 | — | 1 | — | — | — |
+| Krea | — | 4 | — | 1 | — | — |
+| Meta (Muse) | 5 | — | 5 | — | — | — |
+| MiniMax | 8 | — | 1 | — | — | — |
+| Mistral AI | 8 | — | 6 | — | — | — |
+| OpenAI | 20 | 7 | 20 | 7 | — | — |
+| Perplexity | 4 | — | — | — | — | — |
+| Qwen (DashScope) | 13 | 2 | 3 | 3 | 2 | 1 |
+| Recraft | — | 9 | — | 3 | — | — |
+| StepFun | 4 | — | 2 | — | — | — |
+| xAI | 14 | 3 | 13 | 3 | 2 | 2 |
+| Xiaomi (MiMo) | 3 | — | 3 | — | — | — |
+| Z.ai (GLM) | 11 | — | 2 | — | — | — |
 
 ---
 
@@ -188,6 +190,22 @@ gemini-3-pro-image           # per_image $0.134
 gemini-3.1-flash-image       # per_image $0.067
 gemini-3.1-flash-lite-image  # per_image $0.0336
 gemini-nano-banana-2.1       # per_image $0.0336
+```
+
+### `text-to-video`
+
+```
+veo-3.1-fast-generate-preview  # per_second {'720p': 0.1, '1080p': 0.12, '4k': 0.3}
+veo-3.1-generate-preview       # per_second {'720p': 0.4, '1080p': 0.4, '4k': 0.6}
+veo-3.1-lite-generate-preview  # per_second {'720p': 0.05, '1080p': 0.08}
+```
+
+### `image-to-video`
+
+```
+veo-3.1-fast-generate-preview  # per_second {'720p': 0.1, '1080p': 0.12, '4k': 0.3}
+veo-3.1-generate-preview       # per_second {'720p': 0.4, '1080p': 0.4, '4k': 0.6}
+veo-3.1-lite-generate-preview  # per_second {'720p': 0.05, '1080p': 0.08}
 ```
 
 ---
@@ -455,6 +473,19 @@ qwen-image-edit-max   # per_image $0.075
 qwen-image-edit-plus  # per_image $0.03
 ```
 
+### `text-to-video`
+
+```
+wan2.2-t2v-plus  # per_second {'480p': 0.02, '1080p': 0.1}
+wan2.7-t2v       # per_second {'720p': 0.1, '1080p': 0.15}
+```
+
+### `image-to-video`
+
+```
+wan2.7-i2v  # per_second {'720p': 0.1, '1080p': 0.15}
+```
+
 ---
 
 ## Recraft
@@ -562,6 +593,20 @@ grok-4.7                      # $2 in / $6 out per 1M tokens
 grok-imagine-image          # per_image $0.02
 grok-imagine-image-2.0      # per_image $0.04
 grok-imagine-image-quality  # per_image $0.05
+```
+
+### `text-to-video`
+
+```
+grok-imagine-video-1.5       # per_second $0.08
+grok-imagine-video-1.5-lite  # per_second $0.02
+```
+
+### `image-to-video`
+
+```
+grok-imagine-video-1.5       # per_second $0.08
+grok-imagine-video-1.5-lite  # per_second $0.02
 ```
 
 ---
@@ -684,7 +729,7 @@ Importable from `models.registry`:
 <!-- g:registry-constants -->
 | Name | Value |
 |---|---|
-| `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image')` |
+| `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image', 'text-to-video', 'image-to-video')` |
 | `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
