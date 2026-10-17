@@ -70,7 +70,6 @@ fail_under = 78.0
 # offline and not yet tested — the list to shrink).
 "yait_aichain/tools/embed/_cohere.py" = { kind = "external", reason = "request shaping for the Cohere embeddings API" }
 "yait_aichain/tools/rerank/_voyage.py" = { kind = "external", reason = "request shaping for the Voyage rerank API" }
-"yait_aichain/utilities/vectors/__init__.py" = { kind = "external", reason = "`VectorDB` connects to a provider on construction" }
 
 [tool.mutmut]
 # Which tests actually catch a broken line. A mutant is a one-token change to
