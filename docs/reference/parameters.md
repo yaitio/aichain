@@ -19,6 +19,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `deepseek` | `1.0` | `1.0` | — | `4096`\* |
 | `google` | `1.0` | `0.95` | `40` | `8192`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
+| `kling` | `1.0`\* | — | — | `4096`\* |
 | `krea` | `1.0`\* | — | — | `4096`\* |
 | `meta` | `1.0` | — | — | `16384`\* |
 | `minimax` | `1.0` | `0.95` | — | `16384`\* |
@@ -73,6 +74,11 @@ They are deliberately **not** converged: a library-wide default would override a
 - `temperature` — vendor · Kimi's default, and the API *enforces* 1.0 while thinking is on. The non-thinking recommendation of 0.6 has to be asked for explicitly
 - `top_p` — vendor · Kimi's default
 - `max_tokens` — vendor · Kimi's own default, which is why this one is the largest in the table
+
+**`kling`**
+
+- `temperature` — unused · this provider renders images and video and reads neither of these
+- `max_tokens` — unused · this provider renders images and video and reads neither of these
 
 **`krea`**
 

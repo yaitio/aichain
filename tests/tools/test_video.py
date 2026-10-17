@@ -192,6 +192,39 @@ class TestTheNewerModels(unittest.TestCase):
         self.assertTrue(any("no sound from a first frame" in n for n in result["notices"]))
 
 
+class TestKling(unittest.TestCase):
+
+    DONE = {"code": 0, "data": [{"status": "succeeded",
+                                 "outputs": [{"type": "video", "url": "https://k/v.mp4", "duration": "3.0"}]}]}
+
+    def _run(self, images=None, options=None):
+        tool = video("kling", model="kling-3.0", api_key="k")
+        sent = []
+        with patch.object(tool._model.client, "_post",
+                          side_effect=lambda p, b, h: (sent.append((p, b)), b'{"code": 0, "data": {"id": "k1"}}')[1]), \
+                patch.object(tool._model.client, "_get", side_effect=[
+                    b'{"code": 0, "data": [{"status": "processing"}]}', json.dumps(self.DONE).encode()]), \
+                patch.object(tool._model.client, "_download", return_value={"data": MP4}), patch("time.sleep"):
+            return tool.run("a boat", images=images, options=options), sent
+
+    def test_text_goes_to_the_models_path_with_the_shape_in_settings(self):
+        result, sent = self._run(options={"duration": 3, "aspect_ratio": "9:16"})
+        path, body = sent[0]
+        self.assertEqual(path, "/text-to-video/kling-3.0")
+        self.assertEqual(body["settings"], {"resolution": "720p", "duration": 3, "multi_shot": False,
+                                            "audio": "off", "aspect_ratio": "9:16"})
+        self.assertEqual((result["videos"][0]["duration"], result["cost"]), (3, 0.252))
+
+    def test_a_first_frame_goes_in_contents_and_sound_is_priced_apart(self):
+        result, sent = self._run(images=[_frame()], options={"duration": 3, "audio": True})
+        path, body = sent[0]
+        self.assertEqual(path, "/image-to-video/kling-3.0")
+        self.assertEqual([c["type"] for c in body["contents"]], ["prompt", "first_frame"])
+        self.assertNotIn("aspect_ratio", body["settings"])
+        self.assertEqual(body["settings"]["audio"], "native")
+        self.assertEqual(result["cost"], 0.378)                     # 3 s at $0.126, with sound
+
+
 class TestTheJob(unittest.TestCase):
 
     def test_a_job_crosses_a_process_and_is_collected_by_another_tool(self):
@@ -261,7 +294,7 @@ class TestTheRegistry(unittest.TestCase):
 
 
 class TestVideoLive(unittest.TestCase):
-    """The cheapest clip on each provider: about $0.57 for the four."""
+    """The cheapest clip on each provider: about $0.82 for the five."""
 
     def _live(self, service, model, key, options):
         if not os.getenv(key):
@@ -280,6 +313,9 @@ class TestVideoLive(unittest.TestCase):
 
     def test_minimax(self):
         self._live("minimax", "MiniMax-H3-Max", "MINIMAX_API_KEY", {"resolution": "480p", "duration": 5})
+
+    def test_kling(self):
+        self._live("kling", "kling-3.0", "KLING_API_KEY", {"duration": 3})
 
     def test_qwen(self):
         self._live("qwen", "wan2.2-t2v-plus", "DASHSCOPE_API_KEY", {"resolution": "480p"})

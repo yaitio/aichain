@@ -41,6 +41,7 @@ on your own server needs no key and sends nothing outside your network.
 | DeepSeek | `DEEPSEEK_API_KEY` | <https://platform.deepseek.com/api_keys> |
 | Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
 | Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |
+| Kling | `KLING_API_KEY` | <https://kling.ai/document-api/api/get-started/authentication> |
 | Krea | `KREA_API_KEY` | — |
 | Meta (Muse) | `META_API_KEY` | <https://dev.meta.ai> |
 | MiniMax | `MINIMAX_API_KEY` | <https://platform.minimax.io> |

@@ -18,6 +18,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `DEEPSEEK_API_KEY` | DeepSeek | <https://platform.deepseek.com/api_keys> |
 | `GOOGLE_AI_API_KEY` | Google AI | <https://aistudio.google.com/app/apikey> |
 | `MOONSHOT_API_KEY` | Kimi (Moonshot AI) | <https://platform.kimi.ai/> |
+| `KLING_API_KEY` | Kling | <https://kling.ai/document-api/api/get-started/authentication> |
 | `KREA_API_KEY` | Krea | — |
 | `META_API_KEY` | Meta (Muse) | <https://dev.meta.ai> |
 | `MINIMAX_API_KEY` | MiniMax | <https://platform.minimax.io> |
@@ -50,6 +51,7 @@ Model("flux-2-flex")              # reads BFL_API_KEY
 Model("deepseek-chat")            # reads DEEPSEEK_API_KEY
 Model("gemini-3-flash-preview")   # reads GOOGLE_AI_API_KEY
 Model("kimi-k2.6")                # reads MOONSHOT_API_KEY
+Model("kling-3.0")                # reads KLING_API_KEY
 Model("krea-2-large")             # reads KREA_API_KEY
 Model("muse-spark-1.1")           # reads META_API_KEY
 Model("MiniMax-M2")               # reads MINIMAX_API_KEY
@@ -109,6 +111,7 @@ export BFL_API_KEY="…"
 export DEEPSEEK_API_KEY="…"
 export GOOGLE_AI_API_KEY="…"
 export MOONSHOT_API_KEY="…"
+export KLING_API_KEY="…"
 export KREA_API_KEY="…"
 export META_API_KEY="…"
 export MINIMAX_API_KEY="…"

@@ -222,7 +222,7 @@ still works, warns, and raises in 4.0.
 output_dir="videos/")`; `clip.run(prompt, images=[first_frame], options={"duration": 6,
 "resolution": "720p"})` waits (minutes) and returns `out["videos"][0]["path"]`, `out["cost"]`;
 `job = clip.submit(...)` returns at once and `clip.collect(job)` finishes it, in any process.
-Services: google (Veo), xai, qwen (Wan), minimax (H3); OpenAI's Sora is closed.
+Services: google (Veo), xai, qwen (Wan), minimax (H3), kling; OpenAI's Sora is closed.
 
 **Utilities** hold a connection or a place: `from yait_aichain.utilities import Vectors,
 MCP, REST, Shell`. Code calls their methods directly; their tools are attributes called

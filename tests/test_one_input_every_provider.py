@@ -33,7 +33,7 @@ from yait_aichain.models._data import PROVIDERS                 # noqa: E402
 #: One text model per provider. The image-only ones are excluded by name
 #: rather than skipped silently — a provider that grows a text model should
 #: turn up here rather than stay quietly out of the comparison.
-IMAGE_ONLY = {"bfl", "recraft", "krea"}
+IMAGE_ONLY = {"bfl", "recraft", "krea", "kling"}
 
 #: Providers with no registry: the server decides what it serves, so a name is
 #: chosen here and sent as written.

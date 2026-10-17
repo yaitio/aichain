@@ -1,0 +1,69 @@
+# kling — Kuaishou's Kling: images through image(), video through video().
+#
+# One Bearer key for both (the console's "Create a new API Key"; the older
+# access-key/secret-key JWT is not used). Billed from resource packages or a
+# balance, in units of $0.14 — separate from the Kling web app.
+#
+# Two API generations live side by side. Images are the older one: POST
+# /v1/images/generations with model_name, poll /v1/images/generations/{id},
+# download task_result.images[0].url; an input image is base64 with no data:
+# prefix. Video is the newer one: the model in the path (/text-to-video/
+# kling-3.0, /image-to-video/kling-3.0), the shape in "settings", the task at
+# GET /tasks?task_ids=. Results are cleared after 30 days.
+
+[provider]
+key      = "kling"
+client   = "kling"
+base_url = "https://api-singapore.klingai.com"
+env_key  = "KLING_API_KEY"
+label    = "Kling"
+keys_url = "https://kling.ai/document-api/api/get-started/authentication"
+auth     = "bearer"
+
+[provider.options]
+# Which universal options this provider has a control for at all. An image and
+# video provider: none of the text options apply.
+format_accepts = ["size", "aspect_ratio"]
+accepts = []
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 4096
+
+[provider.default_notes]
+temperature = "unused · this provider renders images and video and reads neither of these"
+max_tokens  = "unused · this provider renders images and video and reads neither of these"
+
+# Images. The registry's name is the wire's model_name. Prices per image from
+# Kling's list, 2026-10-17 (an image-to-image on 2.1 costs twice its text-to-image).
+[models."kling-v3"]
+caps          = ["text-to-image", "image-to-image"]
+aspect_ratios = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9"]
+resolutions   = ["1k", "2k"]
+price         = { per_image = 0.028 }
+
+[models."kling-v2-1"]
+caps          = ["text-to-image", "image-to-image"]
+aspect_ratios = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9"]
+resolutions   = ["1k", "2k"]
+price         = { per_image = 0.014 }
+
+# Video. Kling 3.0 makes sound only when asked, and sound costs more; 3.0
+# Turbo always makes it. With a first frame the shape follows the image.
+# multi_shot is sent false: Kling's default cuts one prompt into several shots.
+[models."kling-3.0"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [3, 15]
+resolutions    = ["720p", "1080p", "4k"]
+aspect_ratios  = ["16:9", "9:16", "1:1"]
+audio          = "optional"
+price          = { per_second = { "720p" = 0.084, "1080p" = 0.112, "4k" = 0.42 } }
+price_audio    = { "720p" = 0.126, "1080p" = 0.168, "4k" = 0.42 }
+
+[models."kling-3.0-turbo"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [3, 15]
+resolutions    = ["720p", "1080p"]
+aspect_ratios  = ["16:9", "9:16", "1:1"]
+audio          = "always"
+price          = { per_second = { "720p" = 0.112, "1080p" = 0.14 } }

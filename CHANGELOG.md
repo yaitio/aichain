@@ -22,6 +22,12 @@
   OpenAI's Sora closed on 2026-09-24 and is named, not listed. Verified live on
   every model family, text and first frame: Veo Lite in 31–45 s, xAI in 16–28 s,
   Wan in 47–193 s, MiniMax in 11–174 s.
+- **Kling**, one key for both tools. In `video()`: Kling 3.0 (3–15 s at 720p,
+  1080p or 4k, sound when asked and priced apart) and 3.0 Turbo (sound always),
+  verified live in 71–100 s, $0.25 for three seconds at 720p. In `image()`:
+  Kling Image 3.0 and 2.1, text-to-image and an edit from one image, run as a
+  job and priced from Kling's list (an edit on 2.1 costs twice); a ratio Kling
+  lacks goes as the nearest of its eight, with a notice. Verified live, 28–53 s.
 - A video, and an image, whose price is more than a budget in force has left is
   **warned about and made**, the warning also a notice on the result; a budget
   with nothing left still stops a call before it begins.

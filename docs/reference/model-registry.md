@@ -30,7 +30,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
+`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `kling`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -43,6 +43,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | DeepSeek | 4 | — | — | — | — | — |
 | Google AI | 6 | 5 | 6 | 5 | 3 | 3 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — | — | — |
+| Kling | — | 2 | — | 2 | 2 | 2 |
 | Krea | — | 4 | — | 1 | — | — |
 | Meta (Muse) | 5 | — | 5 | — | — | — |
 | MiniMax | 8 | — | 1 | — | 2 | 2 |
@@ -227,6 +228,40 @@ kimi-k3                   # $3 in / $15 out per 1M tokens
 
 ```
 kimi-k2.6  # $0.95 in / $4 out per 1M tokens
+```
+
+---
+
+## Kling
+
+`provider = "kling"` · key `KLING_API_KEY`
+
+### `text-to-image`
+
+```
+kling-v2-1  # per_image $0.014
+kling-v3    # per_image $0.028
+```
+
+### `image-to-image`
+
+```
+kling-v2-1  # per_image $0.014
+kling-v3    # per_image $0.028
+```
+
+### `text-to-video`
+
+```
+kling-3.0        # per_second {'720p': 0.084, '1080p': 0.112, '4k': 0.42}
+kling-3.0-turbo  # per_second {'720p': 0.112, '1080p': 0.14}
+```
+
+### `image-to-video`
+
+```
+kling-3.0        # per_second {'720p': 0.084, '1080p': 0.112, '4k': 0.42}
+kling-3.0-turbo  # per_second {'720p': 0.112, '1080p': 0.14}
 ```
 
 ---
@@ -748,7 +783,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image', 'text-to-video', 'image-to-video')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'kling', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

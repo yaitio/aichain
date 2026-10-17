@@ -47,8 +47,8 @@ You ask for `temperature`, `max_tokens`, `reasoning` the same way everywhere:
 
 | Key | What it asks for | ✓ | Providers that read it |
 |---|---|---|---|
-| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
-| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `size` | pixel dimensions, as 'WIDTHxHEIGHT' | ✓ | Black Forest Labs (FLUX), Google AI, Kling, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
+| `aspect_ratio` | shape without committing to a pixel count, as '16:9' | ✓ | Black Forest Labs (FLUX), Google AI, Kling, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
 | `quality` | how much work to spend on the render |  | OpenAI |
 | `background` | transparent, opaque, or let the model decide | ✓ | OpenAI |
 | `output_format` | the file format to return: png, jpeg, webp | ✓ | Black Forest Labs (FLUX), OpenAI |

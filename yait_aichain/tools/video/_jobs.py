@@ -171,6 +171,44 @@ class MiniMax(_Adapter):
                 "duration": (task.get("usage") or {}).get("output_seconds")}
 
 
+class Kling(_Adapter):
+    """Kling: the model in the path, the shape in settings, the task at /tasks.
+    Sound is "native" or "off"; multi_shot is off, or one prompt becomes several shots."""
+
+    def __init__(self, client, model: str, data: dict) -> None:
+        super().__init__(client, model)
+        self.data = data
+
+    def submit(self, prompt: str, image: dict | None, plan: dict) -> str:
+        settings: dict = {"resolution": plan["resolution"], "duration": plan["duration"], "multi_shot": False}
+        if self.data.get("audio") == "optional":
+            settings["audio"] = "native" if plan.get("audio") else "off"
+        if image:
+            path, body = f"/image-to-video/{self.model}", {"contents": [
+                {"type": "prompt", "text": prompt}, {"type": "first_frame", "url": image["base64"]}]}
+        else:
+            settings["aspect_ratio"] = plan["aspect_ratio"]
+            path, body = f"/text-to-video/{self.model}", {"prompt": prompt}
+        made = json.loads(self.client._post(path, {**body, "settings": settings}, self._headers()))
+        task = made.get("data") or {}
+        if made.get("code") not in (0, None) or not task.get("id"):
+            raise TaskFailedError(502, f"Kling refused the task: {made.get('message') or made}")
+        return task["id"]
+
+    def poll(self, job_id: str) -> dict:
+        tasks = json.loads(self.client._get(f"/tasks?task_ids={job_id}", self._headers())).get("data") or []
+        task = tasks[0] if tasks else {}
+        status = task.get("status")
+        if status == "failed":
+            return {"status": FAILED, "error": task.get("message") or status}
+        if status != "succeeded":
+            return {"status": RUNNING}
+        video = next((o for o in task.get("outputs") or [] if o.get("type") == "video"), {})
+        seconds = video.get("duration")
+        return {"status": COMPLETED, "url": video.get("url"),
+                "duration": round(float(seconds)) if seconds else None}
+
+
 def adapter(service: str, client, model: str, data: dict) -> _Adapter:
     if service == "google":
         return Google(client, model)
@@ -180,4 +218,6 @@ def adapter(service: str, client, model: str, data: dict) -> _Adapter:
         return Qwen(client, model, data)
     if service == "minimax":
         return MiniMax(client, model)
+    if service == "kling":
+        return Kling(client, model, data)
     raise TaskFailedError(400, f"no video adapter for {service}")

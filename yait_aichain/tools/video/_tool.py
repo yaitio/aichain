@@ -103,7 +103,7 @@ class Video(Tool):
             plan = self._plan(opts, frame is not None)
         announce(made)
         notices = [_notice(a) for a in made]
-        rate = price_per_second(self.model, plan["resolution"])
+        rate = self._rate(plan["resolution"], plan.get("audio"))
         estimate = round(rate * plan["duration"], 4) if rate is not None else None
         notices += self._budget(estimate)
         job_id = self._jobs.submit(input.strip(), frame, plan)
@@ -215,6 +215,13 @@ class Video(Tool):
 
     # ── money, the frame, the result ─────────────────────────────────────────
 
+    def _rate(self, resolution: str, audio) -> float | None:
+        """The registry's rate per second — with sound, where sound is priced apart."""
+        with_sound = self._data.get("price_audio") or {}
+        if audio and resolution in with_sound:
+            return float(with_sound[resolution])
+        return price_per_second(self.model, resolution)
+
     def _budget(self, estimate: float | None) -> list:
         """A budget with nothing left stops the job; one with less left than the
         estimate is warned about, and the job goes ahead."""
@@ -254,7 +261,7 @@ class Video(Tool):
         if self.output_dir:
             clip["path"], clip["data"] = self._save(data), None
         cost, basis = state.get("cost"), f"{self.service} reported it"
-        if cost is None and (rate := price_per_second(self.model, resolution)) is not None:
+        if cost is None and (rate := self._rate(resolution, plan.get("audio"))) is not None:
             cost, basis = round(rate * seconds, 4), f"{seconds} s at ${rate}/s, the registry's {resolution} rate"
         from ..._budget import in_force
         for budget in in_force(None):
