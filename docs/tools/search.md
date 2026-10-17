@@ -34,6 +34,7 @@ tool translates them, the way the [decision tools](decide.md) work.
 | `country` | ISO alpha-2 | native | native | `userLocation` | native | the country's name; general topic only, said so | `location` |
 | `language` | ISO 639-1 | native | `search_lang` | **not applied** — said so | **not applied** — said so | a ranking boost; a filter with `filter_by_language` | **not applied** — said so |
 | `domains` | a domain or a domain with a path | native, ≤ 20 | `site:` in the query | `includeDomains` | `includeDomains`; with a path, `site:` — said so | `include_domains` | `include_domains`; paths and `.edu`-style extensions work |
+| `kind` | `web` (default) or `images` | `web` only | `images` is Brave's image search | `web` only | `web` only | `web` only | `web` only |
 
 `recency` and `start_date` bound the same side; the later is kept. Each
 provider keeps its own options beside these — Brave `extra_snippets`,
@@ -60,7 +61,7 @@ found = search("perplexity").run("AI and leadership", {"domains": ["hbr.org"],
                                  "start_date": "2026-09-28", "end_date": "2026-10-04"})
 found["results"][0]
 # {"title": "...", "url": "https://hbr.org/2026/10/...", "date": "2026-10-02",
-#  "author": "", "snippets": ["..."], "text": ""}
+#  "author": "", "snippets": ["..."], "text": "", "image": {}}
 found["notices"]            # [] — or what was not applied, and why
 str(found)                  # what a model reads: the numbered list, then the notes
 
@@ -96,6 +97,26 @@ Agent(model, tools=[search("perplexity")])           # the agent calls the same 
   `fetch(...)`, whose pages carry the date they declare.
 - **`text`** is the page's own text where the provider returned it — Exa,
   Firecrawl and Tavily, with `text_chars`.
+
+## Images
+
+`{"kind": "images"}` finds pictures instead of pages. Each result keeps the
+page in `url` and adds `image`: the picture's own `url`, its `width` and
+`height`, and a `thumbnail`. Brave is the provider that searches images; the
+others refuse `kind="images"` with a `ValueError` rather than return pages, which
+would look like an answer and not be one.
+
+```python
+found = search("brave").run("hand-knit grey wool fisherman sweater", {"kind": "images", "max_results": 5})
+found["results"][0]["image"]
+# {"url": "https://i.etsystatic.com/…/il_300x300….jpg", "width": 300, "height": 300,
+#  "thumbnail": "https://imgs.search.brave.com/…"}
+```
+
+Brave's image search has no time filter, so `recency` and the dates are not
+applied and said so; its safe search is on or off, so `moderate` goes as
+`strict`, said so. A found picture belongs to whoever published it: a
+reference to look at or to draw from, not something to publish as it is.
 
 ## Provider notes
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.12.0] — unreleased
+
+### Added
+
+- **Image search**: `search("brave").run(query, {"kind": "images"})` returns
+  pictures — each result keeps its page in `url` and adds `image` with the
+  picture's own URL, size and thumbnail. A new standard option, `kind`, `web`
+  by default; a provider with no image search refuses `images` rather than
+  return pages. Every result now carries `image`, empty for a page.
+
 ## [4.11.0] — 2026-10-17
 
 ### Added

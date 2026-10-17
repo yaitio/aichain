@@ -371,7 +371,7 @@ class TestParallel(unittest.TestCase):
 
 class TestOneRecord(unittest.TestCase):
 
-    KEYS = {"title", "url", "date", "author", "snippets", "text"}
+    KEYS = {"title", "url", "date", "author", "snippets", "text", "image"}
 
     def test_every_provider_returns_the_same_keys(self):
         for cls in FIXTURE:
@@ -407,6 +407,34 @@ class TestOneRecord(unittest.TestCase):
         self.assertEqual(r["author"], "Sebastian Raschka, PhD")
         self.assertEqual(r["text"], "Full page text.")
         self.assertEqual(_sent(tool)["contents"], {"highlights": {"maxCharacters": 1000}, "text": {"maxCharacters": 2000}})
+
+
+class TestImages(unittest.TestCase):
+    """kind="images": the picture's own URL beside its page, on the provider that has one."""
+
+    RESP = {"type": "images", "results": [
+        {"type": "image_result", "title": "Fisherman&#39;s sweater", "url": "https://shop.example/sweater",
+         "source": "shop.example", "page_fetched": "2026-07-05T16:45:45Z",
+         "thumbnail": {"src": "https://imgs.search.brave.com/t.jpg", "width": 400, "height": 347},
+         "properties": {"url": "https://cdn.example/sweater.jpg", "width": 1200, "height": 1041}},
+        {"type": "image_result", "title": "no picture", "url": "https://shop.example/x", "properties": {}}]}
+
+    def test_brave_asks_the_image_endpoint_and_returns_the_picture(self):
+        tool, found, warned = _search(searchBrave, {"kind": "images", "recency": "week"}, self.RESP)
+        call = tool._http.request.call_args
+        self.assertEqual((call.args[0], call.args[1]), ("GET", "https://api.search.brave.com/res/v1/images/search"))
+        self.assertEqual(call.kwargs["fields"]["safesearch"], "strict")
+        (r,) = found["results"]                                       # a result with no picture is left out
+        self.assertEqual((r["url"], r["title"], r["date"]), ("https://shop.example/sweater", "Fisherman's sweater", ""))
+        self.assertEqual(r["image"], {"url": "https://cdn.example/sweater.jpg", "width": 1200, "height": 1041,
+                                      "thumbnail": "https://imgs.search.brave.com/t.jpg"})
+        self.assertTrue(any("time window was not applied" in n for n in found["notices"]))
+        self.assertIn("Image: https://cdn.example/sweater.jpg (1200x1041)", str(found))
+
+    def test_a_provider_with_no_image_search_refuses_rather_than_return_pages(self):
+        for cls in (searchExa, searchPerplexity, searchTavily, searchFirecrawl, searchParallel):
+            with self.subTest(provider=cls.__name__), self.assertRaisesRegex(ValueError, "has no images search"):
+                _search(cls, {"kind": "images"})
 
 
 class TestWhatACallCost(unittest.TestCase):

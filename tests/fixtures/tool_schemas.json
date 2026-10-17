@@ -578,6 +578,14 @@
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
       },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web",
+        "images"
+       ],
+       "description": "Pages (default) or images: each result then carries the picture's own URL, its size and the page it is on. Brave searches images."
+      },
       "safe_search": {
        "type": "string",
        "enum": [
@@ -658,6 +666,13 @@
         "type": "string"
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web"
+       ],
+       "description": "Pages; this provider has no image search."
       },
       "exclude_domains": {
        "type": "array",
@@ -757,6 +772,13 @@
         "type": "string"
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web"
+       ],
+       "description": "Pages; this provider has no image search."
       },
       "exclude_domains": {
        "type": "array",
@@ -865,6 +887,13 @@
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
       },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web"
+       ],
+       "description": "Pages; this provider has no image search."
+      },
       "objective": {
        "type": "string",
        "description": "The goal of the search in natural language; default: the query."
@@ -961,6 +990,13 @@
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
       },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web"
+       ],
+       "description": "Pages; this provider has no image search."
+      },
       "after_date": {
        "type": "string",
        "description": "Perplexity's own MM/DD/YYYY lower bound; wins over start_date."
@@ -1028,6 +1064,13 @@
         "type": "string"
        },
        "description": "Only these sites — a domain, or a domain with a path prefix."
+      },
+      "kind": {
+       "type": "string",
+       "enum": [
+        "web"
+       ],
+       "description": "Pages; this provider has no image search."
       },
       "topic": {
        "type": "string",

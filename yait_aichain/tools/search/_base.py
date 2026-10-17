@@ -51,6 +51,9 @@ STANDARD_OPTIONS = {
     "language":    {"type": "string", "description": "ISO 639-1 language code, e.g. 'en'."},
     "domains":     {"type": "array", "items": {"type": "string"},
                     "description": "Only these sites — a domain, or a domain with a path prefix."},
+    "kind":        {"type": "string", "enum": ["web", "images"],
+                    "description": "Pages (default) or images: each result then carries the picture's "
+                                   "own URL, its size and the page it is on. Brave searches images."},
 }
 
 _MONTHS = {m: i for i, m in enumerate(
@@ -129,6 +132,8 @@ class Search(Tool):
     extra_options: dict = {}
     #: Standard options this provider cannot honour → why.
     declines: dict = {}
+    #: What it finds: "web", and "images" where the provider searches pictures.
+    kinds: tuple = ("web",)
     #: The provider's key variable; a tuple here so the base names none.
     _ENV_KEY: str | tuple = ()
     _PROVIDER: str = ""
@@ -172,6 +177,9 @@ class Search(Tool):
         props = {k: (v if k not in cls.declines else
                      {**v, "description": f"{v['description']} Not applied here: {cls.declines[k]}."})
                  for k, v in STANDARD_OPTIONS.items()}
+        if "images" not in cls.kinds:         # a choice a model is shown is one it can make
+            props["kind"] = {"type": "string", "enum": ["web"],
+                             "description": "Pages; this provider has no image search."}
         props.update(cls.extra_options)
         cls.parameters = {
             "type": "object",
@@ -205,6 +213,10 @@ class Search(Tool):
             self._notice(notices, f"{key} is not supported by {self.name} and was not applied: "
                                   f"{self.declines[key]}")
             opts.pop(key)
+        # Pages in place of the pictures asked for would look like an answer and not be one.
+        if (kind := opts.get("kind") or "web") not in self.kinds:
+            raise ValueError(f"{self.name} has no {kind} search; it finds {', '.join(self.kinds)}. "
+                             "For images: search('brave').")
         count = int(opts.get("max_results") or 10)
         if count > self.max_results:
             self._notice(notices, f"max_results {count} is above {self.name}'s ceiling; "
@@ -240,18 +252,23 @@ class Search(Tool):
             lines += ["    · " + " ".join(s.split()) for s in r["snippets"] if s and s.strip()]
             if r["text"]:
                 lines.append("    Text: " + " ".join(r["text"].split()))
+            if r["image"]:
+                size = f" ({r['image']['width']}x{r['image']['height']})" if r["image"].get("width") else ""
+                lines.append(f"    Image: {r['image']['url']}{size}")
             lines.append("")
         for n in found["notices"]:
             lines.append(f"Note: {n}")
         return "\n".join(lines).rstrip()
 
     @staticmethod
-    def record(title="", url="", date_="", author="", snippets=(), text="") -> dict:
-        """One result in the common shape — every key present."""
+    def record(title="", url="", date_="", author="", snippets=(), text="", image=None) -> dict:
+        """One result in the common shape — every key present. ``url`` is always the
+        page; an image result adds ``image``: the picture's own ``url``, ``width``,
+        ``height`` and ``thumbnail``."""
         return {"title": (title or "").strip(), "url": url or "", "date": day(date_),
                 "author": (author or "").strip() if isinstance(author, str) else "",
                 "snippets": [s for s in snippets if isinstance(s, str) and s.strip()],
-                "text": text or ""}
+                "text": text or "", "image": image or {}}
 
     def _window(self, opts: dict, now: datetime | None = None) -> tuple:
         """The (start, end) days the options ask for; the later start wins."""

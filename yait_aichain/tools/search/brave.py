@@ -17,6 +17,7 @@ from ...clients._http import request_json
 from ._base import Search
 
 _ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
+_IMAGES = "https://api.search.brave.com/res/v1/images/search"
 _FRESHNESS = {"hour": "pd", "day": "pd", "week": "pw", "month": "pm", "year": "py"}
 
 
@@ -45,6 +46,7 @@ class searchBrave(Search):
     """
 
     name        = "searchBrave"
+    kinds       = ("web", "images")
     description = ("Search the web with Brave. Returns titles, URLs, dates and a "
                    "description of each page.")
     max_results = 20
@@ -89,6 +91,8 @@ class searchBrave(Search):
         return body
 
     def _search(self, query, opts, window, notices, cost):
+        if opts.get("kind") == "images":
+            return self._images(query, opts, window, notices)
         data = request_json(self._http, "POST", _ENDPOINT, json=self._body(query, opts, window, notices),
                             headers={"x-subscription-token": self._api_key, "Accept": "application/json"},
                             what="Brave Search API")
@@ -103,6 +107,37 @@ class searchBrave(Search):
             out.append(self.record(it.get("title"), it.get("url"), article.get("date") or it.get("page_age"),
                                    author, [_plain(it.get("description"))] +
                                    [_plain(s) for s in it.get("extra_snippets") or []]))
+        return out
+
+
+    def _images(self, query, opts, window, notices):
+        """Brave's image search: a GET, no time filter, safe search on or off."""
+        if any(window) or opts.get("freshness"):
+            self._notice(notices, "the time window was not applied: Brave's image search has none")
+        params = {"q": site_query(query, opts.get("domains")), "count": opts["max_results"]}
+        if opts.get("country"):
+            params["country"] = opts["country"]
+        if opts.get("language"):
+            params["search_lang"] = opts["language"]
+        safe = opts.get("safe_search") or "strict"
+        if safe == "moderate":
+            self._notice(notices, "safe_search 'moderate' went as 'strict': Brave's image search has off and strict")
+            safe = "strict"
+        params["safesearch"] = safe
+        data = request_json(self._http, "GET", _IMAGES, fields=params,
+                            headers={"x-subscription-token": self._api_key, "Accept": "application/json"},
+                            what="Brave Image Search API")
+        out = []
+        for it in data.get("results") or []:
+            props, thumb = it.get("properties") or {}, it.get("thumbnail") or {}
+            if not props.get("url"):
+                continue
+            # page_fetched is when Brave last read the page, not when it was published.
+            out.append(self.record(_plain(it.get("title")), it.get("url"), "", "",
+                                   [it.get("source") or ""],
+                                   image={"url": props["url"], "width": props.get("width") or thumb.get("width"),
+                                          "height": props.get("height") or thumb.get("height"),
+                                          "thumbnail": thumb.get("src", "")}))
         return out
 
 

@@ -62,6 +62,7 @@ searchPerplexity(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages; this provider has no image search. One of `web`. |
 | `options.after_date` | `string` |  | Perplexity's own MM/DD/YYYY lower bound; wins over start_date. |
 | `options.before_date` | `string` |  | Perplexity's own MM/DD/YYYY upper bound; wins over end_date. |
 
@@ -101,6 +102,7 @@ searchBrave(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages (default) or images: each result then carries the picture's own URL, its size and the page it is on. Brave searches images. One of `web`, `images`. |
 | `options.safe_search` | `string` |  | Adult-content filter. Default 'moderate'. One of `off`, `moderate`, `strict`. |
 | `options.extra_snippets` | `boolean` |  | Up to five more passages from each page. Default false. |
 | `options.result_filter` | `string` |  | Comma-separated result types: discussions, faq, infobox, news, query, summarizer, videos, web, locations. |
@@ -142,6 +144,7 @@ searchExa(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. Not applied here: Exa has no language filter. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages; this provider has no image search. One of `web`. |
 | `options.exclude_domains` | `list[string]` |  | Leave out results from these domains. |
 | `options.category` | `string` |  | Focus on one kind of page. One of `company`, `publication`, `news`, `personal site`, `financial report`, `people`. |
 | `options.search_type` | `string` |  | 'auto' (default) balances quality and speed; 'instant'/'fast' trade quality for latency; the 'deep' modes search iteratively and cost more. One of `instant`, `fast`, `auto`, `deep-lite`, `deep`, `deep-reasoning`. |
@@ -184,6 +187,7 @@ searchFirecrawl(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. Not applied here: Firecrawl has no language filter. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages; this provider has no image search. One of `web`. |
 | `options.exclude_domains` | `list[string]` |  | Leave out results from these host names. Not with domains. |
 | `options.categories` | `list[string]` |  | Restrict to research sites, PDFs, the developer index or the government index ('gov' combines with nothing else). |
 | `options.sources` | `list[string]` |  | Where to search: 'web' (default) and/or 'news'. |
@@ -228,6 +232,7 @@ searchTavily(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages; this provider has no image search. One of `web`. |
 | `options.topic` | `string` |  | What to search: 'general' (default), 'news' or 'finance'. One of `general`, `news`, `finance`. |
 | `options.search_depth` | `string` |  | 'basic' (default); 'advanced' is more relevant and costs two credits. One of `ultra-fast`, `fast`, `basic`, `advanced`. |
 | `options.chunks_per_source` | `integer` |  | Passages per page, 1 to 3 (default 3). |
@@ -274,6 +279,7 @@ searchParallel(
 | `options.country` | `string` |  | ISO 3166-1 alpha-2 country code, e.g. 'GB'. |
 | `options.language` | `string` |  | ISO 639-1 language code, e.g. 'en'. Not applied here: Parallel has no language filter. |
 | `options.domains` | `list[string]` |  | Only these sites — a domain, or a domain with a path prefix. |
+| `options.kind` | `string` |  | Pages; this provider has no image search. One of `web`. |
 | `options.objective` | `string` |  | The goal of the search in natural language; default: the query. |
 | `options.search_queries` | `list[string]` |  | Short keyword queries, three to six words, to run beside the query. |
 | `options.mode` | `string` |  | 'advanced' (default) is the most thorough; 'turbo' the fastest. One of `turbo`, `fast`, `basic`, `advanced`. |
