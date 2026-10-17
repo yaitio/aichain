@@ -1,0 +1,3 @@
+yait-aichain==4.10.1
+yait-byheart==0.1.1
+nltk==3.10.3

@@ -1,0 +1,10 @@
+# LoCoMo (Maharana et al., 2024): ten long conversations with questions and
+# answers. CC BY-NC 4.0 — non-commercial use only; checked 2026-10-17. The
+# recipe downloads it at run time and redistributes nothing.
+
+[[source]]
+id      = "locomo"
+url     = "https://raw.githubusercontent.com/snap-research/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376/data/locomo10.json"
+sha256  = "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4"
+licence = "CC BY-NC 4.0 (non-commercial)"
+file    = "locomo10.json"
