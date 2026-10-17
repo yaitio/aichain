@@ -1,0 +1,2 @@
+yait-aichain==4.10.1
+markitdown==0.1.8

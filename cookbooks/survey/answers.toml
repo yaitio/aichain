@@ -1,0 +1,20 @@
+# The figures the report must get right, read at build time: revenue and net
+# income from the XBRL facts for the fiscal year ending on `period`, the
+# employee count from the 10-K's own text (Apple reports none in XBRL). A
+# figure passes within `tolerance` and with the filing as its source.
+company   = "Apple Inc."
+period    = "2025-09-27"
+tolerance = 0.005
+
+[[check]]
+id   = "revenue"
+tags = ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"]
+
+[[check]]
+id   = "net_income"
+tags = ["NetIncomeLoss"]
+
+[[check]]
+id      = "employees"
+filing  = "10k_fy2025"
+pattern = 'approximately ([\d,]+) full-time equivalent employees'

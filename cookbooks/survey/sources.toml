@@ -1,0 +1,28 @@
+# Apple's last two annual reports on Form 10-K, and its XBRL facts for the
+# answer key. Works of the US government's EDGAR system: public domain. SEC
+# asks every client to name itself — SEC_USER_AGENT, e.g. "Jane Doe jane@example.com".
+#
+# companyfacts grows with every filing, so its hash changes when Apple files
+# again; the answer key reads the fiscal year these two reports cover, not the
+# newest one.
+
+[[source]]
+id      = "10k_fy2025"
+url     = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+sha256  = "4e0132982298def43a7972e284c77308e79b2d6cef057538884ea598f6b8430f"
+licence = "Public domain (SEC EDGAR)"
+file    = "aapl-20250927.htm"
+
+[[source]]
+id      = "10k_fy2024"
+url     = "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm"
+sha256  = "5ee4e028942626d5b033f2df8ea616bfbe3fff906d680c68e14539f02712450f"
+licence = "Public domain (SEC EDGAR)"
+file    = "aapl-20240928.htm"
+
+[[source]]
+id      = "facts"
+url     = "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+sha256  = "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43"
+licence = "Public domain (SEC EDGAR)"
+file    = "companyfacts.json"
