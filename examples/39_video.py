@@ -1,9 +1,10 @@
 """
 39_video.py — A video takes minutes: submit returns a job at once, collect waits for it.
 
-Keys: any of XAI_API_KEY, GOOGLE_AI_API_KEY, DASHSCOPE_API_KEY, MINIMAX_API_KEY, KLING_API_KEY. Videos
+Keys: any of XAI_API_KEY, GOOGLE_AI_API_KEY, DASHSCOPE_API_KEY, MINIMAX_API_KEY, KLING_API_KEY,
+BYTEPLUS_API_KEY. Videos
 go to AICHAIN_EXAMPLES_DIR (the temp directory by default). The cheapest clip each
-provider makes: about $0.02, $0.20, $0.10, $0.25 or $0.25.
+provider makes: about $0.02, $0.20, $0.10, $0.25, $0.25 or $0.02.
 """
 
 import json
@@ -19,7 +20,8 @@ PROVIDERS = [("XAI_API_KEY", "xai", "grok-imagine-video-1.5-lite", {"duration": 
              ("GOOGLE_AI_API_KEY", "google", "veo-3.1-lite-generate-preview", {"duration": 4}),
              ("DASHSCOPE_API_KEY", "qwen", "wan2.2-t2v-plus", {"resolution": "480p"}),
              ("MINIMAX_API_KEY", "minimax", "MiniMax-H3-Max", {"resolution": "480p", "duration": 5}),
-             ("KLING_API_KEY", "kling", "kling-3.0", {"duration": 3})]
+             ("KLING_API_KEY", "kling", "kling-3.0", {"duration": 3}),
+             ("BYTEPLUS_API_KEY", "byteplus", "seedance-1-0-pro-fast-251015", {"duration": 2, "resolution": "480p"})]
 ready = [p for p in PROVIDERS if os.getenv(p[0])]
 if not ready:
     raise SystemExit("set one of: " + ", ".join(p[0] for p in PROVIDERS))

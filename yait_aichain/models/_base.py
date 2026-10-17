@@ -38,6 +38,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
     from ..clients._families.bfl        import BFLClient
     from ..clients._families.krea       import KreaClient
     from ..clients._families.kling      import KlingClient
+    from ..clients._families.byteplus   import BytePlusClient
 
     family = {
         "openai":     OpenAIClient,
@@ -49,6 +50,7 @@ def _build_client(provider: str, api_key: str, client_options: dict) -> "BaseCli
         "bfl":        BFLClient,
         "krea":       KreaClient,
         "kling":      KlingClient,
+        "byteplus":   BytePlusClient,
     }[ctype]
     _hints.check_client_options(ctype, client_options)
     return family(api_key, data=data, **client_options)
@@ -70,6 +72,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^flux"),                                             "bfl"),
     (re.compile(r"^krea-"),                                            "krea"),
     (re.compile(r"^kling-"),                                           "kling"),
+    (re.compile(r"^(seed-|dola-seed|seedream-|seedance-|dreamina-seedance-)"), "byteplus"),
     (re.compile(r"^glm-"),                                             "zai"),
     (re.compile(r"^muse-"),                                            "meta"),
     (re.compile(r"^mimo-"),                                            "xiaomi"),

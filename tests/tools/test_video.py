@@ -225,6 +225,43 @@ class TestKling(unittest.TestCase):
         self.assertEqual(result["cost"], 0.378)                     # 3 s at $0.126, with sound
 
 
+class TestBytePlus(unittest.TestCase):
+
+    DONE = {"id": "cgt-1", "status": "succeeded", "content": {"video_url": "https://b/v.mp4"},
+            "resolution": "480p", "duration": 4, "usage": {"completion_tokens": 40594}}
+
+    def _run(self, model, images=None, options=None):
+        tool = video("byteplus", model=model, api_key="k")
+        sent = []
+        with patch.object(tool._model.client, "_post",
+                          side_effect=lambda p, b, h: (sent.append((p, b)), b'{"id": "cgt-1"}')[1]), \
+                patch.object(tool._model.client, "_get", side_effect=[
+                    b'{"id": "cgt-1", "status": "queued"}', json.dumps(self.DONE).encode()]), \
+                patch.object(tool._model.client, "_download", return_value={"data": MP4}), patch("time.sleep"):
+            return tool.run("a boat", images=images, options=options), sent
+
+    def test_text_goes_with_its_ratio_and_is_priced_by_its_tokens(self):
+        result, sent = self._run("dreamina-seedance-2-0-mini-260615",
+                                 options={"duration": 4, "resolution": "480p", "aspect_ratio": "9:16", "audio": False})
+        path, body = sent[0]
+        self.assertEqual(path, "/api/v3/contents/generations/tasks")
+        self.assertEqual((body["ratio"], body["duration"], body["generate_audio"], body["watermark"]),
+                         ("9:16", 4, False, False))
+        self.assertEqual(result["cost"], 0.142079)                  # 40,594 tokens at $3.5 per million
+        self.assertIn("tokens", result["cost_basis"])
+
+    def test_a_first_frame_sets_the_shape(self):
+        _, sent = self._run("dreamina-seedance-2-5-260628", images=[_frame()], options={"duration": 4})
+        body = sent[0][1]
+        self.assertEqual(body["ratio"], "adaptive")
+        self.assertEqual([c.get("role") for c in body["content"]], [None, "first_frame"])
+
+    def test_seed_reaches_the_models_that_take_one(self):
+        _, sent = self._run("seedance-1-0-pro-fast-251015", options={"duration": 2, "seed": 7})
+        self.assertEqual(sent[0][1]["seed"], 7)
+        self.assertNotIn("generate_audio", sent[0][1])            # 1.0 makes no sound
+
+
 class TestTheJob(unittest.TestCase):
 
     def test_a_job_crosses_a_process_and_is_collected_by_another_tool(self):
@@ -294,7 +331,7 @@ class TestTheRegistry(unittest.TestCase):
 
 
 class TestVideoLive(unittest.TestCase):
-    """The cheapest clip on each provider: about $0.82 for the five."""
+    """The cheapest clip on each provider: about $0.84 for the six."""
 
     def _live(self, service, model, key, options):
         if not os.getenv(key):
@@ -313,6 +350,10 @@ class TestVideoLive(unittest.TestCase):
 
     def test_minimax(self):
         self._live("minimax", "MiniMax-H3-Max", "MINIMAX_API_KEY", {"resolution": "480p", "duration": 5})
+
+    def test_byteplus(self):
+        self._live("byteplus", "seedance-1-0-pro-fast-251015", "BYTEPLUS_API_KEY",
+                   {"duration": 2, "resolution": "480p"})
 
     def test_kling(self):
         self._live("kling", "kling-3.0", "KLING_API_KEY", {"duration": 3})

@@ -209,6 +209,54 @@ class Kling(_Adapter):
                 "duration": round(float(seconds)) if seconds else None}
 
 
+class BytePlus(_Adapter):
+    """Seedance on ModelArk: /api/v3/contents/generations/tasks, a task to poll, a
+    URL to download. Billed by the tokens the task reports, at the registry's rate
+    for the resolution — sound costs nothing apart on these models."""
+
+    _PATH = "/api/v3/contents/generations/tasks"
+
+    def __init__(self, client, model: str, data: dict) -> None:
+        super().__init__(client, model)
+        self.data = data
+
+    def submit(self, prompt: str, image: dict | None, plan: dict) -> str:
+        content: list = [{"type": "text", "text": prompt}]
+        body = {"model": self.model, "resolution": plan["resolution"], "duration": plan["duration"],
+                "watermark": False}
+        if image:
+            # The frame sets the shape: Seedance 2.5 takes nothing but "adaptive" with one.
+            content.append({"type": "image_url", "image_url": {"url": image["data_uri"]}, "role": "first_frame"})
+            body["ratio"] = "adaptive"
+        else:
+            body["ratio"] = plan["aspect_ratio"]
+        if self.data.get("audio") == "optional":
+            body["generate_audio"] = bool(plan.get("audio"))
+        if plan.get("seed") is not None:
+            body["seed"] = plan["seed"]
+        made = json.loads(self.client._post(self._PATH, {**body, "content": content}, self._headers()))
+        if not made.get("id"):
+            raise TaskFailedError(502, f"BytePlus refused the task: {(made.get('error') or {}).get('message') or made}")
+        return made["id"]
+
+    def poll(self, job_id: str) -> dict:
+        task = json.loads(self.client._get(f"{self._PATH}/{job_id}", self._headers()))
+        status = task.get("status")
+        if status in ("failed", "cancelled", "expired"):
+            return {"status": FAILED, "error": (task.get("error") or {}).get("message") or status}
+        if status != "succeeded":
+            return {"status": RUNNING}
+        resolution = task.get("resolution")
+        out = {"status": COMPLETED, "url": (task.get("content") or {}).get("video_url"),
+               "duration": task.get("duration"), "resolution": resolution}
+        tokens = (task.get("usage") or {}).get("completion_tokens")
+        rate = (self.data.get("price_tokens") or {}).get(resolution)
+        if tokens and rate is not None:
+            out["cost"] = round(tokens * rate / 1e6, 6)
+            out["cost_basis"] = f"{tokens:,} tokens at ${rate} per million, the registry's {resolution} rate"
+        return out
+
+
 def adapter(service: str, client, model: str, data: dict) -> _Adapter:
     if service == "google":
         return Google(client, model)
@@ -220,4 +268,6 @@ def adapter(service: str, client, model: str, data: dict) -> _Adapter:
         return MiniMax(client, model)
     if service == "kling":
         return Kling(client, model, data)
+    if service == "byteplus":
+        return BytePlus(client, model, data)
     raise TaskFailedError(400, f"no video adapter for {service}")

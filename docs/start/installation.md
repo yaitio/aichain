@@ -38,6 +38,7 @@ on your own server needs no key and sends nothing outside your network.
 |---|---|---|
 | Anthropic | `ANTHROPIC_API_KEY` | <https://console.anthropic.com/settings/keys> |
 | Black Forest Labs (FLUX) | `BFL_API_KEY` | — |
+| BytePlus | `BYTEPLUS_API_KEY` | <https://console.byteplus.com/ark/region:ap-southeast-1/apiKey> |
 | DeepSeek | `DEEPSEEK_API_KEY` | <https://platform.deepseek.com/api_keys> |
 | Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
 | Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |

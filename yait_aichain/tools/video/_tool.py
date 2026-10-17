@@ -260,7 +260,7 @@ class Video(Tool):
                 "resolution": resolution}
         if self.output_dir:
             clip["path"], clip["data"] = self._save(data), None
-        cost, basis = state.get("cost"), f"{self.service} reported it"
+        cost, basis = state.get("cost"), state.get("cost_basis") or f"{self.service} reported it"
         if cost is None and (rate := self._rate(resolution, plan.get("audio"))) is not None:
             cost, basis = round(rate * seconds, 4), f"{seconds} s at ${rate}/s, the registry's {resolution} rate"
         from ..._budget import in_force

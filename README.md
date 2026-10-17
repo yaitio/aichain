@@ -72,7 +72,7 @@ you to find out from the output.
 | **[Tools](docs/tools/index.md)** | Search, fetch, decide, speech, transcription, images, video, embeddings, reranking, chunking, wait and gate — each made the same way, `search("exa")`. Any function becomes a tool with `@tool`; any REST API or MCP server goes into an agent in two lines. |
 | **[Utilities](docs/utilities/index.md)** | `Vectors` for a vector collection, `Shell` for one folder to browse, read, write and run commands in, `MCP` and `REST` for connections. Your code calls their methods; the agent gets only the methods that are tools. |
 | **[Control and measurement](docs/control/cost-and-budget.md)** | Usage and cost on every result. `max_cost` — one budget in dollars across every step. Permissions by risk class in one `policy`, and a person to decide — now or later. An event for every step. `eval/` runs arms × cases × trials and reports accuracy, `Pass^k` and cost side by side. |
-| **[Models](docs/models/models.md)** | **<!-- g:count-models -->181 models from 18 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
+| **[Models](docs/models/models.md)** | **<!-- g:count-models -->196 models from 19 cloud providers<!-- /g:count-models -->**, plus any open-weight model on your own server, where the data never leaves your perimeter. Text and vision are models; image generation is a tool. |
 
 ---
 
@@ -91,6 +91,7 @@ providers you use:
 ```bash
 export ANTHROPIC_API_KEY="…"
 export BFL_API_KEY="…"
+export BYTEPLUS_API_KEY="…"
 export DEEPSEEK_API_KEY="…"
 export GOOGLE_AI_API_KEY="…"
 export MOONSHOT_API_KEY="…"
@@ -182,7 +183,7 @@ The skill alone works too: copy `plugin/skills/yait-aichain/` into
 | 09 | [`09_private_model.py`](examples/09_private_model.py) | A model on your own server: the data stays with you, the code is the same. |
 | 10 | [`10_what_was_sent.py`](examples/10_what_was_sent.py) | The library never changes a request in silence. |
 | 11 | [`11_custom_tool.py`](examples/11_custom_tool.py) | Any function becomes a tool: its docstring is the schema a model sees. |
-| 12 | [`12_image.py`](examples/12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, eight APIs. |
+| 12 | [`12_image.py`](examples/12_image.py) | Make an image, then edit it on every provider whose key is set: one tool, nine APIs. |
 | 13 | [`13_speech.py`](examples/13_speech.py) | Voice both ways through one interface: text to an mp3, and back to text. |
 | 14 | [`14_search_fetch.py`](examples/14_search_fetch.py) | Search the web, then read the first result as a model would. |
 | 15 | [`15_retrieval.py`](examples/15_retrieval.py) | Answer from your own texts: chunk, embed, find, rerank, answer with the source. |

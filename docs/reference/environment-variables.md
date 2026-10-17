@@ -15,6 +15,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Anthropic | <https://console.anthropic.com/settings/keys> |
 | `BFL_API_KEY` | Black Forest Labs (FLUX) | — |
+| `BYTEPLUS_API_KEY` | BytePlus | <https://console.byteplus.com/ark/region:ap-southeast-1/apiKey> |
 | `DEEPSEEK_API_KEY` | DeepSeek | <https://platform.deepseek.com/api_keys> |
 | `GOOGLE_AI_API_KEY` | Google AI | <https://aistudio.google.com/app/apikey> |
 | `MOONSHOT_API_KEY` | Kimi (Moonshot AI) | <https://platform.kimi.ai/> |
@@ -46,25 +47,26 @@ no key at all (see [Private models](../models/private-models.md)).
 
 <!-- g:env-resolve -->
 ```python
-Model("claude-fable-5")           # reads ANTHROPIC_API_KEY
-Model("flux-2-flex")              # reads BFL_API_KEY
-Model("deepseek-chat")            # reads DEEPSEEK_API_KEY
-Model("gemini-3-flash-preview")   # reads GOOGLE_AI_API_KEY
-Model("kimi-k2.6")                # reads MOONSHOT_API_KEY
-Model("kling-3.0")                # reads KLING_API_KEY
-Model("krea-2-large")             # reads KREA_API_KEY
-Model("muse-spark-1.1")           # reads META_API_KEY
-Model("MiniMax-M2")               # reads MINIMAX_API_KEY
-Model("codestral-2508")           # reads MISTRAL_API_KEY
-Model("gpt-4.1")                  # reads OPENAI_API_KEY
-Model("sonar")                    # reads PERPLEXITY_API_KEY
-Model("qwen-flash")               # reads DASHSCOPE_API_KEY
-Model("recraft-vectorize")        # reads RECRAFT_API_TOKEN
-Model("step-3.5-flash")           # reads STEPFUN_API_KEY
-Model("grok-3")                   # reads XAI_API_KEY
-Model("mimo-v2.6-flash")          # reads MIMO_API_KEY
-Model("glm-4.5")                  # reads ZAI_API_KEY
-Model("openrouter/vendor/model")  # reads OPENROUTER_API_KEY
+Model("claude-fable-5")              # reads ANTHROPIC_API_KEY
+Model("flux-2-flex")                 # reads BFL_API_KEY
+Model("dola-seed-2-1-turbo-260628")  # reads BYTEPLUS_API_KEY
+Model("deepseek-chat")               # reads DEEPSEEK_API_KEY
+Model("gemini-3-flash-preview")      # reads GOOGLE_AI_API_KEY
+Model("kimi-k2.6")                   # reads MOONSHOT_API_KEY
+Model("kling-3.0")                   # reads KLING_API_KEY
+Model("krea-2-large")                # reads KREA_API_KEY
+Model("muse-spark-1.1")              # reads META_API_KEY
+Model("MiniMax-M2")                  # reads MINIMAX_API_KEY
+Model("codestral-2508")              # reads MISTRAL_API_KEY
+Model("gpt-4.1")                     # reads OPENAI_API_KEY
+Model("sonar")                       # reads PERPLEXITY_API_KEY
+Model("qwen-flash")                  # reads DASHSCOPE_API_KEY
+Model("recraft-vectorize")           # reads RECRAFT_API_TOKEN
+Model("step-3.5-flash")              # reads STEPFUN_API_KEY
+Model("grok-3")                      # reads XAI_API_KEY
+Model("mimo-v2.6-flash")             # reads MIMO_API_KEY
+Model("glm-4.5")                     # reads ZAI_API_KEY
+Model("openrouter/vendor/model")     # reads OPENROUTER_API_KEY
 
 Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 ```
@@ -108,6 +110,7 @@ Set only the ones you use.
 ```bash
 export ANTHROPIC_API_KEY="…"
 export BFL_API_KEY="…"
+export BYTEPLUS_API_KEY="…"
 export DEEPSEEK_API_KEY="…"
 export GOOGLE_AI_API_KEY="…"
 export MOONSHOT_API_KEY="…"

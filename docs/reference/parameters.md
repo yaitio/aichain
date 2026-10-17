@@ -16,6 +16,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 |---|---|---|---|---|
 | `anthropic` | `1.0` | — | — | `8192`\* |
 | `bfl` | `1.0`\* | — | — | `4096`\* |
+| `byteplus` | `1.0` | `0.7` | — | `16384`\* |
 | `deepseek` | `1.0` | `1.0` | — | `4096`\* |
 | `google` | `1.0` | `0.95` | `40` | `8192`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
@@ -55,6 +56,12 @@ They are deliberately **not** converged: a library-wide default would override a
 
 - `temperature` — unused · this provider renders images and reads neither of these
 - `max_tokens` — unused · this provider renders images and reads neither of these
+
+**`byteplus`**
+
+- `temperature` — vendor · ModelArk's documented default
+- `top_p` — vendor · ModelArk's documented default
+- `max_tokens` — ours · the API's own default is 4096 and counts the reasoning, which a reasoning model can spend whole
 
 **`deepseek`**
 

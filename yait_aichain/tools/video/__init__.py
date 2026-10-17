@@ -8,7 +8,7 @@ See docs/tools/media.md.
 from ._tool import OPTIONS, Video
 
 #: The providers with video models — the ones `video()` takes.
-SERVICES = ("google", "xai", "qwen", "minimax", "kling")
+SERVICES = ("google", "xai", "qwen", "minimax", "kling", "byteplus")
 
 #: Providers that were here, or were asked about, and say so instead of "unknown".
 CLOSED = {"openai": "OpenAI closed Sora and its Videos API on 2026-09-24"}

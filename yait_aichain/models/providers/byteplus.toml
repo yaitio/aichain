@@ -1,0 +1,186 @@
+# byteplus — BytePlus ModelArk: ByteDance's Seed models for text, Seedream
+# through image(), Seedance through video().
+#
+# One Bearer key for all three, from the console of one region; a key works in
+# its own region only (an eu-west key answers 401 here). The models are each
+# activated in the console first — before that the API answers ModelNotOpen or
+# "does not exist", the same for a model the region does not serve.
+#
+# Text is OpenAI-compatible Chat Completions at /api/v3. Measured on every
+# model below, 2026-10-17: reasoning_effort minimal..max, a strict JSON
+# Schema, tool calls, temperature and top_p all taken. Every one of them
+# reasons when nothing is said. seed-2-0-code-preview answers HTTP 400 to a
+# JSON Schema and is not listed.
+#
+# Images: POST /api/v3/images/generations — prompt, size as WIDTHxHEIGHT
+# inside the model's pixel range, images as data: URIs. The watermark is on
+# unless turned off, and is. The answer carries the size it made, which is
+# what the price is read from.
+#
+# Video: POST /api/v3/contents/generations/tasks, polled at /tasks/{id}.
+# Billed by tokens, w × h × 24 × seconds / 1024; the task reports them.
+# Dreamina Seedance 2.x refuses a first frame with a real person's face.
+
+[provider]
+key      = "byteplus"
+client   = "byteplus"
+base_url = "https://ark.ap-southeast.bytepluses.com"
+env_key  = "BYTEPLUS_API_KEY"
+label    = "BytePlus"
+keys_url = "https://console.byteplus.com/ark/region:ap-southeast-1/apiKey"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/api/v3/models"
+chat_path        = "/api/v3/chat/completions"
+images_path      = "/api/v3/images/generations"
+
+[provider.options]
+accepts = ["temperature", "top_p", "max_tokens", "reasoning"]
+format_accepts = ["size", "aspect_ratio"]
+
+# The most images an edit takes; more are left out and said.
+max_input_images = 10
+
+[provider.defaults]
+temperature = 1.0
+max_tokens  = 16384
+top_p       = 0.7
+
+[provider.default_notes]
+temperature = "vendor · ModelArk's documented default"
+top_p       = "vendor · ModelArk's documented default"
+max_tokens  = "ours · the API's own default is 4096 and counts the reasoning, which a reasoning model can spend whole"
+
+# none is minimal: "none" switches the reasoning off and the answer runs long
+# (74 tokens for a product, against 3), measured 2026-10-17.
+[provider.reasoning_map]
+none   = "minimal"
+low    = "low"
+medium = "medium"
+high   = "high"
+
+[provider.reasoning]
+field = "reasoning_effort"
+
+# Text. Prices: docs.byteplus.com model pricing, read 2026-10-17, USD per 1M
+# tokens, the tier for a prompt up to 128K (the price doubles above it).
+[models."seed-2-0-pro-260328"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.50, output = 3.00, cache_read = 0.10 }
+
+[models."seed-2-0-lite-260428"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.25, output = 2.00, cache_read = 0.05 }
+
+[models."seed-2-0-mini-260428"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.10, output = 0.40, cache_read = 0.02 }
+
+[models."dola-seed-2-1-turbo-260628"]
+caps  = ["image-to-text", "text-to-text"]
+price = { input = 0.50, output = 2.50, cache_read = 0.10 }
+
+# Images. pixels is the range of WIDTH × HEIGHT the model makes; a size
+# outside it is scaled into it, the shape kept. default_pixels is what a ratio
+# alone is drawn at. default_size is sent when no shape is asked: a tier, so the
+# model takes the shape from the prompt or the input image — a pixel size here
+# made a 16:9 picture's edit square. Seedream 5.0 pro costs twice above 2.61
+# million pixels, so it is drawn at 1.5K (1536², the same price as 1K) unless
+# asked for more.
+[models."dola-seedream-5-0-pro-260628"]
+caps           = ["text-to-image", "image-to-image"]
+pixels         = [921600, 4624220]
+default_pixels = 2359296
+default_size   = "1.5K"
+price          = { per_image = 0.045 }
+price_large    = { pixels = 2610000, per_image = 0.09 }
+price_extra_input = 0.003                   # each reference image after the first
+
+[models."dola-seedream-5-0-flash-260915"]
+caps           = ["text-to-image", "image-to-image"]
+pixels         = [921600, 4624220]
+default_pixels = 2359296
+default_size   = "1.5K"
+price          = { per_image = 0.018 }
+
+[models."seedream-5-0-260128"]
+caps           = ["text-to-image", "image-to-image"]
+pixels         = [3686400, 16777216]
+default_pixels = 4194304
+default_size   = "2K"
+sequential     = true
+price          = { per_image = 0.035 }
+
+[models."seedream-4-5-251128"]
+caps           = ["text-to-image", "image-to-image"]
+pixels         = [3686400, 16777216]
+default_pixels = 4194304
+default_size   = "2K"
+sequential     = true
+price          = { per_image = 0.04 }
+
+[models."seedream-4-0-250828"]
+caps           = ["text-to-image", "image-to-image"]
+pixels         = [921600, 16777216]
+default_pixels = 1048576
+default_size   = "2K"
+sequential     = true
+price          = { per_image = 0.03 }
+
+# Video. per_second is BytePlus's own example — 16:9, five seconds — for the
+# estimate; price_tokens is USD per 1M tokens, what the task's token count is
+# billed at. Sound costs nothing apart on these; a request with a video in it
+# is cheaper, and video() sends none.
+[models."dreamina-seedance-2-5-260628"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [4, 30]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+audio          = "optional"
+price          = { per_second = { "480p" = 0.103, "720p" = 0.231, "1080p" = 0.569 } }
+price_tokens   = { "480p" = 10.7, "720p" = 10.7, "1080p" = 11.7 }
+
+[models."dreamina-seedance-2-0-260128"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [4, 15]
+resolutions    = ["480p", "720p", "1080p", "4k"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+audio          = "optional"
+price          = { per_second = { "480p" = 0.07, "720p" = 0.15, "1080p" = 0.37, "4k" = 0.78 } }
+price_tokens   = { "480p" = 7.0, "720p" = 7.0, "1080p" = 7.7, "4k" = 4.0 }
+
+[models."dreamina-seedance-2-0-fast-260128"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [4, 15]
+resolutions    = ["480p", "720p"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+audio          = "optional"
+price          = { per_second = { "480p" = 0.06, "720p" = 0.12 } }
+price_tokens   = { "480p" = 5.6, "720p" = 5.6 }
+
+[models."dreamina-seedance-2-0-mini-260615"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [4, 15]
+resolutions    = ["480p", "720p"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+audio          = "optional"
+price          = { per_second = { "480p" = 0.04, "720p" = 0.08 } }
+price_tokens   = { "480p" = 3.5, "720p" = 3.5 }
+
+[models."seedance-1-0-pro-250528"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [2, 12]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+seed           = true
+price          = { per_second = { "480p" = 0.024, "720p" = 0.052, "1080p" = 0.122 } }
+price_tokens   = { "480p" = 2.5, "720p" = 2.5, "1080p" = 2.5 }
+
+[models."seedance-1-0-pro-fast-251015"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [2, 12]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]
+seed           = true
+price          = { per_second = { "480p" = 0.0097, "720p" = 0.021, "1080p" = 0.049 } }
+price_tokens   = { "480p" = 1.0, "720p" = 1.0, "1080p" = 1.0 }

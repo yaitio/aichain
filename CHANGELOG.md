@@ -28,6 +28,16 @@
   Kling Image 3.0 and 2.1, text-to-image and an edit from one image, run as a
   job and priced from Kling's list (an edit on 2.1 costs twice); a ratio Kling
   lacks goes as the nearest of its eight, with a notice. Verified live, 28–53 s.
+- **BytePlus ModelArk**, one key for three things. Text: Seed 2.0 Pro, Lite and
+  Mini and Dola Seed 2.1 Turbo, OpenAI-compatible, with reasoning, a JSON
+  Schema and tools measured on each; no reasoning goes as `minimal`, since
+  `none` makes the answer run long. In `image()`: Seedream 5.0 pro, flash and
+  lite, 4.5 and 4.0, generating and editing; a size is scaled into the model's
+  range of pixels with its shape kept, and the price is read from the size that
+  came back (5.0 pro costs twice above 2.6 million pixels). In `video()`:
+  Seedance 2.5, 2.0, 2.0 Fast and Mini, 1.0 Pro and Pro Fast, priced by the
+  tokens the task reports. Verified live: text, a picture and an edit in 6–16 s,
+  a clip from text in 104 s ($0.14) and from a first frame in 20–78 s.
 - A video, and an image, whose price is more than a budget in force has left is
   **warned about and made**, the warning also a notice on the result; a budget
   with nothing left still stops a call before it begins.

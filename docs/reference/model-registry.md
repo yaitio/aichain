@@ -30,7 +30,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `deepseek`, `google`, `kimi`, `kling`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
+`anthropic`, `bfl`, `byteplus`, `deepseek`, `google`, `kimi`, `kling`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -40,6 +40,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 |---|---|---|---|---|---|---|
 | Anthropic | 14 | — | 14 | — | — | — |
 | Black Forest Labs (FLUX) | — | 11 | — | 2 | — | — |
+| BytePlus | 4 | 5 | 4 | 5 | 6 | 6 |
 | DeepSeek | 4 | — | — | — | — | — |
 | Google AI | 6 | 5 | 6 | 5 | 3 | 3 |
 | Kimi (Moonshot AI) | 4 | — | 1 | — | — | — |
@@ -128,6 +129,72 @@ flux-pro-1.1-ultra  # per_image $0.06
 ```
 flux-kontext-max  # per_image $0.08
 flux-kontext-pro  # per_image $0.04
+```
+
+---
+
+## BytePlus
+
+`provider = "byteplus"` · key `BYTEPLUS_API_KEY`
+
+### `text-to-text`
+
+```
+dola-seed-2-1-turbo-260628  # $0.5 in / $2.5 out per 1M tokens
+seed-2-0-lite-260428        # $0.25 in / $2 out per 1M tokens
+seed-2-0-mini-260428        # $0.1 in / $0.4 out per 1M tokens
+seed-2-0-pro-260328         # $0.5 in / $3 out per 1M tokens
+```
+
+### `text-to-image`
+
+```
+dola-seedream-5-0-flash-260915  # per_image $0.018
+dola-seedream-5-0-pro-260628    # per_image $0.045
+seedream-4-0-250828             # per_image $0.03
+seedream-4-5-251128             # per_image $0.04
+seedream-5-0-260128             # per_image $0.035
+```
+
+### `image-to-text`
+
+```
+dola-seed-2-1-turbo-260628  # $0.5 in / $2.5 out per 1M tokens
+seed-2-0-lite-260428        # $0.25 in / $2 out per 1M tokens
+seed-2-0-mini-260428        # $0.1 in / $0.4 out per 1M tokens
+seed-2-0-pro-260328         # $0.5 in / $3 out per 1M tokens
+```
+
+### `image-to-image`
+
+```
+dola-seedream-5-0-flash-260915  # per_image $0.018
+dola-seedream-5-0-pro-260628    # per_image $0.045
+seedream-4-0-250828             # per_image $0.03
+seedream-4-5-251128             # per_image $0.04
+seedream-5-0-260128             # per_image $0.035
+```
+
+### `text-to-video`
+
+```
+dreamina-seedance-2-0-260128       # per_second {'480p': 0.07, '720p': 0.15, '1080p': 0.37, '4k': 0.78}
+dreamina-seedance-2-0-fast-260128  # per_second {'480p': 0.06, '720p': 0.12}
+dreamina-seedance-2-0-mini-260615  # per_second {'480p': 0.04, '720p': 0.08}
+dreamina-seedance-2-5-260628       # per_second {'480p': 0.103, '720p': 0.231, '1080p': 0.569}
+seedance-1-0-pro-250528            # per_second {'480p': 0.024, '720p': 0.052, '1080p': 0.122}
+seedance-1-0-pro-fast-251015       # per_second {'480p': 0.0097, '720p': 0.021, '1080p': 0.049}
+```
+
+### `image-to-video`
+
+```
+dreamina-seedance-2-0-260128       # per_second {'480p': 0.07, '720p': 0.15, '1080p': 0.37, '4k': 0.78}
+dreamina-seedance-2-0-fast-260128  # per_second {'480p': 0.06, '720p': 0.12}
+dreamina-seedance-2-0-mini-260615  # per_second {'480p': 0.04, '720p': 0.08}
+dreamina-seedance-2-5-260628       # per_second {'480p': 0.103, '720p': 0.231, '1080p': 0.569}
+seedance-1-0-pro-250528            # per_second {'480p': 0.024, '720p': 0.052, '1080p': 0.122}
+seedance-1-0-pro-fast-251015       # per_second {'480p': 0.0097, '720p': 0.021, '1080p': 0.049}
 ```
 
 ---
@@ -783,7 +850,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image', 'text-to-video', 'image-to-video')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'deepseek', 'google', 'kimi', 'kling', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'byteplus', 'deepseek', 'google', 'kimi', 'kling', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

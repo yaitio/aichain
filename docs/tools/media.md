@@ -85,7 +85,7 @@ repeat a few seconds of speech in the joined text. A runnable version is the
 A model, in this library, is what can be an agent's mind: it reads, reasons
 and calls tools. An image model does none of that, so since 3.9.0 it is
 reached as a tool — `image(service, model=…)` with `openai`, `google`, `bfl`,
-`xai`, `qwen`, `recraft`, `krea` or `kling`. An agent given one draws when it decides a picture
+`xai`, `qwen`, `recraft`, `krea`, `kling` or `byteplus`. An agent given one draws when it decides a picture
 is needed, the way it searches when it decides it needs to know something.
 
 The request underneath is the one the model layer always built, with one
@@ -116,6 +116,16 @@ from the Kling web app. `kling-v3` ($0.028) and `kling-v2-1` ($0.014; an edit
 costs twice that) both generate and edit from one image. Each takes eight
 ratios, from 21:9 to 9:16: an `aspect_ratio` or a `size` becomes the nearest,
 said in the notices, and a size over 1536 pixels asks for the 2K tier.
+
+**BytePlus** serves ByteDance's Seedream with `BYTEPLUS_API_KEY`, a key from
+one ModelArk region with each model activated in the console first. Seedream
+5.0 pro ($0.045, or $0.09 above 2.6 million pixels), 5.0 flash ($0.018), 5.0
+lite ($0.035), 4.5 ($0.04) and 4.0 ($0.03) all generate and edit, with up to
+ten images. Each makes a range of pixel counts: a `size` outside it is scaled
+into it with its shape kept, an `aspect_ratio` is drawn at the model's base
+size, and with neither the model takes the shape from the prompt or the input
+image. The price is read from the size that came back. The watermark Seedream
+adds by default is turned off.
 
 ## Where the bytes go
 
@@ -169,6 +179,7 @@ than paid for twice. `images` is one image, the clip's first frame.
 | `xai` | `grok-imagine-video-1.5`, `-1.5-lite` | $0.08, $0.02; the job reports its own cost |
 | `qwen` | `wan3.0-video`, `wan3.0-video-prime`, `wan2.7-t2v`, `wan2.7-i2v`, `wan2.2-t2v-plus` | $0.02–0.28 by model and resolution; Wan 3.0 up to 30 s |
 | `minimax` | `MiniMax-H3`, `MiniMax-H3-Max` | $0.05–0.13 by resolution (480p, 768p, 2K) |
+| `byteplus` | `dreamina-seedance-2-5-260628`, `-2-0-`, `-2-0-fast-`, `-2-0-mini-`; `seedance-1-0-pro-250528`, `-pro-fast-` | $0.01–0.78 by model and resolution; billed by the tokens the task reports; 2.5 up to 30 s; sound on 2.x when asked, at no extra cost; 2.x refuses a first frame with a real person's face |
 | `kling` | `kling-3.0`, `kling-3.0-turbo` | $0.084–0.42 by resolution (720p, 1080p, 4k), 3–15 s; sound on 3.0 when asked ($0.126 at 720p), always on Turbo |
 
 OpenAI closed Sora and its video API on 2026-09-24.
