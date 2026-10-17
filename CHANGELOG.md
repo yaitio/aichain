@@ -5,8 +5,9 @@
 ### Added
 
 - `video(service, model=…)`, a video model as a tool: Google Veo 3.1 (and its
-  Fast and Lite), xAI Grok Imagine Video 1.5 (and Lite), and Qwen's Wan 2.7 and
-  2.2. A video takes minutes, so a call is a job: `submit()` returns it at
+  Fast and Lite), xAI Grok Imagine Video 1.5 (and Lite), Qwen's Wan 3.0 (and
+  Prime, up to 30 s), 2.7 and 2.2, and MiniMax H3 (and H3-Max, at 480p, 768p
+  and 2K). A video takes minutes, so a call is a job: `submit()` returns it at
   once, as a small dict that crosses a process; `collect(job)` waits, downloads
   the file and prices it; `run()` is both, waiting up to `timeout`. A wait that
   runs out raises with the job, to be collected again rather than paid twice.
@@ -20,7 +21,7 @@
   registry tasks, `text-to-video` and `image-to-video`, and prices per second.
   OpenAI's Sora closed on 2026-09-24 and is named, not listed. Verified live on
   every model family, text and first frame: Veo Lite in 31–45 s, xAI in 16–28 s,
-  Wan in 47–103 s.
+  Wan in 47–193 s, MiniMax in 11–174 s.
 - A video, and an image, whose price is more than a budget in force has left is
   **warned about and made**, the warning also a notice on the result; a budget
   with nothing left still stops a call before it begins.

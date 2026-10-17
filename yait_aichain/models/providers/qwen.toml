@@ -188,3 +188,30 @@ sizes         = { "480p" = { "16:9" = "832*480", "9:16" = "480*832", "1:1" = "62
 seed          = true
 negative_prompt = true
 price         = { per_second = { "480p" = 0.02, "1080p" = 0.10 } }
+
+# Wan 3.0: one model for every mode, the mode following input.media. Sound is
+# on by default and does not change the price; it is not made with a first
+# frame. With a first frame the shape follows the image.
+[models."wan3.0-video"]
+caps           = ["text-to-video", "image-to-video"]
+frame          = "media"
+duration_range = [2, 30]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+shape          = "ratio"
+audio          = "optional"
+audio_frame    = false
+seed           = true
+price          = { per_second = { "480p" = 0.05, "720p" = 0.10, "1080p" = 0.20 } }
+
+[models."wan3.0-video-prime"]
+caps           = ["text-to-video", "image-to-video"]
+frame          = "media"
+duration_range = [2, 30]
+resolutions    = ["480p", "720p", "1080p"]
+aspect_ratios  = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+shape          = "ratio"
+audio          = "optional"
+audio_frame    = false
+seed           = true
+price          = { per_second = { "480p" = 0.068, "720p" = 0.14, "1080p" = 0.28 } }

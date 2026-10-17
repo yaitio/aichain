@@ -85,8 +85,8 @@ is a [tool](tools/media.md).
 | **Text → Image** | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Image → Text** | Anthropic, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM) |
 | **Image → Image** | Black Forest Labs (FLUX), Google AI, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
-| **Text → Video** | Google AI, Qwen (DashScope), xAI |
-| **Image → Video** | Google AI, Qwen (DashScope), xAI |
+| **Text → Video** | Google AI, MiniMax, Qwen (DashScope), xAI |
+| **Image → Video** | Google AI, MiniMax, Qwen (DashScope), xAI |
 | **Web search** (a tool) | `searchBrave`, `searchExa`, `searchFirecrawl`, `searchParallel`, `searchPerplexity`, `searchTavily` |
 <!-- /g:modalities -->
 

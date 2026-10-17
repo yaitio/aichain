@@ -114,8 +114,12 @@ class Qwen(_Adapter):
             inputs["negative_prompt"] = plan["negative_prompt"]
         if self.data.get("shape") == "size":
             parameters = {"size": self.data["sizes"][plan["resolution"]][plan["aspect_ratio"]]}
+        elif image and self.data.get("frame") == "media":     # the shape follows the first frame
+            parameters = {"resolution": plan["resolution"].upper()}
         else:
             parameters = {"resolution": plan["resolution"].upper(), "ratio": plan["aspect_ratio"]}
+        if plan.get("audio") is not None:
+            parameters["audio"] = plan["audio"]
         if len(self.data.get("durations") or []) != 1:       # a model of one length takes no field
             parameters["duration"] = plan["duration"]
         if plan.get("seed") is not None:
@@ -142,6 +146,31 @@ class Qwen(_Adapter):
                 "resolution": f"{height}p" if height else None}
 
 
+class MiniMax(_Adapter):
+    """MiniMax H3: /v2/video_generation with a content list, a task to poll, a URL to
+    download. The shape of a text-to-video comes from the ratio; with a first frame,
+    from the image."""
+
+    def submit(self, prompt: str, image: dict | None, plan: dict) -> str:
+        content: list = [{"type": "text", "text": prompt}]
+        if image:
+            content.append({"type": "image_url", "image_url": {"url": image["data_uri"]}, "role": "first_frame"})
+        body = {"model": self.model, "content": content, "resolution": plan["resolution"].upper(),
+                "duration": plan["duration"], "ratio": "adaptive" if image else plan["aspect_ratio"]}
+        return json.loads(self.client._post("/v2/video_generation", body, self._headers()))["task_id"]
+
+    def poll(self, job_id: str) -> dict:
+        task = json.loads(self.client._get(f"/v2/query/video_generation/{job_id}", self._headers())).get("task") or {}
+        status = task.get("status")
+        if status in ("failed", "cancelled"):
+            error = task.get("error") or {}
+            return {"status": FAILED, "error": (error.get("message") if isinstance(error, dict) else error) or status}
+        if status != "succeeded":
+            return {"status": RUNNING}
+        return {"status": COMPLETED, "url": (task.get("content") or {}).get("url"),
+                "duration": (task.get("usage") or {}).get("output_seconds")}
+
+
 def adapter(service: str, client, model: str, data: dict) -> _Adapter:
     if service == "google":
         return Google(client, model)
@@ -149,4 +178,6 @@ def adapter(service: str, client, model: str, data: dict) -> _Adapter:
         return XAI(client, model)
     if service == "qwen":
         return Qwen(client, model, data)
+    if service == "minimax":
+        return MiniMax(client, model)
     raise TaskFailedError(400, f"no video adapter for {service}")

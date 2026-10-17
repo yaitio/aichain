@@ -31,7 +31,7 @@ OPTIONS = {
     "audio":           {"type": "boolean", "description": "With sound or without, where the model lets you choose."},
     "negative_prompt": {"type": "string", "description": "What the video should not show, where the model takes it."},
 }
-_HEIGHT = {"480p": 480, "720p": 720, "1080p": 1080, "4k": 2160}
+_HEIGHT = {"480p": 480, "720p": 720, "768p": 768, "1080p": 1080, "2k": 1440, "4k": 2160}
 _STEP, _LONGEST_STEP = 5.0, 30.0         # seconds between polls: from, growing to
 
 
@@ -147,7 +147,8 @@ class Video(Tool):
         size = opts.get("size")
         wh = [int(n) for n in str(size).lower().split("x")] if size else None
         ratio = opts.get("aspect_ratio") or (f"{wh[0]}:{wh[1]}" if wh else None)
-        plan = {"aspect_ratio": self._nearest_ratio(ratio, size), "seed": None, "negative_prompt": None}
+        plan = {"aspect_ratio": self._nearest_ratio(ratio, size), "seed": None, "negative_prompt": None,
+                "audio": None}
         asked = str(opts.get("resolution") or (f"{min(wh)}p" if wh else "")).lower().replace("2160p", "4k")
         plan["resolution"] = self._nearest_resolution(asked, size)
         plan["duration"] = self._length(opts.get("duration"), plan["resolution"])
@@ -158,10 +159,14 @@ class Video(Tool):
                 else:
                     self._say(DECLINED, option, value, None, "this model has no such control")
         if opts.get("audio") is not None:
-            always = d.get("audio") == "always"
-            if bool(opts.get("audio")) != always:
-                self._say(DECLINED, "audio", opts.get("audio"), always,
-                          "this model always makes sound" if always else "this model makes no sound")
+            wanted, kind = bool(opts.get("audio")), d.get("audio")
+            if kind == "optional" and not (wanted and has_frame and d.get("audio_frame") is False):
+                plan["audio"] = wanted
+            elif kind == "optional":
+                self._say(DECLINED, "audio", True, False, "this model makes no sound from a first frame")
+            elif wanted != (kind == "always"):
+                self._say(DECLINED, "audio", wanted, kind == "always",
+                          "this model always makes sound" if kind == "always" else "this model makes no sound")
         return plan
 
     def _nearest_ratio(self, asked, size) -> str:
@@ -179,8 +184,8 @@ class Video(Tool):
 
     def _nearest_resolution(self, asked: str, size) -> str:
         allowed = list(self._data.get("resolutions") or ["720p"])
-        if not asked:
-            return "720p" if "720p" in allowed else allowed[0]
+        if not asked:                                        # the nearest to 720p
+            return min(allowed, key=lambda r: abs(_HEIGHT[r] - 720))
         if asked not in _HEIGHT and not size:
             raise ValueError(f"{self.model}: resolution {asked!r} is not one of {', '.join(_HEIGHT)}")
         height = _HEIGHT.get(asked) or int(asked.rstrip("p"))

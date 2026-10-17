@@ -42,7 +42,7 @@ def _run(tool, polls, images=None, options=None, budget=None):
 
     def post(path, body, headers):
         sent.append((path, body, headers))
-        return json.dumps({"name": "models/m/operations/op1", "request_id": "r1",
+        return json.dumps({"name": "models/m/operations/op1", "request_id": "r1", "task_id": "t1",
                            "output": {"task_id": "t1"}}).encode()
     answers = iter(polls)
     with patch.object(client, "_post", side_effect=post), \
@@ -152,8 +152,44 @@ class TestEachProvidersRequest(unittest.TestCase):
         _, sent, _ = _run(video("qwen", model="wan2.7-i2v", api_key="k"), [done],
                           images=[_frame()], options={"duration": 2})
         body = sent[0][1]
-        self.assertEqual(body["parameters"], {"resolution": "720P", "ratio": "16:9", "duration": 2})
+        self.assertEqual(body["parameters"], {"resolution": "720P", "duration": 2})   # the shape follows the frame
         self.assertEqual(body["input"]["media"][0]["type"], "first_frame")
+
+
+class TestTheNewerModels(unittest.TestCase):
+
+    def test_minimax_h3_sends_a_content_list_and_its_shape_follows_a_first_frame(self):
+        done = {"task": {"id": "t1", "status": "succeeded", "content": {"url": "https://m/v.mp4"},
+                         "usage": {"output_seconds": 4}}}
+        result, sent, _ = _run(video("minimax", model="MiniMax-H3", api_key="k"),
+                               [{"task": {"status": "running"}}, done], images=[_frame()],
+                               options={"duration": 4, "resolution": "1080p"})
+        path, body, _ = sent[0]
+        self.assertEqual(path, "/v2/video_generation")
+        self.assertEqual([c["type"] for c in body["content"]], ["text", "image_url"])
+        self.assertEqual(body["content"][1]["role"], "first_frame")
+        self.assertEqual((body["resolution"], body["duration"], body["ratio"]), ("768P", 4, "adaptive"))
+        self.assertEqual((result["videos"][0]["resolution"], result["cost"]), ("768p", 0.32))
+        self.assertTrue(any(n.startswith("resolution: adapted") for n in result["notices"]))
+
+    def test_minimax_from_text_takes_a_ratio(self):
+        done = {"task": {"status": "succeeded", "content": {"url": "https://m/v.mp4"}}}
+        _, sent, _ = _run(video("minimax", model="MiniMax-H3-Max", api_key="k"), [done],
+                          options={"aspect_ratio": "9:16"})
+        self.assertEqual((sent[0][1]["ratio"], sent[0][1]["resolution"]), ("9:16", "768P"))
+
+    def test_wan_3_takes_media_sound_and_no_ratio_beside_a_first_frame(self):
+        done = {"output": {"task_status": "SUCCEEDED", "video_url": "https://q/v.mp4"},
+                "usage": {"output_video_duration": 2, "SR": 480}}
+        _, sent, _ = _run(video("qwen", model="wan3.0-video", api_key="k"), [done],
+                          options={"resolution": "480p", "duration": 2, "audio": False})
+        self.assertEqual(sent[0][1]["parameters"], {"resolution": "480P", "ratio": "16:9", "duration": 2,
+                                                    "audio": False})
+        result, sent, _ = _run(video("qwen", model="wan3.0-video", api_key="k"), [done], images=[_frame()],
+                               options={"resolution": "480p", "duration": 2, "audio": True})
+        self.assertEqual(sent[0][1]["parameters"], {"resolution": "480P", "duration": 2})
+        self.assertEqual(sent[0][1]["input"]["media"][0]["type"], "first_frame")
+        self.assertTrue(any("no sound from a first frame" in n for n in result["notices"]))
 
 
 class TestTheJob(unittest.TestCase):
@@ -225,7 +261,7 @@ class TestTheRegistry(unittest.TestCase):
 
 
 class TestVideoLive(unittest.TestCase):
-    """The cheapest clip on each provider: about $0.32 for the three."""
+    """The cheapest clip on each provider: about $0.57 for the four."""
 
     def _live(self, service, model, key, options):
         if not os.getenv(key):
@@ -241,6 +277,9 @@ class TestVideoLive(unittest.TestCase):
 
     def test_google(self):
         self._live("google", "veo-3.1-lite-generate-preview", "GOOGLE_AI_API_KEY", {"duration": 4})
+
+    def test_minimax(self):
+        self._live("minimax", "MiniMax-H3-Max", "MINIMAX_API_KEY", {"resolution": "480p", "duration": 5})
 
     def test_qwen(self):
         self._live("qwen", "wan2.2-t2v-plus", "DASHSCOPE_API_KEY", {"resolution": "480p"})

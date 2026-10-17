@@ -94,3 +94,23 @@ price = { input = 0.6, output = 2.4, cache_read = 0.03 }
 [models."MiniMax-M2"]
 caps  = ["text-to-text"]
 price = { input = 0.3, output = 1.2, cache_read = 0.03 }
+
+# Video — MiniMax H3, through video(): POST /v2/video_generation with a content
+# list (the prompt, and an image as the first frame), poll /v2/query/
+# video_generation/{id}, download task.content.url. A text-to-video request
+# needs a ratio; with a first frame the shape follows the image. 2K is
+# 2560×1440. Prices per second of output, from the MiniMax price list,
+# 2026-10-17; the Hailuo models of the v1 API are not here.
+[models."MiniMax-H3"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [4, 15]
+resolutions    = ["768p", "2k"]
+aspect_ratios  = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+price          = { per_second = { "768p" = 0.08, "2k" = 0.13 } }
+
+[models."MiniMax-H3-Max"]
+caps           = ["text-to-video", "image-to-video"]
+duration_range = [5, 15]
+resolutions    = ["480p", "768p"]
+aspect_ratios  = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+price          = { per_second = { "480p" = 0.05, "768p" = 0.08 } }

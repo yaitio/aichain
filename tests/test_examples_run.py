@@ -96,7 +96,7 @@ RUNS = {
     "37_tenant_keys.py": ("run", (), [re.compile(r"tenant-a .*sk-…"), re.compile(r"tenant-b .*sk-…"),
                                       "keys in store: 0"]),
     "38_eval.py": ("run", (), ["pass^3", "terse", "verbose", "ledger:"]),
-    "39_video.py": ("live", {"XAI_API_KEY", "GOOGLE_AI_API_KEY", "DASHSCOPE_API_KEY"}, ["submitted:", "saved:", "cost: $"]),
+    "39_video.py": ("live", {"XAI_API_KEY", "GOOGLE_AI_API_KEY", "DASHSCOPE_API_KEY", "MINIMAX_API_KEY"}, ["submitted:", "saved:", "cost: $"]),
 }
 
 #: What `examples/` holds besides the scripts.

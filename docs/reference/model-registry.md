@@ -45,11 +45,11 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | Kimi (Moonshot AI) | 4 | — | 1 | — | — | — |
 | Krea | — | 4 | — | 1 | — | — |
 | Meta (Muse) | 5 | — | 5 | — | — | — |
-| MiniMax | 8 | — | 1 | — | — | — |
+| MiniMax | 8 | — | 1 | — | 2 | 2 |
 | Mistral AI | 8 | — | 6 | — | — | — |
 | OpenAI | 20 | 7 | 20 | 7 | — | — |
 | Perplexity | 4 | — | — | — | — | — |
-| Qwen (DashScope) | 13 | 2 | 3 | 3 | 2 | 1 |
+| Qwen (DashScope) | 13 | 2 | 3 | 3 | 4 | 3 |
 | Recraft | — | 9 | — | 3 | — | — |
 | StepFun | 4 | — | 2 | — | — | — |
 | xAI | 14 | 3 | 13 | 3 | 2 | 2 |
@@ -301,6 +301,20 @@ MiniMax-M3              # $0.3 in / $1.2 out per 1M tokens
 MiniMax-M3  # $0.3 in / $1.2 out per 1M tokens
 ```
 
+### `text-to-video`
+
+```
+MiniMax-H3      # per_second {'768p': 0.08, '2k': 0.13}
+MiniMax-H3-Max  # per_second {'480p': 0.05, '768p': 0.08}
+```
+
+### `image-to-video`
+
+```
+MiniMax-H3      # per_second {'768p': 0.08, '2k': 0.13}
+MiniMax-H3-Max  # per_second {'480p': 0.05, '768p': 0.08}
+```
+
 ---
 
 ## Mistral AI
@@ -476,14 +490,18 @@ qwen-image-edit-plus  # per_image $0.03
 ### `text-to-video`
 
 ```
-wan2.2-t2v-plus  # per_second {'480p': 0.02, '1080p': 0.1}
-wan2.7-t2v       # per_second {'720p': 0.1, '1080p': 0.15}
+wan2.2-t2v-plus     # per_second {'480p': 0.02, '1080p': 0.1}
+wan2.7-t2v          # per_second {'720p': 0.1, '1080p': 0.15}
+wan3.0-video        # per_second {'480p': 0.05, '720p': 0.1, '1080p': 0.2}
+wan3.0-video-prime  # per_second {'480p': 0.068, '720p': 0.14, '1080p': 0.28}
 ```
 
 ### `image-to-video`
 
 ```
-wan2.7-i2v  # per_second {'720p': 0.1, '1080p': 0.15}
+wan2.7-i2v          # per_second {'720p': 0.1, '1080p': 0.15}
+wan3.0-video        # per_second {'480p': 0.05, '720p': 0.1, '1080p': 0.2}
+wan3.0-video-prime  # per_second {'480p': 0.068, '720p': 0.14, '1080p': 0.28}
 ```
 
 ---

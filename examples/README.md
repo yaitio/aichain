@@ -47,7 +47,7 @@ A **tool** is anything a model or a pipeline can call — your function, an API,
 | [`17_mcp.py`](17_mcp.py) | An MCP server is a set of agent tools: discover them, call one. | *(none)* |
 | [`18_rest.py`](18_rest.py) | Your own API as tools, without code per method; the risk class follows the method. | *(none)* |
 | [`19_shell.py`](19_shell.py) | Shell under a policy that reads the command, not only the tool. | *(none)* |
-| [`39_video.py`](39_video.py) | A video takes minutes: submit returns a job at once, collect waits for it. | any one of `XAI_API_KEY` `GOOGLE_AI_API_KEY` `DASHSCOPE_API_KEY` |
+| [`39_video.py`](39_video.py) | A video takes minutes: submit returns a job at once, collect waits for it. | any one of `XAI_API_KEY` `GOOGLE_AI_API_KEY` `DASHSCOPE_API_KEY` `MINIMAX_API_KEY` |
 
 ---
 

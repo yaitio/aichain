@@ -160,7 +160,8 @@ than paid for twice. `images` is one image, the clip's first frame.
 |---|---|---|
 | `google` | `veo-3.1-generate-preview`, `-fast-`, `-lite-` | $0.05–0.60 by model and resolution; sound always on |
 | `xai` | `grok-imagine-video-1.5`, `-1.5-lite` | $0.08, $0.02; the job reports its own cost |
-| `qwen` | `wan2.7-t2v`, `wan2.7-i2v`, `wan2.2-t2v-plus` | $0.02–0.15 by resolution |
+| `qwen` | `wan3.0-video`, `wan3.0-video-prime`, `wan2.7-t2v`, `wan2.7-i2v`, `wan2.2-t2v-plus` | $0.02–0.28 by model and resolution; Wan 3.0 up to 30 s |
+| `minimax` | `MiniMax-H3`, `MiniMax-H3-Max` | $0.05–0.13 by resolution (480p, 768p, 2K) |
 
 OpenAI closed Sora and its video API on 2026-09-24.
 
