@@ -20,7 +20,7 @@ from ._openai_compat import (_edit_sources, _image_source_to_data_uri,
 _FAILED = frozenset({"failed", "cancelled"})
 
 
-def _pixels_of(uri: str) -> "tuple[int, int] | None":
+def _pixels_of(uri: str) -> tuple[int, int] | None:
     """A data URI's image size from its header — PNG, JPEG or WebP — or None."""
     if not isinstance(uri, str) or not uri.startswith("data:") or "," not in uri:
         return None
@@ -129,7 +129,7 @@ class KreaClient(BaseClient):
         return _parse_image_generations_response(response)
 
     # ── request lifecycle: submit → poll → download ──────────────────
-    def _price(self, path: str, body: dict) -> "float | None":
+    def _price(self, path: str, body: dict) -> float | None:
         """What Krea charges for this request, from its price list — a job
         reports no cost of its own."""
         model = next((m for m in self._data["models"].values() if m.get("path") == path), None)

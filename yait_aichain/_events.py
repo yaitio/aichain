@@ -132,7 +132,7 @@ import contextvars as _contextvars
 #: The run in flight — the innermost Chain, Pool or Agent — so a Skill's model
 #: calls inside it carry its id. Contextvars cross into a Pool's workers
 #: because the pool copies the context into each.
-_RUN_ID: "_contextvars.ContextVar[str | None]" = _contextvars.ContextVar(
+_RUN_ID: _contextvars.ContextVar[str | None] = _contextvars.ContextVar(
     "yait_aichain_run_id", default=None)
 
 
@@ -149,7 +149,7 @@ def running(run_id):
 
 #: Hooks that hear every event sent inside a block, beside the sender's own:
 #: a lead's, while a chain it delegated to runs.
-_LISTENERS: "_contextvars.ContextVar[tuple]" = _contextvars.ContextVar(
+_LISTENERS: _contextvars.ContextVar[tuple] = _contextvars.ContextVar(
     "yait_aichain_listeners", default=())
 
 

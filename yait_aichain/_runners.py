@@ -87,7 +87,7 @@ def inputs(runner, task_key: str = "task") -> dict:
     return out
 
 
-def outputs(runner) -> "set | None":
+def outputs(runner) -> set | None:
     """The fields a runner's output is known to have before it runs, or None:
     a Skill answering to a JSON schema, a function returning a TypedDict or a
     dataclass."""

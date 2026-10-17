@@ -449,7 +449,7 @@ class sttGoogle(Transcription):
         return json.dumps({"text": text, "words": cls._words(results)}, ensure_ascii=False)
 
 
-def _wav_seconds(path: str) -> "float | None":
+def _wav_seconds(path: str) -> float | None:
     """A WAV file's duration from its header, or None when it cannot be read."""
     import wave
     try:
