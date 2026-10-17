@@ -19,7 +19,7 @@ import unittest
 
 from yait_aichain._multipart import Multipart
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -124,6 +124,25 @@ class TestOpenAIEdit(unittest.TestCase):
     def test_dalle2_uses_single_image_field(self):
         _, body = _build_image_edits_request(_wrap("dall-e-2"), _edit_msgs(), _OUT)
         self.assertIn("image", [f[0] for f in body.fields])
+
+
+class TestOpenAISizes(unittest.TestCase):
+    """gpt-image-1.x takes three sizes and answers any other with HTTP 400; gpt-image-2 takes any."""
+
+    def _size(self, name, ratio):
+        from yait_aichain import Model
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}):
+            _, body = Model(name).to_request([{"role": "user", "parts": [{"type": "text", "text": "x"}]}],
+                                             {"modalities": ["image"], "format": {"type": "image", "aspect_ratio": ratio}})
+        return body["size"]
+
+    def test_a_ratio_goes_as_the_nearest_of_three_on_the_first_generation(self):
+        self.assertEqual(self._size("gpt-image-1.5", "21:9"), "1536x1024")
+        self.assertEqual(self._size("gpt-image-1-mini", "9:16"), "1024x1536")
+        self.assertEqual(self._size("gpt-image-1.5", "1:1"), "1024x1024")
+
+    def test_gpt_image_2_keeps_the_shape(self):
+        self.assertEqual(self._size("gpt-image-2", "21:9"), "2384x1024")
 
 
 class TestOpenAISendSeam(unittest.TestCase):

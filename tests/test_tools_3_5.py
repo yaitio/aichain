@@ -32,7 +32,8 @@ from yait_aichain.tools import (Embedder, RerankBase, Tool, chunk, embed, gate, 
 from yait_aichain.tools.embed._base import EmbeddingResult
 
 KEYS = {"OPENAI_API_KEY": "k", "COHERE_API_KEY": "k", "VOYAGE_API_KEY": "k",
-        "GOOGLE_AI_API_KEY": "k", "DASHSCOPE_API_KEY": "k", "XAI_API_KEY": "k"}
+        "GOOGLE_AI_API_KEY": "k", "DASHSCOPE_API_KEY": "k", "XAI_API_KEY": "k", "ELEVENLABS_API_KEY": "k",
+        "MINIMAX_API_KEY": "k"}
 
 
 @patch.dict(os.environ, KEYS)

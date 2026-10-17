@@ -28,10 +28,9 @@ _EXT_MIME = {
 
 
 def _guess_mime(path: pathlib.Path, head: bytes) -> str:
-    """Best-effort MIME for a local file: extension first, then magic bytes."""
-    by_ext = _EXT_MIME.get(path.suffix.lower())
-    if by_ext:
-        return by_ext
+    """Best-effort MIME for a local file: the first bytes, then the extension."""
+    # The bytes win because a name can lie: a PNG saved as .jpg went out as
+    # image/jpeg, and Anthropic answers that with HTTP 400.
     if head[:3] == b"\xff\xd8\xff":
         return "image/jpeg"
     if head[:4] == b"\x89PNG":
@@ -42,7 +41,7 @@ def _guess_mime(path: pathlib.Path, head: bytes) -> str:
         return "image/gif"
     if head[:4] == b"%PDF":
         return "application/pdf"
-    return "application/octet-stream"
+    return _EXT_MIME.get(path.suffix.lower(), "application/octet-stream")
 
 
 def _resolve_file_source(part: dict) -> None:

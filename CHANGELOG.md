@@ -9,6 +9,20 @@
   picture's own URL, size and thumbnail. A new standard option, `kind`, `web`
   by default; a provider with no image search refuses `images` rather than
   return pages. Every result now carries `image`, empty for a page.
+- **A voice of its own**: `speech("elevenlabs")` and `speech("minimax")`. Both
+  speak with any voice id and make voices from a description: `design()` returns
+  candidates with a sample each (three from ElevenLabs a call, one from MiniMax),
+  `keep()` makes the chosen one permanent. ElevenLabs speaks on `eleven_v4` with
+  emotion from inline tags and a `speed` of 0.7–1.2. Verified live: three
+  characters' voices designed, kept and spoken, in Russian and English.
+
+### Fixed
+
+- A file's MIME type is read from its first bytes before its extension: a PNG
+  saved as `.jpg` went to Anthropic as `image/jpeg` and was refused with HTTP 400.
+- `gpt-image-1.5`, `gpt-image-1-mini`, `gpt-image-1` and `chatgpt-image-latest`
+  take three sizes; a ratio now goes as the nearest of them, with a notice,
+  where `21:9` used to go as `2384x1024` and be refused.
 
 ## [4.11.0] — 2026-10-17
 

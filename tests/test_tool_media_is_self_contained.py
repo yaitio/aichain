@@ -44,6 +44,13 @@ class TestMediaPart(unittest.TestCase):
                          ("image", "base64", "image/png"))
         self.assertTrue(carries_media(part))
 
+    def test_the_bytes_name_the_type_when_the_extension_lies(self):
+        # A PNG saved as .jpg went out as image/jpeg and Anthropic refused it with HTTP 400.
+        path = os.path.join(tempfile.mkdtemp(), "a.jpg")
+        with open(path, "wb") as fh:
+            fh.write(b"\x89PNG\r\n\x1a\nrest")
+        self.assertEqual(media_part(path)["source"]["mime"], "image/png")
+
     def test_what_is_not_a_regular_file_is_refused(self):
         with self.assertRaisesRegex(ValueError, "regular file"):
             media_part(tempfile.mkdtemp())

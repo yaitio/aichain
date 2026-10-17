@@ -567,16 +567,36 @@ def _is_o_series_model(name: str) -> bool:
     )
 
 
+def _ratio_value(ratio):
+    a, _, b = str(ratio).partition(":")
+    try:
+        return float(a) / float(b)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
 def _ratio_as_size(fmt: dict, model) -> dict:
     """A ratio as pixels for an API that takes only pixels — WxH in multiples of
     16 between 1:3 and 3:1, which a 1024 short edge meets. Every other image
     provider in the library takes both."""
     if not fmt.get("aspect_ratio") or fmt.get("size"):
         return fmt
+    from ...models._adaptation import Adaptation, ADAPTED, record
+    from ...models._data import PROVIDERS
+    from ._shape import pixels
+    fixed = (PROVIDERS.get("openai", {}).get("models", {}).get(model.name) or {}).get("sizes")
+    if fixed:                      # a model with a closed list of sizes gets the nearest shape
+        want = _ratio_value(fmt["aspect_ratio"])
+        if want is None:
+            return fmt
+        size = min(fixed, key=lambda s: abs((lambda w, h: w / h)(*pixels(s)) - want))
+        record(Adaptation(
+            kind=ADAPTED, option="aspect_ratio", asked=fmt["aspect_ratio"], sent=f"size={size}",
+            model=model.name, why=f"this model takes only {', '.join(fixed)}; the nearest shape went"))
+        return {**fmt, "size": size}
     size = size_from_ratio(fmt["aspect_ratio"], multiple=16)
     if not size:
         return fmt
-    from ...models._adaptation import Adaptation, ADAPTED, record
     record(Adaptation(
         kind=ADAPTED, option="aspect_ratio", asked=fmt["aspect_ratio"],
         sent=f"size={size}", model=model.name,

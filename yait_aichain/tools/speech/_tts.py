@@ -560,3 +560,167 @@ class ttsQwen(Speech):
         if len(data) > MAX_AUDIO_BYTES:
             raise ValueError(f"ttsQwen: the audio is over {MAX_AUDIO_BYTES:,} bytes; not saved")
         return data
+
+
+# ── Voices made from a description: ElevenLabs and MiniMax ─────────────────────
+
+class _DesignedSpeech(Speech):
+    """A provider whose voices can be made from a description: ``design()`` returns
+    candidates with a sample each, ``keep()`` makes one permanent where the provider
+    asks for that, and ``run()`` speaks with a voice id."""
+
+    # The base reads no option; each provider declares the ones its run() reads.
+    parameters = _without_options(Speech.parameters, "language", "speed", "format")
+    _ENV_KEY = ""
+    _LABEL = ""
+
+    def __init__(self, api_key: str | None = None, model: str | None = None, *,
+                 output_dir: str | None = None) -> None:
+        self.model = _model_setting(self, model)
+        self.output_dir = output_dir
+        self._api_key = api_key or os.environ.get(self._ENV_KEY)
+        if not self._api_key:
+            raise ValueError(f"No {self._LABEL} API key found.  "
+                             f"Pass api_key= or set the {self._ENV_KEY} environment variable.")
+        self._http = make_http(timeout=urllib3.Timeout(connect=10.0, read=180.0),
+                               retries=urllib3.Retry(total=2, backoff_factor=0.5))
+
+    def _voice(self, opts: dict) -> str:
+        voice = opts.get("voice") or self._DEFAULT_VOICE
+        if not voice:
+            raise ValueError(f"{self.name} speaks with a voice id: options={{'voice': …}} — "
+                             "a stock one, or one made with design() and kept with keep()")
+        return voice
+
+    def _sample(self, data: bytes, fmt: str) -> str:
+        fd, path = tempfile.mkstemp(dir=_output_folder(self.output_dir), prefix="voice-", suffix=f".{fmt}")
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        return path
+
+    def keep(self, voice_id: str, name: str, description: str) -> str:
+        """The permanent id of a designed voice; where the provider keeps designs as they are, the same id."""
+        return voice_id
+
+
+class ttsElevenLabs(_DesignedSpeech):
+    """
+    Text-to-speech and voice design via ElevenLabs. ``design(description)`` asks
+    for three voices from a description and saves a sample of each; ``keep()``
+    turns the chosen one into a voice of the account (a design is a preview until
+    then); ``run()`` speaks with any voice id. MP3 out, the format every plan has.
+
+    Models: ``eleven_multilingual_v2`` (default), ``eleven_v3``; designs with
+    ``eleven_multilingual_ttv_v2``. Key: ``ELEVENLABS_API_KEY``, with the rights
+    Text to Speech, Voice Generation and Voices write.
+    """
+
+    name           = "ttsElevenLabs"
+    parameters     = _without_options(Speech.parameters, "language")
+    _ENV_KEY       = "ELEVENLABS_API_KEY"
+    _LABEL         = "ElevenLabs"
+    _BASE_URL      = "https://api.elevenlabs.io"
+    _DEFAULT_MODEL = "eleven_multilingual_v2"
+    _DEFAULT_VOICE = None
+    _FORMATS       = frozenset({"mp3"})
+    _DESIGN_MODEL  = "eleven_multilingual_ttv_v2"
+
+    def _headers(self) -> dict:
+        return {"xi-api-key": self._api_key}
+
+    def run(self, input: str, options: dict | None = None) -> str:
+        """Speak *input* with ``options["voice"]``; ``speed`` 0.7–1.2. Returns the file's path."""
+        opts = _call_options(self, options)
+        fmt = opts.get("format", "mp3")
+        body = {"text": input, "model_id": self.model}
+        if opts.get("speed") is not None:
+            speed = float(opts.get("speed"))
+            if not 0.7 <= speed <= 1.2:
+                raise ValueError(f"{self.name}: speed is 0.7–1.2 here; {speed} is not")
+            body["voice_settings"] = {"speed": speed}
+        return self._save(opts, fmt, lambda: request(
+            self._http, "POST", f"{self._BASE_URL}/v1/text-to-speech/{self._voice(opts)}?output_format=mp3_44100_128",
+            json=body, headers=self._headers(), what="ElevenLabs speech API").data)
+
+    def design(self, description: str, text: str | None = None, seed: int | None = None) -> list:
+        """Voices from *description*: ``[{"voice_id", "path", "seconds"}]``, a sample of each spoken
+        with *text* (100–1000 characters), or with text the provider writes when there is none."""
+        body = {"voice_description": description, "model_id": self._DESIGN_MODEL}
+        if text:
+            if not 100 <= len(text) <= 1000:
+                raise ValueError(f"{self.name}: a design's text is 100–1000 characters; this one is {len(text)}")
+            body["text"] = text
+        else:
+            body["auto_generate_text"] = True
+        if seed is not None:
+            body["seed"] = seed
+        import base64
+        made = request_json(self._http, "POST", f"{self._BASE_URL}/v1/text-to-voice/design?output_format=mp3_44100_128",
+                            json=body, headers=self._headers(), what="ElevenLabs voice design")
+        return [{"voice_id": p["generated_voice_id"], "seconds": p.get("duration_secs"),
+                 "path": self._sample(base64.b64decode(p["audio_base_64"]), "mp3")}
+                for p in made.get("previews") or []]
+
+    def keep(self, voice_id: str, name: str, description: str) -> str:
+        made = request_json(self._http, "POST", f"{self._BASE_URL}/v1/text-to-voice",
+                            json={"voice_name": name[:100], "voice_description": description[:1000],
+                                  "generated_voice_id": voice_id},
+                            headers=self._headers(), what="ElevenLabs voice create")
+        return made["voice_id"]
+
+
+class ttsMiniMax(_DesignedSpeech):
+    """
+    Text-to-speech and voice design via MiniMax. ``design(description, text)`` makes
+    one voice per call and returns it with its sample; the voice is the account's
+    at once, so ``keep()`` changes nothing — MiniMax deletes cloned voices unused
+    for seven days, and may treat designed ones the same, so a kept voice is one
+    that is spoken with. ``run()`` speaks with any voice id.
+
+    Models: ``speech-2.8-hd`` (default), ``speech-2.8-turbo``, ``speech-2.6-hd``.
+    Key: ``MINIMAX_API_KEY``. A design is $30 per million characters of sample.
+    """
+
+    name           = "ttsMiniMax"
+    parameters     = _without_options(Speech.parameters, "language")
+    _ENV_KEY       = "MINIMAX_API_KEY"
+    _LABEL         = "MiniMax"
+    _BASE_URL      = "https://api.minimax.io"
+    _DEFAULT_MODEL = "speech-2.8-hd"
+    _DEFAULT_VOICE = None
+    _FORMATS       = frozenset({"mp3", "wav", "flac"})
+
+    def _headers(self) -> dict:
+        return {"Authorization": f"Bearer {self._api_key}"}
+
+    def _answer(self, data: dict, what: str) -> dict:
+        status = (data.get("base_resp") or {})
+        if status.get("status_code", 0) != 0:
+            raise RuntimeError(f"{self.name}: {what} refused — {status.get('status_code')} {status.get('status_msg')}")
+        return data
+
+    def run(self, input: str, options: dict | None = None) -> str:
+        """Speak *input* with ``options["voice"]``; ``speed`` 0.5–2.0; mp3, wav or flac."""
+        opts = _call_options(self, options)
+        fmt = opts.get("format", _DEFAULT_FORMAT)
+        body = {"model": self.model, "text": input, "stream": False, "output_format": "hex",
+                "language_boost": "auto",
+                "voice_setting": {"voice_id": self._voice(opts), "speed": float(opts.get("speed", _DEFAULT_SPEED)),
+                                  "vol": 1, "pitch": 0},
+                "audio_setting": {"sample_rate": 32000, "bitrate": 128000, "format": fmt, "channel": 1}}
+
+        def produce():
+            data = self._answer(request_json(self._http, "POST", f"{self._BASE_URL}/v1/t2a_v2", json=body,
+                                             headers=self._headers(), what="MiniMax speech API"), "speech")
+            return bytes.fromhex(data["data"]["audio"])
+        return self._save(opts, fmt, produce)
+
+    def design(self, description: str, text: str, seed: int | None = None) -> list:
+        """One voice from *description*: ``[{"voice_id", "path"}]``, its sample spoken with *text*
+        (at most 500 characters). Call again for another candidate."""
+        if len(text) > 500:
+            raise ValueError(f"{self.name}: a design's text is at most 500 characters; this one is {len(text)}")
+        data = self._answer(request_json(self._http, "POST", f"{self._BASE_URL}/v1/voice_design",
+                                         json={"prompt": description, "preview_text": text},
+                                         headers=self._headers(), what="MiniMax voice design"), "voice design")
+        return [{"voice_id": data["voice_id"], "path": self._sample(bytes.fromhex(data["trial_audio"]), "mp3")}]

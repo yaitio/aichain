@@ -26,8 +26,8 @@ out["videos"][0]["path"], out["cost"]
 
 ## Speech and transcription
 
-`speech(service)` and `transcribe(service)` take `openai`, `google`, `xai` or
-`qwen`. A voice, a speed, a language and a format are asked per call; the
+`speech(service)` takes `openai`, `google`, `xai`, `qwen`, `elevenlabs` and
+`minimax`; `transcribe(service)` the first four. A voice, a speed, a language and a format are asked per call; the
 service and the model are fixed when the tool is made. Speech returns the path
 of the file it wrote, which is what a chain passes on and what a model can be
 told. The file goes in the tool's `output_dir`, else `AICHAIN_OUTPUT_ROOT`,
@@ -35,6 +35,32 @@ else the system's temporary directory — the one writable place on Lambda.
 Qwen's speech endpoint answers WAV whatever is asked, so `wav` is the one
 format `speech("qwen")` takes; its host, like every DashScope tool's, follows
 `region=` or `DASHSCOPE_REGION` (`ap`, `us`, `cn`, `hk`).
+
+### A voice of its own
+
+`speech("elevenlabs")` and `speech("minimax")` make voices from a description,
+not only speak with stock ones. `design(description, text)` returns candidates —
+three from ElevenLabs, one from MiniMax per call — each with a sample spoken in
+that voice; `keep(voice_id, name, description)` makes the chosen one permanent
+(an ElevenLabs design is a preview until then; a MiniMax voice is the account's
+at once), and `run(text, {"voice": voice_id})` speaks with it from then on.
+
+```python
+voices = speech("elevenlabs", output_dir="voices").design(
+    "A young woman speaking Russian: clean, bright, ringing, lively.", "Текст образца…" * 10, seed=7)
+kept = speech("elevenlabs").keep(voices[2]["voice_id"], "Linara", "clean, bright, ringing")
+speech("elevenlabs", model="eleven_v4").run("[excited] Уже пишем?! [laughing] Ой.", {"voice": kept, "speed": 1.12})
+```
+
+`eleven_v4` reads emotion from inline tags — `[excited]`, `[whispers]`,
+`[laughing]`, `[pause]` — one emotion a segment works best. `speed` is 0.7–1.2
+on ElevenLabs. A seed with the same description gives the same voice back; the
+voice itself lives with the provider and is not exported, so keep the
+description, the seed and a sample beside the id. Voice design needs a paid
+ElevenLabs plan and a key with Text to Speech, Voice Generation and Voices
+write; a plan's concurrency limit (two on the smallest) holds design calls too.
+MiniMax deletes cloned voices unused for seven days and may treat designed ones
+the same; its design costs $30 per million characters of sample.
 
 A transcript is plain text, or a JSON string with words and their times when
 `timestamps` or `format="json"` is asked. Word timestamps come from
