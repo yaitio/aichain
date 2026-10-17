@@ -1,0 +1,2 @@
+yait-aichain==4.10.1
+markitdown[pdf]==0.1.8

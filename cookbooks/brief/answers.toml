@@ -1,0 +1,5 @@
+# The answer key is three properties of the brief, checked in run.py:
+#   1. it is longer, in output tokens, than the writer model can give in one answer;
+#   2. no section call ended cut off at max_tokens;
+#   3. every one of the twelve papers is cited at least once.
+threshold = 3

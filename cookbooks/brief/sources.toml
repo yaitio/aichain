@@ -1,0 +1,100 @@
+# Twelve arXiv papers on measuring the reliability of LLM agents, chosen
+# 2026-10-17 from one arXiv query (agent AND reliability AND benchmark).
+# Each fixed by id and version; every one CC BY 4.0, read from its arXiv page.
+# arXiv asks for one request per three seconds.
+
+[[source]]
+id      = "2406.12045"
+title   = "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains"
+url     = "https://arxiv.org/pdf/2406.12045v1"
+sha256  = "0ce66a1763d698c61bb311c3c874bf593d1e9a5bfff11bb35f6f72b981f6da56"
+licence = "CC BY 4.0"
+file    = "2406.12045v1.pdf"
+
+[[source]]
+id      = "2602.16666"
+title   = "Towards a Science of AI Agent Reliability"
+url     = "https://arxiv.org/pdf/2602.16666v3"
+sha256  = "f6347ad130f009ea385cfa341a32fd1c7d757d65458b4d1d73dae5c3a28a2ccf"
+licence = "CC BY 4.0"
+file    = "2602.16666v3.pdf"
+
+[[source]]
+id      = "2610.00651"
+title   = "Agent Evaluation Reliability: More Tasks Won't (Always) Fix An Agent Leaderboard"
+url     = "https://arxiv.org/pdf/2610.00651v1"
+sha256  = "231ca4551516682b25d7d38462fdda47bb7a546a149b680c5547ee79a9ac83f2"
+licence = "CC BY 4.0"
+file    = "2610.00651v1.pdf"
+
+[[source]]
+id      = "2601.06112"
+title   = "ReliabilityBench: Evaluating LLM Agent Reliability Under Production-Like Stress Conditions"
+url     = "https://arxiv.org/pdf/2601.06112v1"
+sha256  = "d0754cb8970d8766558e5087060f38cad3bee3ab34fc5206c9d703f22f5c6282"
+licence = "CC BY 4.0"
+file    = "2601.06112v1.pdf"
+
+[[source]]
+id      = "2511.14136"
+title   = "Beyond Accuracy: A Multi-Dimensional Framework for Evaluating Enterprise Agentic AI Systems"
+url     = "https://arxiv.org/pdf/2511.14136v1"
+sha256  = "bf6d7a38e8796788ed13eb6fb285ee695aa61edf097f75743837dd7155be81cf"
+licence = "CC BY 4.0"
+file    = "2511.14136v1.pdf"
+
+[[source]]
+id      = "2609.01660"
+title   = "How Fast Do Agents Rot? An Empirical Study of Long-Horizon Degradation in LLM Agents"
+url     = "https://arxiv.org/pdf/2609.01660v1"
+sha256  = "ba195a954caaf7512bd57dad2dfd747419db657589db005b14ffb17a667e4707"
+licence = "CC BY 4.0"
+file    = "2609.01660v1.pdf"
+
+[[source]]
+id      = "2610.19560"
+title   = "τ-Emotion-Bench: Exposing the Interaction Fragility of LLM Agents through Real-World User Emotions"
+url     = "https://arxiv.org/pdf/2610.19560v1"
+sha256  = "fc7e4da7c89ae0561c6523c71e48bf73b2c02a1446cf8d2eb7edb71860896396"
+licence = "CC BY 4.0"
+file    = "2610.19560v1.pdf"
+
+[[source]]
+id      = "2609.02095"
+title   = "READY or Not: Reliable Enterprise Agent Deployment"
+url     = "https://arxiv.org/pdf/2609.02095v1"
+sha256  = "19e9ef8532aec4ba5f1e932633388993233d92dcdd6f8eafb275840aa244a8bc"
+licence = "CC BY 4.0"
+file    = "2609.02095v1.pdf"
+
+[[source]]
+id      = "2610.04123"
+title   = "Agent Reliability Profiles in Financial Services"
+url     = "https://arxiv.org/pdf/2610.04123v1"
+sha256  = "ecde06d377be30ec0a00c5783ce1574cad351d1fb59db678834fd6f62df7702c"
+licence = "CC BY 4.0"
+file    = "2610.04123v1.pdf"
+
+[[source]]
+id      = "2410.10934"
+title   = "Agent-as-a-Judge: Evaluate Agents with Agents"
+url     = "https://arxiv.org/pdf/2410.10934v2"
+sha256  = "830911474bce590fa8e549179a309572a28d4e585611bc4d44ef08337765f5f6"
+licence = "CC BY 4.0"
+file    = "2410.10934v2.pdf"
+
+[[source]]
+id      = "2603.05399"
+title   = "Judge Reliability Harness: Stress Testing the Reliability of LLM Judges"
+url     = "https://arxiv.org/pdf/2603.05399v1"
+sha256  = "c851a1d3e0b671484cc24fda54b0fd2fd7f13301e6a446a9b1f0f0ccb599f53a"
+licence = "CC BY 4.0"
+file    = "2603.05399v1.pdf"
+
+[[source]]
+id      = "2511.08042"
+title   = "Towards a Standard, Enterprise-Relevant Agentic AI Benchmark: Lessons from 5.5 Billion Tokens"
+url     = "https://arxiv.org/pdf/2511.08042v1"
+sha256  = "a77c611a6df5adcc0b55174a8295d6f6a312c37a16f535835aa6b9488f13b161"
+licence = "CC BY 4.0"
+file    = "2511.08042v1.pdf"
