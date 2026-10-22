@@ -73,7 +73,7 @@ for a person to decide; an [event for every step](control/observability.md);
 [Eval](control/eval.md) runs arms × cases × trials and reports accuracy,
 `Pass^k` and cost side by side.
 
-**Models.** <!-- g:provider-list -->**19 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), BytePlus, DeepSeek, Google AI, Kimi (Moonshot AI), Kling, Krea, Meta (Muse), MiniMax, Mistral AI, OpenAI, Perplexity, Qwen (DashScope), Recraft, StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM)<!-- /g:provider-list -->, and any [private OpenAI-compatible server](models/private-models.md)
+**Models.** <!-- g:provider-list -->**20 cloud providers + your own** — Anthropic, Black Forest Labs (FLUX), BytePlus, DeepSeek, Google AI, Inception (Mercury), Kimi (Moonshot AI), Kling, Krea, Meta (Muse), MiniMax, Mistral AI, OpenAI, Perplexity, Qwen (DashScope), Recraft, StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM)<!-- /g:provider-list -->, and any [private OpenAI-compatible server](models/private-models.md)
 you run yourself (vLLM, Ollama, LM Studio, …), where nothing leaves your
 perimeter. Text and vision are [models](models/models.md); image generation
 is a [tool](tools/media.md).
@@ -81,7 +81,7 @@ is a [tool](tools/media.md).
 <!-- g:modalities -->
 | Modality | Providers |
 |---|---|
-| **Text → Text** | Anthropic, BytePlus, DeepSeek, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Perplexity, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM), OpenRouter, [your own private server](models/private-models.md) |
+| **Text → Text** | Anthropic, BytePlus, DeepSeek, Google AI, Inception (Mercury), Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Perplexity, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM), OpenRouter, [your own private server](models/private-models.md) |
 | **Text → Image** | Black Forest Labs (FLUX), BytePlus, Google AI, Kling, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |
 | **Image → Text** | Anthropic, BytePlus, Google AI, Kimi (Moonshot AI), Meta (Muse), MiniMax, Mistral AI, OpenAI, Qwen (DashScope), StepFun, xAI, Xiaomi (MiMo), Z.ai (GLM) |
 | **Image → Image** | Black Forest Labs (FLUX), BytePlus, Google AI, Kling, Krea, OpenAI, Qwen (DashScope), Recraft, xAI |

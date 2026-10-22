@@ -18,6 +18,7 @@ These keys are required to use the corresponding `Model(...)` prefix or direct s
 | `BYTEPLUS_API_KEY` | BytePlus | <https://console.byteplus.com/ark/region:ap-southeast-1/apiKey> |
 | `DEEPSEEK_API_KEY` | DeepSeek | <https://platform.deepseek.com/api_keys> |
 | `GOOGLE_AI_API_KEY` | Google AI | <https://aistudio.google.com/app/apikey> |
+| `INCEPTION_API_KEY` | Inception (Mercury) | <https://platform.inceptionlabs.ai> |
 | `MOONSHOT_API_KEY` | Kimi (Moonshot AI) | <https://platform.kimi.ai/> |
 | `KLING_API_KEY` | Kling | <https://kling.ai/document-api/api/get-started/authentication> |
 | `KREA_API_KEY` | Krea | — |
@@ -52,6 +53,7 @@ Model("flux-2-flex")                 # reads BFL_API_KEY
 Model("dola-seed-2-1-turbo-260628")  # reads BYTEPLUS_API_KEY
 Model("deepseek-chat")               # reads DEEPSEEK_API_KEY
 Model("gemini-3-flash-preview")      # reads GOOGLE_AI_API_KEY
+Model("mercury-2")                   # reads INCEPTION_API_KEY
 Model("kimi-k2.6")                   # reads MOONSHOT_API_KEY
 Model("kling-3.0")                   # reads KLING_API_KEY
 Model("krea-2-large")                # reads KREA_API_KEY
@@ -87,6 +89,7 @@ Model("gpt-5.5", api_key="sk-…")    # explicit — the environment is not read
 | `GOOGLE_AI_API_KEY` | `EmbeddingGoogle`, `sttGoogle`, `ttsGoogle` | yes |
 | `GOOGLE_API_KEY` | `EmbeddingGoogle`, `sttGoogle`, `ttsGoogle` | — |
 | `GOOGLE_CLOUD_API_KEY` | `sttGoogle`, `ttsGoogle` | — |
+| `INCEPTION_API_KEY` | `decisionInception` | yes |
 | `OPENAI_API_KEY` | `EmbeddingOpenAI`, `decisionOpenAI`, `sttOpenAI`, `ttsOpenAI` | yes |
 | `PARALLEL_API_KEY` | `fetchParallel`, `searchParallel` | — |
 | `PERPLEXITY_API_KEY` | `searchPerplexity` | yes |
@@ -113,6 +116,7 @@ export BFL_API_KEY="…"
 export BYTEPLUS_API_KEY="…"
 export DEEPSEEK_API_KEY="…"
 export GOOGLE_AI_API_KEY="…"
+export INCEPTION_API_KEY="…"
 export MOONSHOT_API_KEY="…"
 export KLING_API_KEY="…"
 export KREA_API_KEY="…"

@@ -685,6 +685,48 @@
    ]
   }
  },
+ "mercury-3": {
+  "temperature": {
+   "outcome": "converted",
+   "detail": "temperature",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "top_p": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "top_k": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  },
+  "max_tokens": {
+   "outcome": "renamed",
+   "detail": "max_completion_tokens",
+   "said": []
+  },
+  "reasoning": {
+   "outcome": "renamed",
+   "detail": "reasoning_effort",
+   "said": [
+    "adapted+named"
+   ]
+  },
+  "cache_control": {
+   "outcome": "dropped",
+   "detail": "",
+   "said": [
+    "declined"
+   ]
+  }
+ },
  "gpt-image-2.5-flare": {
   "size": {
    "outcome": "passed",

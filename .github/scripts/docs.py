@@ -420,7 +420,7 @@ TOOL_PAGES = {
     "api/utilities/rest.md":   ("REST endpoint as a tool", ["RestApiTool"]),
     "api/utilities/mcp.md":    ("MCP server tools", ["MCPTool"]),
     "api/tools/wait-gate.md":  ("Pause for a signal", ["Wait", "Gate"]),
-    "api/tools/decide.md":     ("Decisions: text → probabilities", ["decisionOpenAI", "decisionTypeSafe"]),
+    "api/tools/decide.md":     ("Decisions: text → probabilities", ["decisionOpenAI", "decisionTypeSafe", "decisionInception"]),
 }
 #: Exported, and deliberately without a page of their own.
 NOT_PAGED = {"Search": "abstract base of the search tools",

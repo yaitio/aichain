@@ -1,12 +1,15 @@
 """
-Z.ai, Meta, Mistral, Xiaomi, MiniMax and StepFun (4.0): providers described by data, on the OpenAI family.
+Z.ai, Meta, Mistral, Xiaomi, MiniMax, StepFun (4.0) and Inception (4.12): providers described by data,
+on the OpenAI family.
 
 What is pinned here is what each provider's documentation says the request
 must be, read 2026-10-11: the URL, the token field, how reasoning is asked
 for, and what happens to a JSON Schema where the provider takes none. Mistral
 and Xiaomi were called live the same day, and what that found is pinned too:
 Mistral's reasoning models answer with a list of parts, thinking among them,
-and two of its models refuse a reasoning setting outright.
+and two of its models refuse a reasoning setting outright. Inception was
+read and called live on 2026-10-21: reasoning as instant/low/medium/high,
+temperature only within 0.5–1.0, no top_p.
 """
 
 import os
@@ -20,7 +23,7 @@ MSGS = [{"role": "user", "parts": [{"type": "text", "text": "hi"}]}]
 SCHEMA = {"type": "json_schema", "schema": {"type": "object", "properties": {"a": {"type": "string"}},
                                             "required": ["a"]}}
 KEYS = {"ZAI_API_KEY": "k", "META_API_KEY": "k", "MISTRAL_API_KEY": "k", "MIMO_API_KEY": "k",
-        "MINIMAX_API_KEY": "k", "STEPFUN_API_KEY": "k"}
+        "MINIMAX_API_KEY": "k", "STEPFUN_API_KEY": "k", "INCEPTION_API_KEY": "k"}
 
 
 def _request(name, options=None, fmt=None):
@@ -38,7 +41,8 @@ class TestTheNameIsTheProvider(unittest.TestCase):
         for name, provider in (("glm-5.3", "zai"), ("muse-spark-1.3", "meta"),
                                ("mistral-small-2603", "mistral"), ("ministral-14b-2512", "mistral"),
                                ("codestral-2508", "mistral"), ("mimo-v2.6-pro", "xiaomi"),
-                               ("MiniMax-M3", "minimax"), ("step-5-preview", "stepfun")):
+                               ("MiniMax-M3", "minimax"), ("step-5-preview", "stepfun"),
+                               ("mercury-3", "inception")):
             with self.subTest(name):
                 self.assertEqual(Model(name)._provider, provider)
 
@@ -208,6 +212,89 @@ class TestXiaomiAndStepFun(unittest.TestCase):
     def test_stepfun_sends_a_level(self):
         _, _, body = _request("step-5-preview", {"reasoning": "low"})
         self.assertEqual(body["reasoning_effort"], "low")
+
+
+@patch.dict(os.environ, KEYS)
+class TestInception(unittest.TestCase):
+
+    def test_the_path_and_the_token_field(self):
+        m, path, body = _request("mercury-3")
+        self.assertEqual((m.client._base_url, path), ("https://api.inceptionlabs.ai", "/v1/chat/completions"))
+        self.assertIn("max_completion_tokens", body)
+        self.assertNotIn("top_p", body)
+
+    def test_none_is_instant_and_a_level_is_itself(self):
+        for level, sent in (("none", "instant"), ("low", "low"), ("high", "high")):
+            with self.subTest(level=level):
+                _, _, body = _request("mercury-3", {"reasoning": level})
+                self.assertEqual(body["reasoning_effort"], sent)
+
+    def test_temperature_outside_its_range_is_brought_in_and_said(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _, body, made = Model("mercury-3", options={"temperature": 0.2},
+                                  api_key="k").build(MSGS, {"format": {"type": "text"}})
+        self.assertEqual(body["temperature"], 0.5)
+        self.assertIn(("adapted", "temperature"), {(a.kind, a.option) for a in made})
+
+    def test_top_p_is_declined_not_sent(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _, body, made = Model("mercury-3", options={"top_p": 0.9},
+                                  api_key="k").build(MSGS, {"format": {"type": "text"}})
+        self.assertNotIn("top_p", body)
+        self.assertIn(("declined", "top_p"), {(a.kind, a.option) for a in made})
+
+
+
+class TestInceptionLive(unittest.TestCase):
+    """Mercury 3 called for real: text, a schema, a tool, and every reasoning level."""
+
+    def setUp(self):
+        if os.environ.get("INCEPTION_API_KEY", "") in ("", "k"):
+            self.skipTest("INCEPTION_API_KEY not set to a real key")
+
+    def test_text_and_its_cost(self):
+        from yait_aichain import Skill
+        s = Skill(Model("mercury-3"), prompt="Name the capital of Norway in one word.")
+        self.assertIn("oslo", s.run().lower())
+        self.assertGreater(s.last_usage.cost, 0)
+
+    def test_a_schema_is_followed(self):
+        from yait_aichain import Skill
+        out = Skill(Model("mercury-3"), prompt="Give two planets with their order from the sun.",
+                    output={"format": {"type": "json_schema", "schema": {
+                        "type": "object", "additionalProperties": False, "required": ["planets"],
+                        "properties": {"planets": {"type": "array", "items": {
+                            "type": "object", "additionalProperties": False, "required": ["name", "order"],
+                            "properties": {"name": {"type": "string"}, "order": {"type": "integer"}}}}}}}}).run()
+        self.assertTrue(all(isinstance(p["order"], int) for p in out["planets"]))
+
+    def test_an_agent_calls_a_tool(self):
+        from yait_aichain import Agent
+        from yait_aichain.tools import tool
+        asked = []
+
+        @tool(risk="read")
+        def weather(city: str) -> str:
+            """The weather in a city.
+
+            city: the city.
+            """
+            asked.append(city)
+            return f"{city}: 14°C, light rain"
+
+        r = Agent(Model("mercury-3"), tools=[weather]).run("What is the weather in Kazan? One line.")
+        self.assertEqual([c.lower() for c in asked], ["kazan"])
+        self.assertIn("14", r.output)
+
+    def test_every_reasoning_level_is_taken(self):
+        from yait_aichain import Skill
+        for level in ("none", "low", "medium", "high"):
+            with self.subTest(level=level), warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                s = Skill(Model("mercury-3", options={"reasoning": level}), prompt="2 + 2 = ? Digits only.")
+                self.assertIn("4", s.run())
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """
 Decision tools — one format of questions and answers, a provider per tool.
 
-``decisionTypeSafe`` (TypeSafe's Jev) and ``decisionOpenAI`` (OpenAI's
+``decisionTypeSafe`` (TypeSafe's Jev), ``decisionInception`` (Mercury Decide) and ``decisionOpenAI`` (OpenAI's
 Decisions API) answer the same three kinds of question with probabilities and
 disagree on every wire detail: Jev takes a map of questions and calls a
 predicate ``noul``; OpenAI takes a list carrying names and returns lists of
@@ -37,7 +37,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
-from yait_aichain.tools import Decision, Record, decide, decisionOpenAI, decisionTypeSafe
+from yait_aichain.tools import Decision, Record, decide, decisionInception, decisionOpenAI, decisionTypeSafe
 from yait_aichain.tools.decision._base import check_questions
 
 QUESTIONS = {
@@ -84,7 +84,21 @@ OPENAI = {
               "output_tokens": 0, "total_tokens": 395},
 }
 
-PROVIDERS = {decisionTypeSafe: JEV, decisionOpenAI: OPENAI}
+#: Captured live from mercury-decide, 2026-10-21, rounded.
+MERCURY = {
+    "model": "mercury-decide",
+    "answers": {
+        "urgent": {"type": "noul", "noul": 0.99},
+        "team": {"type": "choice", "choice": "billing", "confidence": 0.97,
+                 "probabilities": {"billing": 0.98, "technical": 0.02, "sales": 0.0}},
+        "frustration": {"type": "score", "score": 1.73, "confidence": 0.59,
+                        "legend": {"0": "Calm", "1": "Frustrated: Annoyed, still polite", "2": "Very angry"},
+                        "probabilities": {"0": 0.02, "1": 0.24, "2": 0.74}},
+    },
+    "usage": {"input_tokens": 240, "output_tokens": 3},
+}
+
+PROVIDERS = {decisionTypeSafe: JEV, decisionOpenAI: OPENAI, decisionInception: MERCURY}
 
 
 def _tool(cls, response=None, status=200, **kw):
@@ -129,7 +143,8 @@ class TestOneQuestionFormat(unittest.TestCase):
                     self.assertIn(needle, str(ctx.exception))
 
     def test_no_key_is_refused_at_construction_naming_the_variable(self):
-        for cls, var in ((decisionTypeSafe, "TYPESAFE_API_KEY"), (decisionOpenAI, "OPENAI_API_KEY")):
+        for cls, var in ((decisionTypeSafe, "TYPESAFE_API_KEY"), (decisionOpenAI, "OPENAI_API_KEY"),
+                         (decisionInception, "INCEPTION_API_KEY")):
             saved = os.environ.pop(var, None)
             try:
                 with self.subTest(provider=cls.__name__), self.assertRaises(ValueError) as ctx:
@@ -171,6 +186,18 @@ class TestEachProvidersRequest(unittest.TestCase):
              "levels": [{"label": "Calm"}, {"label": "Frustrated", "description": "Annoyed, still polite"},
                         {"label": "Very angry"}]}]})
 
+    def test_inception_gets_typesafes_wire_at_its_own_endpoint(self):
+        tool = _tool(decisionInception)
+        tool.run(state=TICKET)
+        method, url = tool._http.request.call_args.args
+        self.assertEqual((method, url), ("POST", "https://api.inceptionlabs.ai/v1/decisions"))
+        self.assertEqual(tool._http.request.call_args.kwargs["headers"]["Authorization"], "Bearer k")
+        sent = _sent(tool)
+        self.assertEqual((sent["model"], sent["state"]), ("mercury-decide", TICKET))
+        self.assertEqual(sent["questions"]["urgent"]["type"], "noul")
+        self.assertEqual(sent["questions"]["frustration"]["criteria"],
+                         ["Calm", "Frustrated: Annoyed, still polite", "Very angry"])
+
     def test_a_structured_state_is_structure_to_jev_and_json_text_to_openai(self):
         record = {"name": "John Smith", "last_employer": "Google"}
         jev = _tool(decisionTypeSafe); jev.run(state=record)
@@ -191,10 +218,8 @@ class TestEachProvidersRequest(unittest.TestCase):
 
 class TestOneAnswerFormat(unittest.TestCase):
 
-    def test_both_providers_answer_in_the_same_shape(self):
-        jev = _tool(decisionTypeSafe).run(state=TICKET)["answers"]
-        oai = _tool(decisionOpenAI).run(state=TICKET)["answers"]
-        for a in (jev, oai):
+    def test_every_provider_answers_in_the_same_shape(self):
+        for a in (_tool(cls).run(state=TICKET)["answers"] for cls in PROVIDERS):
             self.assertEqual(set(a), set(QUESTIONS))
             self.assertEqual(set(a["urgent"]), {"type", "probability"})
             self.assertEqual(set(a["team"]), {"type", "choice", "confidence", "probabilities"})
@@ -215,6 +240,13 @@ class TestOneAnswerFormat(unittest.TestCase):
         self.assertEqual(a["team"]["choice"], "billing")
         self.assertEqual(a["frustration"]["probabilities"], {"Calm": 0.0, "Frustrated": 0.61, "Very angry": 0.39})
         self.assertEqual(a["frustration"]["confidence"], 0.41)
+
+    def test_inception_values_survive_the_translation(self):
+        a = _tool(decisionInception).run(state=TICKET)["answers"]
+        self.assertEqual(a["urgent"], {"type": "predicate", "probability": 0.99})
+        self.assertEqual(a["frustration"]["probabilities"], {"Calm": 0.02, "Frustrated": 0.24, "Very angry": 0.74})
+        out = _tool(decisionInception).run(state=TICKET)
+        self.assertAlmostEqual(out["cost"], 240 * 0.02 / 1_000_000)
 
     def test_the_version_that_answered_and_input_only_cost(self):
         jev = _tool(decisionTypeSafe).run(state=TICKET)
@@ -260,6 +292,20 @@ class TestImages(unittest.TestCase):
         finally:
             os.unlink(fh.name)
 
+    def test_inception_takes_them_as_parts_of_the_state(self):
+        tool = _tool(decisionInception)
+        tool.run(state="Inspect this photo.", images=[b"\x89PNG fake"])
+        state = _sent(tool)["state"]
+        self.assertEqual(state[0], {"type": "text", "text": "Inspect this photo."})
+        self.assertEqual(state[1], {"type": "image_url", "image_url": {
+            "url": "data:image/png;base64," + base64.b64encode(b"\x89PNG fake").decode()}})
+
+    def test_inception_refuses_a_seventeenth_image(self):
+        tool = _tool(decisionInception)
+        with self.assertRaisesRegex(ValueError, "at most 16"):
+            tool.run(state="x", images=[b"\x89PNG"] * 17)
+        tool._http.request.assert_not_called()
+
     def test_a_hosted_url_is_refused_before_the_network(self):
         tool = _tool(decisionOpenAI)
         with self.assertRaises(ValueError):
@@ -291,6 +337,7 @@ class TestWhatTheModelSees(unittest.TestCase):
     def test_the_default_name_is_the_providers(self):
         self.assertEqual(decisionTypeSafe(QUESTIONS, api_key="k").name, "decisionTypeSafe")
         self.assertEqual(decisionOpenAI(QUESTIONS, api_key="k").name, "decisionOpenAI")
+        self.assertEqual(decisionInception(QUESTIONS, api_key="k").name, "decisionInception")
 
 
 class TestInsideAnAgent(unittest.TestCase):
@@ -363,7 +410,8 @@ class TestFactory(unittest.TestCase):
 
     def test_every_service_by_name(self):
         from yait_aichain.tools.decision import SERVICES
-        self.assertEqual(SERVICES, {"openai": decisionOpenAI, "typesafe": decisionTypeSafe})
+        self.assertEqual(SERVICES, {"openai": decisionOpenAI, "typesafe": decisionTypeSafe,
+                                    "inception": decisionInception})
         for service, cls in SERVICES.items():
             with self.subTest(service):
                 t = decide(service, questions=QUESTIONS, api_key="k", name="triage", model="m-1")
@@ -377,7 +425,7 @@ class TestFactory(unittest.TestCase):
             decide("openai", api_key="k", questions={"x": {"type": "noul", "instructions": "?"}})
 
     def test_an_unknown_service_names_the_ones_that_exist(self):
-        with self.assertRaisesRegex(ValueError, "one of: openai, typesafe"):
+        with self.assertRaisesRegex(ValueError, "one of: openai, typesafe, inception"):
             decide("jev", questions=QUESTIONS, api_key="k")
 
 
@@ -410,6 +458,13 @@ class TestDecisionLive(unittest.TestCase):
         out = decisionOpenAI(QUESTIONS).run(state=TICKET)
         self._check(out)
         self.assertEqual(out["model"], "gpt-6-luna")
+
+    def test_inception(self):
+        if not _real("INCEPTION_API_KEY"):
+            self.skipTest("INCEPTION_API_KEY not set to a real key")
+        out = decisionInception(QUESTIONS).run(state=TICKET)
+        self._check(out)
+        self.assertEqual(out["model"], "mercury-decide")
 
 
 if __name__ == "__main__":

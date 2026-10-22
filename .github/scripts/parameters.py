@@ -88,6 +88,7 @@ TEXT_MODELS = [
     "qwen-max", "qwen3.7-flash",
     "sonar",
     "glm-5.3", "muse-spark-1.3", "mistral-small-2603", "mimo-v2.6-pro", "MiniMax-M3", "step-5-preview",
+    "mercury-3",
 ]
 IMAGE_MODELS = [
     "gpt-image-2.5-flare", "gpt-image-1.5",

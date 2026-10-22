@@ -19,6 +19,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `byteplus` | `1.0` | `0.7` | — | `16384`\* |
 | `deepseek` | `1.0` | `1.0` | — | `4096`\* |
 | `google` | `1.0` | `0.95` | `40` | `8192`\* |
+| `inception` | `0.75`\* | — | — | `16384`\* |
 | `kimi` | `1.0` | `0.95` | — | `32768` |
 | `kling` | `1.0`\* | — | — | `4096`\* |
 | `krea` | `1.0`\* | — | — | `4096`\* |
@@ -36,7 +37,7 @@ A `*` marks a number the library picked rather than the provider. The two are no
 | `xiaomi` | `1.0`\* | — | — | `16384`\* |
 | `zai` | `1.0` | `0.95` | — | `16384`\* |
 
-`temperature` alone takes `0.2`, `0.7`, `1.0` depending on where the request goes; `max_tokens` spans `4096`–`32768`.
+`temperature` alone takes `0.2`, `0.7`, `0.75`, `1.0` depending on where the request goes; `max_tokens` spans `4096`–`32768`.
 
 **Why they differ — three separate reasons, and only the first is the providers' fault.** Some are genuinely each vendor's own default and disagree because the vendors disagree. Some are the vendor's *advice for a task* rather than their default, adopted here as a house choice: Perplexity documents no default at all and recommends a low temperature for search, so `0.2` is ours. And `max_tokens` is almost entirely ours, because most of these APIs do not default it either (Anthropic requires the field), so the library had to pick — and picked per provider rather than once.
 
@@ -75,6 +76,11 @@ They are deliberately **not** converged: a library-wide default would override a
 - `top_p` — vendor · Google's recommended default for controlled generation
 - `top_k` — vendor · Google's default for Gemini 2.x Flash; 1.5 Pro used 64
 - `max_tokens` — ours · applies to every current Gemini
+
+**`inception`**
+
+- `temperature` — ours · the middle of the 0.5–1.0 range Mercury 3 accepts; the docs name no default
+- `max_tokens` — ours · the docs name none; reasoning shares this budget with the answer, so it is set generously
 
 **`kimi`**
 
@@ -175,11 +181,11 @@ The universal vocabulary. **Model options** are set once on the `Model` and are 
 
 | option | what it does | values | who takes it |
 |---|---|---|---|
-| `temperature` | how much randomness the model is allowed | `0.0`–`1.0` (glm-5.3); `0.0`–`2.0` (MiniMax-M3, muse-spark-1.3) | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
+| `temperature` | how much randomness the model is allowed | `0.0`–`1.0` (glm-5.3); `0.0`–`2.0` (MiniMax-M3, muse-spark-1.3); `0.5`–`1.0` (mercury-3) | `anthropic`, `deepseek`, `google`, `inception`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
 | `top_p` | nucleus sampling: the probability mass to sample from | `0.01`–`1.0` (glm-5.3); `0.0`–`1.0` (MiniMax-M3) | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
 | `top_k` | sample only from the k most likely tokens | any | `anthropic`, `google` |
-| `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
-| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `qwen`, `stepfun`, `xai`, `zai` |
+| `max_tokens` | ceiling on the answer's length | any | `anthropic`, `deepseek`, `google`, `inception`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `stepfun`, `xai`, `xiaomi`, `zai` |
+| `reasoning` | how much deliberation before answering: low / medium / high | `none`, `low`, `medium`, `high` | `anthropic`, `deepseek`, `google`, `inception`, `kimi`, `meta`, `minimax`, `mistral`, `openai`, `qwen`, `stepfun`, `xai`, `zai` |
 | `cache_control` | cache the stable prefix so a repeated one is not re-billed: True, an int, or 'last' for an agent loop | any | `anthropic` |
 | `cache_ttl` | how long a cached prefix lives: '5m' or '1h' | any | `anthropic` |
 
@@ -206,6 +212,7 @@ From the provider data, not from the code — `accepts` and `format_accepts`. A 
 | `bfl` | `aspect_ratio`, `output_format`, `seed`, `size` |
 | `deepseek` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `google` | `aspect_ratio`, `max_tokens`, `reasoning`, `size`, `temperature`, `top_k`, `top_p` |
+| `inception` | `max_tokens`, `reasoning`, `temperature` |
 | `kimi` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
 | `krea` | `aspect_ratio`, `seed`, `size` |
 | `meta` | `max_tokens`, `reasoning`, `temperature`, `top_p` |
@@ -229,6 +236,7 @@ A universal name is only half the promise. These are the tables the value is put
 | `anthropic` | `reasoning` | `low`→`4000`, `medium`→`10000`, `high`→`20000` |
 | `deepseek` | `reasoning` | `low`→`deepseek-chat`, `medium`→`deepseek-chat`, `high`→`deepseek-reasoner` |
 | `google` | `reasoning` | `low`→`2048`, `medium`→`8192`, `high`→`24576` |
+| `inception` | `reasoning` | `none`→`instant`, `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `kimi` | `reasoning` | `low`→`enabled`, `medium`→`enabled`, `high`→`enabled` |
 | `meta` | `reasoning` | `low`→`low`, `medium`→`medium`, `high`→`high` |
 | `minimax` | `reasoning` | `low`→`adaptive`, `medium`→`adaptive`, `high`→`adaptive` |
@@ -276,6 +284,7 @@ without saying so. It may adapt; it may not do it quietly.
 | `mimo-v2.6-pro` | ✓ | ✓ | — | ✓ | — | — |
 | `MiniMax-M3` | ✓ | ✓ | — | → `max_completion_tokens` | ≈ `type` | — |
 | `step-5-preview` | ✓ | ✓ | — | ✓ | → `reasoning_effort` | — |
+| `mercury-3` | ≈ `temperature` | — | — | → `max_completion_tokens` | → `reasoning_effort` | — |
 
 ### Output format (image)
 

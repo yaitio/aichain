@@ -41,6 +41,7 @@ on your own server needs no key and sends nothing outside your network.
 | BytePlus | `BYTEPLUS_API_KEY` | <https://console.byteplus.com/ark/region:ap-southeast-1/apiKey> |
 | DeepSeek | `DEEPSEEK_API_KEY` | <https://platform.deepseek.com/api_keys> |
 | Google AI | `GOOGLE_AI_API_KEY` | <https://aistudio.google.com/app/apikey> |
+| Inception (Mercury) | `INCEPTION_API_KEY` | <https://platform.inceptionlabs.ai> |
 | Kimi (Moonshot AI) | `MOONSHOT_API_KEY` | <https://platform.kimi.ai/> |
 | Kling | `KLING_API_KEY` | <https://kling.ai/document-api/api/get-started/authentication> |
 | Krea | `KREA_API_KEY` | — |

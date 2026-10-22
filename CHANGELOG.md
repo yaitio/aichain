@@ -15,11 +15,31 @@
   `keep()` makes the chosen one permanent. ElevenLabs speaks on `eleven_v4` with
   emotion from inline tags and a `speed` of 0.7–1.2. Verified live: three
   characters' voices designed, kept and spoken, in Russian and English.
+- **Inception** as a provider: `Model("mercury-3")`, Inception's diffusion
+  language model, with `INCEPTION_API_KEY`. OpenAI-compatible chat with tools
+  and structured output, a 1M-token context, `reasoning` sent as
+  `reasoning_effort` (`none` as `instant`), temperature brought into its
+  0.5–1.0 with a notice. Mercury 2.5 and 2 are listed for those who still have
+  them. Verified live: text, a JSON schema, an agent that called a tool twice,
+  every reasoning level; about 270–300 tokens a second on a long answer against
+  191 for Claude Haiku 5.5. At `reasoning: none` it answered a primality
+  question confidently and wrongly, at `high` correctly.
+- **`decisionInception`**, a third decision tool: Inception's Mercury Decide
+  behind the same questions and answers as `decisionOpenAI` and
+  `decisionTypeSafe`, made with `decide("inception", questions=…)`. Its wire is
+  TypeSafe's, so the translation is shared; it also looks at images, up to 16 a
+  request, sent as parts beside the text. Input $0.02 per million tokens at the
+  launch price, output free. Verified live: a ticket triaged on all three
+  question types, and a photograph read correctly.
 
 ### Fixed
 
 - A file's MIME type is read from its first bytes before its extension: a PNG
   saved as `.jpg` went to Anthropic as `image/jpeg` and was refused with HTTP 400.
+- A provider on the OpenAI wire that has no `top_p` was sent one anyway: the
+  family's builder adds it for every provider. It is now declined with a
+  notice where the provider's data leaves it out — Inception answers 200 to it
+  and reads nothing.
 - `gpt-image-1.5`, `gpt-image-1-mini`, `gpt-image-1` and `chatgpt-image-latest`
   take three sizes; a ratio now goes as the nearest of them, with a notice,
   where `21:9` used to go as `2384x1024` and be refused.

@@ -10,8 +10,8 @@ sure, which of five teams. A decision tool answers them directly.
 ## What a decision tool is
 
 A decision model writes no prose. It is given evidence — a text, a record, an
-image — and questions fixed in advance, and answers each with a number. Two
-providers sell exactly this and differ in every wire detail, so the library
+image — and questions fixed in advance, and answers each with a number. Three
+providers sell exactly this and differ in the wire details, so the library
 holds one format of questions and answers and each provider tool translates
 it, the way the search tools work.
 
@@ -19,8 +19,9 @@ it, the way the search tools work.
 |---|---|---|---|---|
 | `decisionOpenAI` | OpenAI Decisions API, `gpt-6-luna` (beta) | text, images | $0.10 / 1M tokens | `OPENAI_API_KEY` |
 | `decisionTypeSafe` | TypeSafe Jev | text, structured state | $0.042 / 1M tokens | `TYPESAFE_API_KEY` |
+| `decisionInception` | Inception Mercury Decide | text, structured state, images (up to 16) | $0.02 / 1M tokens (launch price; $0.04 regular) | `INCEPTION_API_KEY` |
 
-Output is free on both. Both take up to 255 options and 2 to 10 levels.
+Output is free on all three. All take up to 255 options and 2 to 10 levels.
 
 ## Questions
 
@@ -37,7 +38,7 @@ from yait_aichain.agent import Agent
 from yait_aichain.models import Model
 from yait_aichain.tools import decide
 
-triage = decide("openai", name="triage", questions={      # or "typesafe" — same arguments
+triage = decide("openai", name="triage", questions={      # or "typesafe", "inception" — same arguments
     "urgent": {"type": "predicate", "instructions": "Does this convey urgency?"},
     "team":   {"type": "choice", "instructions": "Which team should handle it?",
                "choices": {"billing": "Payments, refunds", "technical": "Bugs, outages", "other": None}},
@@ -72,7 +73,7 @@ str(out)
 # anger: score 1.00 (confidence 1.00; Calm 0.00, Frustrated 1.00, Very angry 0.00)
 ```
 
-`decide(service, questions=…)` makes the tool — `openai` or `typesafe` — with
+`decide(service, questions=…)` makes the tool — `openai`, `typesafe` or `inception` — with
 `model`, `name`, `description` and `api_key`; the questions are fixed there, so
 an agent passes only the text. `run()` returns a `Record`: the dict for code,
 and one line per answer for a model — which is what an agent sees, and what a
@@ -98,12 +99,14 @@ Name each tool by what it decides — `triage`, `is_duplicate`.
 
 ## What differs between providers
 
-- **Images** — `decisionOpenAI` only, passed from code:
+- **Images** — `decisionOpenAI` and `decisionInception`, passed from code:
   `run(state=..., images=["photo.png", b"...", "data:image/png;base64,..."])`.
-  The endpoint takes base64 data URLs, not hosted URLs; a hosted URL is
-  refused before the call. `decisionTypeSafe` refuses images by name.
-- **Structured state** — a dict or a list from code reaches Jev as structure
-  and OpenAI as JSON text.
+  Both endpoints take base64 data URLs, not hosted URLs; a hosted URL is
+  refused before the call. Mercury Decide takes up to 16 a request, sent as
+  parts beside the text. `decisionTypeSafe` refuses images by name.
+- **Structured state** — a dict or a list from code reaches Jev and Mercury
+  Decide as structure (as JSON text when Mercury Decide also gets images) and
+  OpenAI as JSON text.
 - **Dependent questions** — answered in one call, questions cannot see each
   other's answers. For a question that depends on another, make two calls.
 

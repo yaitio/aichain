@@ -1,0 +1,80 @@
+# inception — Inception's Mercury: diffusion language models (data tier)
+#
+# Read 2026-10-21 from inceptionlabs.ai/models, docs.inceptionlabs.ai and the
+# key's own GET /v1/models. A diffusion LLM drafts the whole answer and refines
+# it in a few passes instead of writing token by token, which is where the
+# claimed 1000+ tokens a second comes from. OpenAI-compatible chat
+# completions at api.inceptionlabs.ai/v1.
+#
+# Differences from OpenAI's wire: the models list declares temperature and
+# stop as the only sampling parameters (no top_p, no top_k); temperature runs
+# 0.5–1.0 on Mercury 3; `reasoning_effort` takes instant, low, medium, high,
+# and instant is the closest thing to off. Mercury Decide answers on its own
+# endpoint (/v1/decisions) and is not a chat model, so it is not listed here;
+# Mercury Voice and Mercury Edit 2 are on the docs' table but not on this key's
+# /v1/models. Probed 2026-10-21: the chat endpoint refuses mercury-voice and
+# names what it takes — mercury, mercury-2, mercury-2.5, mercury-3, two
+# mercury-3 previews, mercury-coder, mercury-coder-small, mercury-small — and
+# mercury-edit-2 answers on /v1/fim/completions (a prompt and a suffix; "def
+# add(a, b):" came back "return a + b"), a completion shape this library has
+# no tool for, so it is not listed.
+#
+# Rate limits on the owner's key, read from the console 2026-10-21, per
+# minute: 1,000 requests, 3,000,000 input tokens, 100,000 output tokens.
+# Not what the key gets: after about 725 requests and 16K tokens in a day,
+# with at most six in flight, every generation call (chat and decisions) was
+# answered 429 "too many requests per minute" and stayed so through ten idle
+# minutes, while GET /v1/models still answered 200 and no Retry-After came.
+# Some limit the console does not show; request f8792a43-a017-4f06-9d43-9af4bcbeadfd.
+
+[provider]
+key      = "inception"
+client   = "openai"
+base_url = "https://api.inceptionlabs.ai"
+env_key  = "INCEPTION_API_KEY"
+label    = "Inception (Mercury)"
+keys_url = "https://platform.inceptionlabs.ai"
+auth     = "bearer"
+max_tokens_field = "max_completion_tokens"
+models_path      = "/v1/models"
+chat_path        = "/v1/chat/completions"
+
+[provider.options]
+accepts = ["temperature", "max_tokens", "reasoning"]
+
+[provider.options.values]
+temperature = [0.5, 1.0]
+
+[provider.defaults]
+temperature = 0.75
+max_tokens  = 16384
+
+[provider.default_notes]
+temperature = "ours · the middle of the 0.5–1.0 range Mercury 3 accepts; the docs name no default"
+max_tokens  = "ours · the docs name none; reasoning shares this budget with the answer, so it is set generously"
+
+[provider.reasoning]
+field = "reasoning_effort"
+
+[provider.reasoning_map]
+none   = "instant"
+low    = "low"
+medium = "medium"
+high   = "high"
+
+# Prices: USD per 1M tokens. Mercury 3 at its launch price (50% off: list 0.20
+# input, 0.02 cached, 0.70 output), read 2026-10-21; the key's /v1/models gives
+# it as 0, which is the free allowance (100M tokens a new key), not the rate.
+[models."mercury-3"]
+caps  = ["text-to-text"]
+price = { input = 0.10, output = 0.35, cache_read = 0.01 }
+
+# The previous generation: closed to new users; existing users keep it until
+# 2026-11-15. Listed so a caller who still has it is priced.
+[models."mercury-2.5"]
+caps  = ["text-to-text"]
+price = { input = 0.20, output = 0.75, cache_read = 0.02 }
+
+[models."mercury-2"]
+caps  = ["text-to-text"]
+price = { input = 0.25, output = 0.75, cache_read = 0.025 }

@@ -30,7 +30,7 @@ registry.accepts("openai")                   # the options this provider has a c
 
 ## Providers
 
-`anthropic`, `bfl`, `byteplus`, `deepseek`, `google`, `kimi`, `kling`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
+`anthropic`, `bfl`, `byteplus`, `deepseek`, `google`, `inception`, `kimi`, `kling`, `krea`, `meta`, `minimax`, `mistral`, `openai`, `perplexity`, `qwen`, `recraft`, `stepfun`, `xai`, `xiaomi`, `zai`.
 
 The `private` provider is registry-less by design: its catalogue belongs to the server you run (vLLM, Ollama, LM Studio, …), so any name it serves works and none is listed here. See [Private models](../models/private-models.md).
 
@@ -43,6 +43,7 @@ The `private` provider is registry-less by design: its catalogue belongs to the 
 | BytePlus | 4 | 5 | 4 | 5 | 6 | 6 |
 | DeepSeek | 4 | — | — | — | — | — |
 | Google AI | 6 | 5 | 6 | 5 | 3 | 3 |
+| Inception (Mercury) | 3 | — | — | — | — | — |
 | Kimi (Moonshot AI) | 4 | — | 1 | — | — | — |
 | Kling | — | 2 | — | 2 | 2 | 2 |
 | Krea | — | 4 | — | 1 | — | — |
@@ -274,6 +275,20 @@ veo-3.1-lite-generate-preview  # per_second {'720p': 0.05, '1080p': 0.08}
 veo-3.1-fast-generate-preview  # per_second {'720p': 0.1, '1080p': 0.12, '4k': 0.3}
 veo-3.1-generate-preview       # per_second {'720p': 0.4, '1080p': 0.4, '4k': 0.6}
 veo-3.1-lite-generate-preview  # per_second {'720p': 0.05, '1080p': 0.08}
+```
+
+---
+
+## Inception (Mercury)
+
+`provider = "inception"` · key `INCEPTION_API_KEY`
+
+### `text-to-text`
+
+```
+mercury-2    # $0.25 in / $0.75 out per 1M tokens
+mercury-2.5  # $0.2 in / $0.75 out per 1M tokens
+mercury-3    # $0.1 in / $0.35 out per 1M tokens
 ```
 
 ---
@@ -850,7 +865,7 @@ Importable from `models.registry`:
 | Name | Value |
 |---|---|
 | `TASKS` | `('text-to-text', 'text-to-image', 'image-to-text', 'image-to-image', 'text-to-video', 'image-to-video')` |
-| `PROVIDERS` | `('anthropic', 'bfl', 'byteplus', 'deepseek', 'google', 'kimi', 'kling', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
+| `PROVIDERS` | `('anthropic', 'bfl', 'byteplus', 'deepseek', 'google', 'inception', 'kimi', 'kling', 'krea', 'meta', 'minimax', 'mistral', 'openai', 'perplexity', 'qwen', 'recraft', 'stepfun', 'xai', 'xiaomi', 'zai')` |
 | `OPTIONS` | `('temperature', 'top_p', 'top_k', 'max_tokens', 'reasoning', 'cache_control', 'cache_ttl')` |
 <!-- /g:registry-constants -->
 

@@ -59,6 +59,7 @@ Chains and Agents identically.
 | Pause | [`Gate`](../api/tools/wait-gate.md#gate) | `Gate` | Gate any Tool behind an external signal. | — | `write` |
 | Decision | [`decisionOpenAI`](../api/tools/decide.md#decisionopenai) | `decisionOpenAI` | Typed questions about a text — and images — answered with probabilities, by OpenAI's Decisions API. | `OPENAI_API_KEY` | `read` |
 | Decision | [`decisionTypeSafe`](../api/tools/decide.md#decisiontypesafe) | `decisionTypeSafe` | Typed questions about a text, answered with probabilities, by TypeSafe's Jev. | `TYPESAFE_API_KEY` | `read` |
+| Decision | [`decisionInception`](../api/tools/decide.md#decisioninception) | `decisionInception` | Typed questions about a text — and images — answered with probabilities, by Inception's Mercury Decide. | `INCEPTION_API_KEY` | `read` |
 <!-- /g:tools-index -->
 
 ---

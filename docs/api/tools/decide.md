@@ -82,4 +82,27 @@ decisionTypeSafe(
 ```
 
 The call schema is built from the constructor arguments, so it is whatever the caller declares.
+
+### `decisionInception`
+
+Typed questions about a text — and images — answered with probabilities, by Inception's Mercury Decide.
+
+| | |
+|---|---|
+| Import | `from yait_aichain.tools import decisionInception` |
+| Risk class | `read` |
+| Key | `INCEPTION_API_KEY` |
+
+```python
+decisionInception(
+    questions: dict,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
+)
+```
+
+The call schema is built from the constructor arguments, so it is whatever the caller declares.
 <!-- /g:tool -->

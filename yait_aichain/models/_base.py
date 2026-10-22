@@ -76,6 +76,7 @@ _PROVIDER_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^glm-"),                                             "zai"),
     (re.compile(r"^muse-"),                                            "meta"),
     (re.compile(r"^mimo-"),                                            "xiaomi"),
+    (re.compile(r"^mercury-"),                                         "inception"),
     (re.compile(r"^minimax-"),                                         "minimax"),
     (re.compile(r"^step-"),                                            "stepfun"),
     (re.compile(r"^(mistral-|ministral-|codestral-|magistral-|devstral-)"), "mistral"),

@@ -17,7 +17,7 @@ from ._permissions    import (
 
 from .search     import Search, searchPerplexity, searchBrave, searchExa, searchFirecrawl, searchTavily, searchParallel
 from .fetch      import Fetch, fetchFirecrawl, fetchTavily, fetchExa, fetchParallel, fetchLocal
-from .decision   import Decision, decisionOpenAI, decisionTypeSafe
+from .decision   import Decision, decisionInception, decisionOpenAI, decisionTypeSafe
 from .embed      import Embedder, EmbeddingResult, EmbeddingOpenAI, EmbeddingCohere, EmbeddingVoyage, EmbeddingGoogle, EmbeddingQwen
 from .rerank     import RerankBase, RerankResult, RerankCohere, RerankVoyage, RerankQwen
 from .speech     import Speech, ttsGoogle, ttsOpenAI, ttsQwen, ttsXAI
@@ -63,7 +63,7 @@ __all__ = [
     "Search", "searchPerplexity", "searchBrave", "searchExa", "searchFirecrawl", "searchTavily",
     "searchParallel",
     "Fetch", "fetchFirecrawl", "fetchTavily", "fetchExa", "fetchParallel", "fetchLocal",
-    "Decision", "decisionOpenAI", "decisionTypeSafe",
+    "Decision", "decisionInception", "decisionOpenAI", "decisionTypeSafe",
     "Chunk",
     "Embedder", "EmbeddingResult", "EmbeddingOpenAI", "EmbeddingCohere", "EmbeddingVoyage",
     "EmbeddingGoogle", "EmbeddingQwen",

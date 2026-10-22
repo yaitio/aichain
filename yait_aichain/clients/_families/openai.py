@@ -393,6 +393,14 @@ class OpenAIClient(BaseClient):
         # OpenAI's wire has no top_k; a provider that claims it takes it as is.
         if m.top_k is not None and "top_k" in (prov.get("options") or {}).get("accepts", ()):
             body["top_k"] = m.top_k
+        # The family's builder sends top_p for every provider on this wire; one whose data leaves it out
+        # has no such control (Inception, 2026-10-21, answers 200 to a top_p and declares only temperature
+        # and stop). It is declined and said, never sent into a field the provider does not read.
+        accepts = (prov.get("options") or {}).get("accepts")
+        if accepts is not None and "top_p" not in accepts and body.pop("top_p", None) is not None:
+            record(Adaptation(kind=DECLINED, option="top_p", asked=m.top_p, model=m.name,
+                              why=f"the {self._provider} API has no top_p; temperature is the sampling control "
+                                  "it takes"))
         how = prov.get("reasoning") or {}
         if m.reasoning is not None and "reasoning" in m._REJECTS:
             record(Adaptation(
